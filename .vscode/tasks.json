@@ -1,0 +1,18 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"label": "Test SharedPreferences Persistence",
+			"command": "flutter run",
+			"args": [
+				"--hot"
+			],
+			"problemMatcher": [
+				"$dart"
+			],
+			"group": "test",
+			"isBackground": false
+		}
+	]
+}
