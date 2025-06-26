@@ -91,10 +91,9 @@ final List<Map<String, dynamic>> shellPages = [
     'showBackArrow': true
   },
   {
-    'path': '/task/preview',
+    'path': '/task/create/preview',
     'builder': (context, state) {
-      final data = state.extra as Map<String, dynamic>;
-      return TaskPreviewPage(data: data);
+      return TaskPreviewPage(data: state as Map<String, dynamic>);
     },
     'title': 'Task Preview',
     'showBottomNav': false,

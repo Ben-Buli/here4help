@@ -206,23 +206,23 @@ class GlobalTaskList {
       id: "k2k2k2k2-l3l3-m4m4-n5n5-o6o6o6o6o6o7",
       creatorName: "Mia",
       acceptorId: null,
-      title: "Reject Status Example Task",
+      title: "Grocery Shopping Assistance",
       description:
-          "This is a sample task to demonstrate the 'reject' status. No action required.",
-      salary: "0",
-      location: "Online",
+          "This is a demonstration task for the 'Rejected (Tasker)' status. No actual action is needed.",
+      salary: "400",
+      location: "NIU",
       taskDate: "2025-07-01",
       status: "Rejected (Tasker)",
       creatorConfirmed: "0",
       acceptorConfirmed: "0",
-      cancelReason: "Application rejected by creator.",
+      cancelReason: "Your application was rejected by the task creator.",
       failReason: null,
-      applicationQuestion: "Why do you think you were rejected?",
+      applicationQuestion: "What do you think was the reason for rejection?",
       languageRequirement: "English",
       hashtags: ['Sample', 'Tasker'],
       createdAt: "2025-06-01 12:00:00",
       updatedAt: "2025-06-01 12:00:00",
-    ),
+    )
   ];
 
   /// 讀取任務列表，只有在 _tasks 為空時才加入預設任務。

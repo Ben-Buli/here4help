@@ -234,6 +234,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                   final globalTaskList = GlobalTaskList();
 
                   /// 送出任務到全域任務列表
+                  globalTaskList.loadTasks(); // 確保載入任務列表
                   globalTaskList.addTask(widget.data);
 
                   ScaffoldMessenger.of(context).showSnackBar(
