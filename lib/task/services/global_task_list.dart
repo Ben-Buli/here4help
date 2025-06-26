@@ -158,6 +158,71 @@ class GlobalTaskList {
       createdAt: "2024-03-01 11:00:00",
       updatedAt: "2024-03-01 11:00:00",
     ),
+    TaskModel(
+      id: "i9i9i9i9-j0j0-k1k1-l2l2-m3m3m3m3m3m4",
+      creatorName: "Buli",
+      acceptorId: null,
+      title: "Apply for Passport",
+      description:
+          "Need assistance with the process of applying for a new passport, including preparing documents and visiting the government office.",
+      salary: "350",
+      location: "NTU",
+      taskDate: "2025-06-12",
+      status: "Applying (Tasker)", // 此狀態for 應徵者模式
+      creatorConfirmed: "0",
+      acceptorConfirmed: "0",
+      cancelReason: null,
+      failReason: null,
+      applicationQuestion:
+          "Have you helped someone apply for a passport before?",
+      languageRequirement: "English",
+      hashtags: ['Tasker', 'Passport'],
+      createdAt: "2025-05-28 09:30:00",
+      updatedAt: "2025-05-28 09:30:00",
+    ),
+    TaskModel(
+      id: "j1j1j1j1-k2k2-l3l3-m4m4-n5n5n5n5n5n6",
+      creatorName: "Sophia",
+      acceptorId: null,
+      title: "Apply for International Driver's License",
+      description:
+          "Need assistance with the process of applying for an international driver's license, including preparing required documents and visiting the relevant office.",
+      salary: "400",
+      location: "NCCU",
+      taskDate: "2025-06-15",
+      status: "In Progress (Tasker)", // 此狀態for 應徵者模式
+      creatorConfirmed: "0",
+      acceptorConfirmed: "0",
+      cancelReason: null,
+      failReason: null,
+      applicationQuestion:
+          "Have you applied for an international driver's license before?",
+      languageRequirement: "English",
+      hashtags: ['Tasker', 'DriverLicense'],
+      createdAt: "2025-05-29 10:00:00",
+      updatedAt: "2025-05-29 10:00:00",
+    ),
+    TaskModel(
+      id: "k2k2k2k2-l3l3-m4m4-n5n5-o6o6o6o6o6o7",
+      creatorName: "Mia",
+      acceptorId: null,
+      title: "Reject Status Example Task",
+      description:
+          "This is a sample task to demonstrate the 'reject' status. No action required.",
+      salary: "0",
+      location: "Online",
+      taskDate: "2025-07-01",
+      status: "Rejected (Tasker)",
+      creatorConfirmed: "0",
+      acceptorConfirmed: "0",
+      cancelReason: "Application rejected by creator.",
+      failReason: null,
+      applicationQuestion: "Why do you think you were rejected?",
+      languageRequirement: "English",
+      hashtags: ['Sample', 'Demo'],
+      createdAt: "2025-06-01 12:00:00",
+      updatedAt: "2025-06-01 12:00:00",
+    ),
   ];
 
   /// 讀取任務列表，只有在 _tasks 為空時才加入預設任務。

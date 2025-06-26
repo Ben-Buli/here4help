@@ -2,7 +2,7 @@ final List<Map<String, dynamic>> testAccounts = [
   {
     'id': 1,
     'name': 'Michael',
-    'email': 'mchl000@nccu.edu.test',
+    'email': 'mchaell@nccu.edu.test',
     'password': 'admin1234',
     'permission': 99,
     'avatar_url': 'assets/images/avatar/avatar-4.png',
@@ -12,7 +12,7 @@ final List<Map<String, dynamic>> testAccounts = [
   {
     'id': 2,
     'name': 'Luisa',
-    'email': 'luisa1001@nccu.edu.test',
+    'email': 'luisa123@nccu.edu.test',
     'password': 'user5678',
     'permission': 1,
     'avatar_url': 'assets/images/avatar/avatar-1.png',
@@ -22,7 +22,7 @@ final List<Map<String, dynamic>> testAccounts = [
   {
     'id': 3,
     'name': 'Linda',
-    'email': 'lndd123@nccu.edu.test',
+    'email': 'ld321@nccu.edu.test',
     'password': 'user5678',
     'permission': 1,
     'avatar_url': 'assets/images/avatar/avatar-2.png',

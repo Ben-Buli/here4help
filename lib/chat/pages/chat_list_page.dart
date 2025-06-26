@@ -13,6 +13,11 @@ const Map<String, String> statusString = {
   'pending_confirmation': 'Pending Confirmation',
   'dispute': 'Dispute',
   'completed': 'Completed',
+  'applying_tasker': 'Applying (Tasker)',
+  'in_progress_tasker': 'In Progress (Tasker)',
+  'pending_confirmation_tasker': 'Pending Confirmation (Tasker)',
+  'rejected_tasker': 'Rejected (Tasker)',
+  'completed_tasker': 'Completed (Tasker)',
 };
 
 class ChatListPage extends StatefulWidget {
@@ -114,6 +119,10 @@ class _ChatListPageState extends State<ChatListPage> {
         return Colors.purple[800]!;
       case 'Completed':
         return Colors.grey[800]!;
+      case 'Applying (Tasker)':
+        return Colors.blue[800]!;
+      case 'In Progress (Tasker)':
+        return Colors.orange[800]!;
       default:
         return Colors.grey[800]!;
     }
@@ -130,10 +139,19 @@ class _ChatListPageState extends State<ChatListPage> {
       case 'Pending Confirmation':
         return Colors.purple[100]!;
       case 'Completed':
-        return const Color.fromARGB(255, 218, 218, 218);
+        return Colors.grey[100]!;
+      case 'Applying (Tasker)':
+        return Colors.blue[100]!;
+      case 'In Progress (Tasker)':
+        return Colors.orange[100]!;
       default:
         return Colors.grey[100]!;
     }
+  }
+
+  bool _isCountdownStatus(String status) {
+    return status == statusString['pending_confirmation'] ||
+        status == statusString['pending_confirmation_tasker'];
   }
 
   Widget _taskCardWithapplierChatItems(
@@ -165,7 +183,7 @@ class _ChatListPageState extends State<ChatListPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (task['status'] == 'Pending Confirmation') ...[
+                if (_isCountdownStatus(task['status'])) ...[
                   _buildCountdownTimer(task),
                   const SizedBox(height: 8),
                 ],
@@ -448,7 +466,12 @@ class _ChatListPageState extends State<ChatListPage> {
       task: task,
       onCountdownComplete: () {
         setState(() {
-          task['status'] = 'Completed';
+          if (task['status'] == statusString['pending_confirmation']) {
+            task['status'] = statusString['completed'];
+          } else if (task['status'] ==
+              statusString['pending_confirmation_tasker']) {
+            task['status'] = statusString['completed_tasker'];
+          }
         });
       },
     );

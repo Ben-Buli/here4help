@@ -119,7 +119,7 @@ final List<Map<String, dynamic>> chatRoomModel = [
   {
     "id": "room_10",
     "taskId": "h8h8h8h8-i9i9-j0j0-k1k1-l2l2l2l2l2l3",
-    "name": "Lucas Wang",
+    "name": "Ethan King",
     "rating": 4.3,
     "reviewsCount": 19,
     "questionReply": "I am familiar with telecom services.",
@@ -127,6 +127,41 @@ final List<Map<String, dynamic>> chatRoomModel = [
       "Hi, I am interested in this task.",
       "I have experience setting up phone numbers and telecom services.",
       "Looking forward to helping you with this task."
+    ]
+  },
+  {
+    "id": "tasker_room_11",
+    "taskId": "i9i9i9i9-j0j0-k1k1-l2l2-m3m3m3m3m3m4",
+    "name": "Task Poster",
+    "rating": 4.5,
+    "reviewsCount": 14,
+    "questionReply": "",
+    "sentMessages": [
+      "Hello, thank you for your interest in this task! We will review your qualifications and get back to you if you are a good fit.",
+      "Congratulations! You have been selected to carry out this task. Please let us know your availability to get started."
+    ]
+  },
+  {
+    "id": "tasker_room_12",
+    "taskId": "j1j1j1j1-k2k2-l3l3-m4m4-n5n5n5n5n5n6",
+    "name": "Task Poster",
+    "rating": 4.6,
+    "reviewsCount": 17,
+    "questionReply": "",
+    "sentMessages": [
+      "Thank you for submitting your resume. If there is a suitable opportunity, we will contact you as soon as possible. Thank you."
+    ]
+  },
+  {
+    "id": "tasker_13",
+    "taskId": "k2k2k2k2-l3l3-m4m4-n5n5-o6o6o6o6o6o7",
+    "name": "Task Poster",
+    "rating": 4.0,
+    "reviewsCount": 9,
+    "questionReply": "",
+    "status": "Rejected (Tasker)",
+    "sentMessages": [
+      "Thank you for the opportunity, but I regret that I have to decline this job."
     ]
   }
 ];
