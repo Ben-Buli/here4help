@@ -36,6 +36,8 @@ class _ChatListPageState extends State<ChatListPage> {
   String? selectedLocation;
   String? selectedHashtag;
   String? selectedStatus;
+  // Tasker 篩選狀態
+  bool taskerFilterEnabled = false;
 
   @override
   void initState() {
@@ -567,29 +569,79 @@ class _ChatListPageState extends State<ChatListPage> {
                 selectedHashtag == null || hashtags.contains(selectedHashtag);
             final matchStatus =
                 selectedStatus == null || selectedStatus == status;
+            final matchTasker = !taskerFilterEnabled ||
+                (task['hashtags'] as List<dynamic>? ?? [])
+                    .map((e) => e.toString().toLowerCase())
+                    .contains('tasker');
 
-            return matchQuery && matchLocation && matchHashtag && matchStatus;
+            return matchQuery &&
+                matchLocation &&
+                matchHashtag &&
+                matchStatus &&
+                matchTasker;
           }).toList();
 
           return Column(
             children: [
               Padding(
                 padding: const EdgeInsets.all(12.0),
-                child: TextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  onChanged: (value) {
-                    setState(() {
-                      searchQuery = value.toLowerCase();
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Search...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                child: Row(
+                  children: [
+                    // Search bar
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        onChanged: (value) {
+                          setState(() {
+                            searchQuery = value.toLowerCase();
+                          });
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'Search...',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchController.clear();
+                                      searchQuery = '';
+                                    });
+                                  },
+                                )
+                              : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.cyan),
+                        textStyle: const TextStyle(fontSize: 11),
+                        backgroundColor: taskerFilterEnabled
+                            ? Colors.cyan[800]
+                            : Colors.transparent,
+                        foregroundColor: taskerFilterEnabled
+                            ? Colors.white
+                            : Colors.cyan[800],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        minimumSize: const Size(56, 56), // 高度與搜尋欄一致
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          taskerFilterEnabled = !taskerFilterEnabled;
+                        });
+                      },
+                      child: const Text('Tasker', textAlign: TextAlign.center),
+                    ),
+                  ],
                 ),
               ),
               // 篩選下拉選單 - 底線簡潔樣式，無 'All'，互動連動

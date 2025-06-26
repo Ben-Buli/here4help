@@ -219,7 +219,7 @@ class GlobalTaskList {
       failReason: null,
       applicationQuestion: "Why do you think you were rejected?",
       languageRequirement: "English",
-      hashtags: ['Sample', 'Demo'],
+      hashtags: ['Sample', 'Tasker'],
       createdAt: "2025-06-01 12:00:00",
       updatedAt: "2025-06-01 12:00:00",
     ),
