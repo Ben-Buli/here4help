@@ -82,7 +82,7 @@ class GlobalTaskList {
       description:
           "Need help moving furniture from the first floor to the third floor, including sofa, table, and other large furniture.",
       salary: "500",
-      location: "NCU",
+      location: "NCCU",
       taskDate: "2025-06-03 23:46:14",
       status: "Pending Confirmation",
       creatorConfirmed: "0",
@@ -124,7 +124,7 @@ class GlobalTaskList {
       description:
           "Translate documents from English to Chinese, approximately 10 pages.",
       salary: "300",
-      location: "NCU",
+      location: "NCCU",
       taskDate: "2024-03-17",
       status: "Open",
       creatorConfirmed: "0",

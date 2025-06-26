@@ -27,6 +27,10 @@ class _ChatListPageState extends State<ChatListPage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String searchQuery = '';
+  // 篩選狀態變數（nullable, 無選擇時為 null）
+  String? selectedLocation;
+  String? selectedHashtag;
+  String? selectedStatus;
 
   @override
   void initState() {
@@ -481,6 +485,69 @@ class _ChatListPageState extends State<ChatListPage> {
                 .compareTo(DateTime.parse(a['task_date']));
           });
 
+          // 下拉選單互相連動：依據目前選擇過濾產生 options
+          List<Map<String, dynamic>> getFilteredTasksForDropdown() {
+            return tasks.where((task) {
+              final locationMatch = selectedLocation == null ||
+                  task['location'] == selectedLocation;
+              final hashtagMatch = selectedHashtag == null ||
+                  (task['hashtags'] as List<dynamic>? ?? [])
+                      .contains(selectedHashtag);
+              final statusMatch =
+                  selectedStatus == null || task['status'] == selectedStatus;
+              return locationMatch && hashtagMatch && statusMatch;
+            }).toList();
+          }
+
+          final filteredTasksForDropdown = getFilteredTasksForDropdown();
+          final locationOptions = filteredTasksForDropdown
+              .map((e) => (e['location'] ?? '').toString())
+              .where((e) => e.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+          final hashtagOptions = filteredTasksForDropdown
+              .expand((e) => (e['hashtags'] as List<dynamic>? ?? [])
+                  .map((h) => h.toString()))
+              .where((e) => e.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+          final statusOptions = filteredTasksForDropdown
+              .map((e) => (e['status'] ?? '').toString())
+              .where((e) => e.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+          // 篩選邏輯
+          final filteredTasks = tasks.where((task) {
+            final title = (task['title'] ?? '').toString().toLowerCase();
+            final location = (task['location'] ?? '').toString();
+            final hashtags = (task['hashtags'] as List<dynamic>? ?? [])
+                .map((h) => h.toString())
+                .toList();
+            final status = (task['status'] ?? '').toString();
+            final description =
+                (task['description'] ?? '').toString().toLowerCase();
+
+            final query = searchQuery.toLowerCase();
+
+            final matchQuery = query.isEmpty ||
+                title.contains(query) ||
+                location.toLowerCase().contains(query) ||
+                description.contains(query);
+
+            final matchLocation =
+                selectedLocation == null || selectedLocation == location;
+            final matchHashtag =
+                selectedHashtag == null || hashtags.contains(selectedHashtag);
+            final matchStatus =
+                selectedStatus == null || selectedStatus == status;
+
+            return matchQuery && matchLocation && matchHashtag && matchStatus;
+          }).toList();
+
           return Column(
             children: [
               Padding(
@@ -502,21 +569,82 @@ class _ChatListPageState extends State<ChatListPage> {
                   ),
                 ),
               ),
+              // 篩選下拉選單 - 底線簡潔樣式，無 'All'，互動連動
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: selectedLocation,
+                        hint: const Text('Location'),
+                        underline: Container(height: 1, color: Colors.grey),
+                        items: locationOptions.map((loc) {
+                          return DropdownMenuItem(value: loc, child: Text(loc));
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedLocation = value;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: selectedHashtag,
+                        hint: const Text('Hashtag'),
+                        underline: Container(height: 1, color: Colors.grey),
+                        items: hashtagOptions.map((tag) {
+                          return DropdownMenuItem(value: tag, child: Text(tag));
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedHashtag = value;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: selectedStatus,
+                        hint: const Text('Status'),
+                        underline: Container(height: 1, color: Colors.grey),
+                        items: statusOptions.map((status) {
+                          return DropdownMenuItem(
+                              value: status, child: Text(status));
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedStatus = value;
+                          });
+                        },
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, color: Colors.blue),
+                      tooltip: 'Reset Filters',
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                          searchQuery = '';
+                          selectedLocation = null;
+                          selectedHashtag = null;
+                          selectedStatus = null;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.all(12),
-                  children: tasks.where((task) {
-                    final title =
-                        (task['title'] ?? '').toString().toLowerCase();
-                    final location =
-                        (task['location'] ?? '').toString().toLowerCase();
-                    final description =
-                        (task['description'] ?? '').toString().toLowerCase();
-                    return searchQuery.isEmpty ||
-                        title.contains(searchQuery) ||
-                        location.contains(searchQuery) ||
-                        description.contains(searchQuery);
-                  }).map((task) {
+                  children: filteredTasks.map((task) {
                     final applierChatItems = chatRoomModel
                         .where((applierChatItem) =>
                             applierChatItem['taskId'] == task['id'])
