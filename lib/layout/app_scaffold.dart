@@ -41,6 +41,8 @@ class AppScaffold extends StatelessWidget {
                             icon: const Icon(Icons.arrow_back_ios_new,
                                 color: Color(0xFF2563EB)),
                             onPressed: () {
+                              debugPrint(
+                                  'Back button pressed: ${context.canPop()}');
                               if (context.canPop()) {
                                 context.pop();
                                 return;
@@ -55,6 +57,13 @@ class AppScaffold extends StatelessWidget {
                         color: Color(0xFF2563EB),
                         fontWeight: FontWeight.w700,
                         fontSize: 20,
+                      ),
+                    ),
+                    bottom: PreferredSize(
+                      preferredSize: const Size.fromHeight(1.0),
+                      child: Container(
+                        height: 1.0,
+                        color: const Color(0xFFCCCCCC),
                       ),
                     ),
                   )

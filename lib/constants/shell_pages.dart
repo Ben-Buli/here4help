@@ -1,3 +1,5 @@
+// ==================== flutter ====================
+
 // ==================== account 模組 ====================
 import 'package:here4help/account/pages/account_page.dart';
 import 'package:here4help/account/pages/contact_us_page.dart';
@@ -26,7 +28,6 @@ import 'package:here4help/home/pages/home_page.dart';
 
 // ==================== pay 模組 ====================
 import 'package:here4help/pay/pages/pay_setting_page.dart';
-import 'package:here4help/task/pages/task_apply_page.dart';
 
 // ==================== task 模組 ====================
 import 'package:here4help/task/pages/task_create_page.dart';
@@ -56,14 +57,17 @@ final List<Map<String, dynamic>> shellPages = [
     'child': const ChatListPage(),
     'title': 'Chat',
     'showBottomNav': true,
-    'showBackArrow': false,
+    'showBackArrow': false
   },
   {
     'path': '/chat/detail',
-    'child': const ChatDetailPage(),
-    'title': 'Chat',
+    'builder': (context, data) {
+      return ChatDetailPage(data: data as Map<String, dynamic>);
+    },
+    // 設定寫在ChatDetailPage中
+    'showAppBar': false,
     'showBottomNav': false,
-    'showBackArrow': true
+    'showBackArrow': false
   },
   {
     'path': '/account',
@@ -74,17 +78,9 @@ final List<Map<String, dynamic>> shellPages = [
   {
     'path': '/task',
     'child': const TaskListPage(),
-    'title': 'Tasks',
+    'title': 'Task',
     'showBottomNav': true,
     'showBackArrow': false
-  },
-  {
-    'path': '/task/apply', // 應徵任務
-    'builder': (context, data) =>
-        TaskApplyPage(data: data as Map<String, dynamic>),
-    'title': 'APPLY NOW',
-    'showBottomNav': false,
-    'showBackArrow': true
   },
   {
     'path': '/task/create',
@@ -94,9 +90,11 @@ final List<Map<String, dynamic>> shellPages = [
     'showBackArrow': true
   },
   {
-    'path': '/task/create/preview',
-    'builder': (context, data) =>
-        TaskPreviewPage(data: data as Map<String, dynamic>),
+    'path': '/task/preview',
+    'builder': (context, state) {
+      final data = state.extra as Map<String, dynamic>;
+      return TaskPreviewPage(data: data);
+    },
     'title': 'Task Preview',
     'showBottomNav': false,
     'showBackArrow': true

@@ -26,9 +26,59 @@ class _TaskListPageState extends State<TaskListPage> {
   Future<void> _loadGlobalTasks() async {
     final globalTaskList = GlobalTaskList();
     await globalTaskList.loadTasks();
+
+    // 新增 unreadCount 計算邏輯
+    for (final task in globalTaskList.tasks) {
+      final visibleAppliers = (task['appliers'] as List<dynamic>?)
+              ?.where((ap) => ap['visible'] == true)
+              .toList() ??
+          [];
+
+      for (final applier in visibleAppliers) {
+        applier['unreadCount'] = calculateUnreadCount(applier, task);
+      }
+
+      final status = (task['status'] ?? '').toString().toLowerCase();
+      if (status == 'open') {
+        task['unreadCount'] = visibleAppliers
+            .map((ap) => ap['unreadCount'] as int)
+            .fold(0, (prev, element) => prev + element);
+      } else if (status == 'pending confirmation') {
+        task['unreadCount'] = 1; // Pending confirmation adds 1 unread count
+      } else if (status == 'closed' || status == 'cancelled') {
+        task['unreadCount'] =
+            0; // Closed or cancelled tasks have no unread count
+      } else {
+        task['unreadCount'] = 0;
+      }
+    }
+
     setState(() {
       tasks = globalTaskList.tasks;
     });
+  }
+
+  // 新增 unread_service 工具函式
+  int calculateUnreadCount(
+      Map<String, dynamic> applier, Map<String, dynamic> task) {
+    final status = (task['status'] ?? '').toString().toLowerCase();
+
+    if (status == 'pending confirmation') {
+      return 1;
+    }
+
+    if (status != 'open') {
+      return 0;
+    }
+
+    final questionApply = applier['questionApply'] ?? 0;
+    final unreadMessages = (applier['messages'] != null)
+        ? (applier['messages'] as List)
+            .where((m) => m['isRead'] == false)
+            .length
+        : 0;
+
+    return questionApply + unreadMessages;
   }
 
   /// 彈出任務詳情對話框

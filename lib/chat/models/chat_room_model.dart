@@ -1,8 +1,7 @@
-import 'dart:math';
-
-final List<Map<String, dynamic>> taskAppliers = [
+/// 任務聊天室模型，包含任務相關資訊和聊天記錄
+final List<Map<String, dynamic>> chatRoomModel = [
   {
-    "id": "a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e5e6-applier-1",
+    "id": "room_1",
     "taskId": "a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e5e6",
     "name": "John Doe",
     "rating": 4.5,
@@ -11,11 +10,10 @@ final List<Map<String, dynamic>> taskAppliers = [
     "sentMessages": [
       "Hello, I am interested in this task.",
       "I have cleaned apartments before and can handle this efficiently.",
-      "Looking forward to helping you with this task."
     ]
   },
   {
-    "id": "a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e5e6-applier-2",
+    "id": "room_2",
     "taskId": "a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e5e6",
     "name": "Sophia Lee",
     "rating": 4.3,
@@ -28,7 +26,7 @@ final List<Map<String, dynamic>> taskAppliers = [
     ]
   },
   {
-    "id": "b2b2b2b2-c3c3-d4d4-e5e5-f6f6f6f6f6f7-applier-1",
+    "id": "room_3",
     "taskId": "b2b2b2b2-c3c3-d4d4-e5e5-f6f6f6f6f6f7",
     "name": "Mason Smith",
     "rating": 4.2,
@@ -41,7 +39,7 @@ final List<Map<String, dynamic>> taskAppliers = [
     ]
   },
   {
-    "id": "c3c3c3c3-d4d4-e5e5-f6f6-a1a1a1a1a1a2-applier-1",
+    "id": "room_4",
     "taskId": "c3c3c3c3-d4d4-e5e5-f6f6-a1a1a1a1a1a2",
     "name": "Alice Brown",
     "rating": 3.8,
@@ -54,7 +52,7 @@ final List<Map<String, dynamic>> taskAppliers = [
     ]
   },
   {
-    "id": "e5e5e5e5-f6f6-a1a1-b2b2-c3c3c3c3c3c3-applier-1",
+    "id": "room_5",
     "taskId": "e5e5e5e5-f6f6-a1a1-b2b2-c3c3c3c3c3c3",
     "name": "Chris Green",
     "rating": 4.0,
@@ -67,7 +65,7 @@ final List<Map<String, dynamic>> taskAppliers = [
     ]
   },
   {
-    "id": "f6f6f6f6-a1a1-b2b2-c3c3-d4d4d4d4d4d4-applier-1",
+    "id": "room_6",
     "taskId": "f6f6f6f6-a1a1-b2b2-c3c3-d4d4d4d4d4d4",
     "name": "Linda White",
     "rating": 4.7,
@@ -80,7 +78,7 @@ final List<Map<String, dynamic>> taskAppliers = [
     ]
   },
   {
-    "id": "g7g7g7g7-h8h8-i9i9-j0j0-k1k1k1k1k1k2-applier-1",
+    "id": "room_7",
     "taskId": "g7g7g7g7-h8h8-i9i9-j0j0-k1k1k1k1k1k2",
     "name": "David Brown",
     "rating": 4.1,
@@ -93,7 +91,7 @@ final List<Map<String, dynamic>> taskAppliers = [
     ]
   },
   {
-    "id": "g7g7g7g7-h8h8-i9i9-j0j0-k1k1k1k1k1k2-applier-2",
+    "id": "room_8",
     "taskId": "g7g7g7g7-h8h8-i9i9-j0j0-k1k1k1k1k1k2",
     "name": "Olivia Chen",
     "rating": 4.4,
@@ -106,7 +104,7 @@ final List<Map<String, dynamic>> taskAppliers = [
     ]
   },
   {
-    "id": "h8h8h8h8-i9i9-j0j0-k1k1-l2l2l2l2l2l3-applier-1",
+    "id": "room_9",
     "taskId": "h8h8h8h8-i9i9-j0j0-k1k1-l2l2l2l2l2l3",
     "name": "Emma White",
     "rating": 4.6,
@@ -119,7 +117,7 @@ final List<Map<String, dynamic>> taskAppliers = [
     ]
   },
   {
-    "id": "h8h8h8h8-i9i9-j0j0-k1k1-l2l2l2l2l2l3-applier-2",
+    "id": "room_10",
     "taskId": "h8h8h8h8-i9i9-j0j0-k1k1-l2l2l2l2l2l3",
     "name": "Lucas Wang",
     "rating": 4.3,
