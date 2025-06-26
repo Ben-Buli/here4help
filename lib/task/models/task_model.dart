@@ -14,7 +14,7 @@ class TaskModel {
   final String? failReason;
   final String? applicationQuestion;
   final String languageRequirement;
-  final String? hashtags;
+  final List<String>? hashtags;
   final String createdAt;
   final String updatedAt;
 
