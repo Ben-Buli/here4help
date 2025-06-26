@@ -16,11 +16,50 @@ class TaskListPage extends StatefulWidget {
 
 class _TaskListPageState extends State<TaskListPage> {
   List<Map<String, dynamic>> tasks = [];
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  String searchQuery = '';
+  String? selectedLocation;
+  String? selectedLanguage;
+
+  // 根據目前選擇的語言，取得可用的地點
+  List<String> getAvailableLocations() {
+    final filtered = tasks.where((task) {
+      final language = (task['language_requirement'] ?? '').toString();
+      return selectedLanguage == null || language == selectedLanguage;
+    });
+    return filtered
+        .map((e) => (e['location'] ?? '').toString())
+        .toSet()
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
+
+  // 根據目前選擇的地點，取得可用的語言
+  List<String> getAvailableLanguages() {
+    final filtered = tasks.where((task) {
+      final location = (task['location'] ?? '').toString();
+      return selectedLocation == null || location == selectedLocation;
+    });
+    return filtered
+        .map((e) => (e['language_requirement'] ?? '').toString())
+        .toSet()
+        .where((e) => e.isNotEmpty)
+        .toList();
+  }
 
   @override
   void initState() {
     super.initState();
     _loadGlobalTasks();
+    // 移除 search bar 自動 focus 功能
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _loadGlobalTasks() async {
@@ -234,15 +273,120 @@ class _TaskListPageState extends State<TaskListPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 取得根據篩選條件的可用選項
+    final locations = getAvailableLocations();
+    final languages = getAvailableLanguages();
+
+    final filteredTasks = tasks.where((task) {
+      final title = (task['title'] ?? '').toString().toLowerCase();
+      final description = (task['description'] ?? '').toString().toLowerCase();
+      final location = (task['location'] ?? '').toString();
+      final language = (task['language_requirement'] ?? '').toString();
+
+      final matchQuery =
+          title.contains(searchQuery) || description.contains(searchQuery);
+      final matchLocation =
+          selectedLocation == null || location == selectedLocation;
+      final matchLanguage =
+          selectedLanguage == null || language == selectedLanguage;
+
+      return matchQuery && matchLocation && matchLanguage;
+    }).toList();
+
     return Scaffold(
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              onChanged: (value) {
+                setState(() {
+                  searchQuery = value.toLowerCase();
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Search...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    hint: const Text('Location'),
+                    value: selectedLocation,
+                    items: locations
+                        .map((loc) => DropdownMenuItem(
+                              value: loc,
+                              child: Text(loc),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedLocation = value;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    hint: const Text('Language'),
+                    value: selectedLanguage,
+                    items: languages
+                        .map((lang) => DropdownMenuItem(
+                              value: lang,
+                              child: Text(lang),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedLanguage = value;
+                      });
+                    },
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    setState(() {
+                      _searchController.clear();
+                      searchQuery = '';
+                      selectedLocation = null;
+                      selectedLanguage = null;
+                    });
+                  },
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+          ),
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(12),
-              itemCount: tasks.length,
+              itemCount: filteredTasks.length,
               itemBuilder: (context, index) {
-                final task = tasks[index];
+                final task = filteredTasks[index];
                 final date = task['task_date'];
                 final dateLabel = (date != null)
                     ? DateFormat('MM/dd')

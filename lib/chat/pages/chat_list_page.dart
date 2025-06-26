@@ -43,9 +43,6 @@ class _ChatListPageState extends State<ChatListPage> {
   void initState() {
     super.initState();
     _taskFuture = GlobalTaskList().loadTasks();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _searchFocusNode.requestFocus();
-    });
   }
 
   @override

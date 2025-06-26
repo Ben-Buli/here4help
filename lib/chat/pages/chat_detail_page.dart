@@ -48,9 +48,6 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final now = DateTime.now();
     joinTime =
         "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-    Future.delayed(Duration.zero, () {
-      _focusNode.requestFocus();
-    });
     // 加強 pendingStart 處理，若不存在自動補上
     if (widget.data['task']['status'] ==
         statusString['pending_confirmation_tasker']) {
