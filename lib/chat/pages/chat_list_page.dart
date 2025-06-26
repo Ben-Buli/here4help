@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:here4help/task/services/global_task_list.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:here4help/chat/models/chat_room_model.dart';
+import 'package:here4help/chat/services/global_chat_room.dart';
 
 // Define statusString as a constant outside the class
 const Map<String, String> statusString = {
@@ -14,11 +15,6 @@ const Map<String, String> statusString = {
   'completed': 'Completed',
 };
 
-// TODO: 左右滑動功能：Card, Item
-// TODO: 滑動後的動作：接受、拒絕申請者
-//  TODO: 點擊進入聊天室
-// TODO：各種狀態Card 樣式
-
 class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
 
@@ -28,11 +24,24 @@ class ChatListPage extends StatefulWidget {
 
 class _ChatListPageState extends State<ChatListPage> {
   late Future<void> _taskFuture;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  String searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _taskFuture = GlobalTaskList().loadTasks();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchFocusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
   }
 
   void _showTaskInfoDialog(Map<String, dynamic> task) {
@@ -51,7 +60,6 @@ class _ChatListPageState extends State<ChatListPage> {
                 Text('Language Requirement: ${task['language_requirement']}'),
                 Text(
                     'Hashtags: ${(task['hashtags'] as List<dynamic>).join(', ')}'),
-                Text('Status: ${task['status']}'),
               ],
             ),
           ),
@@ -198,152 +206,44 @@ class _ChatListPageState extends State<ChatListPage> {
                       startActionPane: ActionPane(
                         motion: const DrawerMotion(),
                         children: [
-                          Flexible(
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  visibleapplierChatItems
-                                      .remove(applierChatItem);
-                                  visibleapplierChatItems.insert(
-                                      0, applierChatItem);
-                                  applierChatItems.remove(applierChatItem);
-                                  applierChatItems.insert(0, applierChatItem);
-                                });
-                                Slidable.of(context)?.close();
-                              },
-                              child: Container(
-                                alignment: Alignment.center,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.blueGrey[300],
-                                ),
-                                child: const Icon(Icons.push_pin,
-                                    color: Colors.black),
-                              ),
-                            ),
+                          SlidableAction(
+                            onPressed: (_) {
+                              setState(() {
+                                visibleapplierChatItems.remove(applierChatItem);
+                                visibleapplierChatItems.insert(
+                                    0, applierChatItem);
+                                applierChatItems.remove(applierChatItem);
+                                applierChatItems.insert(0, applierChatItem);
+                              });
+                              Slidable.of(context)?.close();
+                            },
+                            backgroundColor: Colors.blueGrey,
+                            foregroundColor: Colors.black,
+                            icon: Icons.push_pin,
+                            label: 'Pin',
                           ),
-                          Flexible(
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  applierChatItem['isMuted'] =
-                                      !(applierChatItem['isMuted'] ?? false);
-                                });
-                                Slidable.of(context)?.close();
-                              },
-                              child: Container(
-                                alignment: Alignment.center,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.brown[300],
-                                ),
-                                child: Icon(
-                                  (applierChatItem['isMuted'] ?? false)
-                                      ? Icons.volume_up
-                                      : Icons.volume_off,
-                                  color: Colors.black,
-                                ),
-                              ),
-                            ),
+                          SlidableAction(
+                            onPressed: (_) {
+                              setState(() {
+                                applierChatItem['isMuted'] =
+                                    !(applierChatItem['isMuted'] ?? false);
+                              });
+                              Slidable.of(context)?.close();
+                            },
+                            backgroundColor: Colors.brown,
+                            foregroundColor: Colors.black,
+                            icon: applierChatItem['isMuted'] == true
+                                ? Icons.volume_up
+                                : Icons.volume_off,
+                            label: 'Mute',
                           ),
                         ],
                       ),
                       endActionPane: ActionPane(
                         motion: const DrawerMotion(),
-                        children: [
-                          Flexible(
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  int applierChatItemUnread =
-                                      applierChatItem['unreadCount'] ?? 0;
-                                  applierChatItem['unreadCount'] = 0;
-                                  task['unreadCount'] =
-                                      (task['unreadCount'] ?? 0) -
-                                          applierChatItemUnread;
-                                  if (task['unreadCount']! < 0) {
-                                    task['unreadCount'] = 0;
-                                  }
-                                });
-                                Slidable.of(context)?.close();
-                              },
-                              child: Container(
-                                alignment: Alignment.center,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 18),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue[100],
-                                ),
-                                child: const Text(
-                                  'Read',
-                                  style: TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Flexible(
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  applierChatItem['isHidden'] = true;
-                                });
-                                Slidable.of(context)?.close();
-                              },
-                              child: Container(
-                                alignment: Alignment.center,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 18),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange[100],
-                                ),
-                                child: const Text(
-                                  'Hide',
-                                  style: TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Flexible(
-                            child: GestureDetector(
-                              onTap: () async {
-                                final confirm = await _showDoubleConfirmDialog(
-                                    'Reject applierChatItem',
-                                    'Are you sure you want to reject this applierChatItem?');
-                                if (confirm == true) {
-                                  setState(() {
-                                    applierChatItem['isHidden'] = true;
-                                  });
-                                }
-                                Slidable.of(context)?.close();
-                              },
-                              child: Container(
-                                alignment: Alignment.center,
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 18),
-                                decoration: BoxDecoration(
-                                  color: Colors.red[100],
-                                ),
-                                child: const Text(
-                                  'Reject',
-                                  style: TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        children: _buildApplierEndActions(
+                            context, task, applierChatItem),
                       ),
-                      // 修改這裡: 用 Stack 包裹 Card，並將未讀徽章放在右上角
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
@@ -383,7 +283,6 @@ class _ChatListPageState extends State<ChatListPage> {
                                 softWrap: true,
                                 overflow: TextOverflow.visible,
                               ),
-                              // 移除 trailing 的未讀徽章
                               trailing: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -411,7 +310,6 @@ class _ChatListPageState extends State<ChatListPage> {
                               },
                             ),
                           ),
-                          // 未讀徽章，右上角
                           if ((applierChatItem['unreadCount'] ?? 0) > 0)
                             Positioned(
                               top: 0,
@@ -583,15 +481,52 @@ class _ChatListPageState extends State<ChatListPage> {
                 .compareTo(DateTime.parse(a['task_date']));
           });
 
-          return ListView(
-            padding: const EdgeInsets.all(12),
-            children: tasks.map((task) {
-              final applierChatItems = chatRoomModel
-                  .where((applierChatItem) =>
-                      applierChatItem['taskId'] == task['id'])
-                  .toList();
-              return _taskCardWithapplierChatItems(task, applierChatItems);
-            }).toList(),
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: TextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  onChanged: (value) {
+                    setState(() {
+                      searchQuery = value.toLowerCase();
+                    });
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Search...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(12),
+                  children: tasks.where((task) {
+                    final title =
+                        (task['title'] ?? '').toString().toLowerCase();
+                    final location =
+                        (task['location'] ?? '').toString().toLowerCase();
+                    final description =
+                        (task['description'] ?? '').toString().toLowerCase();
+                    return searchQuery.isEmpty ||
+                        title.contains(searchQuery) ||
+                        location.contains(searchQuery) ||
+                        description.contains(searchQuery);
+                  }).map((task) {
+                    final applierChatItems = chatRoomModel
+                        .where((applierChatItem) =>
+                            applierChatItem['taskId'] == task['id'])
+                        .toList();
+                    return _taskCardWithapplierChatItems(
+                        task, applierChatItems);
+                  }).toList(),
+                ),
+              ),
+            ],
           );
         }
       },
@@ -754,5 +689,104 @@ class Ticker {
 
   void dispose() {
     stop();
+  }
+  // 根據 task 狀態和 applierChatItem 動態產生 endActionPane 的按鈕
+}
+
+extension _ChatListPageStateApplierEndActions on _ChatListPageState {
+  // 根據 task 狀態和 applierChatItem 動態產生 endActionPane 的按鈕
+  List<Widget> _buildApplierEndActions(BuildContext context,
+      Map<String, dynamic> task, Map<String, dynamic> applierChatItem) {
+    final status = task['status'];
+    List<Widget> actions = [];
+
+    void addButton(String label, Color color, VoidCallback onTap,
+        {IconData? icon}) {
+      actions.add(
+        Flexible(
+          child: GestureDetector(
+            onTap: () {
+              onTap();
+              Slidable.of(context)?.close();
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (icon != null) ...[
+                    Icon(icon, size: 16, color: Colors.black),
+                    const SizedBox(height: 4),
+                  ],
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (status == 'Open') {
+      addButton('Read', Colors.blue[100]!, () {
+        setState(() {
+          int unread = applierChatItem['unreadCount'] ?? 0;
+          applierChatItem['unreadCount'] = 0;
+          task['unreadCount'] = (task['unreadCount'] ?? 0) - unread;
+          if (task['unreadCount']! < 0) task['unreadCount'] = 0;
+        });
+      });
+      addButton('Hide', Colors.orange[100]!, () {
+        setState(() {
+          applierChatItem['isHidden'] = true;
+        });
+      });
+      addButton('Delete', Colors.red[100]!, () async {
+        final confirm = await _showDoubleConfirmDialog('Delete applierChatItem',
+            'Are you sure you want to delete this applierChatItem?');
+        if (confirm == true) {
+          setState(() {
+            applierChatItem['isHidden'] = true;
+          });
+        }
+      });
+    } else if (status == 'In Progress' ||
+        status == 'Dispute' ||
+        status == 'Completed') {
+      addButton('Read', Colors.blue[100]!, () {
+        setState(() {
+          int unread = applierChatItem['unreadCount'] ?? 0;
+          applierChatItem['unreadCount'] = 0;
+          task['unreadCount'] = (task['unreadCount'] ?? 0) - unread;
+          if (task['unreadCount']! < 0) task['unreadCount'] = 0;
+        });
+      });
+    } else if (status == 'Pending Confirmation') {
+      addButton('Confirm', Colors.green[100]!, () {
+        GlobalTaskList().updateTaskStatus(task['id'], 'Completed');
+        setState(() {
+          task['status'] = 'Completed';
+        });
+      });
+    }
+
+    return actions;
   }
 }

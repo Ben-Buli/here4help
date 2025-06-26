@@ -33,6 +33,7 @@ import 'package:here4help/pay/pages/pay_setting_page.dart';
 import 'package:here4help/task/pages/task_create_page.dart';
 import 'package:here4help/task/pages/task_list_page.dart';
 import 'package:here4help/task/pages/task_preview_page.dart';
+import 'package:here4help/task/pages/task_apply_page.dart';
 
 // 集中管理 ShellRoute 內的頁面
 final List<Map<String, dynamic>> shellPages = [
@@ -55,7 +56,7 @@ final List<Map<String, dynamic>> shellPages = [
   {
     'path': '/chat',
     'child': const ChatListPage(),
-    'title': 'Chat',
+    'title': 'Posts',
     'showBottomNav': true,
     'showBackArrow': false
   },
@@ -96,6 +97,15 @@ final List<Map<String, dynamic>> shellPages = [
       return TaskPreviewPage(data: data);
     },
     'title': 'Task Preview',
+    'showBottomNav': false,
+    'showBackArrow': true
+  },
+  {
+    'path': '/task/apply',
+    'builder': (context, state) {
+      return TaskApplyPage(data: state as Map<dynamic, dynamic>);
+    },
+    'title': 'Task Apply',
     'showBottomNav': false,
     'showBackArrow': true
   },

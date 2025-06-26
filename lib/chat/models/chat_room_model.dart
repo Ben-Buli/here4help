@@ -74,7 +74,7 @@ final List<Map<String, dynamic>> chatRoomModel = [
     "sentMessages": [
       "Hello, I am interested in this task.",
       "I have accompanied elderly individuals to hospitals before.",
-      "Looking forward to helping you with this."
+      "Hello, I finished the task and please confirm the payment, thanks!"
     ]
   },
   {

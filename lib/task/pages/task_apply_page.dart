@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 
 /// 任務投遞應徵履歷表單頁面
 class TaskApplyPage extends StatefulWidget {
-  final Map<String, dynamic> data;
+  final Map<dynamic, dynamic> data;
 
   const TaskApplyPage({
     Key? key,

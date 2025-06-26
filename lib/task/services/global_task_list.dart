@@ -168,6 +168,18 @@ class GlobalTaskList {
     }
   }
 
+  /// 更新任務狀態，並在更新後對任務進行排序。
+  void updateTaskStatus(String taskId, String newStatus) {
+    loadTasks(); // 确保任务列表已加载
+    if (newStatus.isEmpty) return; // 如果新狀態為空，
+    final index = _tasks.indexWhere((task) => task['id'] == taskId);
+    if (index != -1) {
+      _tasks[index]['status'] = newStatus;
+      _tasks[index]['updated_at'] = DateTime.now().toString();
+      _sortTasks();
+    }
+  }
+
   /// 添加新任務到列表中，並在添加後對任務進行排序。
   void addTask(Map<String, dynamic> task) {
     _tasks.add(task);

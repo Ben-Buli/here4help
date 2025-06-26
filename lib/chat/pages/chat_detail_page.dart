@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:here4help/task/services/global_task_list.dart';
+import 'package:here4help/chat/services/global_chat_room.dart';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, required this.data});
@@ -57,42 +59,148 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         sentMessages.length +
         _messages.length;
 
-    Widget buildApplierBubble(String text) {
+    Widget buildQuestionReplyBubble(String text) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3.0), // 上下間距
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(vertical: 3.0),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 16,
-              child: Text(
-                (room['user']?['name'] ?? applier['name'] ?? 'U')[0]
-                    .toUpperCase(),
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                constraints: const BoxConstraints(maxWidth: 400),
-                decoration: BoxDecoration(
-                  color: const Color.fromARGB(255, 235, 241, 249),
-                  borderRadius: BorderRadius.circular(12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  child: Text(
+                    (room['user']?['name'] ?? applier['name'] ?? 'U')[0]
+                        .toUpperCase(),
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(text),
-                    const SizedBox(height: 4),
-                    Text(
-                      joinTime,
-                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    constraints: const BoxConstraints(maxWidth: 300),
+                    decoration: BoxDecoration(
+                      color: const Color.fromARGB(255, 235, 241, 249),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(text),
+                        // Text(
+                        //   joinTime,
+                        //   style:
+                        //       const TextStyle(fontSize: 10, color: Colors.grey),
+                        // ),
+                        const SizedBox(height: 4),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) {
+                                    return AlertDialog(
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 24,
+                                            child: Text(
+                                              (room['name'] ?? 'U')[0]
+                                                  .toUpperCase(),
+                                              style: const TextStyle(
+                                                  color: Colors.white),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            room['name'] ?? '',
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.star,
+                                                  color: Color.fromARGB(
+                                                      255, 255, 187, 0),
+                                                  size: 16),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '${room['rating'] ?? 0.0}',
+                                                style: const TextStyle(
+                                                    fontSize: 14),
+                                              ),
+                                            ],
+                                          ),
+                                          Text(
+                                            '(${room['reviewsCount'] ?? 0} reviews)',
+                                            style:
+                                                const TextStyle(fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                      actions: [
+                                        Center(
+                                            child: ElevatedButton(
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                          },
+                                          child: const Text('Understand'),
+                                        )),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                              child: const Text('View Resume')),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    Widget buildApplierBubble(String text) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  child: Text(
+                    (room['user']?['name'] ?? applier['name'] ?? 'U')[0]
+                        .toUpperCase(),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    constraints: const BoxConstraints(maxWidth: 300),
+                    decoration: BoxDecoration(
+                      color: const Color.fromARGB(255, 235, 241, 249),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(text),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -111,7 +219,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                 padding: const EdgeInsets.all(12),
                 constraints: const BoxConstraints(maxWidth: 400),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade100,
+                  color: Colors.grey.shade100, // 我的訊息背景色
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -119,10 +227,10 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                   children: [
                     Text(text),
                     const SizedBox(height: 4),
-                    Text(
-                      joinTime,
-                      style: const TextStyle(fontSize: 10, color: Colors.grey),
-                    ),
+                    // Text(
+                    //   joinTime,
+                    //   style: const TextStyle(fontSize: 10, color: Colors.grey),
+                    // ),
                   ],
                 ),
               ),
@@ -132,6 +240,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       );
     }
 
+    final isCompleted = widget.data['task']['status'] == 'Completed';
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -164,7 +273,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
               itemCount: totalItemCount,
               itemBuilder: (context, index) {
                 if (questionReply.isNotEmpty && index == 0) {
-                  return buildApplierBubble(questionReply);
+                  return buildQuestionReplyBubble(questionReply);
                 }
 
                 int adjustedIndex = index - (questionReply.isNotEmpty ? 1 : 0);
@@ -187,16 +296,31 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
               },
             ),
           ),
-          const Divider(),
+          Container(
+            color:
+                _getStatusBackgroundColor(widget.data['task']['status'] ?? ''),
+            width: double.infinity,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(
+              widget.data['task']['status'] ?? '',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: _getStatusChipColor(widget.data['task']['status'] ?? ''),
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const Divider(
+            height: 1,
+            thickness: 2,
+          ),
+          const SizedBox(height: 12),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              if (taskStatus == 'pending confirmation')
-                _actionButton(Icons.payment, 'Pay', () {}),
-              _actionButton(Icons.volume_off, 'Silence', () {}),
-              _actionButton(Icons.article, 'Complaint', () {}),
-              _actionButton(Icons.block, 'Block', () {}),
-            ],
+            children: _buildActionButtonsByStatus()
+                .map((e) => Expanded(child: e))
+                .toList(),
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -207,24 +331,35 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                     margin: const EdgeInsets.only(top: 12),
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
+                      color: Colors.grey[100],
                       borderRadius: BorderRadius.circular(24),
                     ),
                     child: TextField(
                       controller: _controller,
                       focusNode: _focusNode,
+                      enabled: !isCompleted,
                       textInputAction: TextInputAction.send,
-                      onSubmitted: (value) => _sendMessage(),
-                      decoration: const InputDecoration(
+                      onSubmitted: (value) {
+                        if (!isCompleted) _sendMessage();
+                      },
+                      decoration: InputDecoration(
                         border: InputBorder.none,
-                        hintText: 'Type a message',
+                        hintText: isCompleted
+                            ? 'This task is completed'
+                            : 'Type a message',
+                        hintStyle: TextStyle(
+                          color: isCompleted ? Colors.grey : Colors.black54,
+                        ),
                       ),
                     ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.send, color: Colors.blue),
-                  onPressed: _sendMessage,
+                  icon: Icon(
+                    Icons.send,
+                    color: isCompleted ? Colors.grey : Colors.blue,
+                  ),
+                  onPressed: isCompleted ? null : _sendMessage,
                 ),
               ],
             ),
@@ -247,5 +382,189 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
         ],
       ),
     );
+  }
+
+  // Store applierChatItems in state for Accept button logic
+  List<Map<String, dynamic>> applierChatItems = [];
+
+  List<Widget> _buildActionButtonsByStatus() {
+    final status = (widget.data['task']['status'] ?? '').toString();
+
+    final Map<String, List<Map<String, dynamic>>> statusActions = {
+      'Open': [
+        {'icon': Icons.check, 'label': 'Accept'},
+        // {'icon': Icons.cancel, 'label': 'Reject'},
+      ],
+      'In Progress': [
+        {'icon': Icons.payment, 'label': 'Pay'},
+        {'icon': Icons.volume_off, 'label': 'Silence'},
+        {'icon': Icons.article, 'label': 'Complaint'},
+        {'icon': Icons.block, 'label': 'Block'},
+      ],
+      'Pending Confirmation': [
+        {'icon': Icons.check, 'label': 'Confirm'},
+        {'icon': Icons.article, 'label': 'Complaint'},
+      ],
+      'Dispute': [
+        {'icon': Icons.article, 'label': 'Complaint'},
+      ],
+      'Completed': [
+        {'icon': Icons.attach_money, 'label': 'Paid'},
+        {'icon': Icons.reviews, 'label': 'Reviews'},
+      ],
+    };
+
+    final actions = statusActions[status] ?? [];
+
+    return actions
+        .map((action) => _actionButton(
+              action['icon'],
+              action['label'],
+              () {
+                // Accept button logic with double confirm dialog
+                if (action['label'] == 'Accept') {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Double Check'),
+                      content: const Text(
+                          'Are you sure you want to accept this applier for this task?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+
+                            // 更新 GlobalTaskList 的任務狀態
+                            GlobalTaskList().updateTaskStatus(
+                              widget.data['task']['id'].toString(),
+                              'In Progress',
+                            );
+
+                            // 移除其他聊天室
+                            GlobalChatRoom().removeRoomsByTaskIdExcept(
+                              widget.data['task']['id'].toString(),
+                              widget.data['room']['roomId'].toString(),
+                            );
+
+                            // 刷新界面
+                            setState(() {});
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content:
+                                      Text('Task accepted. Now in progress.')),
+                            );
+                          },
+                          child: const Text('Confirm'),
+                        ),
+                      ],
+                    ),
+                  );
+                } else if (action['label'] == 'Confirm') {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Double Check'),
+                      content: const Text(
+                          'Are you sure you want to confirm this task?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            GlobalTaskList globalTaskList = GlobalTaskList();
+                            globalTaskList.updateTaskStatus(
+                              widget.data['room']['taskId'].toString(),
+                              'Completed',
+                            );
+                            setState(() {}); // 刷新界面
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Task confirmed! Salary paid to the creator.')),
+                            );
+                          },
+                          child: const Text('Confirm'),
+                        ),
+                      ],
+                    ),
+                  );
+                } else if (action['label'] == 'Pay') {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Double Check'),
+                      content: const Text(
+                          'Are you sure you want to complete this task with payment?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            GlobalTaskList().updateTaskStatus(
+                              widget.data['task']['id'].toString(),
+                              'Completed',
+                            );
+                            setState(() {}); // 更新畫面
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Task marked as completed with payment.')),
+                            );
+                          },
+                          child: const Text('Confirm'),
+                        ),
+                      ],
+                    ),
+                  );
+                } else {
+                  // TODO: Define other button behaviors here
+                }
+              },
+            ))
+        .toList();
+  }
+}
+
+Color _getStatusChipColor(String status) {
+  switch (status) {
+    case 'Open':
+      return Colors.blue[800]!;
+    case 'In Progress':
+      return Colors.orange[800]!;
+    case 'Dispute':
+      return Colors.red[800]!;
+    case 'Pending Confirmation':
+      return Colors.purple[800]!;
+    case 'Completed':
+      return Colors.grey[800]!;
+    default:
+      return Colors.grey[800]!;
+  }
+}
+
+Color _getStatusBackgroundColor(String status) {
+  switch (status) {
+    case 'Open':
+      return Colors.blue[50]!;
+    case 'In Progress':
+      return Colors.orange[50]!;
+    case 'Dispute':
+      return Colors.red[50]!;
+    case 'Pending Confirmation':
+      return Colors.purple[50]!;
+    case 'Completed':
+      return Colors.grey[200]!;
+    default:
+      return Colors.grey[200]!;
   }
 }
