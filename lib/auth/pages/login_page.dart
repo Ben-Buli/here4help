@@ -84,11 +84,17 @@ class _LoginPageState extends State<LoginPage> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const SizedBox(height: 12),
+          const SizedBox(height: 30),
           const Text("Demo Account",
               style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text("tap to login",
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                  fontSize: 10)),
           const SizedBox(height: 12),
           Column(
             children: testAccounts.map((account) {
@@ -112,15 +118,21 @@ class _LoginPageState extends State<LoginPage> {
                     child: Row(
                       children: [
                         CircleAvatar(
-                          backgroundImage: account['avatar_url'] != null &&
-                                  account['avatar_url'].toString().isNotEmpty
-                              ? NetworkImage(account['avatar_url'].toString())
-                              : null,
                           radius: 24,
-                          child: account['avatar_url'] == null ||
-                                  account['avatar_url'].toString().isEmpty
-                              ? const Icon(Icons.person)
-                              : null,
+                          backgroundColor: Colors.primaries[
+                                  (account['name']?.hashCode ?? 0) %
+                                      Colors.primaries.length]
+                              .withOpacity(0.8),
+                          child: Text(
+                            (account['name']?.toString().isNotEmpty == true)
+                                ? account['name']!.toString()[0].toUpperCase()
+                                : '',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(

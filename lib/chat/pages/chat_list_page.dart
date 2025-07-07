@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:here4help/task/services/global_task_list.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:here4help/chat/models/chat_room_model.dart';
-import 'package:here4help/chat/services/global_chat_room.dart';
 
 // Define statusString as a constant outside the class
 const Map<String, String> statusString = {
@@ -508,20 +507,21 @@ class _ChatListPageState extends State<ChatListPage> {
           });
 
           // 下拉選單互相連動：依據目前選擇過濾產生 options
-          List<Map<String, dynamic>> getFilteredTasksForDropdown() {
-            return tasks.where((task) {
-              final locationMatch = selectedLocation == null ||
-                  task['location'] == selectedLocation;
-              final hashtagMatch = selectedHashtag == null ||
-                  (task['hashtags'] as List<dynamic>? ?? [])
-                      .contains(selectedHashtag);
-              final statusMatch =
-                  selectedStatus == null || task['status'] == selectedStatus;
-              return locationMatch && hashtagMatch && statusMatch;
-            }).toList();
-          }
+          // List<Map<String, dynamic>> getFilteredTasksForDropdown() {
+          //   return tasks.where((task) {
+          //     final locationMatch = selectedLocation == null ||
+          //         task['location'] == selectedLocation;
+          //     final hashtagMatch = selectedHashtag == null ||
+          //         (task['hashtags'] as List<dynamic>? ?? [])
+          //             .contains(selectedHashtag);
+          //     final statusMatch =
+          //         selectedStatus == null || task['status'] == selectedStatus;
+          //     return locationMatch && hashtagMatch && statusMatch;
+          //   }).toList();
+          // }
 
-          final filteredTasksForDropdown = getFilteredTasksForDropdown();
+          // final filteredTasksForDropdown = getFilteredTasksForDropdown();
+          final filteredTasksForDropdown = tasks; // 不做下拉選單聯動篩選
           final locationOptions = filteredTasksForDropdown
               .map((e) => (e['location'] ?? '').toString())
               .where((e) => e.isNotEmpty)

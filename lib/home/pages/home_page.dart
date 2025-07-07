@@ -101,7 +101,7 @@ class HomePage extends StatelessWidget {
                             fontWeight: FontWeight.bold, fontSize: 18)),
                     const SizedBox(height: 12),
                     SizedBox(
-                      height: 120,
+                      height: 160,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         children: const [
@@ -309,7 +309,10 @@ class _ChallengeCard extends StatelessWidget {
           const SizedBox(height: 8),
           ElevatedButton(
             onPressed: () {},
-            child: const Text('Take on Task Now'),
+            child: const FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text('Take on Task Now'),
+            ),
           )
         ],
       ),

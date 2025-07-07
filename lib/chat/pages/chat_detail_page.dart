@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:here4help/task/services/global_task_list.dart';
 import 'package:here4help/chat/services/global_chat_room.dart';
-import 'dart:async';
 import 'package:flutter/scheduler.dart';
 
 class ChatDetailPage extends StatefulWidget {

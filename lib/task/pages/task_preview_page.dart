@@ -129,15 +129,28 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                     children: [
                       CircleAvatar(
                         radius: 16,
+                        backgroundColor: (creatorAvatarUrl == null ||
+                                creatorAvatarUrl.isEmpty)
+                            ? Colors.primaries[creatorName.hashCode %
+                                    Colors.primaries.length]
+                                .withOpacity(0.8)
+                            : Colors.grey.shade200,
                         backgroundImage: (creatorAvatarUrl != null &&
                                 creatorAvatarUrl.isNotEmpty)
                             ? NetworkImage(creatorAvatarUrl)
                             : null,
-                        backgroundColor: Colors.grey.shade200,
                         child: (creatorAvatarUrl == null ||
                                 creatorAvatarUrl.isEmpty)
-                            ? const Icon(Icons.person,
-                                size: 16, color: Colors.grey)
+                            ? Text(
+                                creatorName.isNotEmpty
+                                    ? creatorName[0].toUpperCase()
+                                    : '',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              )
                             : null,
                       ),
                       const SizedBox(width: 8),

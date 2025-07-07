@@ -33,8 +33,8 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     // 初始化資料
-    firstName = currentUser?.name?.split(' ').first ?? '';
-    lastName = currentUser?.name?.split(' ').last ?? '';
+    firstName = currentUser?.name.split(' ').first ?? '';
+    lastName = currentUser?.name.split(' ').last ?? '';
     email = currentUser?.email ?? '';
     // phone = currentUser?.phone ?? '';
     // dob = currentUser?.dob ?? '';

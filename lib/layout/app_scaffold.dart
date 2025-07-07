@@ -2,16 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-class AppScaffold extends StatelessWidget {
-  final Widget child;
-  final String? title;
-  final bool showAppBar;
-  final bool centerTitle;
-  final bool showBottomNav;
-  final bool showBackArrow;
-  final List<Widget>? actions;
-
-  /// AppScaffold 是應用程式的主要結構元件，
+class AppScaffold extends StatefulWidget {
   const AppScaffold({
     super.key,
     required this.child,
@@ -23,6 +14,19 @@ class AppScaffold extends StatelessWidget {
     this.actions, // 新增
   });
 
+  final Widget child;
+  final String? title;
+  final bool showAppBar;
+  final bool centerTitle;
+  final bool showBottomNav;
+  final bool showBackArrow;
+  final List<Widget>? actions;
+
+  @override
+  State<AppScaffold> createState() => _AppScaffoldState();
+}
+
+class _AppScaffoldState extends State<AppScaffold> {
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -31,18 +35,16 @@ class AppScaffold extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 500),
           child: Scaffold(
-            appBar: showAppBar
+            appBar: widget.showAppBar
                 ? AppBar(
                     backgroundColor: const Color.fromARGB(255, 255, 255, 255),
                     elevation: 0,
-                    centerTitle: centerTitle,
-                    leading: showBackArrow
+                    centerTitle: widget.centerTitle,
+                    leading: widget.showBackArrow
                         ? IconButton(
                             icon: const Icon(Icons.arrow_back_ios_new,
                                 color: Color(0xFF2563EB)),
                             onPressed: () {
-                              debugPrint(
-                                  'Back button pressed: ${context.canPop()}');
                               if (context.canPop()) {
                                 context.pop();
                                 return;
@@ -52,24 +54,29 @@ class AppScaffold extends StatelessWidget {
                           )
                         : null,
                     title: Text(
-                      title ?? '',
+                      widget.title ?? '',
                       style: const TextStyle(
                         color: Color(0xFF2563EB),
                         fontWeight: FontWeight.w700,
                         fontSize: 20,
                       ),
                     ),
-                    bottom: PreferredSize(
-                      preferredSize: const Size.fromHeight(1.0),
-                      child: Container(
+                    actions: [
+                      ...?widget.actions,
+                    ],
+                    bottom: const PreferredSize(
+                      preferredSize: Size.fromHeight(1.0),
+                      child: SizedBox(
                         height: 1.0,
-                        color: const Color(0xFFCCCCCC),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(color: Color(0xFFCCCCCC)),
+                        ),
                       ),
                     ),
                   )
                 : null,
-            body: child,
-            bottomNavigationBar: showBottomNav
+            body: widget.child,
+            bottomNavigationBar: widget.showBottomNav
                 ? BottomNavigationBar(
                     type: BottomNavigationBarType.fixed,
                     currentIndex: _getCurrentIndex(context),

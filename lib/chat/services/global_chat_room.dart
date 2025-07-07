@@ -30,8 +30,6 @@ class GlobalChatRoom {
       orElse: () => <String, dynamic>{},
     );
 
-    if (task == null) return null;
-
     final rooms = getRoomsByTaskId(taskId);
 
     return {
@@ -55,8 +53,8 @@ class GlobalChatRoom {
 
   // 移除其他聊天室，保留指定的 roomId
   void removeRoomsByTaskIdExcept(String taskId, String roomId) {
-    _chatRooms.removeWhere((room) =>
-        room['taskId'] == taskId && room['roomId'] != roomId);
+    _chatRooms.removeWhere(
+        (room) => room['taskId'] == taskId && room['roomId'] != roomId);
   }
 
   List<Map<String, dynamic>> get chatRooms => _chatRooms;

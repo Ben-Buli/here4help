@@ -31,7 +31,9 @@ dev_dependencies:
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/icon/app_icon.png"
+  image_path: 'assets/icon/AppIcon.png'
+  
+  
 
 flutter:
   uses-material-design: true
@@ -39,3 +41,4 @@ flutter:
     - assets/icon/
     - assets/demoData/
     - assets/images/avatar/
+    - assets/icon/
