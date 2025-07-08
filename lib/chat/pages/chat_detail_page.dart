@@ -26,6 +26,30 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     'completed': 'Completed',
     'completed_tasker': 'Completed (Tasker)',
   };
+
+  // 狀態進度對應表，方便維護與擴充
+  static const Map<String, double> _statusProgressMap = {
+    'Open': 0.0,
+    'In Progress': 0.25,
+    'Pending Confirmation': 0.5,
+    'Completed': 1.0,
+    'Dispute': 0.75,
+    'Applying (Tasker)': 0.0,
+    'In Progress (Tasker)': 0.25,
+    'Completed (Tasker)': 1.0,
+    'Rejected (Tasker)': 0.0,
+    'Pending Confirmation (Tasker)': 0.5,
+    // 其他狀態可依需求加入
+  };
+
+  Map<String, dynamic> _getProgressData(String status) {
+    if (_statusProgressMap.containsKey(status)) {
+      return {'progress': _statusProgressMap[status]};
+    }
+    // 不顯示進度條的狀態
+    return {'progress': null};
+  }
+
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final List<String> _messages = [];
@@ -475,7 +499,17 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: Text(
-              widget.data['task']['status'] ?? '',
+              (() {
+                final status = widget.data['task']['status'] ?? '';
+                final progressData = _getProgressData(status);
+                final progress = progressData['progress'];
+                if (progress != null) {
+                  final percent = (progress * 100).round();
+                  return '$status ($percent%)';
+                } else {
+                  return status;
+                }
+              })(),
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
@@ -778,7 +812,7 @@ Color _getStatusChipColor(String status) {
     case 'Rejected (Tasker)':
       return Colors.grey[800]!;
     case 'Dispute':
-      return Colors.red[800]!;
+      return Colors.brown[800]!;
     case 'Pending Confirmation':
       return Colors.purple[800]!;
     case 'Pending Confirmation (Tasker)':
@@ -805,7 +839,7 @@ Color _getStatusBackgroundColor(String status) {
     case 'Rejected (Tasker)':
       return Colors.grey[200]!;
     case 'Dispute':
-      return Colors.red[50]!;
+      return Colors.brown[50]!;
     case 'Pending Confirmation':
       return Colors.purple[50]!;
     case 'Pending Confirmation (Tasker)':

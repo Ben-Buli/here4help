@@ -152,6 +152,111 @@ class _ChatListPageState extends State<ChatListPage> {
         status == statusString['pending_confirmation_tasker'];
   }
 
+  /// 根據狀態返回進度值和顏色
+  Map<String, dynamic> _getProgressData(String status) {
+    const int colorRates = 200;
+    switch (status) {
+      case 'Open':
+        return {'progress': 0.0, 'color': Colors.blue[colorRates]!};
+      case 'In Progress':
+        return {'progress': 0.25, 'color': Colors.orange[colorRates]!};
+      case 'Pending Confirmation':
+        return {'progress': 0.5, 'color': Colors.purple[colorRates]!};
+      case 'Completed':
+        return {'progress': 1.0, 'color': Colors.lightGreen[colorRates]!};
+      case 'Dispute':
+        return {'progress': 0.75, 'color': Colors.brown[colorRates]!};
+      case 'Applying (Tasker)':
+        return {'progress': 0.0, 'color': Colors.lightGreenAccent[colorRates]!};
+      case 'In Progress (Tasker)':
+        return {'progress': 0.25, 'color': Colors.orange[colorRates]!};
+      case 'Completed (Tasker)':
+        return {'progress': 1.0, 'color': Colors.green[colorRates]!};
+      case 'Rejected (Tasker)':
+        return {'progress': 1.0, 'color': Colors.blueGrey[colorRates]!};
+      default:
+        return {
+          'progress': null,
+          'color': Colors.lightBlue[colorRates]!
+        }; // 其他狀態
+    }
+  }
+
+  /// 修改卡片內容，添加進度條
+  Widget _taskCardWithProgressBar(Map<String, dynamic> task) {
+    final progressData = _getProgressData(task['status']);
+    final progress = progressData['progress'];
+    final color = progressData['color'];
+
+    return Card(
+      clipBehavior: Clip.hardEdge,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              task['title'] ?? 'N/A',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              maxLines: null,
+              softWrap: true,
+            ),
+            Row(
+              children: [
+                Icon(Icons.location_on, size: 16, color: Colors.grey[700]),
+                Flexible(
+                  child: Text(
+                    ' ${task['location']}   💰 ${task['salary']}   📅 ${task['task_date']}   🌐 ${task['language_requirement']}',
+                    maxLines: null,
+                    softWrap: true,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (progress != null) ...[
+              // 進度條
+              Container(
+                height: 30, // 確保容器高度足夠
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    LinearProgressIndicator(
+                      value: _getProgressData(task['status'])['progress'],
+                      backgroundColor: Colors.grey[300],
+                      color: _getProgressData(task['status'])['color'],
+                      minHeight: 20,
+                    ),
+                    Text(
+                      _getProgressLabel(task['status']),
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ] else ...[
+              // 顯示 Label 或 Chip
+              Chip(
+                label: Text(task['status']),
+                backgroundColor: Colors.transparent,
+                labelStyle: const TextStyle(color: Colors.red),
+                side: const BorderSide(color: Colors.red),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _taskCardWithapplierChatItems(
       Map<String, dynamic> task, List<Map<String, dynamic>> applierChatItems) {
     // Calculate unreadCount: sum of all applierChatItems' unreadCount
@@ -205,17 +310,29 @@ class _ChatListPageState extends State<ChatListPage> {
                 Wrap(
                   spacing: 6,
                   children: [
-                    Chip(
-                      label: Text(task['status']),
-                      backgroundColor: Colors.transparent,
-                      labelStyle: TextStyle(
-                          color: _getStatusChipColor(task['status'], 'Text')),
-                      side: BorderSide(
-                          color: _getStatusChipBorderColor(task['status'])),
+                    // 顯示進度條
+                    Container(
+                      height: 30, // 確保容器高度足夠
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          LinearProgressIndicator(
+                            value: _getProgressData(task['status'])['progress'],
+                            backgroundColor: Colors.grey[300],
+                            color: _getProgressData(task['status'])['color'],
+                            minHeight: 20,
+                          ),
+                          Text(
+                            _getProgressLabel(task['status']),
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    ...((task['hashtags'] as List<dynamic>)
-                        .map((tag) => Chip(label: Text(tag.toString())))
-                        .toList()),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -475,6 +592,19 @@ class _ChatListPageState extends State<ChatListPage> {
     );
   }
 
+  String _getProgressLabel(String status) {
+    final progressData = _getProgressData(status);
+    final progress = progressData['progress'];
+    if (status == 'Rejected (Tasker)') {
+      return status; // 不顯示百分比
+    }
+    if (progress == null) {
+      return status; // 非進度條狀態僅顯示狀態名稱
+    }
+    final percentage = (progress * 100).toInt();
+    return '$status ($percentage%)';
+  }
+
   @override
   Widget build(BuildContext context) {
     final globalTaskList = GlobalTaskList();
@@ -506,20 +636,6 @@ class _ChatListPageState extends State<ChatListPage> {
                 .compareTo(DateTime.parse(a['task_date']));
           });
 
-          // 下拉選單互相連動：依據目前選擇過濾產生 options
-          // List<Map<String, dynamic>> getFilteredTasksForDropdown() {
-          //   return tasks.where((task) {
-          //     final locationMatch = selectedLocation == null ||
-          //         task['location'] == selectedLocation;
-          //     final hashtagMatch = selectedHashtag == null ||
-          //         (task['hashtags'] as List<dynamic>? ?? [])
-          //             .contains(selectedHashtag);
-          //     final statusMatch =
-          //         selectedStatus == null || task['status'] == selectedStatus;
-          //     return locationMatch && hashtagMatch && statusMatch;
-          //   }).toList();
-          // }
-
           // final filteredTasksForDropdown = getFilteredTasksForDropdown();
           final filteredTasksForDropdown = tasks; // 不做下拉選單聯動篩選
           final locationOptions = filteredTasksForDropdown
@@ -528,13 +644,14 @@ class _ChatListPageState extends State<ChatListPage> {
               .toSet()
               .toList()
             ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-          final hashtagOptions = filteredTasksForDropdown
-              .expand((e) => (e['hashtags'] as List<dynamic>? ?? [])
-                  .map((h) => h.toString()))
-              .where((e) => e.isNotEmpty)
-              .toSet()
-              .toList()
-            ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+          /// 註解掉 hashtag的篩選邏輯
+          // final hashtagOptions = filteredTasksForDropdown
+          //     .expand((e) => (e['hashtags'] as List<dynamic>? ?? [])
+          //         .map((h) => h.toString()))
+          //     .where((e) => e.isNotEmpty)
+          //     .toSet()
+          //     .toList()
           final statusOptions = filteredTasksForDropdown
               .map((e) => (e['status'] ?? '').toString())
               .where((e) => e.isNotEmpty)
@@ -562,8 +679,8 @@ class _ChatListPageState extends State<ChatListPage> {
 
             final matchLocation =
                 selectedLocation == null || selectedLocation == location;
-            final matchHashtag =
-                selectedHashtag == null || hashtags.contains(selectedHashtag);
+            // final matchHashtag =
+            //     selectedHashtag == null || hashtags.contains(selectedHashtag);
             final matchStatus =
                 selectedStatus == null || selectedStatus == status;
             final matchTasker = !taskerFilterEnabled ||
@@ -573,7 +690,7 @@ class _ChatListPageState extends State<ChatListPage> {
 
             return matchQuery &&
                 matchLocation &&
-                matchHashtag &&
+                // matchHashtag &&
                 matchStatus &&
                 matchTasker;
           }).toList();
@@ -663,22 +780,22 @@ class _ChatListPageState extends State<ChatListPage> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedHashtag,
-                        hint: const Text('Hashtag'),
-                        underline: Container(height: 1, color: Colors.grey),
-                        items: hashtagOptions.map((tag) {
-                          return DropdownMenuItem(value: tag, child: Text(tag));
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedHashtag = value;
-                          });
-                        },
-                      ),
-                    ),
+                    // Expanded(
+                    //   child: DropdownButton<String>(
+                    //     isExpanded: true,
+                    //     value: selectedHashtag,
+                    //     hint: const Text('Hashtag'),
+                    //     underline: Container(height: 1, color: Colors.grey),
+                    //     items: hashtagOptions.map((tag) {
+                    //       return DropdownMenuItem(value: tag, child: Text(tag));
+                    //     }).toList(),
+                    //     onChanged: (value) {
+                    //       setState(() {
+                    //         selectedHashtag = value;
+                    //       });
+                    //     },
+                    //   ),
+                    // ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: DropdownButton<String>(
