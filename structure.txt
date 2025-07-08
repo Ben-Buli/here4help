@@ -1,0 +1,132 @@
+.
+├── android
+│   ├── app
+│   └── gradle
+├── assets
+│   ├── demoData
+│   ├── icon
+│   └── images
+├── build
+│   ├── ios
+│   └── native_assets
+├── ios
+│   ├── Flutter
+│   ├── Pods
+│   ├── Runner
+│   ├── Runner.xcodeproj
+│   ├── Runner.xcworkspace
+│   └── RunnerTests
+├── linux
+│   ├── flutter
+│   └── runner
+├── macos
+│   ├── Flutter
+│   ├── Pods
+│   ├── Runner
+│   ├── Runner.xcodeproj
+│   ├── Runner.xcworkspace
+│   └── RunnerTests
+├── test
+├── web
+│   └── icons
+└── windows
+    ├── flutter
+    └── runner
+
+34 directories
+
+📁 lib folder with files:
+
+lib
+├── account
+│   ├── models
+│   │   └── account_routes.dart
+│   ├── pages
+│   │   ├── account_page.dart
+│   │   ├── change_password.dart
+│   │   ├── contact_us_page.dart
+│   │   ├── faq_page.dart
+│   │   ├── issue_status_page.dart
+│   │   ├── logout_page.dart
+│   │   ├── profile_page.dart
+│   │   ├── ratings_page.dart
+│   │   ├── security_page.dart
+│   │   ├── support_page.dart
+│   │   ├── task_history_page.dart
+│   │   └── wallet_page.dart
+│   ├── services
+│   └── widgets
+├── auth
+│   ├── models
+│   │   └── user_model.dart
+│   ├── pages
+│   │   ├── login_page_regular.dart
+│   │   ├── login_page.dart
+│   │   └── signup_page.dart
+│   ├── services
+│   │   ├── auth_guard.dart
+│   │   └── user_service.dart
+│   └── widgets
+├── chat
+│   ├── models
+│   │   ├── chat_detail_model.dart
+│   │   └── chat_room_model.dart
+│   ├── pages
+│   │   ├── chat_detail_page.dart
+│   │   └── chat_list_page.dart
+│   ├── services
+│   │   └── global_chat_room.dart
+│   └── widgets
+├── constants
+│   ├── app_scaffold_config.dart
+│   ├── demo_users.dart
+│   ├── language_list.dart
+│   ├── route_permissions.dart
+│   └── shell_pages.dart
+├── explore
+│   ├── models
+│   ├── pages
+│   │   └── explore_page.dart
+│   └── service
+├── home
+│   ├── models
+│   ├── pages
+│   │   └── home_page.dart
+│   ├── services
+│   └── widgets
+├── layout
+│   └── app_scaffold.dart
+├── main.dart
+├── pay
+│   ├── models
+│   ├── pages
+│   │   └── pay_setting_page.dart
+│   ├── services
+│   └── widgets
+├── router
+│   └── app_router.dart
+├── system
+│   ├── models
+│   ├── pages
+│   │   ├── banned_page.dart
+│   │   ├── unauthorized_page.dart
+│   │   └── unknown_page.dart
+│   ├── services
+│   └── widgets
+├── task
+│   ├── models
+│   │   ├── task_model.dart
+│   │   └── university_list.dart
+│   ├── pages
+│   │   ├── task_apply_page.dart
+│   │   ├── task_create_page.dart
+│   │   ├── task_list_page.dart
+│   │   └── task_preview_page.dart
+│   ├── services
+│   │   └── global_task_list.dart
+│   └── widgets
+└── widgets
+    ├── custom_popup.dart
+    └── error_page.dart
+
+44 directories, 47 files

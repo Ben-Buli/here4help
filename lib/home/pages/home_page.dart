@@ -13,7 +13,8 @@ class HomePage extends StatelessWidget {
         builder: (context, constraints) {
           bool isWide = constraints.maxWidth > 800;
           final user = context.watch<UserService>().currentUser;
-          return Center(
+          return Align(
+            alignment: Alignment.topCenter, // 將內容靠上對齊
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: isWide ? 800 : double.infinity,
@@ -21,7 +22,8 @@ class HomePage extends StatelessWidget {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start, // 水平方向靠左對齊
+                  mainAxisAlignment: MainAxisAlignment.start, // 垂直方向靠上對齊
                   children: [
                     Row(
                       children: [
@@ -95,88 +97,91 @@ class HomePage extends StatelessWidget {
                         _AchievementBox(label: 'Avg Rating', value: '4.5'),
                       ],
                     ),
-                    const SizedBox(height: 24),
-                    const Text('Ongoing Challenges',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 18)),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 160,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: const [
-                          _ChallengeCard(
-                              title: 'Complete 3 lifestyle tasks',
-                              progress: '1/3'),
-                          _ChallengeCard(
-                              title: 'Finish 5 tasks this week',
-                              progress: '2/5'),
-                          _ChallengeCard(
-                              title: 'Try multilingual tasks', progress: ''),
-                          _ChallengeCard(
-                              title: 'Collect 10 five-star ratings',
-                              progress: '7/10'),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text('Unlockable Achievements',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 18)),
-                    const SizedBox(height: 12),
-                    const Wrap(
-                      spacing: 12,
-                      children: [
-                        Chip(
-                          label: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text('🧭'),
-                              Text('Explorer'),
-                            ],
-                          ),
-                        ),
-                        Chip(
-                          label: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text('🐝'),
-                              Text('Busy Bee'),
-                            ],
-                          ),
-                        ),
-                        Chip(
-                          label: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text('💬'),
-                              Text('Social Star'),
-                            ],
-                          ),
-                        ),
-                        Chip(
-                          label: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text('⭐'),
-                              Text('5 Star Warrior'),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                        '• Unlock Conditions: Tap to view requirements and progress\n• Rewards Upon Unlock: +10 Coins / Priority Matching / Exclusive Titles',
-                        style: TextStyle(fontSize: 12, color: Colors.grey))
+
+                    /// 以下成就系統先隱藏不做
+                    // const SizedBox(height: 24),
+                    // const Text('Ongoing Challenges',
+                    //     style: TextStyle(
+                    //         fontWeight: FontWeight.bold, fontSize: 18)),
+                    // const SizedBox(height: 12),
+                    // SizedBox(
+                    //   height: 160,
+                    //   child: ListView(
+                    //     scrollDirection: Axis.horizontal,
+                    //     children: const [
+                    //       _ChallengeCard(
+                    //           title: 'Complete 3 lifestyle tasks',
+                    //           progress: '1/3'),
+                    //       _ChallengeCard(
+                    //           title: 'Finish 5 tasks this week',
+                    //           progress: '2/5'),
+                    //       _ChallengeCard(
+                    //           title: 'Try multilingual tasks', progress: ''),
+                    //       _ChallengeCard(
+                    //           title: 'Collect 10 five-star ratings',
+                    //           progress: '7/10'),
+                    //     ],
+                    //   ),
+                    // ),
+                    // const SizedBox(height: 24),
+                    // const Text('Unlockable Achievements',
+                    //     style: TextStyle(
+                    //         fontWeight: FontWeight.bold, fontSize: 18)),
+                    // const SizedBox(height: 12),
+                    // const Wrap(
+                    //   spacing: 12,
+                    //   children: [
+                    //     Chip(
+                    //       label: Column(
+                    //         mainAxisSize: MainAxisSize.min,
+                    //         mainAxisAlignment: MainAxisAlignment.center,
+                    //         crossAxisAlignment: CrossAxisAlignment.center,
+                    //         children: [
+                    //           Text('🧭'),
+                    //           Text('Explorer'),
+                    //         ],
+                    //       ),
+                    //     ),
+                    //     Chip(
+                    //       label: Column(
+                    //         mainAxisSize: MainAxisSize.min,
+                    //         mainAxisAlignment: MainAxisAlignment.center,
+                    //         crossAxisAlignment: CrossAxisAlignment.center,
+                    //         children: [
+                    //           Text('🐝'),
+                    //           Text('Busy Bee'),
+                    //         ],
+                    //       ),
+                    //     ),
+                    //     Chip(
+                    //       label: Column(
+                    //         mainAxisSize: MainAxisSize.min,
+                    //         mainAxisAlignment: MainAxisAlignment.center,
+                    //         crossAxisAlignment: CrossAxisAlignment.center,
+                    //         children: [
+                    //           Text('💬'),
+                    //           Text('Social Star'),
+                    //         ],
+                    //       ),
+                    //     ),
+                    //     Chip(
+                    //       label: Column(
+                    //         mainAxisSize: MainAxisSize.min,
+                    //         mainAxisAlignment: MainAxisAlignment.center,
+                    //         crossAxisAlignment: CrossAxisAlignment.center,
+                    //         children: [
+                    //           Text('⭐'),
+                    //           Text('5 Star Warrior'),
+                    //         ],
+                    //       ),
+                    //     ),
+                    //   ],
+                    // ),
+                    // const SizedBox(height: 8),
+                    // const Text(
+                    //     '• Unlock Conditions: Tap to view requirements and progress\n• Rewards Upon Unlock: +10 Coins / Priority Matching / Exclusive Titles',
+                    //     style: TextStyle(fontSize: 12, color: Colors.grey))
+                    /// 以上，成就系統先隱藏不做
                   ],
                 ),
               ),
