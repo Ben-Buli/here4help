@@ -48,8 +48,21 @@ class _AppScaffoldState extends State<AppScaffold> {
                               if (context.canPop()) {
                                 context.pop();
                                 return;
+                              } else if (GoRouterState.of(context)
+                                      .uri
+                                      .pathSegments
+                                      .length >
+                                  1) {
+                                // 取得上一層路由
+                                final segments =
+                                    GoRouterState.of(context).uri.pathSegments;
+                                final parentPath =
+                                    '/${segments.sublist(0, segments.length - 1).join('/')}';
+                                context.go(parentPath);
+                              } else {
+                                // 如果沒有上一層路由，則返回到首頁
+                                context.go('/home');
                               }
-                              context.go('/home');
                             },
                           )
                         : null,
@@ -75,7 +88,11 @@ class _AppScaffoldState extends State<AppScaffold> {
                     ),
                   )
                 : null,
-            body: widget.child,
+            body: SafeArea(
+              top: widget.showAppBar,
+              bottom: !widget.showBottomNav,
+              child: widget.child,
+            ),
             bottomNavigationBar: widget.showBottomNav
                 ? BottomNavigationBar(
                     type: BottomNavigationBarType.fixed,
