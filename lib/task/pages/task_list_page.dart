@@ -78,13 +78,14 @@ class _TaskListPageState extends State<TaskListPage> {
       }
 
       final status = (task['status'] ?? '').toString().toLowerCase();
-      if (status == 'open') {
+      if (status.toLowerCase() == 'open') {
         task['unreadCount'] = visibleAppliers
             .map((ap) => ap['unreadCount'] as int)
             .fold(0, (prev, element) => prev + element);
-      } else if (status == 'pending confirmation') {
+      } else if (status.toLowerCase() == 'pending confirmation') {
         task['unreadCount'] = 1; // Pending confirmation adds 1 unread count
-      } else if (status == 'closed' || status == 'cancelled') {
+      } else if (status.toLowerCase() == 'closed' ||
+          status.toLowerCase() == 'cancelled') {
         task['unreadCount'] =
             0; // Closed or cancelled tasks have no unread count
       } else {
@@ -154,6 +155,14 @@ class _TaskListPageState extends State<TaskListPage> {
                     const Text('Task Description',
                         style: TextStyle(fontWeight: FontWeight.bold)),
                     Text(task['description'] ?? 'No description.'),
+                    const SizedBox(height: 12),
+                    const Text('Application Question',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    ...((task['application_question'] ?? '—')
+                        .toString()
+                        .split('|')
+                        .map((q) => Text(q.trim()))
+                        .toList()),
                     const SizedBox(height: 12),
                     Text.rich(TextSpan(
                       children: [
