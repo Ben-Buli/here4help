@@ -27,6 +27,34 @@ class AppScaffold extends StatefulWidget {
 }
 
 class _AppScaffoldState extends State<AppScaffold> {
+  // 新增 route history
+  final List<String> _routeHistory = [];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final currentPath = GoRouterState.of(context).uri.toString();
+    if (_routeHistory.isEmpty || _routeHistory.last != currentPath) {
+      _routeHistory.add(currentPath);
+    }
+  }
+
+  void _handleBack() {
+    final popped = Navigator.of(context).maybePop();
+    popped.then((didPop) {
+      if (!didPop) {
+        if (_routeHistory.length > 1) {
+          // 移除當前
+          _routeHistory.removeLast();
+          // 回到上一頁
+          final previous = _routeHistory.removeLast();
+          context.go(previous);
+          // 沒有上一頁則點擊沒有反應
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -38,32 +66,25 @@ class _AppScaffoldState extends State<AppScaffold> {
             appBar: widget.showAppBar
                 ? AppBar(
                     backgroundColor: const Color.fromARGB(255, 255, 255, 255),
+                    shape: const Border(
+                      bottom: BorderSide(
+                        color: Color(0xFFCCCCCC),
+                        width: 1.0,
+                      ),
+                    ),
                     elevation: 0,
                     centerTitle: widget.centerTitle,
                     leading: widget.showBackArrow
                         ? IconButton(
-                            icon: const Icon(Icons.arrow_back_ios_new,
-                                color: Color(0xFF2563EB)),
-                            onPressed: () {
-                              if (context.canPop()) {
-                                context.pop();
-                                return;
-                              } else if (GoRouterState.of(context)
-                                      .uri
-                                      .pathSegments
-                                      .length >
-                                  1) {
-                                // 取得上一層路由
-                                final segments =
-                                    GoRouterState.of(context).uri.pathSegments;
-                                final parentPath =
-                                    '/${segments.sublist(0, segments.length - 1).join('/')}';
-                                context.go(parentPath);
-                              } else {
-                                // 如果沒有上一層路由，則返回到首頁
-                                context.go('/home');
-                              }
-                            },
+                            icon: Icon(
+                              Icons.arrow_back_ios_new,
+                              color: _routeHistory.length > 1
+                                  ? const Color(0xFF2563EB)
+                                  : Colors.grey,
+                            ),
+                            onPressed:
+                                _routeHistory.length > 1 ? _handleBack : null,
+                            // 如果沒有上一頁，按鈕 disabled
                           )
                         : null,
                     title: Text(
@@ -78,12 +99,24 @@ class _AppScaffoldState extends State<AppScaffold> {
                       ...?widget.actions,
                     ],
                     bottom: const PreferredSize(
-                      preferredSize: Size.fromHeight(1.0),
-                      child: SizedBox(
-                        height: 1.0,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(color: Color(0xFFCCCCCC)),
-                        ),
+                      preferredSize: Size.fromHeight(2.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            height: 1.0,
+                            child: DecoratedBox(
+                              decoration:
+                                  BoxDecoration(color: Color(0xFFCCCCCC)),
+                            ),
+                          ),
+                          SizedBox(
+                            height: 1.0,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(color: Colors.grey),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   )
@@ -102,19 +135,19 @@ class _AppScaffoldState extends State<AppScaffold> {
                     onTap: (index) {
                       switch (index) {
                         case 0:
-                          context.go('/task/create');
+                          context.push('/task/create');
                           break;
                         case 1:
-                          context.go('/task');
+                          context.push('/task');
                           break;
                         case 2:
-                          context.go('/home');
+                          context.push('/home');
                           break;
                         case 3:
-                          context.go('/chat');
+                          context.push('/chat');
                           break;
                         case 4:
-                          context.go('/account');
+                          context.push('/account');
                           break;
                       }
                     },
