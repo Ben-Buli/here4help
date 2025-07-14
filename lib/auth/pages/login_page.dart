@@ -117,23 +117,57 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 24,
-                          backgroundColor: Colors.primaries[
-                                  (account['name']?.hashCode ?? 0) %
-                                      Colors.primaries.length]
-                              .withOpacity(0.8),
-                          child: Text(
-                            (account['name']?.toString().isNotEmpty == true)
-                                ? account['name']!.toString()[0].toUpperCase()
-                                : '',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
+                        (account['avatar_url'] != null &&
+                                (account['avatar_url'] as String).isNotEmpty)
+                            ? CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Colors.grey.shade200,
+                                child: ClipOval(
+                                  child: Image.asset(
+                                    account['avatar_url'],
+                                    width: 48,
+                                    height: 48,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Text(
+                                        (account['name']
+                                                    ?.toString()
+                                                    .isNotEmpty ==
+                                                true)
+                                            ? account['name']!
+                                                .toString()[0]
+                                                .toUpperCase()
+                                            : '',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              )
+                            : CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Colors.primaries[
+                                        (account['name']?.hashCode ?? 0) %
+                                            Colors.primaries.length]
+                                    .withOpacity(0.8),
+                                child: Text(
+                                  (account['name']?.toString().isNotEmpty ==
+                                          true)
+                                      ? account['name']!
+                                          .toString()[0]
+                                          .toUpperCase()
+                                      : '',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
