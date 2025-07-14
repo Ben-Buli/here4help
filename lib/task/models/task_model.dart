@@ -1,3 +1,36 @@
+// 新增獨立的 ApplicationQuestion model
+class ApplicationQuestionModel {
+  final String id;
+  final String taskId;
+  final String applicationQuestion;
+  final String? applierReply;
+
+  ApplicationQuestionModel({
+    required this.id,
+    required this.taskId,
+    required this.applicationQuestion,
+    this.applierReply,
+  });
+
+  factory ApplicationQuestionModel.fromMap(Map<String, dynamic> map) {
+    return ApplicationQuestionModel(
+      id: map['id'],
+      taskId: map['task_id'],
+      applicationQuestion: map['application_question'],
+      applierReply: map['applier_reply'],
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'task_id': taskId,
+      'application_question': applicationQuestion,
+      'applier_reply': applierReply,
+    };
+  }
+}
+
 class TaskModel {
   final String id;
   final String? creatorName;
@@ -12,8 +45,8 @@ class TaskModel {
   final String acceptorConfirmed;
   final String? cancelReason;
   final String? failReason;
-  final String? applicationQuestion;
   final String languageRequirement;
+  final List<ApplicationQuestionModel>? applicationQuestions;
   final List<String>? hashtags;
   final String createdAt;
   final String updatedAt;
@@ -32,8 +65,8 @@ class TaskModel {
     required this.acceptorConfirmed,
     this.cancelReason,
     this.failReason,
-    this.applicationQuestion,
     required this.languageRequirement,
+    this.applicationQuestions,
     this.hashtags,
     required this.createdAt,
     required this.updatedAt,
@@ -54,10 +87,11 @@ class TaskModel {
       acceptorConfirmed: map['acceptor_confirmed'],
       cancelReason: map['cancel_reason'],
       failReason: map['fail_reason'],
-      applicationQuestion: map['application_question'],
       languageRequirement: map['language_requirement'],
       createdAt: map['created_at'],
       updatedAt: map['updated_at'],
+      hashtags:
+          map['hashtags'] != null ? List<String>.from(map['hashtags']) : null,
     );
   }
 
@@ -76,9 +110,8 @@ class TaskModel {
       'acceptor_confirmed': acceptorConfirmed,
       'cancel_reason': cancelReason,
       'fail_reason': failReason,
-      'application_question': applicationQuestion,
-      'hashtags': hashtags,
       'language_requirement': languageRequirement,
+      'hashtags': hashtags,
       'created_at': createdAt,
       'updated_at': updatedAt,
     };
