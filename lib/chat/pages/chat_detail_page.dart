@@ -178,91 +178,101 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                   ),
                 ),
                 const SizedBox(width: 8),
-                Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    constraints: const BoxConstraints(maxWidth: 300),
-                    decoration: BoxDecoration(
-                      color: const Color.fromARGB(255, 235, 241, 249),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(text),
-                        // Text(
-                        //   joinTime,
-                        //   style:
-                        //       const TextStyle(fontSize: 10, color: Colors.grey),
-                        // ),
-                        const SizedBox(height: 4),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton(
-                              onPressed: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) {
-                                    return AlertDialog(
-                                      content: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          CircleAvatar(
-                                            radius: 24,
-                                            child: Text(
-                                              (room['name'] ?? 'U')[0]
-                                                  .toUpperCase(),
-                                              style: const TextStyle(
-                                                  color: Colors.white),
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          constraints: const BoxConstraints(maxWidth: 300),
+                          decoration: BoxDecoration(
+                            color: const Color.fromARGB(255, 235, 241, 249),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(text),
+                              const SizedBox(height: 4),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                    onPressed: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) {
+                                          return AlertDialog(
+                                            content: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 24,
+                                                  child: Text(
+                                                    (room['name'] ?? 'U')[0]
+                                                        .toUpperCase(),
+                                                    style: const TextStyle(
+                                                        color: Colors.white),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  room['name'] ?? '',
+                                                  style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 16),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(Icons.star,
+                                                        color: Color.fromARGB(
+                                                            255, 255, 187, 0),
+                                                        size: 16),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      '${room['rating'] ?? 0.0}',
+                                                      style: const TextStyle(
+                                                          fontSize: 14),
+                                                    ),
+                                                  ],
+                                                ),
+                                                Text(
+                                                  '(${room['reviewsCount'] ?? 0} reviews)',
+                                                  style: const TextStyle(
+                                                      fontSize: 12),
+                                                ),
+                                              ],
                                             ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            room['name'] ?? '',
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 16),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(Icons.star,
-                                                  color: Color.fromARGB(
-                                                      255, 255, 187, 0),
-                                                  size: 16),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                '${room['rating'] ?? 0.0}',
-                                                style: const TextStyle(
-                                                    fontSize: 14),
-                                              ),
+                                            actions: [
+                                              Center(
+                                                  child: ElevatedButton(
+                                                onPressed: () {
+                                                  Navigator.of(context).pop();
+                                                },
+                                                child: const Text('Understand'),
+                                              )),
                                             ],
-                                          ),
-                                          Text(
-                                            '(${room['reviewsCount'] ?? 0} reviews)',
-                                            style:
-                                                const TextStyle(fontSize: 12),
-                                          ),
-                                        ],
-                                      ),
-                                      actions: [
-                                        Center(
-                                            child: ElevatedButton(
-                                          onPressed: () {
-                                            Navigator.of(context).pop();
-                                          },
-                                          child: const Text('Understand'),
-                                        )),
-                                      ],
-                                    );
-                                  },
-                                );
-                              },
-                              child: const Text('View Resume')),
+                                          );
+                                        },
+                                      );
+                                    },
+                                    child: const Text('View Resume')),
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        joinTime,
+                        style:
+                            const TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -290,15 +300,28 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                   ),
                 ),
                 const SizedBox(width: 8),
-                Flexible(
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    constraints: const BoxConstraints(maxWidth: 300),
-                    decoration: BoxDecoration(
-                      color: const Color.fromARGB(255, 235, 241, 249),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(text),
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          constraints: const BoxConstraints(maxWidth: 300),
+                          decoration: BoxDecoration(
+                            color: const Color.fromARGB(255, 235, 241, 249),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(text),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        joinTime,
+                        style:
+                            const TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -313,8 +336,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         padding: const EdgeInsets.symmetric(vertical: 3.0), // 上下間距
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            Text(
+              joinTime,
+              style: const TextStyle(fontSize: 10, color: Colors.grey),
+            ),
+            const SizedBox(width: 4),
             Flexible(
               child: Container(
                 padding: const EdgeInsets.all(12),
@@ -323,17 +351,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                   color: Colors.grey.shade100, // 我的訊息背景色
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(text),
-                    const SizedBox(height: 4),
-                    // Text(
-                    //   joinTime,
-                    //   style: const TextStyle(fontSize: 10, color: Colors.grey),
-                    // ),
-                  ],
-                ),
+                child: Text(text),
               ),
             ),
           ],
@@ -432,9 +450,79 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              widget.data['task']['title'] ?? 'Chat',
-              style: const TextStyle(fontSize: 20),
+            GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text(widget.data['task']['title'] ?? 'Task Info'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Task Description',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(widget.data['task']['description'] ??
+                            'No description'),
+                        const SizedBox(height: 8),
+                        const Text('Salary:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(widget.data['task']['salary'] != null
+                            ? 'NT\$${widget.data['task']['salary']}'
+                            : '—'),
+                        const SizedBox(height: 8),
+                        const Text('Request Language:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                            widget.data['task']['language_requirement'] ?? '—'),
+                        const SizedBox(height: 8),
+                        const Text('Location:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(widget.data['task']['location'] ?? '—'),
+                        const SizedBox(height: 8),
+                        const Text('Task Date:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(widget.data['task']['task_date'] ?? '—'),
+                        const SizedBox(height: 8),
+                        // --- Application Question section ---
+                        const Text('Application Question:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                            widget.data['task']['application_question'] ?? '—'),
+                        const SizedBox(height: 8),
+                        // --- End Application Question section ---
+                        const Text('Posted by:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text('UserName: ${widget.data['room']['name'] ?? '—'}'),
+                        Row(
+                          children: [
+                            const Icon(Icons.star,
+                                color: Color.fromARGB(255, 255, 187, 0),
+                                size: 16),
+                            const SizedBox(width: 4),
+                            Text('${widget.data['room']['rating'] ?? 0.0}'),
+                            Text(
+                                ' (${widget.data['room']['reviewsCount'] ?? 0} reviews)'),
+                          ],
+                        )
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('CLOSE'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: Text(
+                widget.data['task']['title'] ?? 'Chat',
+                style: const TextStyle(
+                  fontSize: 20,
+                  color: Colors.blue,
+                ),
+              ),
             ),
             const SizedBox(height: 2),
             Text(
@@ -446,7 +534,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1.0),
           child: Container(
-            color: Colors.blue.shade100,
+            color: Colors.grey,
             height: 1.0,
           ),
         ),
