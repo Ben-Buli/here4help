@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:here4help/task/services/global_task_list.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:here4help/chat/models/chat_room_model.dart';
+import 'package:intl/intl.dart';
 
 // Define statusString as a constant outside the class
 const Map<String, String> statusString = {
@@ -63,7 +64,8 @@ class _ChatListPageState extends State<ChatListPage> {
                 Text('Title: ${task['title'] ?? 'N/A'}'),
                 Text('Location: ${task['location']}'),
                 Text('Salary: ${task['salary']}'),
-                Text('Date: ${task['task_date']}'),
+                Text(
+                    'Date: ${DateFormat('MM/dd').format(DateTime.parse(task['task_date']))}'),
                 Text('Language Requirement: ${task['language_requirement']}'),
                 Text(
                     'Hashtags: ${(task['hashtags'] as List<dynamic>).join(', ')}'),
@@ -198,28 +200,10 @@ class _ChatListPageState extends State<ChatListPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              task['title'] ?? 'N/A',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              maxLines: null,
-              softWrap: true,
-            ),
-            Row(
-              children: [
-                Icon(Icons.location_on, size: 16, color: Colors.grey[700]),
-                Flexible(
-                  child: Text(
-                    ' ${task['location']}   💰 ${task['salary']}   📅 ${task['task_date']}   🌐 ${task['language_requirement']}',
-                    maxLines: null,
-                    softWrap: true,
-                  ),
-                ),
-              ],
-            ),
             const SizedBox(height: 8),
             if (progress != null) ...[
               // 進度條
-              Container(
+              SizedBox(
                 height: 30, // 確保容器高度足夠
                 child: Stack(
                   alignment: Alignment.center,
@@ -290,28 +274,88 @@ class _ChatListPageState extends State<ChatListPage> {
                   _buildCountdownTimer(task),
                   const SizedBox(height: 8),
                 ],
-                Text(task['title'] ?? 'N/A',
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                    maxLines: null,
-                    softWrap: true),
-                Row(
-                  children: [
-                    Icon(Icons.location_on, size: 16, color: Colors.grey[700]),
-                    Flexible(
-                      child: Text(
-                        ' ${task['location']}   💰 ${task['salary']}   📅 ${task['task_date']}   🌐 ${task['language_requirement']}',
-                        maxLines: null,
-                        softWrap: true,
+                Text(
+                  task['title'] ?? 'N/A',
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
+                  maxLines: null,
+                  softWrap: true,
+                ),
+                // 格狀排版的 task 資訊（上下欄對齊、左右有間隔，無背景色與圓角）- new layout
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                  child: Column(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.location_on,
+                                    size: 16, color: Colors.grey[700]),
+                                const SizedBox(width: 6),
+                                Expanded(child: Text('${task['location']}')),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('💰'),
+                                const SizedBox(width: 6),
+                                Expanded(child: Text('${task['salary']}')),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 3),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('📅'),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    DateFormat('yyyy-MM-dd').format(
+                                        DateTime.parse(task['task_date'])),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('🌐'),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                    child: Text(
+                                        '${task['language_requirement']}')),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
                 Wrap(
                   spacing: 6,
                   children: [
                     // 顯示進度條
-                    Container(
+                    SizedBox(
                       height: 30, // 確保容器高度足夠
                       child: Stack(
                         alignment: Alignment.center,
@@ -632,6 +676,7 @@ class _ChatListPageState extends State<ChatListPage> {
             if (statusA != statusB) {
               return statusA.compareTo(statusB);
             }
+
             return (DateTime.parse(b['task_date']))
                 .compareTo(DateTime.parse(a['task_date']));
           });
@@ -951,14 +996,15 @@ class _CountdownTimerWidgetState extends State<_CountdownTimerWidget> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.timer, color: Colors.purple, size: 18),
           const SizedBox(width: 6),
-          const Text('Task completion requested. Please confirm before: ',
+          const Text('Confirm within: ',
               style: TextStyle(
                 color: Colors.blueGrey,
                 fontSize: 12,
                 fontWeight: FontWeight.normal,
               )),
+          const SizedBox(width: 6),
+          const Icon(Icons.timer, color: Colors.purple, size: 18),
           Text(
             _remaining > Duration.zero
                 ? _formatDuration(_remaining)
