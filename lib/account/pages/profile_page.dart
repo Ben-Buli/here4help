@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:here4help/auth/services/user_service.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -12,37 +11,20 @@ class _ProfilePageState extends State<ProfilePage> {
   // 控制每個欄位是否進入編輯狀態
   String? editingField;
 
-  // 從 currentUser 取得資料
-  final currentUser = UserService().currentUser;
-
-  late String firstName;
-  late String lastName;
-  late String email;
-  // late String phone;
-  // late String dob;
-  late String gender;
-  // late String school;
-  // late String aboutMe;
-  late String avatarUrl;
+  // 假資料
+  String firstName = 'Jack';
+  String lastName = 'Wu';
+  String email = 'Jackywu@gmail.com';
+  String phone = '0912345678';
+  String dob = '2000-02-29';
+  String gender = 'Male';
+  String school = 'NCCU';
+  String aboutMe =
+      "Hi, I'm Jack! I'm currently studying at National Chengchi University. I enjoy making new friends, have a good command of English, and love helping others!";
 
   // 編輯暫存
   final TextEditingController firstNameController = TextEditingController();
   final TextEditingController lastNameController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    // 初始化資料
-    firstName = currentUser?.name.split(' ').first ?? '';
-    lastName = currentUser?.name.split(' ').last ?? '';
-    email = currentUser?.email ?? '';
-    // phone = currentUser?.phone ?? '';
-    // dob = currentUser?.dob ?? '';
-    // gender = currentUser?.gender ?? '';
-    // school = currentUser?.school ?? '';
-    // aboutMe = currentUser?.aboutMe ?? '';
-    avatarUrl = currentUser?.avatar_url ?? '';
-  }
 
   @override
   void dispose() {
@@ -63,14 +45,10 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                CircleAvatar(
+                const CircleAvatar(
                   radius: 48,
-                  backgroundImage:
-                      avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
                   backgroundColor: Colors.grey,
-                  child: avatarUrl.isEmpty
-                      ? const Icon(Icons.person, size: 60, color: Colors.white)
-                      : null,
+                  child: Icon(Icons.person, size: 60, color: Colors.white),
                 ),
                 Positioned(
                   bottom: 0,
@@ -169,8 +147,7 @@ class _ProfilePageState extends State<ProfilePage> {
               });
             },
           ),
-          // Phone (註解)
-          /*
+          // Phone
           _profileField(
             label: 'Phone',
             value: phone,
@@ -197,9 +174,7 @@ class _ProfilePageState extends State<ProfilePage> {
               });
             },
           ),
-          */
-          // Date of Birth (註解)
-          /*
+          // Date of Birth
           _profileField(
             label: 'Date of Birth',
             value: dob,
@@ -226,9 +201,34 @@ class _ProfilePageState extends State<ProfilePage> {
               });
             },
           ),
-          */
-          // School (註解)
-          /*
+          // Gender
+          _profileField(
+            label: 'Gender',
+            value: gender,
+            fieldKey: 'gender',
+            isEditing: editingField == 'gender',
+            editWidget: TextField(
+              controller: TextEditingController(text: gender),
+              decoration: const InputDecoration(labelText: 'Gender'),
+            ),
+            onEdit: () {
+              setState(() {
+                editingField = 'gender';
+              });
+            },
+            onCancel: () {
+              setState(() {
+                editingField = null;
+              });
+            },
+            onDone: () {
+              // TODO: 更新 gender
+              setState(() {
+                editingField = null;
+              });
+            },
+          ),
+          // School
           _profileField(
             label: 'School',
             value: school,
@@ -255,9 +255,7 @@ class _ProfilePageState extends State<ProfilePage> {
               });
             },
           ),
-          */
-          // About Me (註解)
-          /*
+          // About Me
           _profileField(
             label: 'About Me',
             value: aboutMe,
@@ -285,7 +283,6 @@ class _ProfilePageState extends State<ProfilePage> {
               });
             },
           ),
-          */
         ],
       ),
     );
