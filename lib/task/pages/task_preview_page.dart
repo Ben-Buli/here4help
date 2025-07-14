@@ -15,11 +15,9 @@ class TaskPreviewPage extends StatefulWidget {
 class _TaskPreviewPageState extends State<TaskPreviewPage> {
   @override
   Widget build(BuildContext context) {
-    debugPrint('Received data in TaskPreviewPage: ${widget.data}');
-
     widget.data['id'] = UniqueKey().toString();
     widget.data['acceptor_id'] = '';
-    widget.data['status'] = 'open';
+    widget.data['status'] = 'Open'; // 預設狀態為 Open
     widget.data['creator_confirmed'] = '0';
     widget.data['acceptor_confirmed'] = '0';
     widget.data['cancel_reason'] = '';
@@ -32,10 +30,9 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
     final location = widget.data['location']?.toString() ?? 'N/A';
     final salary = widget.data['salary']?.toString() ?? 'N/A';
     final date = widget.data['task_date']?.toString() ?? 'N/A';
-    final requestLanguage =
-        (widget.data['request_language'] as List<String>?) ?? [];
     final creatorName = widget.data['creator_name']?.toString() ?? 'N/A';
     final creatorAvatarUrl = widget.data['avatar_url']?.toString();
+
     final languageRequirement =
         widget.data['language_requirement']?.toString() ?? 'N/A';
 
@@ -67,19 +64,93 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                             style: const TextStyle(
                                 fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
+                        if ((widget.data['description']?.toString().trim() ??
+                                '')
+                            .isNotEmpty) ...[
+                          const Text(
+                            'Task Description',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(widget.data['description']!.toString().trim()),
+                          const SizedBox(height: 12),
+                        ],
                         const Text(
-                          'Task Description',
+                          'Application Question:',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        const SizedBox(height: 4),
-                        Text(widget.data['application_question']?.toString() ??
-                            'No description provided'),
+                        ...((widget.data['application_question']?.toString() ??
+                                'No description provided')
+                            .split('|')
+                            .asMap()
+                            .entries
+                            .map((entry) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child:
+                                      Text('${entry.key + 1}. ${entry.value}'),
+                                ))
+                            .toList()),
                         const SizedBox(height: 12),
-                        Text('Reward: $salary'),
-                        Text('Task Time: $date'),
-                        Text('Location: $location'),
-                        Text('Username: $creatorName'),
-                        Text('Language Requirement: $languageRequirement'),
+                        RichText(
+                          text: TextSpan(
+                            style: DefaultTextStyle.of(context).style,
+                            children: [
+                              const TextSpan(
+                                text: 'Reward: ',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(text: '$salary'),
+                            ],
+                          ),
+                        ),
+                        RichText(
+                          text: TextSpan(
+                            style: DefaultTextStyle.of(context).style,
+                            children: [
+                              const TextSpan(
+                                text: 'Task Time: ',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(text: '$date'),
+                            ],
+                          ),
+                        ),
+                        RichText(
+                          text: TextSpan(
+                            style: DefaultTextStyle.of(context).style,
+                            children: [
+                              const TextSpan(
+                                text: 'Location: ',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(text: '$location'),
+                            ],
+                          ),
+                        ),
+                        RichText(
+                          text: TextSpan(
+                            style: DefaultTextStyle.of(context).style,
+                            children: [
+                              const TextSpan(
+                                text: 'Username: ',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(text: '$creatorName'),
+                            ],
+                          ),
+                        ),
+                        RichText(
+                          text: TextSpan(
+                            style: DefaultTextStyle.of(context).style,
+                            children: [
+                              const TextSpan(
+                                text: 'Language Requirement: ',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(text: '$languageRequirement'),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -104,7 +175,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
               );
             },
             child: Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 30),
               decoration: BoxDecoration(
                 color: Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(8),
@@ -116,78 +187,77 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Task Title
-                  Text(title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      )),
-                  const SizedBox(height: 12),
-
-                  // User Name and Date
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor: (creatorAvatarUrl == null ||
-                                creatorAvatarUrl.isEmpty)
-                            ? Colors.primaries[creatorName.hashCode %
-                                    Colors.primaries.length]
-                                .withOpacity(0.8)
-                            : Colors.grey.shade200,
-                        backgroundImage: (creatorAvatarUrl != null &&
-                                creatorAvatarUrl.isNotEmpty)
-                            ? NetworkImage(creatorAvatarUrl)
-                            : null,
-                        child: (creatorAvatarUrl == null ||
-                                creatorAvatarUrl.isEmpty)
-                            ? Text(
-                                creatorName.isNotEmpty
-                                    ? creatorName[0].toUpperCase()
-                                    : '',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              )
-                            : null,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(creatorName,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          )),
-                      const Spacer(),
-                      const Icon(Icons.calendar_today, size: 14),
-                      const SizedBox(width: 4),
-                      Text(date),
-                    ],
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
                   ),
                   const SizedBox(height: 12),
 
-                  // Location and Salary
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on, size: 16),
-                      const SizedBox(width: 4),
-                      Text(location),
-                      const Spacer(),
-                      const Icon(Icons.attach_money, size: 16),
-                      const SizedBox(width: 4),
-                      Text('$salary / hour'),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Languages as Tags
-                  Row(
-                    children: [
-                      const Icon(Icons.language, size: 16),
-                      const SizedBox(width: 4),
-                      Text('Languages: $languageRequirement'),
-                    ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final cardWidth = constraints.maxWidth;
+                      return Wrap(
+                        spacing: 0,
+                        runSpacing: 12,
+                        children: [
+                          SizedBox(
+                            width: cardWidth * 0.5,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.person_outline, size: 16),
+                                const SizedBox(width: 6),
+                                Text(creatorName),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            width: cardWidth * 0.5,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.access_time, size: 16),
+                                const SizedBox(width: 6),
+                                Text(date),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            width: cardWidth * 0.5,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.location_on_outlined,
+                                    size: 16),
+                                const SizedBox(width: 6),
+                                Text(location),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            width: cardWidth * 0.5,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.attach_money, size: 16),
+                                const SizedBox(width: 6),
+                                Text('$salary / hour'),
+                              ],
+                            ),
+                          ),
+                          SizedBox(
+                            width: cardWidth * 0.5,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.language, size: 16),
+                                const SizedBox(width: 6),
+                                Text(languageRequirement.replaceAll(',', ', ')),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -246,15 +316,20 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                 if (confirm == true) {
                   final globalTaskList = GlobalTaskList();
 
-                  /// 送出任務到全域任務列表
-                  globalTaskList.loadTasks(); // 確保載入任務列表
-                  globalTaskList.addTask(widget.data);
+                  // 等待載入任務列表完成
+                  await globalTaskList.loadTasks();
 
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Task posted successfully!')),
-                  );
+                  // 送出任務到全域任務列表，並等待完成
+                  await globalTaskList.addTask(widget.data);
+
+                  print(GlobalTaskList().tasks.length); // 任務有無加進去
+                  print(GlobalTaskList().tasks.last['title']); // 看最後一筆是否你剛剛輸入的
 
                   if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Task posted successfully!')),
+                    );
                     context.go('/task');
                   }
                 } else {
