@@ -1,11 +1,14 @@
 // ==================== flutter ====================
+import 'package:flutter/material.dart';
 
 // ==================== account 模組 ====================
+import 'package:flutter/cupertino.dart';
 import 'package:here4help/account/pages/account_page.dart';
 import 'package:here4help/account/pages/contact_us_page.dart';
 import 'package:here4help/account/pages/faq_page.dart';
 import 'package:here4help/account/pages/issue_status_page.dart';
 import 'package:here4help/account/pages/logout_page.dart';
+import 'package:here4help/account/pages/point_policy.dart';
 import 'package:here4help/account/pages/profile_page.dart';
 import 'package:here4help/account/pages/ratings_page.dart';
 import 'package:here4help/account/pages/security_page.dart';
@@ -21,7 +24,6 @@ import 'package:here4help/chat/pages/chat_list_page.dart';
 import 'package:here4help/chat/pages/chat_detail_page.dart';
 
 // ==================== explore 模組 ====================
-import 'package:here4help/explore/pages/explore_page.dart';
 
 // ==================== home 模組 ====================
 import 'package:here4help/home/pages/home_page.dart';
@@ -49,16 +51,16 @@ final List<Map<String, dynamic>> shellPages = [
     'path': '/home',
     'child': const HomePage(),
     'title': 'Home',
-    'showBottomNav': true, // 确保值为布尔类型
-    'showAppBar': true, // 确保值为布尔类型
-    'showBackArrow': false // 确保值为布尔类型
+    'showBottomNav': true,
+    'showAppBar': true,
+    'showBackArrow': true
   },
   {
     'path': '/chat',
     'child': const ChatListPage(),
     'title': 'Posts',
     'showBottomNav': true,
-    'showBackArrow': false
+    'showBackArrow': true
   },
   {
     'path': '/chat/detail',
@@ -68,20 +70,21 @@ final List<Map<String, dynamic>> shellPages = [
     // 設定寫在ChatDetailPage中
     'showAppBar': false,
     'showBottomNav': false,
-    'showBackArrow': false
+    'showBackArrow': true
   },
   {
     'path': '/account',
     'child': const AccountPage(),
     'title': 'Account',
     'showBottomNav': true,
+    'showBackArrow': true,
   },
   {
     'path': '/task',
     'child': const TaskListPage(),
     'title': 'Task',
     'showBottomNav': true,
-    'showBackArrow': false
+    'showBackArrow': true
   },
   {
     'path': '/task/create',
@@ -108,50 +111,80 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true
   },
-  {
-    'path': '/account/wallet',
-    'child': const WalletPage(),
-    'title': 'Wallet',
-    'showAppBar': true,
-    'showBottomNav': false,
-    'showBackArrow': true
-  },
+  // Account 模組路由
   {
     'path': '/account/profile',
     'child': const ProfilePage(),
-    'title': 'Profile',
+    'title': 'Personal Information',
+    'showAppBar': true,
     'showBottomNav': false,
-    'showBackArrow': true
+    'showBackArrow': true,
+    'icon': Icons.person,
+  },
+  {
+    'path': '/account/wallet',
+    'child': const WalletPage(),
+    'title': 'My Wallet',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'icon': Icons.account_balance_wallet,
+  },
+  {
+    'path': '/account/wallet/point_policy',
+    'child': const PointPolicyPage(),
+    'title': 'Pont Policy',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'icon': Icons.stars,
   },
   {
     'path': '/account/ratings',
     'child': const RatingsPage(),
-    'title': 'Ratings',
+    'title': 'Ratings and Feedback',
+    'showAppBar': true,
     'showBottomNav': false,
-    'showBackArrow': true
+    'showBackArrow': true,
+    'icon': Icons.star_rate,
   },
   {
-    'path': '/account/history',
+    'path': '/account/task_history',
     'child': const TaskHistoryPage(),
-    'title': 'History',
+    'title': 'Task History',
+    'showAppBar': true,
     'showBottomNav': false,
-    'showBackArrow': true
+    'showBackArrow': true,
+    'icon': Icons.history,
   },
   {
     'path': '/account/security',
     'child': const SecurityPage(),
     'title': 'Security Settings',
+    'showAppBar': true,
     'showBottomNav': false,
-    'showBackArrow': true
+    'showBackArrow': true,
+    'icon': Icons.lock,
   },
   {
     'path': '/account/support',
     'child': const SupportPage(),
-    'title': 'Support',
+    'title': 'Contact Customer Support',
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'icon': Icons.support_agent,
   },
+  {
+    'path': '/account/logout',
+    'child': const LogoutPage(),
+    'title': 'Log Out',
+    'showAppBar': false,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'icon': Icons.logout,
+  },
+  // Support 子路由
   {
     'path': '/account/support/contact',
     'child': const ContactUsPage(),
@@ -159,7 +192,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
-    'group': 'support',
+    'icon': Icons.contact_mail,
   },
   {
     'path': '/account/support/faq',
@@ -167,30 +200,17 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'FAQ',
     'showAppBar': true,
     'showBottomNav': false,
-    'group': 'support',
+    'showBackArrow': true,
+    'icon': Icons.help_outline,
   },
   {
-    'path': '/account/support/status',
+    'path': '/account/support/issue_status',
     'child': const IssueStatusPage(),
-    'title': 'Issue Status',
+    'title': 'Check Issue Status',
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
-    'group': 'support',
-  },
-  {
-    'path': '/account/logout',
-    'child': const LogoutPage(),
-    'title': 'Logout',
-    'showBottomNav': false,
-    'showBackArrow': true
-  },
-  {
-    'path': '/account/support/explore',
-    'child': ExplorePage(),
-    'title': 'Explore',
-    'showBottomNav': true,
-    'showBackArrow': false
+    'icon': Icons.report_problem,
   },
   {
     'path': '/pay/setting',
