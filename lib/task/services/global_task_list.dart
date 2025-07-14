@@ -26,7 +26,6 @@ class GlobalTaskList {
       acceptorConfirmed: "0",
       cancelReason: null,
       failReason: null,
-      applicationQuestion: "Do you have cleaning experience?",
       languageRequirement: "English",
       hashtags: ['Cleaning', 'NCCU', 'House'],
       createdAt: "2025-05-24 23:46:14",
@@ -67,8 +66,6 @@ class GlobalTaskList {
       acceptorConfirmed: "1",
       cancelReason: null,
       failReason: null,
-      applicationQuestion:
-          "Do you have relevant computer maintenance experience?",
       languageRequirement: "English",
       hashtags: ['IT', 'NCU', 'Maintenance'],
       createdAt: "2025-05-23 23:46:14",
@@ -89,7 +86,6 @@ class GlobalTaskList {
       acceptorConfirmed: "0",
       cancelReason: null,
       failReason: null,
-      applicationQuestion: "Do you have experience moving large furniture?",
       hashtags: ['Moving', 'NCU', 'Furniture'],
       languageRequirement: "English",
       createdAt: "2025-05-24 23:46:14",
@@ -110,7 +106,6 @@ class GlobalTaskList {
       acceptorConfirmed: "0",
       cancelReason: null,
       failReason: null,
-      applicationQuestion: "Do you have experience accompanying the elderly?",
       languageRequirement: "Spanish",
       hashtags: ['Elderly', 'NTU', 'Health'],
       createdAt: "2025-05-24 23:46:14",
@@ -131,7 +126,6 @@ class GlobalTaskList {
       acceptorConfirmed: "0",
       cancelReason: null,
       failReason: null,
-      applicationQuestion: "Do you have translation experience?",
       languageRequirement: "English",
       hashtags: ['Translation', 'NCU', 'Language'],
       createdAt: "2024-03-01 10:00:00",
@@ -152,7 +146,6 @@ class GlobalTaskList {
       acceptorConfirmed: "0",
       cancelReason: null,
       failReason: null,
-      applicationQuestion: "Are you familiar with telecom services?",
       languageRequirement: "English",
       hashtags: ['Telecom', 'NTU', 'Setup'],
       createdAt: "2024-03-01 11:00:00",
@@ -173,8 +166,6 @@ class GlobalTaskList {
       acceptorConfirmed: "0",
       cancelReason: null,
       failReason: null,
-      applicationQuestion:
-          "Have you helped someone apply for a passport before?",
       languageRequirement: "English",
       hashtags: ['Tasker', 'Passport'],
       createdAt: "2025-05-28 09:30:00",
@@ -195,8 +186,6 @@ class GlobalTaskList {
       acceptorConfirmed: "0",
       cancelReason: null,
       failReason: null,
-      applicationQuestion:
-          "Have you applied for an international driver's license before?",
       languageRequirement: "English",
       hashtags: ['Tasker', 'DriverLicense'],
       createdAt: "2025-05-29 10:00:00",
@@ -217,7 +206,6 @@ class GlobalTaskList {
       acceptorConfirmed: "0",
       cancelReason: "Your application was rejected by the task creator.",
       failReason: null,
-      applicationQuestion: "What do you think was the reason for rejection?",
       languageRequirement: "English",
       hashtags: ['Sample', 'Tasker'],
       createdAt: "2025-06-01 12:00:00",
@@ -246,8 +234,10 @@ class GlobalTaskList {
   }
 
   /// 添加新任務到列表中，並在添加後對任務進行排序。
-  void addTask(Map<String, dynamic> task) {
+  Future<void> addTask(Map<String, dynamic> task) async {
     _tasks.add(task);
+    await Future.delayed(
+        Duration(milliseconds: 10)); // Simulate async operation
     _sortTasks();
   }
 
@@ -263,3 +253,96 @@ class GlobalTaskList {
     return newTasks.length != _tasks.length;
   }
 }
+
+final List<ApplicationQuestionModel> mockApplicationQuestions = [
+  ApplicationQuestionModel(
+    id: 'q1-task1',
+    taskId: 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e5e6',
+    applicationQuestion: 'What is your previous experience in house cleaning?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q2-task1',
+    taskId: 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e5e6',
+    applicationQuestion: 'Can you work with strong cleaning agents?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q3-task1',
+    taskId: 'a1a1a1a1-b2b2-c3c3-d4d4-e5e5e5e5e5e6',
+    applicationQuestion: 'Are you available for a 2-bedroom cleaning job?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q1-task2',
+    taskId: 'b2b2b2b2-c3c3-d4d4-e5e5-f6f6f6f6f6f7',
+    applicationQuestion: 'Have you used scanners or managed paper archives?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q2-task2',
+    taskId: 'b2b2b2b2-c3c3-d4d4-e5e5-f6f6f6f6f6f7',
+    applicationQuestion: 'How do you ensure organized digital records?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q3-task2',
+    taskId: 'b2b2b2b2-c3c3-d4d4-e5e5-f6f6f6f6f6f7',
+    applicationQuestion: 'Do you have experience working with physical files?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q1-task3',
+    taskId: 'c3c3c3c3-d4d4-e5e5-f6f6-a1a1a1a1a1a2',
+    applicationQuestion: 'Have you performed computer maintenance before?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q2-task3',
+    taskId: 'c3c3c3c3-d4d4-e5e5-f6f6-a1a1a1a1a1a2',
+    applicationQuestion: 'Are you familiar with cybersecurity basics?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q3-task3',
+    taskId: 'c3c3c3c3-d4d4-e5e5-f6f6-a1a1a1a1a1a2',
+    applicationQuestion: 'Can you update software and drivers?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q1-task4',
+    taskId: 'e5e5e5e5-f6f6-a1a1-b2b2-c3c3c3c3c3c3',
+    applicationQuestion: 'Do you have experience moving heavy furniture?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q2-task4',
+    taskId: 'e5e5e5e5-f6f6-a1a1-b2b2-c3c3c3c3c3c3',
+    applicationQuestion: 'Are you comfortable working on stairs?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q3-task4',
+    taskId: 'e5e5e5e5-f6f6-a1a1-b2b2-c3c3c3c3c3c3',
+    applicationQuestion: 'Can you help with disassembling furniture?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q1-task5',
+    taskId: 'f6f6f6f6-a1a1-b2b2-c3c3-d4d4d4d4d4d4',
+    applicationQuestion: 'Have you accompanied elderly people before?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q2-task5',
+    taskId: 'f6f6f6f6-a1a1-b2b2-c3c3-d4d4d4d4d4d4',
+    applicationQuestion: 'Are you familiar with hospital procedures?',
+    applierReply: null,
+  ),
+  ApplicationQuestionModel(
+    id: 'q3-task5',
+    taskId: 'f6f6f6f6-a1a1-b2b2-c3c3-d4d4d4d4d4d4',
+    applicationQuestion: 'Can you provide companionship during appointments?',
+    applierReply: null,
+  ),
+];
