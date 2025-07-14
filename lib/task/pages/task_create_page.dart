@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -28,11 +29,13 @@ class _PostFormPageState extends State<TaskCreatePage> {
   final MapController _mapController = MapController();
   final TextEditingController _salaryController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _applicationQuestion = TextEditingController();
+  late final TextEditingController _taskDescriptionController;
   String _languageRequirement = '';
   DateTime? _taskDate;
   DateTime? _periodStart;
   DateTime? _periodEnd;
+
+  String _taskDescription = '';
 
   LatLng? _selectedLocation = const LatLng(25.0208, 121.5418);
   String _locationLabel = 'NCCU';
@@ -43,20 +46,27 @@ class _PostFormPageState extends State<TaskCreatePage> {
 
   final Set<String> _errorFields = {};
   List<String> _selectedLanguages = [];
+  List<String> _applicationQuestions = [''];
 
   @override
   void initState() {
     super.initState();
 
-    _titleController.text = 'Opening Bank Account(Demo)';
-    _salaryController.text = '500';
+    /// 初始化表單欄位
+    _titleController.text = 'Opening Bank Account (Demo)';
+    // _taskDescription =
+    //     'Help me to open a bank account in Taiwan. I am a foreigner and need assistance with the process.';
+    // _taskDescriptionController = TextEditingController();
+    // _taskDescriptionController.text = _taskDescription;
+    final formatter = NumberFormat('#,##0', 'en_US'); // 格式化三位數數字
+    _salaryController.text = formatter.format(500);
     _locationLabel = 'NCCU';
     _locationSearchController.text = 'NCCU';
     final now = DateTime.now();
     _taskDate = DateTime(now.year, now.month, now.day, now.hour, now.minute);
     _periodStart = DateTime(2025, 9, 10, 12, 0);
     _periodEnd = DateTime(2025, 9, 10, 13, 0);
-    _applicationQuestion.text = 'Do you have relevant experience?';
+    _applicationQuestions[0] = 'Do you have relevant experience?';
     _languageRequirement = 'English,Japanese';
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -68,617 +78,774 @@ class _PostFormPageState extends State<TaskCreatePage> {
     });
   }
 
+  void _addApplicationQuestion() {
+    if (_applicationQuestions.isEmpty ||
+        _applicationQuestions.last.trim().isNotEmpty) {
+      setState(() {
+        _applicationQuestions.add('');
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please complete the previous question first.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
+  void _removeApplicationQuestion(int index) {
+    setState(() {
+      _applicationQuestions.removeAt(index);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Personal Data (readonly)
-          _buildLabel('Personal Data', required: false),
-          const SizedBox(height: 4),
-          Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              border: Border(
-                  bottom: BorderSide(color: Color.fromARGB(31, 0, 0, 0))),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 0),
-            child: Text(
-              Provider.of<UserService>(context, listen: false)
-                      .currentUser
-                      ?.name ??
-                  'Unknow Poster',
-              style: const TextStyle(fontSize: 16),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Task Title
-          _buildLabel('Task Title',
-              required: true, isError: _errorFields.contains(kTaskTitleField)),
-          const SizedBox(height: 4),
-          TextFormField(
-            controller: _titleController,
-            decoration: InputDecoration(
-              hintText: 'Enter task title',
-              hintStyle: const TextStyle(color: Colors.grey),
-              border: const UnderlineInputBorder(),
-              filled: _errorFields.contains(kTaskTitleField),
-              fillColor: _errorFields.contains(kTaskTitleField)
-                  ? Colors.pink.shade50
-                  : null,
-            ),
-            onChanged: (_) {
-              if (_errorFields.contains(kTaskTitleField)) {
-                setState(() => _errorFields.remove(kTaskTitleField));
-              }
-            },
-          ),
-          const SizedBox(height: 12),
-
-          // Salary
-          _buildLabel('Salary',
-              required: true, isError: _errorFields.contains('Salary')),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'NT\$',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, color: Colors.black54),
-                ),
+    return GestureDetector(
+      onTap: () {
+        FocusScope.of(context).unfocus(); // 點擊空白處收鍵盤
+      },
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Personal Data (readonly)
+            _buildLabel('Personal Data', required: false),
+            const SizedBox(height: 4),
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: Colors.black)),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextFormField(
-                  controller: _salaryController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: InputDecoration(
-                    hintText: '0',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    border: const UnderlineInputBorder(),
-                    filled: _errorFields.contains('Salary'),
-                    fillColor: _errorFields.contains('Salary')
-                        ? Colors.pink.shade50
-                        : null,
-                  ),
-                  onChanged: (_) {
-                    if (_errorFields.contains('Salary')) {
-                      setState(() => _errorFields.remove('Salary'));
-                    }
-                  },
-                ),
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 0),
+              child: Text(
+                Provider.of<UserService>(context, listen: false)
+                        .currentUser
+                        ?.name ??
+                    'Unknow Poster',
+                style: const TextStyle(fontSize: 16),
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
+            ),
+            const SizedBox(height: 12),
 
-          // Location (popup map)
-          _buildLabel('Location', required: false),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _showLocationPicker(context),
+            // Task Title
+            _buildLabel('Task Title',
+                required: true,
+                isError: _errorFields.contains(kTaskTitleField)),
+            const SizedBox(height: 4),
+            TextFormField(
+              controller: _titleController,
+              decoration: InputDecoration(
+                hintText: 'Enter task title',
+                hintStyle: const TextStyle(color: Colors.grey),
+                border: const UnderlineInputBorder(),
+                filled: _errorFields.contains(kTaskTitleField),
+                fillColor: _errorFields.contains(kTaskTitleField)
+                    ? Colors.pink.shade50
+                    : null,
+              ),
+              onChanged: (_) {
+                if (_errorFields.contains(kTaskTitleField)) {
+                  setState(() => _errorFields.remove(kTaskTitleField));
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Task Description
+            // _buildLabel('Task Description',
+            //     required: true,
+            //     isError: _errorFields.contains('Task Description')),
+            // const SizedBox(height: 4),
+            // TextFormField(
+            //   controller: _taskDescriptionController,
+            //   maxLength: 100,
+            //   maxLines: 3,
+            //   decoration: InputDecoration(
+            //     hintText: 'Please describe the task in detail.',
+            //     hintStyle: const TextStyle(color: Colors.grey),
+            //     border: const UnderlineInputBorder(),
+            //     filled: _errorFields.contains('Task Description'),
+            //     fillColor: _errorFields.contains('Task Description')
+            //         ? Colors.pink.shade50
+            //         : null,
+            //   ),
+            // ),
+            // const SizedBox(height: 12),
+
+            // Salary
+            _buildLabel('Salary',
+                required: true, isError: _errorFields.contains('Salary')),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
                   child: Container(
                     decoration: const BoxDecoration(
-                      border: Border(bottom: BorderSide(color: Colors.black12)),
+                      border: Border(bottom: BorderSide(color: Colors.black)),
                     ),
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 14, horizontal: 0),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: Text(
-                            // ↓↓↓ 新增：如果地點名稱在大學清單中，顯示縮寫
-                            () {
-                              final matched = universityList.firstWhere(
-                                (uni) =>
-                                    uni['en'] == _locationLabel ||
-                                    uni['zh'] == _locationLabel,
-                                orElse: () => {},
-                              );
-                              if (matched.isNotEmpty) {
-                                return matched['abbr']!;
-                              }
-                              return _locationLabel.isNotEmpty
-                                  ? _locationLabel
-                                  : 'Tap to select location';
-                            }(),
-                            style: TextStyle(
-                              color: _locationLabel.isNotEmpty
-                                  ? Colors.black87
-                                  : Colors.grey,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                        const Text(
+                          '💰 | ',
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: Colors.black54,
                           ),
                         ),
-                        const Icon(Icons.chevron_right),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _salaryController,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly
+                            ],
+                            decoration: InputDecoration(
+                              hintText: '0',
+                              hintStyle: const TextStyle(
+                                  color: Color.fromARGB(255, 0, 0, 0)),
+                              border: InputBorder.none,
+                              filled: _errorFields.contains(kSalaryField),
+                              fillColor: _errorFields.contains(kSalaryField)
+                                  ? Colors.pink.shade50
+                                  : null,
+                            ),
+                            onChanged: (value) {
+                              final formatter = NumberFormat('#,##0', 'en_US');
+                              // 移除非數字
+                              final digits =
+                                  value.replaceAll(RegExp(r'[^\d]'), '');
+                              final number = int.tryParse(digits) ?? 0;
+                              final formatted = formatter.format(number);
+                              _salaryController.value = TextEditingValue(
+                                text: formatted,
+                                selection: TextSelection.collapsed(
+                                    offset: formatted.length),
+                              );
+                              if (_errorFields.contains(kSalaryField)) {
+                                setState(
+                                    () => _errorFields.remove(kSalaryField));
+                              }
+                            },
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.my_location),
-                tooltip: 'Use current location',
-                onPressed: _useCurrentLocation,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Time (date picker)
-          _buildLabel('Time',
-              required: true, isError: _errorFields.contains('Time')),
-          const SizedBox(height: 4),
-          TextFormField(
-            readOnly: true,
-            controller: TextEditingController(
-              text: _taskDate != null
-                  ? _taskDate!.toLocal().toString().split(' ')[0]
-                  : '',
+              ],
             ),
-            decoration: InputDecoration(
-              hintText: 'Select date',
-              hintStyle: const TextStyle(color: Colors.grey),
-              border: const UnderlineInputBorder(),
-              filled: _errorFields.contains('Time'),
-              fillColor:
-                  _errorFields.contains('Time') ? Colors.pink.shade50 : null,
-              suffixIcon: const Icon(Icons.calendar_today),
-            ),
-            onTap: () async {
-              _errorFields.remove('Time');
-              _selectDate(context, (picked) {
-                setState(() => _taskDate = picked);
-              });
-            },
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-          // Posting period (two date pickers)
-          _buildLabel('Posting period',
-              required: true, isError: _errorFields.contains('Posting period')),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              // Start date
-              Expanded(
-                child: TextFormField(
-                  readOnly: true,
-                  controller: TextEditingController(
-                    text: _periodStart != null
-                        ? _periodStart!.toLocal().toString().substring(0, 16)
-                        : '',
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Start date (yyyy-mm-dd hh:mm)',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    border: const UnderlineInputBorder(),
-                    filled: _errorFields.contains('Posting period'),
-                    fillColor: _errorFields.contains('Posting period')
-                        ? Colors.pink.shade50
-                        : null,
-                    suffixIcon: const Icon(Icons.calendar_today),
-                  ),
-                  onTap: () async {
-                    _errorFields.remove('Posting period');
-                    DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.now(),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime(DateTime.now().year + 1),
-                    );
-                    if (picked != null) {
-                      TimeOfDay? timePicked = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.now(),
-                      );
-                      if (timePicked != null) {
-                        DateTime combined = DateTime(
-                          picked.year,
-                          picked.month,
-                          picked.day,
-                          timePicked.hour,
-                          timePicked.minute,
-                        );
-                        if (combined.isBefore(DateTime.now())) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'Start date cannot be earlier than the current time.'),
-                              backgroundColor: Colors.red,
+            // Location (popup map)
+            _buildLabel('Location', required: false),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _showLocationPicker(context),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        border: Border(bottom: BorderSide(color: Colors.black)),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 14, horizontal: 0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              // ↓↓↓ 新增：如果地點名稱在大學清單中，顯示縮寫
+                              () {
+                                final matched = universityList.firstWhere(
+                                  (uni) =>
+                                      uni['en'] == _locationLabel ||
+                                      uni['zh'] == _locationLabel,
+                                  orElse: () => {},
+                                );
+                                if (matched.isNotEmpty) {
+                                  return matched['abbr']!;
+                                }
+                                return _locationLabel.isNotEmpty
+                                    ? _locationLabel
+                                    : 'Tap to select location';
+                              }(),
+                              style: TextStyle(
+                                color: _locationLabel.isNotEmpty
+                                    ? Colors.black87
+                                    : Colors.grey,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          );
-                        } else {
-                          if (mounted) {
-                            setState(() {
-                              _periodStart = combined;
-                            });
-                          }
-                        }
-                      }
-                    }
-                  },
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6),
-                child: Text('-',
-                    style: TextStyle(fontSize: 16, color: Colors.black54)),
-              ),
-              // End date
-              Expanded(
-                child: TextFormField(
-                  readOnly: true,
-                  controller: TextEditingController(
-                    text: _periodEnd != null
-                        ? _periodEnd!.toLocal().toString().substring(0, 16)
-                        : '',
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'End date (yyyy-mm-dd hh:mm)',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    border: const UnderlineInputBorder(),
-                    filled: _errorFields.contains('Posting period'),
-                    fillColor: _errorFields.contains('Posting period')
-                        ? Colors.pink.shade50
-                        : null,
-                    suffixIcon: const Icon(Icons.calendar_today),
-                  ),
-                  onTap: () async {
-                    _errorFields.remove('Posting period');
-                    DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.now(),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime(DateTime.now().year + 1),
-                    );
-                    if (picked != null) {
-                      TimeOfDay? timePicked = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.now(),
-                      );
-                      if (timePicked != null) {
-                        DateTime combined = DateTime(
-                          picked.year,
-                          picked.month,
-                          picked.day,
-                          timePicked.hour,
-                          timePicked.minute,
-                        );
-                        if (_periodStart != null &&
-                            combined.isBefore(_periodStart!)) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'End date cannot be earlier than or equal to the start date.'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        } else {
-                          if (mounted) {
-                            setState(() {
-                              _periodEnd = combined;
-                            });
-                          }
-                        }
-                      }
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Application Question (optional)
-          _buildLabel('Application Question (optional)', required: false),
-          const SizedBox(height: 4),
-          TextField(
-            controller: _applicationQuestion,
-            maxLength: 50,
-            maxLines: null,
-            decoration: const InputDecoration(
-              hintText: 'Enter application question (optional)',
-              hintStyle: TextStyle(color: Colors.grey),
-              border: UnderlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(10),
-              color: Colors.grey.shade100,
-            ),
-            child: const Text(
-              'Job seekers must answer questions before applying, helping you screen talents faster.',
-              style: TextStyle(fontSize: 12),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Required Languages (optional)
-          _buildLabel('Language Requirement',
-              required: true,
-              isError: _errorFields.contains('Language Requirement')),
-          const SizedBox(height: 4),
-          GestureDetector(
-            onTap: () async {
-              final result = await showModalBottomSheet<List<String>>(
-                context: context,
-                isScrollControlled: true,
-                builder: (context) {
-                  List<String> tempSelected = List.from(_selectedLanguages);
-                  TextEditingController searchController =
-                      TextEditingController();
-                  return StatefulBuilder(
-                    builder: (context, setState) {
-                      return Padding(
-                        padding: MediaQuery.of(context).viewInsets,
-                        child: SizedBox(
-                          height: 400,
-                          child: Column(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: TextField(
-                                  controller: searchController,
-                                  decoration: const InputDecoration(
-                                    hintText: 'Search language',
-                                    prefixIcon: Icon(Icons.search),
-                                  ),
-                                  onChanged: (_) => setState(() {}),
-                                ),
-                              ),
-                              Expanded(
-                                child: StatefulBuilder(
-                                  builder: (context, setState) {
-                                    List<MapEntry<String, String>>
-                                        filteredList = languageMap.entries
-                                            .where((entry) => entry.value
-                                                .toLowerCase()
-                                                .contains(searchController.text
-                                                    .toLowerCase()))
-                                            .toList();
-
-                                    // 將已選擇的語言優先排序。
-                                    filteredList.sort((a, b) {
-                                      bool aSelected =
-                                          tempSelected.contains(a.key);
-                                      bool bSelected =
-                                          tempSelected.contains(b.key);
-                                      if (aSelected && !bSelected) return -1;
-                                      if (!aSelected && bSelected) return 1;
-                                      return a.value.compareTo(b.value);
-                                    });
-
-                                    return ListView(
-                                      children: filteredList.map((entry) {
-                                        final isSelected =
-                                            tempSelected.contains(entry.key);
-                                        return CheckboxListTile(
-                                          value: isSelected,
-                                          title: Text(entry.value),
-                                          onChanged: (checked) {
-                                            setState(() {
-                                              if (checked == true) {
-                                                tempSelected.add(entry.key);
-                                              } else {
-                                                tempSelected.remove(entry.key);
-                                              }
-                                            });
-                                          },
-                                        );
-                                      }).toList(),
-                                    );
-                                  },
-                                ),
-                              ),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  OutlinedButton(
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: Colors.redAccent,
-                                      side: const BorderSide(
-                                          color: Colors.redAccent),
-                                    ),
-                                    onPressed: () =>
-                                        Navigator.pop(context, null),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  ElevatedButton(
-                                    style: TextButton.styleFrom(
-                                      backgroundColor: const Color(0xFF3A85FF),
-                                      foregroundColor: Colors.white,
-                                    ),
-                                    onPressed: () =>
-                                        Navigator.pop(context, tempSelected),
-                                    child: const Text('Confirm'),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                            ],
                           ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              );
-              if (result != null) {
-                setState(() {
-                  _selectedLanguages = result;
-                  _languageRequirement = _selectedLanguages.join(', ');
-                });
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black12),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: _selectedLanguages.isEmpty
-                  ? const Text(
-                      'Preferred language(s) for the task taker',
-                      style: TextStyle(color: Colors.grey),
-                    )
-                  : Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: _selectedLanguages
-                          .map((code) => Chip(
-                                label: Text(languageMap[code] ?? code),
-                              ))
-                          .toList(),
+                          const Icon(Icons.chevron_right),
+                        ],
+                      ),
                     ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.warning, color: Colors.red, size: 20),
-              const SizedBox(width: 6),
-              Expanded(
-                child: RichText(
-                  text: const TextSpan(
-                    style: TextStyle(fontSize: 12, color: Colors.black87),
-                    children: [
-                      TextSpan(text: 'Please abide by '),
-                      TextSpan(
-                        text: 'The platform regulations',
-                        style: TextStyle(
-                            color: Colors.blue,
-                            decoration: TextDecoration.underline),
-                      ),
-                      TextSpan(
-                        text:
-                            ' and do not post false fraudulent information. Violators will be held legally responsible.',
-                      ),
-                    ],
                   ),
                 ),
+                IconButton(
+                  icon: const Icon(Icons.my_location),
+                  tooltip: 'Use current location',
+                  onPressed: _useCurrentLocation,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Time (date picker)
+            _buildLabel('Time',
+                required: true, isError: _errorFields.contains('Time')),
+            const SizedBox(height: 4),
+            TextFormField(
+              readOnly: true,
+              controller: TextEditingController(
+                text: _taskDate != null
+                    ? _taskDate!.toLocal().toString().split(' ')[0]
+                    : '',
               ),
-            ],
-          ),
-          const SizedBox(height: 24),
+              decoration: InputDecoration(
+                hintText: 'Select date',
+                hintStyle: const TextStyle(color: Colors.grey),
+                border: const UnderlineInputBorder(),
+                filled: _errorFields.contains('Time'),
+                fillColor:
+                    _errorFields.contains('Time') ? Colors.pink.shade50 : null,
+                suffixIcon: const Icon(Icons.calendar_today),
+              ),
+              onTap: () async {
+                _errorFields.remove('Time');
+                _selectDate(context, (picked) {
+                  setState(() => _taskDate = picked);
+                });
+              },
+            ),
+            const SizedBox(height: 12),
 
-          LayoutBuilder(
-            builder: (context, constraints) {
-              double maxWidth = 500;
-              bool isMobile = constraints.maxWidth < 600;
-              return Align(
-                  alignment: Alignment.center,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: isMobile ? double.infinity : maxWidth,
+            // Posting period (two date pickers)
+            _buildLabel('Posting period',
+                required: true,
+                isError: _errorFields.contains('Posting period')),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                // Start date
+                Expanded(
+                  child: TextFormField(
+                    readOnly: true,
+                    controller: TextEditingController(
+                      text: _periodStart != null
+                          ? _periodStart!.toLocal().toString().substring(0, 16)
+                          : '',
                     ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF3A85FF),
-                        ),
-                        onPressed: () {
-                          final user =
-                              Provider.of<UserService>(context, listen: false)
-                                  .currentUser;
-                          final userName = user?.name ?? 'Unknown Poster';
-                          final data = {
-                            'title': _titleController.text.trim(),
-                            'salary': _salaryController.text.trim(),
-                            'location': _locationLabel.isNotEmpty
-                                ? _locationLabel
-                                : 'N/A',
-                            'task_date': _taskDate != null
-                                ? _taskDate!.toLocal().toString().split(' ')[0]
-                                : 'N/A',
-                            'periodStart': _periodStart != null
-                                ? _periodStart!
-                                    .toLocal()
-                                    .toString()
-                                    .split(' ')[0]
-                                : 'N/A',
-                            'periodEnd': _periodEnd != null
-                                ? _periodEnd!.toLocal().toString().split(' ')[0]
-                                : 'N/A',
-                            'application_question':
-                                _applicationQuestion.text.trim(),
-                            'creator_name': userName,
-                            'avatar_url': user?.avatar_url ?? '',
-                            'language_requirement':
-                                _selectedLanguages.join(','),
-                            'creator_id': user?.id ?? 'Unknown',
-                          };
-
-                          // 更嚴謹的資料完整性檢查
-                          final requiredFields = {
-                            kTaskTitleField: data['title'],
-                            kSalaryField: data['salary'],
-                            kTimeField: data['task_date'],
-                            kPostingPeriodField: data['periodStart'] != 'N/A' &&
-                                data['periodEnd'] != 'N/A'
-                          };
-
-                          _errorFields.clear();
-                          requiredFields.forEach((key, value) {
-                            if (key == kPostingPeriodField) {
-                              if (value != true) _errorFields.add(key);
-                            } else if (value == null ||
-                                (value as String).isEmpty ||
-                                value == 'N/A') {
-                              _errorFields.add(key);
-                            }
-                          });
-
-                          if (_errorFields.isNotEmpty) {
-                            setState(() {});
+                    decoration: InputDecoration(
+                      hintText: 'Start date (yyyy-mm-dd hh:mm)',
+                      hintStyle: const TextStyle(color: Colors.grey),
+                      border: const UnderlineInputBorder(),
+                      filled: _errorFields.contains('Posting period'),
+                      fillColor: _errorFields.contains('Posting period')
+                          ? Colors.pink.shade50
+                          : null,
+                      suffixIcon: const Icon(Icons.calendar_today),
+                    ),
+                    onTap: () async {
+                      _errorFields.remove('Posting period');
+                      DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime(DateTime.now().year + 1),
+                      );
+                      if (picked != null) {
+                        TimeOfDay? timePicked = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.now(),
+                        );
+                        if (timePicked != null) {
+                          DateTime combined = DateTime(
+                            picked.year,
+                            picked.month,
+                            picked.day,
+                            timePicked.hour,
+                            timePicked.minute,
+                          );
+                          if (combined.isBefore(DateTime.now())) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                content:
-                                    Text('Please fill in all required fields.'),
+                                content: Text(
+                                    'Start date cannot be earlier than the current time.'),
                                 backgroundColor: Colors.red,
                               ),
                             );
-                            return;
+                          } else {
+                            if (mounted) {
+                              setState(() {
+                                _periodStart = combined;
+                              });
+                            }
                           }
+                        }
+                      }
+                    },
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 6),
+                  child: Text('-',
+                      style: TextStyle(fontSize: 16, color: Colors.black54)),
+                ),
+                // End date
+                Expanded(
+                  child: TextFormField(
+                    readOnly: true,
+                    controller: TextEditingController(
+                      text: _periodEnd != null
+                          ? _periodEnd!.toLocal().toString().substring(0, 16)
+                          : '',
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'End date (yyyy-mm-dd hh:mm)',
+                      hintStyle: const TextStyle(color: Colors.grey),
+                      border: const UnderlineInputBorder(),
+                      filled: _errorFields.contains('Posting period'),
+                      fillColor: _errorFields.contains('Posting period')
+                          ? Colors.pink.shade50
+                          : null,
+                      suffixIcon: const Icon(Icons.calendar_today),
+                    ),
+                    onTap: () async {
+                      _errorFields.remove('Posting period');
+                      DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime(DateTime.now().year + 1),
+                      );
+                      if (picked != null) {
+                        TimeOfDay? timePicked = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.now(),
+                        );
+                        if (timePicked != null) {
+                          DateTime combined = DateTime(
+                            picked.year,
+                            picked.month,
+                            picked.day,
+                            timePicked.hour,
+                            timePicked.minute,
+                          );
+                          if (_periodStart != null &&
+                              combined.isBefore(_periodStart!)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'End date cannot be earlier than or equal to the start date.'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } else {
+                            if (mounted) {
+                              setState(() {
+                                _periodEnd = combined;
+                              });
+                            }
+                          }
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
 
-                          // 傳遞資料到預覽頁面
-                          context.push('/task/create/preview', extra: data);
-                        },
-                        child: const Text(
-                          'Preview and save',
-                          style: TextStyle(color: Colors.white),
+            // Application Question (optional)
+            Column(
+              children: List.generate(_applicationQuestions.length, (index) {
+                // Format the index as two digits (01, 02, ...)
+                final labelNumber = (index + 1).toString().padLeft(2, '0');
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildLabel('Application Question - $labelNumber',
+                          required: true),
+                      const SizedBox(height: 4),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              initialValue: _applicationQuestions[index],
+                              decoration: InputDecoration(
+                                hintText: 'Enter custom question',
+                                hintStyle: const TextStyle(color: Colors.grey),
+                                border: const UnderlineInputBorder(),
+                                filled: _errorFields
+                                    .contains('ApplicationQuestion$index'),
+                                fillColor: _errorFields
+                                        .contains('ApplicationQuestion$index')
+                                    ? Colors.pink.shade50
+                                    : null,
+                              ),
+                              onChanged: (value) {
+                                setState(() {
+                                  _applicationQuestions[index] = value;
+                                });
+                              },
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.grey),
+                            onPressed: () async {
+                              final hasValue = _applicationQuestions[index]
+                                  .trim()
+                                  .isNotEmpty;
+                              if (hasValue) {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Confirm Delete'),
+                                    content: const Text(
+                                        'Are you sure you want to delete this question?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        child: const Text('Delete',
+                                            style:
+                                                TextStyle(color: Colors.red)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  _removeApplicationQuestion(index);
+                                }
+                              } else {
+                                _removeApplicationQuestion(index);
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+            if (_applicationQuestions.length < 3)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ElevatedButton(
+                  onPressed: _addApplicationQuestion,
+                  child: const Text('Add an Application Question'),
+                ),
+              ),
+
+            const SizedBox(height: 24),
+
+            // Required Languages (optional)
+            _buildLabel('Language Requirement',
+                required: true,
+                isError: _errorFields.contains('Language Requirement')),
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: () async {
+                final result = await showModalBottomSheet<List<String>>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (context) {
+                    List<String> tempSelected = List.from(_selectedLanguages);
+                    TextEditingController searchController =
+                        TextEditingController();
+                    return StatefulBuilder(
+                      builder: (context, setState) {
+                        return Padding(
+                          padding: MediaQuery.of(context).viewInsets,
+                          child: SizedBox(
+                            height: 400,
+                            child: Column(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: TextField(
+                                    controller: searchController,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Search language',
+                                      prefixIcon: Icon(Icons.search),
+                                    ),
+                                    onChanged: (_) => setState(() {}),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: StatefulBuilder(
+                                    builder: (context, setState) {
+                                      List<MapEntry<String, String>>
+                                          filteredList = languageMap.entries
+                                              .where((entry) => entry.value
+                                                  .toLowerCase()
+                                                  .contains(searchController
+                                                      .text
+                                                      .toLowerCase()))
+                                              .toList();
+
+                                      // 將已選擇的語言優先排序。
+                                      filteredList.sort((a, b) {
+                                        bool aSelected =
+                                            tempSelected.contains(a.key);
+                                        bool bSelected =
+                                            tempSelected.contains(b.key);
+                                        if (aSelected && !bSelected) return -1;
+                                        if (!aSelected && bSelected) return 1;
+                                        return a.value.compareTo(b.value);
+                                      });
+
+                                      return ListView(
+                                        children: filteredList.map((entry) {
+                                          final isSelected =
+                                              tempSelected.contains(entry.key);
+                                          return CheckboxListTile(
+                                            value: isSelected,
+                                            title: Text(entry.value),
+                                            onChanged: (checked) {
+                                              setState(() {
+                                                if (checked == true) {
+                                                  tempSelected.add(entry.key);
+                                                } else {
+                                                  tempSelected
+                                                      .remove(entry.key);
+                                                }
+                                              });
+                                            },
+                                          );
+                                        }).toList(),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    OutlinedButton(
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: Colors.redAccent,
+                                        side: const BorderSide(
+                                            color: Colors.redAccent),
+                                      ),
+                                      onPressed: () =>
+                                          Navigator.pop(context, null),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    ElevatedButton(
+                                      style: TextButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFF3A85FF),
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      onPressed: () =>
+                                          Navigator.pop(context, tempSelected),
+                                      child: const Text('Confirm'),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+                if (result != null) {
+                  setState(() {
+                    _selectedLanguages = result;
+                    _languageRequirement = _selectedLanguages.join(', ');
+                  });
+                }
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.black12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: _selectedLanguages.isEmpty
+                    ? const Text(
+                        'Preferred language(s) for the task taker',
+                        style: TextStyle(color: Colors.grey),
+                      )
+                    : Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: _selectedLanguages
+                            .map((code) => Chip(
+                                  label: Text(languageMap[code] ?? code),
+                                ))
+                            .toList(),
+                      ),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.warning, color: Colors.red, size: 20),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: RichText(
+                    text: const TextSpan(
+                      style: TextStyle(fontSize: 12, color: Colors.black87),
+                      children: [
+                        TextSpan(text: 'Please abide by '),
+                        TextSpan(
+                          text: 'The platform regulations',
+                          style: TextStyle(
+                              color: Colors.blue,
+                              decoration: TextDecoration.underline),
+                        ),
+                        TextSpan(
+                          text:
+                              ' and do not post false fraudulent information. Violators will be held legally responsible.',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            LayoutBuilder(
+              builder: (context, constraints) {
+                double maxWidth = 500;
+                bool isMobile = constraints.maxWidth < 600;
+                return Align(
+                    alignment: Alignment.center,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: isMobile ? double.infinity : maxWidth,
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF3A85FF),
+                          ),
+                          onPressed: () {
+                            final user =
+                                Provider.of<UserService>(context, listen: false)
+                                    .currentUser;
+                            final userName = user?.name ?? 'Unknown Poster';
+                            final data = {
+                              'title': _titleController.text.trim(),
+                              'salary': _salaryController.text.trim(),
+                              'location': _locationLabel.isNotEmpty
+                                  ? _locationLabel
+                                  : 'N/A',
+                              'task_date': _taskDate != null
+                                  ? _taskDate!
+                                      .toLocal()
+                                      .toString()
+                                      .split(' ')[0]
+                                  : 'N/A',
+                              'periodStart': _periodStart != null
+                                  ? _periodStart!
+                                      .toLocal()
+                                      .toString()
+                                      .split(' ')[0]
+                                  : 'N/A',
+                              'periodEnd': _periodEnd != null
+                                  ? _periodEnd!
+                                      .toLocal()
+                                      .toString()
+                                      .split(' ')[0]
+                                  : 'N/A',
+                              'application_question':
+                                  _applicationQuestions.join(' | '),
+                              'creator_name': userName,
+                              'avatar_url': user?.avatar_url ?? '',
+                              'language_requirement':
+                                  _selectedLanguages.join(','),
+                              'creator_id': user?.id ?? 'Unknown',
+                              // 'description': _taskDescriptionController.text
+                              //     .trim(), // 添加 description 值
+                            };
+
+                            // 檢查必填欄位
+                            final requiredFields = {
+                              kTaskTitleField: data['title'],
+                              // 'Task Description':
+                              //     _taskDescriptionController.text.trim(),
+                              kSalaryField: data['salary'],
+                              kTimeField: data['task_date'],
+                              kPostingPeriodField:
+                                  data['periodStart'] != 'N/A' &&
+                                      data['periodEnd'] != 'N/A'
+                            };
+
+                            _errorFields.clear();
+                            requiredFields.forEach((key, value) {
+                              if (key == kPostingPeriodField) {
+                                if (value != true) _errorFields.add(key);
+                              } else if (value == null ||
+                                  (value as String).isEmpty ||
+                                  value == 'N/A') {
+                                _errorFields.add(key);
+                              }
+                            });
+
+                            // 檢查每個 Application Question 是否為空
+                            for (int i = 0;
+                                i < _applicationQuestions.length;
+                                i++) {
+                              if (_applicationQuestions[i].trim().isEmpty) {
+                                _errorFields.add('ApplicationQuestion$i');
+                              }
+                            }
+
+                            if (_errorFields.isNotEmpty) {
+                              setState(() {});
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Please fill in all required fields.'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            // 傳遞資料到預覽頁面
+                            context.push('/task/create/preview', extra: data);
+                          },
+                          child: const Text(
+                            'Preview and save',
+                            style: TextStyle(color: Colors.white),
+                          ),
                         ),
                       ),
-                    ),
-                  ));
-            },
-          ),
-          const SizedBox(height: 24),
-        ],
+                    ));
+              },
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }
