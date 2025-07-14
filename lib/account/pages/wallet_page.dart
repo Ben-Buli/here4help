@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
 
@@ -161,6 +162,7 @@ class _WalletPageState extends State<WalletPage> {
                 title: const Text('Points Policies'),
                 onTap: () {
                   // TODO: 跳轉到積分政策頁面
+                  GoRouter.of(context).go('/account/wallet/point_policy');
                 },
               ),
             ],
