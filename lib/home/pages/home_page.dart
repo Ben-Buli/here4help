@@ -1,5 +1,6 @@
 // home_page.dart
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
 
@@ -43,7 +44,8 @@ class HomePage extends StatelessWidget {
                             Text(user?.name ?? 'User',
                                 style: const TextStyle(
                                     fontSize: 20, fontWeight: FontWeight.bold)),
-                            Text('${user?.points ?? 0} points',
+                            Text(
+                                '${NumberFormat.decimalPattern().format(user?.points ?? 0)} points',
                                 style: const TextStyle(fontSize: 16)),
                             const Row(
                               children: [
