@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 
 // ==================== account 模組 ====================
-import 'package:flutter/cupertino.dart';
 import 'package:here4help/account/pages/account_page.dart';
 import 'package:here4help/account/pages/contact_us_page.dart';
 import 'package:here4help/account/pages/faq_page.dart';
@@ -58,7 +57,7 @@ final List<Map<String, dynamic>> shellPages = [
   {
     'path': '/chat',
     'child': const ChatListPage(),
-    'title': 'Posts',
+    'title': 'Chats',
     'showBottomNav': true,
     'showBackArrow': true
   },
@@ -107,7 +106,7 @@ final List<Map<String, dynamic>> shellPages = [
     'builder': (context, state) {
       return TaskApplyPage(data: state as Map<dynamic, dynamic>);
     },
-    'title': 'Task Apply',
+    'title': 'Task Apply Resume',
     'showBottomNav': false,
     'showBackArrow': true
   },

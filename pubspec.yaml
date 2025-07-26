@@ -3,7 +3,7 @@ description: NCCU Social Task Posting APP  - Here4help.
 
 publish_to: 'none'
 
-version: 1.1.1+20250708
+version: 1.2.1+20250717
 
 environment:
   sdk: '>=3.3.0 <4.0.0'

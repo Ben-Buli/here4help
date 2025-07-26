@@ -83,31 +83,21 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                       style: const TextStyle(
                           fontSize: 18, fontWeight: FontWeight.bold),
                     ),
-                    ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey[200],
-                        foregroundColor: Colors.black,
-                        elevation: 0,
-                      ),
-                      child: const Text('Edit My Resume'),
+                    Row(
+                      children: [
+                        Row(
+                          children: List.generate(
+                            5,
+                            (index) => const Icon(Icons.star,
+                                color: Colors.amber, size: 20),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Text('5 (16 comments)'),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Row(
-                  children: List.generate(
-                    5,
-                    (index) =>
-                        const Icon(Icons.star, color: Colors.amber, size: 20),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Text('5 (16 comments)'),
               ],
             ),
             const SizedBox(height: 16),
@@ -130,30 +120,26 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                         const SizedBox(height: 4),
                         Text(task['description'] ?? 'No description available'),
                         const SizedBox(height: 12),
-                        Text('Salary:',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold)),
-                        Text('NT\$${task['salary']}'),
+                        const Text('Reward:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text('💰 ${task['salary']}'),
                         const SizedBox(height: 8),
-                        Text('Request Language:',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold)),
+                        const Text('Request Language:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         Text(task['language_requirement'] ?? '-'),
                         const SizedBox(height: 8),
-                        Text('Location:',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold)),
+                        const Text('Location:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         Text(task['location'] ?? '-'),
                         const SizedBox(height: 8),
-                        Text('Task Date:',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold)),
+                        const Text('Task Date:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         Text(task['task_date'] ?? '-'),
                         const SizedBox(height: 8),
                         const Text('Posted by:',
                             style: TextStyle(fontWeight: FontWeight.bold)),
                         Text('UserName: ${task['creator_name'] ?? ''}'),
-                        Text('Rating: ⭐ 5.0 (16 reviews)'),
+                        const Text('Rating: ⭐ 5.0 (16 reviews)'),
                       ],
                     ),
                     actions: [
@@ -189,7 +175,7 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
               controller: _selfIntroController,
               maxLines: 4,
               decoration: InputDecoration(
-                hintText: 'Tell us about yourself',
+                hintText: 'Tell us about yourself.',
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               ),
@@ -226,11 +212,6 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                OutlinedButton(
-                  onPressed: () {},
-                  child: const Text('Preview Resume'),
-                ),
-                const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {

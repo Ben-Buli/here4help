@@ -1,6 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:here4help/task/models/task_model.dart';
 
-class GlobalTaskList {
+class GlobalTaskList extends ChangeNotifier {
   static final GlobalTaskList _instance = GlobalTaskList._internal();
 
   factory GlobalTaskList() => _instance;
@@ -214,11 +215,17 @@ class GlobalTaskList {
   ];
 
   /// 讀取任務列表，只有在 _tasks 為空時才加入預設任務。
-  Future<void> loadTasks() async {
-    if (_tasks.isEmpty) {
+  Future<void> loadTasks({bool force = false}) async {
+    if (force || _tasks.isEmpty) {
+      _tasks.clear();
       _tasks.addAll(_defaultTasks.map((task) => task.toMap()));
       _sortTasks();
     }
+  }
+
+  /// 強制重載任務列表
+  Future<void> reloadTasks() async {
+    await loadTasks(force: true);
   }
 
   /// 更新任務狀態，並在更新後對任務進行排序。
@@ -236,9 +243,9 @@ class GlobalTaskList {
   /// 添加新任務到列表中，並在添加後對任務進行排序。
   Future<void> addTask(Map<String, dynamic> task) async {
     _tasks.add(task);
-    await Future.delayed(
-        Duration(milliseconds: 10)); // Simulate async operation
+    await Future.delayed(const Duration(milliseconds: 10)); // 模擬異步處理
     _sortTasks();
+    notifyListeners(); // 🔔 通知 UI 更新
   }
 
   List<Map<String, dynamic>> get tasks => _tasks;

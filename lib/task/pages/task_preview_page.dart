@@ -99,7 +99,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                                 text: 'Reward: ',
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
-                              TextSpan(text: '$salary'),
+                              TextSpan(text: salary),
                             ],
                           ),
                         ),
@@ -111,7 +111,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                                 text: 'Task Time: ',
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
-                              TextSpan(text: '$date'),
+                              TextSpan(text: date),
                             ],
                           ),
                         ),
@@ -123,7 +123,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                                 text: 'Location: ',
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
-                              TextSpan(text: '$location'),
+                              TextSpan(text: location),
                             ],
                           ),
                         ),
@@ -135,7 +135,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                                 text: 'Username: ',
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
-                              TextSpan(text: '$creatorName'),
+                              TextSpan(text: creatorName),
                             ],
                           ),
                         ),
@@ -147,7 +147,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                                 text: 'Language Requirement: ',
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
-                              TextSpan(text: '$languageRequirement'),
+                              TextSpan(text: languageRequirement),
                             ],
                           ),
                         ),
@@ -315,11 +315,9 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
 
                 if (confirm == true) {
                   final globalTaskList = GlobalTaskList();
-
-                  // 等待載入任務列表完成
                   await globalTaskList.loadTasks();
 
-                  // 送出任務到全域任務列表，並等待完成
+                  // 先新增任務
                   await globalTaskList.addTask(widget.data);
 
                   print(GlobalTaskList().tasks.length); // 任務有無加進去
@@ -330,7 +328,9 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                       const SnackBar(
                           content: Text('Task posted successfully!')),
                     );
-                    context.go('/task');
+                    // go 改成 push 之後，資料才會即時傳到 task list
+                    // 因為 go 會直接跳到 task list，沒有回到上一頁
+                    context.push('/task');
                   }
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(

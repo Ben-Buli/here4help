@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:here4help/task/services/global_task_list.dart';
 import 'package:here4help/chat/services/global_chat_room.dart';
 import 'package:flutter/scheduler.dart';
@@ -13,6 +14,8 @@ class ChatDetailPage extends StatefulWidget {
 
 class _ChatDetailPageState extends State<ChatDetailPage>
     with TickerProviderStateMixin {
+  // 統一應徵者訊息的背景色
+  final Color applierBubbleColor = Colors.grey.shade100;
   // 狀態名稱映射
   final Map<String, String> statusString = const {
     'open': 'Open',
@@ -52,7 +55,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  final List<String> _messages = [];
+  final List<Map<String, String>> _messages = [];
   // 模擬任務狀態
   String taskStatus = 'pending confirmation';
 
@@ -129,8 +132,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   void _sendMessage() {
     final text = _controller.text.trim();
     if (text.isNotEmpty && mounted) {
+      final now = DateTime.now();
+      final formattedTime =
+          "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
       setState(() {
-        _messages.add(text);
+        _messages.add({'text': text, 'time': formattedTime});
       });
       _controller.clear();
       _focusNode.requestFocus();
@@ -154,6 +160,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final questionReply = widget.data['room']['questionReply'] ?? '';
     final room = widget.data['room'];
     final applier = widget.data['room'];
+    print(applier);
     final List<dynamic> sentMessages = room['sentMessages'] ?? [];
 
     int totalItemCount = (questionReply.isNotEmpty ? 1 : 0) +
@@ -187,7 +194,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                           padding: const EdgeInsets.all(12),
                           constraints: const BoxConstraints(maxWidth: 300),
                           decoration: BoxDecoration(
-                            color: const Color.fromARGB(255, 235, 241, 249),
+                            color: applierBubbleColor,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Column(
@@ -198,69 +205,154 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                               Align(
                                 alignment: Alignment.centerRight,
                                 child: TextButton(
-                                    onPressed: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) {
-                                          return AlertDialog(
-                                            content: Column(
-                                              mainAxisSize: MainAxisSize.min,
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Center(
+                                            child: Text('Resume Preview')),
+                                        actions: [
+                                          Center(
+                                            child: TextButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(context),
+                                              child: const Text('CLOSE'),
+                                            ),
+                                          ),
+                                        ],
+                                        insetPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 24.0,
+                                                vertical: 24.0),
+                                        contentPadding:
+                                            const EdgeInsets.fromLTRB(
+                                                24.0, 20.0, 24.0, 0),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.center,
                                               children: [
                                                 CircleAvatar(
-                                                  radius: 24,
-                                                  child: Text(
-                                                    (room['name'] ?? 'U')[0]
-                                                        .toUpperCase(),
-                                                    style: const TextStyle(
-                                                        color: Colors.white),
-                                                  ),
+                                                  radius: 30,
+                                                  backgroundImage: room['user']
+                                                              ?['avatar_url'] !=
+                                                          null
+                                                      ? NetworkImage(
+                                                          room['user']![
+                                                              'avatar_url'])
+                                                      : null,
+                                                  child: room['user']
+                                                              ?['avatar_url'] ==
+                                                          null
+                                                      ? Text(
+                                                          (room['user']?[
+                                                                      'name'] ??
+                                                                  applier[
+                                                                      'name'] ??
+                                                                  'U')[0]
+                                                              .toUpperCase(),
+                                                          style:
+                                                              const TextStyle(
+                                                                  color: Colors
+                                                                      .white,
+                                                                  fontSize: 20),
+                                                        )
+                                                      : null,
                                                 ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  room['name'] ?? '',
-                                                  style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 16),
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
+                                                const SizedBox(width: 16),
+                                                Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
                                                   children: [
-                                                    const Icon(Icons.star,
-                                                        color: Color.fromARGB(
-                                                            255, 255, 187, 0),
-                                                        size: 16),
-                                                    const SizedBox(width: 4),
                                                     Text(
-                                                      '${room['rating'] ?? 0.0}',
+                                                      applier['name'] ??
+                                                          'Applier',
                                                       style: const TextStyle(
-                                                          fontSize: 14),
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 16,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Row(
+                                                      children: [
+                                                        const Icon(Icons.star,
+                                                            color: Colors.amber,
+                                                            size: 16),
+                                                        const SizedBox(
+                                                            width: 4),
+                                                        Text(
+                                                            '${applier['rating'] ?? 4.2}'),
+                                                        Text(
+                                                            ' (${applier['cooment'] ?? '16 comments'})'),
+                                                      ],
                                                     ),
                                                   ],
                                                 ),
-                                                Text(
-                                                  '(${room['reviewsCount'] ?? 0} reviews)',
-                                                  style: const TextStyle(
-                                                      fontSize: 12),
-                                                ),
                                               ],
                                             ),
-                                            actions: [
-                                              Center(
-                                                  child: ElevatedButton(
-                                                onPressed: () {
-                                                  Navigator.of(context).pop();
-                                                },
-                                                child: const Text('Understand'),
-                                              )),
-                                            ],
-                                          );
-                                        },
-                                      );
-                                    },
-                                    child: const Text('View Resume')),
+                                            const SizedBox(height: 12),
+                                            const Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: Text(
+                                                  'Self-recommendation (optional)',
+                                                  style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold)),
+                                            ),
+                                            TextField(
+                                              controller: TextEditingController(
+                                                  text: room['user']
+                                                                  ?['selfIntro']
+                                                              ?.isNotEmpty ==
+                                                          true
+                                                      ? room['user']![
+                                                          'selfIntro']
+                                                      : 'I am reliable, experienced, and proficient in communication. I have handled similar tasks before and am confident in my ability to deliver quality work.'),
+                                              readOnly: true,
+                                              maxLines: 4,
+                                              decoration: const InputDecoration(
+                                                hintText:
+                                                    'Tell us about yourself',
+                                                border: OutlineInputBorder(),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 12),
+                                            const Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: Text(
+                                                  'Can you speak English?',
+                                                  style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold)),
+                                            ),
+                                            TextField(
+                                              controller: TextEditingController(
+                                                  text: room['user']?[
+                                                                  'languageReply']
+                                                              ?.isNotEmpty ==
+                                                          true
+                                                      ? room['user']![
+                                                          'languageReply']
+                                                      : 'Yes, I can speak English fluently.'),
+                                              readOnly: true,
+                                              maxLines: 2,
+                                              decoration: const InputDecoration(
+                                                hintText: 'Write your answer',
+                                                border: OutlineInputBorder(),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text('View Resume'),
+                                ),
                               ),
                             ],
                           ),
@@ -293,11 +385,16 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               children: [
                 CircleAvatar(
                   radius: 16,
-                  child: Text(
-                    (room['user']?['name'] ?? applier['name'] ?? 'U')[0]
-                        .toUpperCase(),
-                    style: const TextStyle(color: Colors.white),
-                  ),
+                  backgroundImage: room['user']?['avatar_url'] != null
+                      ? NetworkImage(room['user']!['avatar_url'])
+                      : null,
+                  child: room['user']?['avatar_url'] == null
+                      ? Text(
+                          (room['user']?['name'] ?? applier['name'] ?? 'U')[0]
+                              .toUpperCase(),
+                          style: const TextStyle(color: Colors.white),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -309,7 +406,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                           padding: const EdgeInsets.all(12),
                           constraints: const BoxConstraints(maxWidth: 300),
                           decoration: BoxDecoration(
-                            color: const Color.fromARGB(255, 235, 241, 249),
+                            color: applierBubbleColor,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(text),
@@ -331,7 +428,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       );
     }
 
-    Widget buildMyMessageBubble(String text) {
+    Widget buildMyMessageBubble(Map<String, String> message) {
+      final text = message['text'] ?? '';
+      final time =
+          message['time'] ?? DateFormat('HH:mm').format(DateTime.now());
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3.0), // 上下間距
         child: Row(
@@ -339,7 +439,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              joinTime,
+              time,
               style: const TextStyle(fontSize: 10, color: Colors.grey),
             ),
             const SizedBox(width: 4),
@@ -348,7 +448,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                 padding: const EdgeInsets.all(12),
                 constraints: const BoxConstraints(maxWidth: 400),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100, // 我的訊息背景色
+                  color: const Color.fromARGB(255, 235, 241, 249), // 我的訊息背景色
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(text),
@@ -508,9 +608,19 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                       ],
                     ),
                     actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('CLOSE'),
+                      Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              height: 10,
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('CLOSE'),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -635,6 +745,14 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                       textInputAction: TextInputAction.send,
                       onSubmitted: (value) {
                         if (!isInputDisabled) _sendMessage();
+                      },
+
+                      /// 鍵盤收起時取消焦點
+                      onEditingComplete: () {
+                        FocusScope.of(context).unfocus();
+                      },
+                      onTapOutside: (_) {
+                        FocusScope.of(context).unfocus();
                       },
                       decoration: InputDecoration(
                         border: InputBorder.none,

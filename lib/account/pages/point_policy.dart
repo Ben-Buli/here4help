@@ -82,7 +82,8 @@ class PointPolicyPage extends StatelessWidget {
           // Points Withdrawal Policy
           const Text(
             'Points Withdrawal Policy',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(
+                fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue),
           ),
           const SizedBox(height: 12),
           Column(
@@ -117,6 +118,7 @@ class PointPolicyPage extends StatelessWidget {
       fontWeight: FontWeight.bold,
       color: Colors.blue[800],
     );
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -124,8 +126,8 @@ class PointPolicyPage extends StatelessWidget {
         children: [
           const Text('• ', style: TextStyle(fontSize: 18)),
           Expanded(
-            child: RichText(
-              text: TextSpan(
+            child: Text.rich(
+              TextSpan(
                 style: normalStyle,
                 children: [
                   TextSpan(text: text),

@@ -158,18 +158,28 @@ class _TaskListPageState extends State<TaskListPage> {
                     const SizedBox(height: 12),
                     const Text('Application Question',
                         style: TextStyle(fontWeight: FontWeight.bold)),
-                    ...((task['application_question'] ?? '—')
+                    ...((task['application_question'] ?? '')
                         .toString()
                         .split('|')
-                        .map((q) => Text(q.trim()))
+                        .where((q) => q.trim().isNotEmpty)
+                        .toList()
+                        .asMap()
+                        .entries
+                        .map((entry) =>
+                            Text('${entry.key + 1}. ${entry.value.trim()}'))
                         .toList()),
+                    if ((task['application_question'] ?? '')
+                        .toString()
+                        .trim()
+                        .isEmpty)
+                      const Text('No questions.'),
                     const SizedBox(height: 12),
                     Text.rich(TextSpan(
                       children: [
                         const TextSpan(
-                            text: 'Salary: \n',
+                            text: 'Reward: \n',
                             style: TextStyle(fontWeight: FontWeight.bold)),
-                        TextSpan(text: 'NT\$${task['salary'] ?? "0"}'),
+                        TextSpan(text: '💰 ${task['salary'] ?? "0"}'),
                       ],
                     )),
                     const SizedBox(height: 8),

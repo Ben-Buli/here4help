@@ -35,7 +35,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
   DateTime? _periodStart;
   DateTime? _periodEnd;
 
-  String _taskDescription = '';
+  final String _taskDescription = '';
 
   LatLng? _selectedLocation = const LatLng(25.0208, 121.5418);
   String _locationLabel = 'NCCU';
@@ -46,7 +46,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
 
   final Set<String> _errorFields = {};
   List<String> _selectedLanguages = [];
-  List<String> _applicationQuestions = [''];
+  final List<String> _applicationQuestions = [''];
 
   @override
   void initState() {
@@ -176,7 +176,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
             // const SizedBox(height: 12),
 
             // Salary
-            _buildLabel('Salary',
+            _buildLabel('Reward',
                 required: true, isError: _errorFields.contains('Salary')),
             const SizedBox(height: 4),
             Row(

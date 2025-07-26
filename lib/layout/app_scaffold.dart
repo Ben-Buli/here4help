@@ -29,30 +29,41 @@ class AppScaffold extends StatefulWidget {
 class _AppScaffoldState extends State<AppScaffold> {
   // 新增 route history
   final List<String> _routeHistory = [];
+  // 新增不可返回的路由清單
+  final Set<String> _nonReturnableRoutes = {
+    '/task/create/preview',
+    '/task/apply',
+    '/chat/detail',
+  };
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final currentPath = GoRouterState.of(context).uri.toString();
-    if (_routeHistory.isEmpty || _routeHistory.last != currentPath) {
+    if (currentPath.isNotEmpty &&
+        (_routeHistory.isEmpty || _routeHistory.last != currentPath)) {
       _routeHistory.add(currentPath);
     }
   }
 
   void _handleBack() {
-    final popped = Navigator.of(context).maybePop();
-    popped.then((didPop) {
-      if (!didPop) {
-        if (_routeHistory.length > 1) {
-          // 移除當前
-          _routeHistory.removeLast();
-          // 回到上一頁
-          final previous = _routeHistory.removeLast();
-          context.go(previous);
-          // 沒有上一頁則點擊沒有反應
+    try {
+      final popped = Navigator.of(context).maybePop();
+      popped.then((didPop) {
+        if (!didPop) {
+          if (_routeHistory.length > 1) {
+            final current = _routeHistory.removeLast();
+            final previous = _routeHistory.last;
+            if (!_nonReturnableRoutes.contains(previous)) {
+              context.go(previous);
+              _routeHistory.removeLast();
+            }
+          }
         }
-      }
-    });
+      });
+    } catch (e) {
+      debugPrint('Back navigation error: $e');
+    }
   }
 
   @override
@@ -66,25 +77,26 @@ class _AppScaffoldState extends State<AppScaffold> {
             appBar: widget.showAppBar
                 ? AppBar(
                     backgroundColor: const Color.fromARGB(255, 255, 255, 255),
-                    shape: const Border(
-                      bottom: BorderSide(
-                        color: Color(0xFFCCCCCC),
-                        width: 1.0,
-                      ),
-                    ),
+                    shape: null,
                     elevation: 0,
                     centerTitle: widget.centerTitle,
                     leading: widget.showBackArrow
                         ? IconButton(
                             icon: Icon(
                               Icons.arrow_back_ios_new,
-                              color: _routeHistory.length > 1
+                              color: (_routeHistory.length > 1 &&
+                                      !_nonReturnableRoutes.contains(
+                                          _routeHistory[
+                                              _routeHistory.length - 2]))
                                   ? const Color(0xFF2563EB)
                                   : Colors.grey,
                             ),
-                            onPressed:
-                                _routeHistory.length > 1 ? _handleBack : null,
-                            // 如果沒有上一頁，按鈕 disabled
+                            onPressed: (_routeHistory.length > 1 &&
+                                    !_nonReturnableRoutes.contains(
+                                        _routeHistory[
+                                            _routeHistory.length - 2]))
+                                ? _handleBack
+                                : null,
                           )
                         : null,
                     title: Text(
@@ -98,27 +110,6 @@ class _AppScaffoldState extends State<AppScaffold> {
                     actions: [
                       ...?widget.actions,
                     ],
-                    bottom: const PreferredSize(
-                      preferredSize: Size.fromHeight(2.0),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            height: 1.0,
-                            child: DecoratedBox(
-                              decoration:
-                                  BoxDecoration(color: Color(0xFFCCCCCC)),
-                            ),
-                          ),
-                          SizedBox(
-                            height: 1.0,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(color: Colors.grey),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   )
                 : null,
             body: SafeArea(

@@ -27,7 +27,8 @@ class ChatListPage extends StatefulWidget {
   State<ChatListPage> createState() => _ChatListPageState();
 }
 
-class _ChatListPageState extends State<ChatListPage> {
+class _ChatListPageState extends State<ChatListPage>
+    with TickerProviderStateMixin {
   late Future<void> _taskFuture;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -38,15 +39,25 @@ class _ChatListPageState extends State<ChatListPage> {
   String? selectedStatus;
   // Tasker 篩選狀態
   bool taskerFilterEnabled = false;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _taskFuture = GlobalTaskList().loadTasks();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        setState(() {
+          taskerFilterEnabled = _tabController.index == 1;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -652,7 +663,6 @@ class _ChatListPageState extends State<ChatListPage> {
   @override
   Widget build(BuildContext context) {
     final globalTaskList = GlobalTaskList();
-
     final statusOrder = {
       statusString['open']!: 0,
       statusString['in_progress']!: 1,
@@ -676,27 +686,17 @@ class _ChatListPageState extends State<ChatListPage> {
             if (statusA != statusB) {
               return statusA.compareTo(statusB);
             }
-
             return (DateTime.parse(b['task_date']))
                 .compareTo(DateTime.parse(a['task_date']));
           });
 
-          // final filteredTasksForDropdown = getFilteredTasksForDropdown();
-          final filteredTasksForDropdown = tasks; // 不做下拉選單聯動篩選
+          final filteredTasksForDropdown = tasks;
           final locationOptions = filteredTasksForDropdown
               .map((e) => (e['location'] ?? '').toString())
               .where((e) => e.isNotEmpty)
               .toSet()
               .toList()
             ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
-          /// 註解掉 hashtag的篩選邏輯
-          // final hashtagOptions = filteredTasksForDropdown
-          //     .expand((e) => (e['hashtags'] as List<dynamic>? ?? [])
-          //         .map((h) => h.toString()))
-          //     .where((e) => e.isNotEmpty)
-          //     .toSet()
-          //     .toList()
           final statusOptions = filteredTasksForDropdown
               .map((e) => (e['status'] ?? '').toString())
               .where((e) => e.isNotEmpty)
@@ -704,194 +704,187 @@ class _ChatListPageState extends State<ChatListPage> {
               .toList()
             ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
-          // 篩選邏輯
-          final filteredTasks = tasks.where((task) {
-            final title = (task['title'] ?? '').toString().toLowerCase();
-            final location = (task['location'] ?? '').toString();
-            final hashtags = (task['hashtags'] as List<dynamic>? ?? [])
-                .map((h) => h.toString())
-                .toList();
-            final status = (task['status'] ?? '').toString();
-            final description =
-                (task['description'] ?? '').toString().toLowerCase();
-
-            final query = searchQuery.toLowerCase();
-
-            final matchQuery = query.isEmpty ||
-                title.contains(query) ||
-                location.toLowerCase().contains(query) ||
-                description.contains(query);
-
-            final matchLocation =
-                selectedLocation == null || selectedLocation == location;
-            // final matchHashtag =
-            //     selectedHashtag == null || hashtags.contains(selectedHashtag);
-            final matchStatus =
-                selectedStatus == null || selectedStatus == status;
-            final matchTasker = !taskerFilterEnabled ||
-                (task['hashtags'] as List<dynamic>? ?? [])
-                    .map((e) => e.toString().toLowerCase())
-                    .contains('tasker');
-
-            return matchQuery &&
-                matchLocation &&
-                // matchHashtag &&
-                matchStatus &&
-                matchTasker;
-          }).toList();
-
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Row(
-                  children: [
-                    // Search bar
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        focusNode: _searchFocusNode,
-                        onChanged: (value) {
-                          setState(() {
-                            searchQuery = value.toLowerCase();
-                          });
-                        },
-                        decoration: InputDecoration(
-                          hintText: 'Search...',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    setState(() {
-                                      _searchController.clear();
-                                      searchQuery = '';
-                                    });
-                                  },
-                                )
-                              : null,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
+          return DefaultTabController(
+            length: 2,
+            initialIndex: taskerFilterEnabled ? 1 : 0,
+            child: Column(
+              children: [
+                TabBar(
+                  controller: _tabController,
+                  indicatorColor: Colors.lightBlue,
+                  tabs: const [
+                    Tab(text: 'Posted Tasks'),
+                    Tab(text: 'My Works'),
+                  ],
+                ),
+                // Removed or reduced vertical space above TabBar
+                // const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
+                    children: [
+                      // Search bar
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          focusNode: _searchFocusNode,
+                          onChanged: (value) {
+                            setState(() {
+                              searchQuery = value.toLowerCase();
+                            });
+                          },
+                          onEditingComplete: () {
+                            FocusScope.of(context).unfocus();
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Search...',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      setState(() {
+                                        _searchController.clear();
+                                        searchQuery = '';
+                                      });
+                                    },
+                                  )
+                                : null,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Colors.cyan),
-                        textStyle: const TextStyle(fontSize: 11),
-                        backgroundColor: taskerFilterEnabled
-                            ? Colors.cyan[800]
-                            : Colors.transparent,
-                        foregroundColor: taskerFilterEnabled
-                            ? Colors.white
-                            : Colors.cyan[800],
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: selectedLocation,
+                          hint: const Text('Location'),
+                          underline: Container(height: 1, color: Colors.grey),
+                          items: locationOptions.map((loc) {
+                            return DropdownMenuItem(
+                                value: loc, child: Text(loc));
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedLocation = value;
+                            });
+                          },
                         ),
-                        minimumSize: const Size(56, 56), // 高度與搜尋欄一致
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
                       ),
-                      onPressed: () {
-                        setState(() {
-                          taskerFilterEnabled = !taskerFilterEnabled;
-                        });
-                      },
-                      child: const Text('Tasker', textAlign: TextAlign.center),
-                    ),
-                  ],
-                ),
-              ),
-              // 篩選下拉選單 - 底線簡潔樣式，無 'All'，互動連動
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedLocation,
-                        hint: const Text('Location'),
-                        underline: Container(height: 1, color: Colors.grey),
-                        items: locationOptions.map((loc) {
-                          return DropdownMenuItem(value: loc, child: Text(loc));
-                        }).toList(),
-                        onChanged: (value) {
+                      const SizedBox(width: 8),
+                      // Hashtag dropdown commented
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: selectedStatus,
+                          hint: const Text('Status'),
+                          underline: Container(height: 1, color: Colors.grey),
+                          items: statusOptions.map((status) {
+                            return DropdownMenuItem(
+                                value: status, child: Text(status));
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedStatus = value;
+                            });
+                          },
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh, color: Colors.blue),
+                        tooltip: 'Reset Filters',
+                        onPressed: () {
                           setState(() {
-                            selectedLocation = value;
+                            _searchController.clear();
+                            searchQuery = '';
+                            selectedLocation = null;
+                            selectedHashtag = null;
+                            selectedStatus = null;
                           });
                         },
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Expanded(
-                    //   child: DropdownButton<String>(
-                    //     isExpanded: true,
-                    //     value: selectedHashtag,
-                    //     hint: const Text('Hashtag'),
-                    //     underline: Container(height: 1, color: Colors.grey),
-                    //     items: hashtagOptions.map((tag) {
-                    //       return DropdownMenuItem(value: tag, child: Text(tag));
-                    //     }).toList(),
-                    //     onChanged: (value) {
-                    //       setState(() {
-                    //         selectedHashtag = value;
-                    //       });
-                    //     },
-                    //   ),
-                    // ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedStatus,
-                        hint: const Text('Status'),
-                        underline: Container(height: 1, color: Colors.grey),
-                        items: statusOptions.map((status) {
-                          return DropdownMenuItem(
-                              value: status, child: Text(status));
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedStatus = value;
-                          });
-                        },
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh, color: Colors.blue),
-                      tooltip: 'Reset Filters',
-                      onPressed: () {
-                        setState(() {
-                          _searchController.clear();
-                          searchQuery = '';
-                          selectedLocation = null;
-                          selectedHashtag = null;
-                          selectedStatus = null;
-                        });
-                      },
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(12),
-                  children: filteredTasks.map((task) {
-                    final applierChatItems = chatRoomModel
-                        .where((applierChatItem) =>
-                            applierChatItem['taskId'] == task['id'])
-                        .toList();
-                    return _taskCardWithapplierChatItems(
-                        task, applierChatItems);
-                  }).toList(),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildTaskList(false), // My Post
+                      _buildTaskList(true), // My Task
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         }
       },
+    );
+  }
+
+  Widget _buildTaskList(bool taskerEnabled) {
+    final globalTaskList = GlobalTaskList();
+    final statusOrder = {
+      statusString['open']!: 0,
+      statusString['in_progress']!: 1,
+      statusString['pending_confirmation']!: 2,
+      statusString['dispute']!: 3,
+      statusString['completed']!: 4,
+    };
+    final tasks = globalTaskList.tasks;
+    tasks.sort((a, b) {
+      final statusA = statusOrder[a['status']] ?? 99;
+      final statusB = statusOrder[b['status']] ?? 99;
+      if (statusA != statusB) {
+        return statusA.compareTo(statusB);
+      }
+      return (DateTime.parse(b['task_date']))
+          .compareTo(DateTime.parse(a['task_date']));
+    });
+    final filteredTasks = tasks.where((task) {
+      final title = (task['title'] ?? '').toString().toLowerCase();
+      final location = (task['location'] ?? '').toString();
+      final hashtags = (task['hashtags'] as List<dynamic>? ?? [])
+          .map((h) => h.toString())
+          .toList();
+      final status = (task['status'] ?? '').toString();
+      final description = (task['description'] ?? '').toString().toLowerCase();
+      final query = searchQuery.toLowerCase();
+      final matchQuery = query.isEmpty ||
+          title.contains(query) ||
+          location.toLowerCase().contains(query) ||
+          description.contains(query);
+      final matchLocation =
+          selectedLocation == null || selectedLocation == location;
+      final matchStatus = selectedStatus == null || selectedStatus == status;
+      final matchTasker = taskerEnabled
+          ? ((task['hashtags'] as List<dynamic>? ?? [])
+              .map((e) => e.toString().toLowerCase())
+              .contains('tasker'))
+          : !((task['hashtags'] as List<dynamic>? ?? [])
+              .map((e) => e.toString().toLowerCase())
+              .contains('tasker'));
+      return matchQuery && matchLocation && matchStatus && matchTasker;
+    }).toList();
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: filteredTasks.map((task) {
+        final applierChatItems = chatRoomModel
+            .where((applierChatItem) => applierChatItem['taskId'] == task['id'])
+            .toList();
+        return _taskCardWithapplierChatItems(task, applierChatItems);
+      }).toList(),
     );
   }
 }
