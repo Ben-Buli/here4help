@@ -711,7 +711,6 @@ class _ChatListPageState extends State<ChatListPage>
               children: [
                 TabBar(
                   controller: _tabController,
-                  indicatorColor: Colors.lightBlue,
                   tabs: const [
                     Tab(text: 'Posted Tasks'),
                     Tab(text: 'My Works'),

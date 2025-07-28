@@ -69,14 +69,14 @@ class _AppScaffoldState extends State<AppScaffold> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFFF0F0F0),
+      color: const Color(0xFFBFE5F1), // Sky Blue
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 500),
           child: Scaffold(
             appBar: widget.showAppBar
                 ? AppBar(
-                    backgroundColor: const Color.fromARGB(255, 255, 255, 255),
+                    backgroundColor: const Color(0xFF51A4C8), // Primary Blue
                     shape: null,
                     elevation: 0,
                     centerTitle: widget.centerTitle,
@@ -88,7 +88,7 @@ class _AppScaffoldState extends State<AppScaffold> {
                                       !_nonReturnableRoutes.contains(
                                           _routeHistory[
                                               _routeHistory.length - 2]))
-                                  ? const Color(0xFF2563EB)
+                                  ? const Color.fromARGB(255, 110, 133, 142)
                                   : Colors.grey,
                             ),
                             onPressed: (_routeHistory.length > 1 &&
@@ -102,7 +102,7 @@ class _AppScaffoldState extends State<AppScaffold> {
                     title: Text(
                       widget.title ?? '',
                       style: const TextStyle(
-                        color: Color(0xFF2563EB),
+                        color: Colors.white,
                         fontWeight: FontWeight.w700,
                         fontSize: 20,
                       ),
@@ -119,6 +119,7 @@ class _AppScaffoldState extends State<AppScaffold> {
             ),
             bottomNavigationBar: widget.showBottomNav
                 ? BottomNavigationBar(
+                    backgroundColor: const Color(0xFF51A4C8), // Primary Blue
                     type: BottomNavigationBarType.fixed,
                     currentIndex: _getCurrentIndex(context),
                     showSelectedLabels: false,

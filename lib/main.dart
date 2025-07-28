@@ -14,18 +14,23 @@ class Here4HelpApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Here4Help',
       theme: ThemeData(
-        scaffoldBackgroundColor: Colors.white,
-        splashColor: Colors.blue.withOpacity(0.1),
-        highlightColor: Colors.blue.withOpacity(0.05),
-        hoverColor: Colors.blue.withOpacity(0.04),
-        focusColor: Colors.blue.withOpacity(0.12),
+        scaffoldBackgroundColor: const Color(0xFFFFFFFF), // White
+        splashColor: const Color(0xFFA6D2E6), // Light Blue
+        highlightColor: const Color(0xFFA6D2E6), // Light Blue
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color.fromARGB(255, 255, 255, 255),
-          foregroundColor: Color(0xFF2563EB),
+          backgroundColor: Color(0xFF51A4C8), // Primary Blue
           elevation: 0,
+          foregroundColor: Colors.white,
         ),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2563EB),
+          seedColor: const Color(0xFF51A4C8), // Primary Blue
+        ).copyWith(
+          primary: const Color(0xFF51A4C8), // Primary Blue
+          background: const Color(0xFFBFE5F1), // Sky Blue
+          surface: const Color(0xFFF9FAFB),
+          secondary: const Color(0xFFA6D2E6), // Light Blue
+          onPrimary: Colors.white,
+          onSecondary: Colors.black,
         ),
         useMaterial3: true,
       ),

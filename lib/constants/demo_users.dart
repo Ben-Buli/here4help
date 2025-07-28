@@ -2,8 +2,8 @@ final List<Map<String, dynamic>> testAccounts = [
   {
     'id': 1,
     'name': 'Michael',
-    'email': 'user.Michael@nccu.edu.test',
-    'password': 'admin1234',
+    'email': 'Michael@test',
+    'password': '1234',
     'permission': 99,
     'avatar_url': 'assets/images/avatar/avatar-4.png',
     'points': 1020,
@@ -12,8 +12,8 @@ final List<Map<String, dynamic>> testAccounts = [
   {
     'id': 2,
     'name': 'Luisa',
-    'email': 'user.Luisa@nccu.edu.test',
-    'password': 'user5678',
+    'email': 'Luisa@test',
+    'password': '1234',
     'permission': 1,
     'avatar_url': 'assets/images/avatar/avatar-1.png',
     'points': 1200,
@@ -22,8 +22,8 @@ final List<Map<String, dynamic>> testAccounts = [
   {
     'id': 3,
     'name': 'Linda',
-    'email': 'user.linda@nccu.edu.test',
-    'password': 'user5678',
+    'email': 'linda@test',
+    'password': '1234',
     'permission': 1,
     'avatar_url': 'assets/images/avatar/avatar-2.png',
     'points': 920,
@@ -32,8 +32,8 @@ final List<Map<String, dynamic>> testAccounts = [
   {
     'id': 4,
     'name': 'Chris',
-    'email': 'user.chris@nccu.edu.test',
-    'password': 'user5678',
+    'email': 'chris@test',
+    'password': '1234',
     'permission': 0,
     'avatar_url': 'assets/images/avatar/avatar-3.png',
     'points': 1234,
