@@ -3,7 +3,7 @@
 // 這個服務會在登入時更新使用者資訊，並提供當前使用者的權限等級。
 import 'package:flutter/material.dart';
 import 'package:here4help/auth/models/user_model.dart';
-import 'package:here4help/constants/demo_users.dart';
+import 'auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UserService extends ChangeNotifier {
@@ -25,10 +25,20 @@ class UserService extends ChangeNotifier {
       _currentUser = UserModel(
         id: prefs.getInt('user_id') ?? 0, // 預設 ID 為 0
         name: prefs.getString('user_name') ?? '',
+        nickname: prefs.getString('user_nickname') ??
+            prefs.getString('user_name') ??
+            '',
         email: email,
+        phone: prefs.getString('user_phone') ?? '',
         points: prefs.getInt('user_points') ?? 0,
         avatar_url: prefs.getString('user_avatarUrl') ?? '',
-        primary_language: prefs.getString('user_primaryLang') ?? '',
+        status: prefs.getString('user_status') ?? 'active',
+        provider: prefs.getString('user_provider') ?? 'email',
+        created_at: prefs.getString('user_created_at') ?? '',
+        updated_at: prefs.getString('user_updated_at') ?? '',
+        referral_code: prefs.getString('user_referral_code'),
+        google_id: prefs.getString('user_google_id'),
+        primary_language: prefs.getString('user_primaryLang') ?? 'English',
         permission_level: permissionLevel ?? 0, // 預設權限等級為 0
       );
       debugPrint('User loaded: $_currentUser');
@@ -47,6 +57,7 @@ class UserService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('user_id');
     await prefs.remove('user_name');
+    await prefs.remove('user_nickname');
     await prefs.remove('user_email');
     await prefs.remove('user_points');
     await prefs.remove('user_avatarUrl');
@@ -63,15 +74,24 @@ class UserService extends ChangeNotifier {
     _currentUser = UserModel(
       id: user.id,
       name: user.name,
+      nickname: user.nickname,
       email: user.email,
+      phone: user.phone,
       points: user.points,
       avatar_url: user.avatar_url,
+      status: user.status,
+      provider: user.provider,
+      created_at: user.created_at,
+      updated_at: user.updated_at,
+      referral_code: user.referral_code,
+      google_id: user.google_id,
       primary_language: user.primary_language,
       permission_level: user.permission_level,
     );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('user_id', user.id);
     await prefs.setString('user_name', user.name);
+    await prefs.setString('user_nickname', user.nickname);
     await prefs.setString('user_email', user.email);
     await prefs.setInt('user_points', user.points);
     await prefs.setString('user_avatarUrl', user.avatar_url);
@@ -87,24 +107,34 @@ class UserService extends ChangeNotifier {
   }
 
   Future<bool> loginWithEmail(String email, String password) async {
-    final matchedAccount = testAccounts.firstWhere(
-      (acc) => acc['email'] == email && acc['password'] == password,
-      orElse: () => {},
-    );
-    if (matchedAccount.isNotEmpty) {
+    try {
+      final result = await AuthService.login(email, password);
+      final userData = result['user'];
+
       setUser(UserModel(
-        id: matchedAccount['id'] as int? ?? 0,
-        name: matchedAccount['name'] as String,
-        email: matchedAccount['email'] as String,
-        points: (matchedAccount['points'] as num).toInt(),
-        avatar_url: (matchedAccount['avatar_url'] ?? '') as String,
-        primary_language:
-            (matchedAccount['language_requirement'] ?? '') as String,
-        permission_level: matchedAccount['permission'] as int,
+        id: userData['id'] as int? ?? 0,
+        name: userData['name'] as String? ?? '',
+        nickname: userData['nickname'] as String? ??
+            userData['name'] as String? ??
+            '',
+        email: userData['email'] as String? ?? '',
+        phone: userData['phone'] as String? ?? '',
+        points: (userData['points'] as num?)?.toInt() ?? 0,
+        avatar_url: userData['avatar_url'] as String? ?? '',
+        status: userData['status'] as String? ?? 'active',
+        provider: userData['provider'] as String? ?? 'email',
+        created_at: userData['created_at'] as String? ?? '',
+        updated_at: userData['updated_at'] as String? ?? '',
+        referral_code: userData['referral_code'] as String?,
+        google_id: userData['google_id'] as String?,
+        primary_language: userData['primary_language'] as String? ?? 'English',
+        permission_level: userData['permission'] as int? ?? 0,
       ));
       return true;
+    } catch (e) {
+      debugPrint('Login failed: $e');
+      return false;
     }
-    return false;
   }
 
   int getCurrentPermissionLevel() {

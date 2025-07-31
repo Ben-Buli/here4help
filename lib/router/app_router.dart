@@ -33,9 +33,32 @@ final GoRouter appRouter = GoRouter(
   redirect: (context, state) async {
     final prefs = await SharedPreferences.getInstance();
     final email = prefs.getString('user_email');
-    if (email == null && state.uri.path != '/login') {
-      return '/login'; // 如果未登入，跳轉到登入頁面
+
+    print('🔄 路由重定向檢查: ${state.uri.path}');
+    print('👤 用戶狀態: ${email != null ? "已登入 ($email)" : "未登入"}');
+
+    // 定義公開頁面（不需要登入驗證）
+    final publicPages = ['/login', '/signup', '/signup/student-id'];
+
+    // 如果是公開頁面，允許訪問
+    if (publicPages.contains(state.uri.path)) {
+      print('✅ 公開頁面，允許訪問: ${state.uri.path}');
+      return null;
     }
+
+    // 如果未登入且不在公開頁面，導向登入頁面
+    if (email == null) {
+      print('➡️ 未登入用戶重定向到登入頁面');
+      return '/login';
+    }
+
+    // 如果已登入且訪問登入頁面，導向首頁
+    if (state.uri.path == '/login') {
+      print('➡️ 已登入用戶重定向到首頁');
+      return '/home';
+    }
+
+    print('✅ 保持當前路由: ${state.uri.path}');
     return null; // 保持當前路由
   },
   // 📍 應用中的所有路由定義（使用 GoRoute）

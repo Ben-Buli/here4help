@@ -18,7 +18,6 @@ migrate_working_dir/
 *.iws
 .idea/
 
-
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
@@ -39,8 +38,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-
-
 
 # Gradle
 .gradle/
@@ -75,3 +72,88 @@ xcuserdata/
 .Spotlight-V100
 .Trashes
 *.icloud
+
+# Backend specific ignores
+# Database configuration with sensitive data
+backend/config/database.php
+admin/includes/config.php
+
+# Uploaded files
+backend/uploads/
+backend/uploads/student_id_images/
+
+# Development and setup scripts
+database_updates/
+execute_*.php
+check_*.php
+fix_*.php
+test_*.html
+backend_example/
+
+# Admin panel (incomplete)
+admin/
+
+# Test files
+test_images/
+view_uploaded_images.html
+test_signup_api*.html
+
+# Shell scripts
+sync_to_mamp.sh
+setup_symlink.sh
+
+# Root level PHP files (mostly setup/utility)
+index.php
+.htaccess
+test_api_connection.php
+check_user_login.php
+fix_user_login.php
+check_database_structure.php
+fix_database_structure.php
+test_login_flow.php
+
+# Additional Flutter/Dart ignores
+*.lock
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+
+# IDE specific
+.vscode/settings.json
+.vscode/launch.json
+.vscode/tasks.json
+
+# OS generated files
+**/.DS_Store
+**/Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Log files
+*.log
+logs/
+
+# Cache directories
+.cache/
+cache/
+
+# Node modules (if any)
+node_modules/
+
+# Coverage reports
+coverage/
+*.lcov
+
+# Generated files
+generated/
+generated_plugin_registrant.dart

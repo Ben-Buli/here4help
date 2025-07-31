@@ -1,5 +1,5 @@
 import 'package:here4help/chat/models/chat_room_model.dart';
-import 'package:here4help/task/services/global_task_list.dart';
+import 'package:here4help/task/services/task_service.dart';
 
 class GlobalChatRoom {
   static final GlobalChatRoom _instance = GlobalChatRoom._internal();
@@ -24,11 +24,8 @@ class GlobalChatRoom {
 
   /// 根據 taskId 獲取對應的任務和聊天房間的 join 效果
   Map<String, dynamic>? getTaskWithRooms(String taskId) {
-    final globalTaskList = GlobalTaskList();
-    final task = globalTaskList.tasks.firstWhere(
-      (task) => task['id'] == taskId,
-      orElse: () => <String, dynamic>{},
-    );
+    final taskService = TaskService();
+    final task = taskService.getTaskById(taskId) ?? {};
 
     final rooms = getRoomsByTaskId(taskId);
 

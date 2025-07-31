@@ -1,83 +1,142 @@
-Here4Help 專案檔案清單 & 檔案組織方案
+# Here4Help - NCCU Social Task Posting APP
 
-這是一份說明 Here4Help Flutter 專案應用程式的檔案組織和綱要。
+一個專為政大學生設計的任務發布和接案平台，提供校園內各種任務的發布、搜尋和接案服務。
 
-⸻
+## 📱 專案概述
 
-目錄組織模式
+Here4Help 是一個 Flutter 跨平台應用程式，結合 PHP 後端 API，為政大學生提供：
+- 任務發布和管理
+- 任務搜尋和篩選
+- 即時聊天功能
+- 學生身份驗證
+- 推薦碼系統
+- 積分和評價系統
 
-針對該專案重視功能分機與維護操作，採用了“功能分類式組織模型 (feature-first organization)”，如下：
+## 🏗️ 專案架構
 
-lib/
-├── account/
-│   ├── models/
-│   ├── pages/
-│   ├── services/
-│   └── widgets/
-├── auth/
-│   ├── models/
-│   ├── pages/
-│   ├── services/
-│   └── widgets/
-├── chat/
-├── home/
-├── pay/
-├── system/
-├── task/
-├── router/
-│   └── app_router.dart
-└── main.dart
+```
+here4help/
+├── lib/                    # Flutter 應用程式主要程式碼
+├── backend/               # PHP 後端 API
+│   ├── api/              # API 端點
+│   ├── config/           # 配置檔案
+│   └── utils/            # 工具類別
+├── admin/                # 後台管理系統 (開發中)
+├── android/              # Android 平台配置
+├── ios/                  # iOS 平台配置
+└── assets/               # 靜態資源
+```
 
+## 🚀 快速開始
 
-⸻
+### 前置需求
 
-說明各功能檔案夾
+- Flutter SDK (>=3.3.0)
+- Dart SDK
+- PHP 7.4+
+- MySQL 5.7+
+- MAMP/XAMPP (本地開發)
 
-✅ account/
-	•	保管成員資訊顯示與編輯模組
+### Flutter App 設置
 
-✅ auth/
-	•	認證與認證效力監控，包括 login/signup 等
+1. **安裝依賴**
+   ```bash
+   flutter pub get
+   ```
 
-✅ chat/
-	•	聊天專區：人員列表、訊息續導、模組管理
+2. **配置環境**
+   - 複製 `backend/config/database.example.php` 為 `backend/config/database.php`
+   - 填入您的資料庫連線資訊
 
-✅ home/
-	•	App 登入後的首頁，通常包含瀏覽、示意符號等
+3. **運行應用程式**
+   ```bash
+   flutter run
+   ```
 
-✅ pay/
-	•	儲值、付款密碼、金款歷史、記錄顯示
+### 後端 API 設置
 
-✅ system/
-	•	系統層面，包含 banned/unathorized/unknown page 等
+1. **資料庫設置**
+   - 建立 MySQL 資料庫
+   - 執行 `database_updates/` 目錄中的 SQL 檔案
 
-✅ task/
-	•	分担發布與管理工作、任務問答，或是工作總覽
+2. **配置檔案**
+   - 修改 `backend/config/database.php` 中的資料庫連線資訊
+   - 確保 PHP 環境支援 PDO 和 MySQL
 
-✅ router/
-	•	集中管理 go_router 導覽功能，使用 /router/app_router.dart
+3. **檔案權限**
+   - 確保 `backend/uploads/` 目錄可寫入
 
-⸻
+## 📋 功能特色
 
-建議檔案
+### 使用者功能
+- ✅ 學生身份驗證
+- ✅ 任務發布和管理
+- ✅ 任務搜尋和篩選
+- ✅ 即時聊天系統
+- ✅ 推薦碼系統
+- ✅ 積分和評價
+- ✅ Google 登入整合
 
-✅ /common/
-	•	建議備用一個 lib/common/ 用於全層共用、舊功能或通用模型
+### 管理功能
+- 🔄 後台管理系統 (開發中)
+- 🔄 任務審核
+- 🔄 使用者管理
+- 🔄 系統統計
 
-✅ /shared/
-	•	用於全部功能重複使用的 widgets 或 style 元件，例如 AppButton, AvatarIcon 等
+## 🔧 開發指南
 
-⸻
+### 目錄結構說明
 
-推薦操作模式
-	•	任何工作先進入該功能檔案夾
-	•	在功能內加入 pages/models/services/widgets
-	•	設定 route 則一組集中管理於 app_router.dart
+- `lib/` - Flutter 應用程式程式碼
+  - `auth/` - 認證相關
+  - `task/` - 任務相關
+  - `chat/` - 聊天功能
+  - `account/` - 帳戶管理
+  - `config/` - 應用程式配置
 
-⸻
+- `backend/` - PHP 後端
+  - `api/` - RESTful API 端點
+  - `config/` - 資料庫和應用程式配置
+  - `utils/` - 共用工具類別
 
-結論
+### API 端點
 
-這種設計有利於讓一個 Flutter app 擴張成中大型應用時，依然能夠維持乾淨與展開性。
+- `POST /api/auth/register.php` - 使用者註冊
+- `POST /api/auth/login.php` - 使用者登入
+- `GET /api/tasks/list.php` - 取得任務列表
+- `POST /api/tasks/create.php` - 建立新任務
 
-如果你將來有推出超過一位開發者同時組織或對多功能系統進行抽象，這種檔案組織層層分明，非常適合。
+## 📝 注意事項
+
+### 安全性
+- 請勿將包含敏感資訊的配置檔案推送到 Git
+- 使用環境變數管理敏感資訊
+- 定期更新依賴套件
+
+### 開發環境
+- 使用 MAMP/XAMPP 進行本地開發
+- 確保資料庫連線設定正確
+- 測試檔案上傳功能
+
+## 🤝 貢獻指南
+
+1. Fork 專案
+2. 建立功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交變更 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 開啟 Pull Request
+
+## 📄 授權
+
+此專案採用 MIT 授權條款 - 詳見 [LICENSE](LICENSE) 檔案
+
+## 📞 聯絡資訊
+
+如有問題或建議，請透過以下方式聯絡：
+- 專案 Issues
+- Email: [您的聯絡信箱]
+
+---
+
+**版本**: 1.2.1+20250717  
+**最後更新**: 2025年1月

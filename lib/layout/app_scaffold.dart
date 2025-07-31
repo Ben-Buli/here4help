@@ -1,6 +1,8 @@
 // app_scaffold.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:here4help/services/theme_service.dart';
 
 class AppScaffold extends StatefulWidget {
   const AppScaffold({
@@ -68,108 +70,114 @@ class _AppScaffoldState extends State<AppScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFFBFE5F1), // Sky Blue
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 500),
-          child: Scaffold(
-            appBar: widget.showAppBar
-                ? AppBar(
-                    backgroundColor: const Color(0xFF51A4C8), // Primary Blue
-                    shape: null,
-                    elevation: 0,
-                    centerTitle: widget.centerTitle,
-                    leading: widget.showBackArrow
-                        ? IconButton(
-                            icon: Icon(
-                              Icons.arrow_back_ios_new,
-                              color: (_routeHistory.length > 1 &&
-                                      !_nonReturnableRoutes.contains(
-                                          _routeHistory[
-                                              _routeHistory.length - 2]))
-                                  ? const Color.fromARGB(255, 110, 133, 142)
-                                  : Colors.grey,
-                            ),
-                            onPressed: (_routeHistory.length > 1 &&
-                                    !_nonReturnableRoutes.contains(
-                                        _routeHistory[
-                                            _routeHistory.length - 2]))
-                                ? _handleBack
-                                : null,
-                          )
-                        : null,
-                    title: Text(
-                      widget.title ?? '',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 20,
-                      ),
-                    ),
-                    actions: [
-                      ...?widget.actions,
-                    ],
-                  )
-                : null,
-            body: SafeArea(
-              top: widget.showAppBar,
-              bottom: !widget.showBottomNav,
-              child: widget.child,
+    return Consumer<ThemeService>(
+      builder: (context, themeService, child) {
+        return Container(
+          color: themeService.currentTheme.background,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 500),
+              child: Scaffold(
+                appBar: widget.showAppBar
+                    ? AppBar(
+                        backgroundColor: themeService.currentTheme.primary,
+                        shape: null,
+                        elevation: 0,
+                        centerTitle: widget.centerTitle,
+                        leading: widget.showBackArrow
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.arrow_back_ios_new,
+                                  color: (_routeHistory.length > 1 &&
+                                          !_nonReturnableRoutes.contains(
+                                              _routeHistory[
+                                                  _routeHistory.length - 2]))
+                                      ? themeService.currentTheme.secondary
+                                      : themeService.currentTheme.accent,
+                                ),
+                                onPressed: (_routeHistory.length > 1 &&
+                                        !_nonReturnableRoutes.contains(
+                                            _routeHistory[
+                                                _routeHistory.length - 2]))
+                                    ? _handleBack
+                                    : null,
+                              )
+                            : null,
+                        title: Text(
+                          widget.title ?? '',
+                          style: TextStyle(
+                            color: themeService.currentTheme.onPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 20,
+                          ),
+                        ),
+                        actions: [
+                          ...?widget.actions,
+                        ],
+                      )
+                    : null,
+                body: SafeArea(
+                  top: widget.showAppBar,
+                  bottom: !widget.showBottomNav,
+                  child: widget.child,
+                ),
+                bottomNavigationBar: widget.showBottomNav
+                    ? BottomNavigationBar(
+                        backgroundColor: themeService.currentTheme.primary,
+                        type: BottomNavigationBarType.fixed,
+                        currentIndex: _getCurrentIndex(context),
+                        showSelectedLabels: false,
+                        showUnselectedLabels: false,
+                        selectedItemColor: themeService.currentTheme.onPrimary,
+                        unselectedItemColor: themeService.currentTheme.accent,
+                        onTap: (index) {
+                          switch (index) {
+                            case 0:
+                              context.push('/task/create');
+                              break;
+                            case 1:
+                              context.push('/task');
+                              break;
+                            case 2:
+                              context.push('/home');
+                              break;
+                            case 3:
+                              context.push('/chat');
+                              break;
+                            case 4:
+                              context.push('/account');
+                              break;
+                          }
+                        },
+                        items: const [
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.add_box_outlined),
+                            label: '',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.search),
+                            label: '',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.home),
+                            label: '',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.message),
+                            label: '',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.person),
+                            label: '',
+                          ),
+                        ],
+                      )
+                    : null,
+              ),
             ),
-            bottomNavigationBar: widget.showBottomNav
-                ? BottomNavigationBar(
-                    backgroundColor: const Color(0xFF51A4C8), // Primary Blue
-                    type: BottomNavigationBarType.fixed,
-                    currentIndex: _getCurrentIndex(context),
-                    showSelectedLabels: false,
-                    showUnselectedLabels: false,
-                    onTap: (index) {
-                      switch (index) {
-                        case 0:
-                          context.push('/task/create');
-                          break;
-                        case 1:
-                          context.push('/task');
-                          break;
-                        case 2:
-                          context.push('/home');
-                          break;
-                        case 3:
-                          context.push('/chat');
-                          break;
-                        case 4:
-                          context.push('/account');
-                          break;
-                      }
-                    },
-                    items: const [
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.add_box_outlined),
-                        label: '',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.search),
-                        label: '',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.home),
-                        label: '',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.message),
-                        label: '',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.person),
-                        label: '',
-                      ),
-                    ],
-                  )
-                : null,
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

@@ -29,6 +29,20 @@ class ApplicationQuestionModel {
       'applier_reply': applierReply,
     };
   }
+
+  ApplicationQuestionModel copyWith({
+    String? id,
+    String? taskId,
+    String? applicationQuestion,
+    String? applierReply,
+  }) {
+    return ApplicationQuestionModel(
+      id: id ?? this.id,
+      taskId: taskId ?? this.taskId,
+      applicationQuestion: applicationQuestion ?? this.applicationQuestion,
+      applierReply: applierReply ?? this.applierReply,
+    );
+  }
 }
 
 class TaskModel {

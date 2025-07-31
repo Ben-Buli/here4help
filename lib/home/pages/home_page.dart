@@ -30,8 +30,12 @@ class HomePage extends StatelessWidget {
                       children: [
                         CircleAvatar(
                           radius: 30,
-                          backgroundImage: user?.avatar_url != null
-                              ? AssetImage(user!.avatar_url)
+                          backgroundImage: user?.avatar_url != null &&
+                                  user!.avatar_url.isNotEmpty
+                              ? (user.avatar_url.startsWith('http')
+                                  ? NetworkImage(user.avatar_url)
+                                  : AssetImage(user.avatar_url)
+                                      as ImageProvider)
                               : null,
                           child: user?.avatar_url == null
                               ? const Icon(Icons.person)

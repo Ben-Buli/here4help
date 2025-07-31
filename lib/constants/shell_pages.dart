@@ -13,10 +13,13 @@ import 'package:here4help/account/pages/ratings_page.dart';
 import 'package:here4help/account/pages/security_page.dart';
 import 'package:here4help/account/pages/support_page.dart';
 import 'package:here4help/account/pages/task_history_page.dart';
+import 'package:here4help/account/pages/theme_settings_page.dart';
 import 'package:here4help/account/pages/wallet_page.dart';
 
 // ==================== auth 模組 ====================
 import 'package:here4help/auth/pages/login_page.dart';
+import 'package:here4help/auth/pages/signup_page.dart';
+import 'package:here4help/auth/pages/student_id_page.dart';
 
 // ==================== chat 模組 ====================
 import 'package:here4help/chat/pages/chat_list_page.dart';
@@ -45,6 +48,22 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': false,
     'showBottomNav': false,
     'showBackArrow': false,
+  },
+  {
+    'path': '/signup',
+    'child': const SignupPage(),
+    'title': 'ESSENTIAL INFORMATION',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+  },
+  {
+    'path': '/signup/student-id',
+    'child': const StudentIdPage(),
+    'title': 'IDENTITY VERIFICATION',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
   },
   {
     'path': '/home',
@@ -164,6 +183,15 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.lock,
+  },
+  {
+    'path': '/account/theme',
+    'child': const ThemeSettingsPage(),
+    'title': 'Theme Settings',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'icon': Icons.palette,
   },
   {
     'path': '/account/support',

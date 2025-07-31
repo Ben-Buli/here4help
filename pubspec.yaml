@@ -21,6 +21,9 @@ dependencies:
   provider: ^6.1.0
   http: ^1.4.0
   flutter_slidable: ^3.0.0
+  # Google 登入套件 (不需要 Firebase)
+  google_sign_in: ^6.2.1
+  image_picker: ^1.0.7
 
 dev_dependencies:
   flutter_test:

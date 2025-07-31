@@ -3,7 +3,7 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:here4help/task/services/global_task_list.dart';
+import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:provider/provider.dart';
 
@@ -63,11 +63,11 @@ class _TaskListPageState extends State<TaskListPage> {
   }
 
   Future<void> _loadGlobalTasks() async {
-    final globalTaskList = GlobalTaskList();
-    await globalTaskList.loadTasks();
+    final taskService = TaskService();
+    await taskService.loadTasks();
 
     // 新增 unreadCount 計算邏輯
-    for (final task in globalTaskList.tasks) {
+    for (final task in taskService.tasks) {
       final visibleAppliers = (task['appliers'] as List<dynamic>?)
               ?.where((ap) => ap['visible'] == true)
               .toList() ??
@@ -94,7 +94,7 @@ class _TaskListPageState extends State<TaskListPage> {
     }
 
     setState(() {
-      tasks = globalTaskList.tasks;
+      tasks = taskService.tasks;
     });
   }
 

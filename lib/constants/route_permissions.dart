@@ -5,4 +5,7 @@
 final Map<String, int> routePermissions = {
   '/home': 1,
   '/task': 0,
+  // 註冊相關頁面不需要權限驗證
+  '/signup': 0,
+  '/signup/student-id': 0,
 };

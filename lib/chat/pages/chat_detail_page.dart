@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:here4help/task/services/global_task_list.dart';
+import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/chat/services/global_chat_room.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -46,8 +46,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   };
 
   Map<String, dynamic> _getProgressData(String status) {
-    if (_statusProgressMap.containsKey(status)) {
-      return {'progress': _statusProgressMap[status]};
+    // Convert database status to display status if needed
+    final displayStatus = statusString[status] ?? status;
+
+    if (_statusProgressMap.containsKey(displayStatus)) {
+      return {'progress': _statusProgressMap[displayStatus]};
     }
     // 不顯示進度條的狀態
     return {'progress': null};
@@ -108,7 +111,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         remainingTime = Duration.zero;
         widget.data['task']['status'] = statusString['completed_tasker'];
       });
-      GlobalTaskList().updateTaskStatus(
+      TaskService().updateTaskStatus(
         widget.data['task']['id'].toString(),
         statusString['completed_tasker']!,
       );
@@ -241,9 +244,17 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                                                   backgroundImage: room['user']
                                                               ?['avatar_url'] !=
                                                           null
-                                                      ? NetworkImage(
-                                                          room['user']![
-                                                              'avatar_url'])
+                                                      ? (room['user']![
+                                                                  'avatar_url']
+                                                              .startsWith(
+                                                                  'http')
+                                                          ? NetworkImage(
+                                                              room['user']![
+                                                                  'avatar_url'])
+                                                          : AssetImage(room[
+                                                                      'user']![
+                                                                  'avatar_url'])
+                                                              as ImageProvider)
                                                       : null,
                                                   child: room['user']
                                                               ?['avatar_url'] ==
@@ -386,7 +397,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                 CircleAvatar(
                   radius: 16,
                   backgroundImage: room['user']?['avatar_url'] != null
-                      ? NetworkImage(room['user']!['avatar_url'])
+                      ? (room['user']!['avatar_url'].startsWith('http')
+                          ? NetworkImage(room['user']!['avatar_url'])
+                          : AssetImage(room['user']!['avatar_url'])
+                              as ImageProvider)
                       : null,
                   child: room['user']?['avatar_url'] == null
                       ? Text(
@@ -868,7 +882,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                         ElevatedButton(
                           onPressed: () {
                             Navigator.of(context).pop();
-                            GlobalTaskList().updateTaskStatus(
+                            TaskService().updateTaskStatus(
                               widget.data['task']['id'].toString(),
                               statusString['in_progress']!,
                             );
@@ -903,8 +917,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                         ElevatedButton(
                           onPressed: () {
                             Navigator.of(context).pop();
-                            GlobalTaskList globalTaskList = GlobalTaskList();
-                            globalTaskList.updateTaskStatus(
+                            TaskService taskService = TaskService();
+                            taskService.updateTaskStatus(
                               widget.data['room']['taskId'].toString(),
                               statusString['completed']!,
                             );
@@ -935,7 +949,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                         ElevatedButton(
                           onPressed: () {
                             Navigator.of(context).pop();
-                            GlobalTaskList().updateTaskStatus(
+                            TaskService().updateTaskStatus(
                               widget.data['task']['id'].toString(),
                               statusString['completed']!,
                             );
@@ -970,7 +984,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                             // 在切換到 pending_confirmation_tasker 狀態時，加入 pendingStart 記錄
                             widget.data['task']['pendingStart'] =
                                 DateTime.now().toIso8601String();
-                            GlobalTaskList().updateTaskStatus(
+                            TaskService().updateTaskStatus(
                               widget.data['task']['id'].toString(),
                               statusString['pending_confirmation_tasker']!,
                             );
@@ -1003,58 +1017,64 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             ))
         .toList();
   }
-}
 
-Color _getStatusChipColor(String status) {
-  switch (status) {
-    case 'Open':
-      return Colors.blue[800]!;
-    case 'In Progress':
-      return Colors.orange[800]!;
-    case 'In Progress (Tasker)':
-      return Colors.orange[800]!;
-    case 'Applying (Tasker)':
-      return Colors.blue[800]!;
-    case 'Rejected (Tasker)':
-      return Colors.grey[800]!;
-    case 'Dispute':
-      return Colors.brown[800]!;
-    case 'Pending Confirmation':
-      return Colors.purple[800]!;
-    case 'Pending Confirmation (Tasker)':
-      return Colors.purple[800]!;
-    case 'Completed':
-      return Colors.grey[800]!;
-    case 'Completed (Tasker)':
-      return Colors.grey[800]!;
-    default:
-      return Colors.grey[800]!;
+  Color _getStatusChipColor(String status) {
+    // Convert database status to display status if needed
+    final displayStatus = statusString[status] ?? status;
+
+    switch (displayStatus) {
+      case 'Open':
+        return Colors.blue[800]!;
+      case 'In Progress':
+        return Colors.orange[800]!;
+      case 'In Progress (Tasker)':
+        return Colors.orange[800]!;
+      case 'Applying (Tasker)':
+        return Colors.blue[800]!;
+      case 'Rejected (Tasker)':
+        return Colors.grey[800]!;
+      case 'Dispute':
+        return Colors.brown[800]!;
+      case 'Pending Confirmation':
+        return Colors.purple[800]!;
+      case 'Pending Confirmation (Tasker)':
+        return Colors.purple[800]!;
+      case 'Completed':
+        return Colors.grey[800]!;
+      case 'Completed (Tasker)':
+        return Colors.grey[800]!;
+      default:
+        return Colors.grey[800]!;
+    }
   }
-}
 
-Color _getStatusBackgroundColor(String status) {
-  switch (status) {
-    case 'Open':
-      return Colors.blue[50]!;
-    case 'In Progress':
-      return Colors.orange[50]!;
-    case 'In Progress (Tasker)':
-      return Colors.orange[50]!;
-    case 'Applying (Tasker)':
-      return Colors.blue[50]!;
-    case 'Rejected (Tasker)':
-      return Colors.grey[200]!;
-    case 'Dispute':
-      return Colors.brown[50]!;
-    case 'Pending Confirmation':
-      return Colors.purple[50]!;
-    case 'Pending Confirmation (Tasker)':
-      return Colors.purple[50]!;
-    case 'Completed':
-      return Colors.grey[200]!;
-    case 'Completed (Tasker)':
-      return Colors.grey[200]!;
-    default:
-      return Colors.grey[200]!;
+  Color _getStatusBackgroundColor(String status) {
+    // Convert database status to display status if needed
+    final displayStatus = statusString[status] ?? status;
+
+    switch (displayStatus) {
+      case 'Open':
+        return Colors.blue[50]!;
+      case 'In Progress':
+        return Colors.orange[50]!;
+      case 'In Progress (Tasker)':
+        return Colors.orange[50]!;
+      case 'Applying (Tasker)':
+        return Colors.blue[50]!;
+      case 'Rejected (Tasker)':
+        return Colors.grey[200]!;
+      case 'Dispute':
+        return Colors.brown[50]!;
+      case 'Pending Confirmation':
+        return Colors.purple[50]!;
+      case 'Pending Confirmation (Tasker)':
+        return Colors.purple[50]!;
+      case 'Completed':
+        return Colors.grey[200]!;
+      case 'Completed (Tasker)':
+        return Colors.grey[200]!;
+      default:
+        return Colors.grey[200]!;
+    }
   }
 }

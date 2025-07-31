@@ -1,0 +1,53 @@
+class AppConfig {
+  // 環境設定
+  static const bool isDevelopment = true; // 開發時設為 true，正式環境設為 false
+
+  // API 基礎 URL
+  static const String devApiBaseUrl = 'http://localhost:8888/here4help';
+  static const String prodApiBaseUrl = 'https://hero4help.demofhs.com';
+
+  // 獲取當前環境的 API 基礎 URL
+  static String get apiBaseUrl {
+    return isDevelopment ? devApiBaseUrl : prodApiBaseUrl;
+  }
+
+  // Google 登入 API 端點
+  static String get googleLoginUrl {
+    return '$apiBaseUrl/backend/api/auth/google-login.php';
+  }
+
+  // 一般登入 API 端點
+  static String get loginUrl {
+    return '$apiBaseUrl/backend/api/auth/login.php';
+  }
+
+  static String get registerUrl {
+    return '$apiBaseUrl/backend/api/auth/register.php';
+  }
+
+  static String get profileUrl {
+    return '$apiBaseUrl/backend/api/auth/profile.php';
+  }
+
+  // 任務相關 API
+  static String get taskListUrl {
+    return '$apiBaseUrl/backend/api/tasks/list.php';
+  }
+
+  static String get taskCreateUrl {
+    return '$apiBaseUrl/backend/api/tasks/create.php';
+  }
+
+  // 推薦碼相關 API
+  static String get referralCodeUrl {
+    return '$apiBaseUrl/backend/api/referral/get-referral-code.php';
+  }
+
+  static String get useReferralCodeUrl {
+    return '$apiBaseUrl/backend/api/referral/use-referral-code.php';
+  }
+
+  static String get referralCodeListUrl {
+    return '$apiBaseUrl/backend/api/referral/list-referral-codes.php';
+  }
+}

@@ -1,7 +1,7 @@
 // home_page.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:here4help/task/services/global_task_list.dart';
+import 'package:here4help/task/services/task_service.dart';
 
 class TaskPreviewPage extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -22,6 +22,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
     widget.data['acceptor_confirmed'] = '0';
     widget.data['cancel_reason'] = '';
     widget.data['fail_reason'] = '';
+    widget.data['creator_name'] = widget.data['creator_name'] ?? 'Anonymous';
     widget.data['updated_at'] = DateTime.now().toIso8601String();
     widget.data['created_at'] = DateTime.now().toIso8601String();
 
@@ -314,14 +315,16 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                 );
 
                 if (confirm == true) {
-                  final globalTaskList = GlobalTaskList();
-                  await globalTaskList.loadTasks();
+                  final taskService = TaskService();
+                  await taskService.loadTasks();
 
                   // 先新增任務
-                  await globalTaskList.addTask(widget.data);
+                  await taskService.createTask(widget.data);
 
-                  print(GlobalTaskList().tasks.length); // 任務有無加進去
-                  print(GlobalTaskList().tasks.last['title']); // 看最後一筆是否你剛剛輸入的
+                  print(taskService.tasks.length); // 任務有無加進去
+                  if (taskService.tasks.isNotEmpty) {
+                    print(taskService.tasks.last['title']); // 看最後一筆是否你剛剛輸入的
+                  }
 
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(

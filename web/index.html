@@ -25,6 +25,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="here4help">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  
+  <!-- 允許不安全內容（開發環境） -->
+  <meta http-equiv="Content-Security-Policy" content="default-src * self blob: data: gap:; style-src * self 'unsafe-inline' blob: data: gap:; script-src * 'self' 'unsafe-eval' 'unsafe-inline' blob: data: gap:; object-src * 'self' blob: data: gap:; img-src * self 'unsafe-inline' blob: data: gap:; connect-src self * 'unsafe-inline' blob: data: gap:; frame-src * self blob: data: gap:;">
+  
+  <!-- 允許混合內容 -->
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
