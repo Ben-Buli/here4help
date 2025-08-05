@@ -484,7 +484,7 @@ class ThemeConfigManager extends ChangeNotifier {
       case 'ocean':
         return const Color(0xFF3B82F6).withOpacity(0.9); // 海藍色半透明
       case 'morandi':
-        return theme.surface;
+        return theme.primary.withOpacity(0.9); // 莫蘭迪主題使用主要色半透明
       case 'glassmorphism':
         return Colors.white; // Glassmorphism 主題使用純白色，不透明
       case 'business':
@@ -506,6 +506,7 @@ class ThemeConfigManager extends ChangeNotifier {
       case 'ocean':
         return const Color.fromARGB(255, 229, 194, 163); // 沙灘色
       case 'morandi':
+        return Colors.white; // 莫蘭迪主題使用白色（在深色背景上）
       case 'glassmorphism':
       case 'business':
       default:
@@ -521,6 +522,7 @@ class ThemeConfigManager extends ChangeNotifier {
       case 'ocean':
         return Colors.white.withOpacity(0.7); // 半透明白色
       case 'morandi':
+        return Colors.white.withOpacity(0.6); // 莫蘭迪主題使用半透明白色（在深色背景上）
       case 'glassmorphism':
       case 'business':
       default:

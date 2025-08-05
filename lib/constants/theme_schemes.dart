@@ -134,7 +134,7 @@ class ThemeScheme {
   static const ThemeScheme morandiBlue = ThemeScheme(
     name: 'morandi_blue',
     displayName: 'Morandi Blue',
-    primary: Color(0xFF7B8A95),
+    primary: Color(0xFF6B7A85), // 調整為更深的藍灰色，適合作為背景
     secondary: Color(0xFF9BA8B4),
     accent: Color(0xFFB8C5D1),
     background: Color(0xFFF8FAFC),
@@ -154,7 +154,7 @@ class ThemeScheme {
   static const ThemeScheme morandiGreen = ThemeScheme(
     name: 'morandi_green',
     displayName: 'Morandi Green - Matcha',
-    primary: Color(0xFF7A9A7A), // 更低飽和度的抹茶綠
+    primary: Color(0xFF6A8A6A), // 調整為更深的抹茶綠，適合作為背景
     secondary: Color(0xFF9BB09B), // 淺抹茶綠
     accent: Color(0xFFB8C5B8), // 極淺抹茶綠
     background: Color(0xFFF8FCF8),
@@ -174,7 +174,7 @@ class ThemeScheme {
   static const ThemeScheme morandiPurple = ThemeScheme(
     name: 'morandi_purple',
     displayName: 'Morandi Purple',
-    primary: Color(0xFF9B8A95),
+    primary: Color(0xFF8B7A85), // 調整為更深的紫色，適合作為背景
     secondary: Color(0xFFB4A8B4),
     accent: Color(0xFFD1C5D1),
     background: Color(0xFFFCF8FC),
@@ -194,7 +194,7 @@ class ThemeScheme {
   static const ThemeScheme morandiPink = ThemeScheme(
     name: 'morandi_pink',
     displayName: 'Morandi Pink',
-    primary: Color(0xFFB56576),
+    primary: Color(0xFFA55566), // 調整為更深的粉色，適合作為背景
     secondary: Color(0xFFC5A8B4),
     accent: Color(0xFFD1C5D1),
     background: Color(0xFFFCF8FA),
@@ -214,7 +214,7 @@ class ThemeScheme {
   static const ThemeScheme morandiOrange = ThemeScheme(
     name: 'morandi_orange',
     displayName: 'Morandi Orange',
-    primary: Color(0xFFD4A574),
+    primary: Color(0xFFC49564), // 調整為更深的橙色，適合作為背景
     secondary: Color(0xFFE0B8A8),
     accent: Color(0xFFECD1C5),
     background: Color(0xFFFCFAF8),
@@ -234,7 +234,7 @@ class ThemeScheme {
   static const ThemeScheme morandiLemon = ThemeScheme(
     name: 'morandi_lemon',
     displayName: 'Yellow',
-    primary: Color(0xFFC4B874), // 更低飽和度的莫蘭迪檸檬黃
+    primary: Color(0xFFB4A864), // 調整為更深的檸檬黃，適合作為背景
     secondary: Color(0xFFD4C8A8), // 更低飽和度的淺檸檬黃
     accent: Color(0xFFE4DCC5), // 更低飽和度的極淺檸檬黃
     background: Color(0xFFFCFCF8),
