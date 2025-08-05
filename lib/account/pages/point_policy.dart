@@ -116,7 +116,7 @@ class PointPolicyPage extends StatelessWidget {
 
   Widget _policyBullet(String text, String? highlight, String? suffix) {
     const normalStyle = TextStyle(fontSize: 15, height: 1.6);
-    final highlightStyle = TextStyle(
+    const highlightStyle = TextStyle(
       fontSize: 15,
       fontWeight: FontWeight.bold,
       color: AppColors.primary,

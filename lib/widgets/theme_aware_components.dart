@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:here4help/services/theme_service.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 
 /// 主題感知的圖標
 class ThemeAwareIcon extends StatelessWidget {
@@ -17,12 +17,12 @@ class ThemeAwareIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeService>(
-      builder: (context, themeService, child) {
+    return Consumer<ThemeConfigManager>(
+      builder: (context, themeManager, child) {
         return Icon(
           icon,
           size: size,
-          color: color ?? themeService.currentTheme.primary,
+          color: color ?? themeManager.currentTheme.primary,
         );
       },
     );
@@ -44,20 +44,20 @@ class ThemeAwareCircleBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeService>(
-      builder: (context, themeService, child) {
+    return Consumer<ThemeConfigManager>(
+      builder: (context, themeManager, child) {
         return Container(
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: themeService.currentTheme.primary,
+            color: themeManager.currentTheme.primary,
             shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
           child: Text(
             text,
             style: TextStyle(
-              color: themeService.currentTheme.onPrimary,
+              color: themeManager.currentTheme.onPrimary,
               fontWeight: FontWeight.bold,
               fontSize: fontSize,
             ),
@@ -89,13 +89,13 @@ class ThemeAwareContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeService>(
-      builder: (context, themeService, child) {
+    return Consumer<ThemeConfigManager>(
+      builder: (context, themeManager, child) {
         return Container(
           padding: padding,
           margin: margin,
           decoration: BoxDecoration(
-            color: backgroundColor ?? themeService.currentTheme.primary,
+            color: backgroundColor ?? themeManager.currentTheme.primary,
             borderRadius: borderRadius,
             border: border,
           ),
@@ -123,15 +123,15 @@ class ThemeAwareText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeService>(
-      builder: (context, themeService, child) {
+    return Consumer<ThemeConfigManager>(
+      builder: (context, themeManager, child) {
         return Text(
           text,
           style: style?.copyWith(
-                color: style?.color ?? themeService.currentTheme.onSurface,
+                color: style?.color ?? themeManager.currentTheme.onSurface,
               ) ??
               TextStyle(
-                color: themeService.currentTheme.onSurface,
+                color: themeManager.currentTheme.onSurface,
               ),
           textAlign: textAlign,
           maxLines: maxLines,
@@ -162,16 +162,16 @@ class ThemeAwareButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeService>(
-      builder: (context, themeService, child) {
+    return Consumer<ThemeConfigManager>(
+      builder: (context, themeManager, child) {
         return SizedBox(
           width: width,
           height: height,
           child: ElevatedButton(
             onPressed: isLoading ? null : onPressed,
             style: ElevatedButton.styleFrom(
-              backgroundColor: themeService.currentTheme.primary,
-              foregroundColor: themeService.currentTheme.onPrimary,
+              backgroundColor: themeManager.currentTheme.primary,
+              foregroundColor: themeManager.currentTheme.onPrimary,
               elevation: 2,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -184,7 +184,7 @@ class ThemeAwareButton extends StatelessWidget {
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        themeService.currentTheme.onPrimary,
+                        themeManager.currentTheme.onPrimary,
                       ),
                     ),
                   )

@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../config/app_config.dart';
-import '../config/environment_config.dart';
 import 'path_mapper.dart';
 
 class ImageHelper {

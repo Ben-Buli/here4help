@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:here4help/services/theme_service.dart';
-import 'package:here4help/widgets/theme_aware_components.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 
 class ErrorPage extends StatelessWidget {
   final Exception? error;
@@ -66,21 +65,21 @@ class ErrorPage extends StatelessWidget {
                 ),
               ],
             ),
-            child: Consumer<ThemeService>(
-              builder: (context, themeService, child) {
+            child: Consumer<ThemeConfigManager>(
+              builder: (context, themeManager, child) {
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(icon,
                         size: isMobile ? 64 : 96,
-                        color: themeService.currentTheme.primary),
+                        color: themeManager.currentTheme.primary),
                     const SizedBox(height: 16),
                     Text(
                       title,
                       style: TextStyle(
                         fontSize: isMobile ? 28 : 36,
                         fontWeight: FontWeight.bold,
-                        color: themeService.currentTheme.primary,
+                        color: themeManager.currentTheme.primary,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -97,8 +96,8 @@ class ErrorPage extends StatelessWidget {
                       icon: const Icon(Icons.home),
                       label: const Text('Back to Home'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: themeService.currentTheme.primary,
-                        foregroundColor: themeService.currentTheme.onPrimary,
+                        backgroundColor: themeManager.currentTheme.primary,
+                        foregroundColor: themeManager.currentTheme.onPrimary,
                         minimumSize: Size(isMobile ? 120 : 160, 48),
                       ),
                       onPressed: () => context.go('/home'),

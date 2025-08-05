@@ -7,7 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:provider/provider.dart';
-import 'package:here4help/services/theme_service.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/widgets/theme_aware_components.dart';
 
 class TaskListPage extends StatefulWidget {
@@ -316,6 +316,7 @@ class _TaskListPageState extends State<TaskListPage> {
     }).toList();
 
     return Scaffold(
+      backgroundColor: Colors.white, // 使用純白色背景，不使用主題背景色
       body: Column(
         children: [
           Padding(
@@ -353,39 +354,71 @@ class _TaskListPageState extends State<TaskListPage> {
             child: Row(
               children: [
                 Expanded(
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    hint: const Text('Location'),
-                    value: selectedLocation,
-                    items: locations
-                        .map((loc) => DropdownMenuItem(
-                              value: loc,
-                              child: Text(loc),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedLocation = value;
-                      });
+                  child: Consumer<ThemeConfigManager>(
+                    builder: (context, themeManager, child) {
+                      return DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        hint: Text('Location',
+                            style: TextStyle(
+                                color: themeManager.inputHintTextColor)),
+                        value: selectedLocation,
+                        style: TextStyle(color: themeManager.inputTextColor),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white, // 使用純白色背景
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        items: locations
+                            .map((loc) => DropdownMenuItem(
+                                  value: loc,
+                                  child: Text(loc,
+                                      style: TextStyle(
+                                          color: themeManager.inputTextColor)),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedLocation = value;
+                          });
+                        },
+                      );
                     },
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    hint: const Text('Language'),
-                    value: selectedLanguage,
-                    items: languages
-                        .map((lang) => DropdownMenuItem(
-                              value: lang,
-                              child: Text(lang),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedLanguage = value;
-                      });
+                  child: Consumer<ThemeConfigManager>(
+                    builder: (context, themeManager, child) {
+                      return DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        hint: Text('Language',
+                            style: TextStyle(
+                                color: themeManager.inputHintTextColor)),
+                        value: selectedLanguage,
+                        style: TextStyle(color: themeManager.inputTextColor),
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Colors.white, // 使用純白色背景
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        items: languages
+                            .map((lang) => DropdownMenuItem(
+                                  value: lang,
+                                  child: Text(lang,
+                                      style: TextStyle(
+                                          color: themeManager.inputTextColor)),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedLanguage = value;
+                          });
+                        },
+                      );
                     },
                   ),
                 ),
@@ -423,7 +456,7 @@ class _TaskListPageState extends State<TaskListPage> {
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Colors.white, // 使用純白色背景
                       border: Border.all(color: Colors.grey.shade300),
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -480,20 +513,18 @@ class _TaskListPageState extends State<TaskListPage> {
                           ],
                         ),
                         const SizedBox(height: 10),
-                        Row(
+                        const Row(
                           children: [
-                            const Icon(Icons.local_fire_department,
+                            Icon(Icons.local_fire_department,
                                 color: Colors.red, size: 16),
-                            const SizedBox(width: 4),
-                            const Text("Popular",
-                                style: TextStyle(fontSize: 12)),
-                            const SizedBox(width: 12),
-                            const Icon(Icons.schedule, size: 14),
-                            const SizedBox(width: 4),
-                            const Text("1 day ago",
-                                style: TextStyle(fontSize: 12)),
-                            const Spacer(),
-                            const ThemeAwareIcon(icon: Icons.bookmark_border),
+                            SizedBox(width: 4),
+                            Text("Popular", style: TextStyle(fontSize: 12)),
+                            SizedBox(width: 12),
+                            Icon(Icons.schedule, size: 14),
+                            SizedBox(width: 4),
+                            Text("1 day ago", style: TextStyle(fontSize: 12)),
+                            Spacer(),
+                            ThemeAwareIcon(icon: Icons.bookmark_border),
                           ],
                         ),
                       ],

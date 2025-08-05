@@ -32,9 +32,9 @@ class _TaskHistoryPageState extends State<TaskHistoryPage>
         Container(
           color: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Row(
+          child: const Row(
             children: [
-              const Text(
+              Text(
                 'Credit Score',
                 style: TextStyle(
                   color: Color(0xFF2563EB),
@@ -42,7 +42,7 @@ class _TaskHistoryPageState extends State<TaskHistoryPage>
                   fontSize: 16,
                 ),
               ),
-              const Spacer(),
+              Spacer(),
               Text(
                 '4.9',
                 style: TextStyle(

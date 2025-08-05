@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/constants/app_colors.dart';
-import 'package:here4help/services/theme_service.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/utils/image_helper.dart';
 
 class HomePage extends StatelessWidget {
@@ -210,8 +210,8 @@ class _AchievementBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeService>(
-      builder: (context, themeService, child) {
+    return Consumer<ThemeConfigManager>(
+      builder: (context, themeManager, child) {
         return Column(
           children: [
             Stack(
@@ -233,9 +233,9 @@ class _AchievementBox extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          themeService.currentTheme.primary,
-                          themeService.currentTheme.secondary,
-                          themeService.currentTheme.accent,
+                          themeManager.currentTheme.primary,
+                          themeManager.currentTheme.secondary,
+                          themeManager.currentTheme.accent,
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -250,7 +250,7 @@ class _AchievementBox extends StatelessWidget {
                         foreground: Paint()
                           ..style = PaintingStyle.stroke
                           ..strokeWidth = 1.5
-                          ..color = themeService.currentTheme.primary,
+                          ..color = themeManager.currentTheme.primary,
                       ),
                     ),
                   ),
@@ -266,7 +266,7 @@ class _AchievementBox extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: themeService.currentTheme.onPrimary,
+                        color: themeManager.currentTheme.onPrimary,
                       ),
                     ),
                   ),

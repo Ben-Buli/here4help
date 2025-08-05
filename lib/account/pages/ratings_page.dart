@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:here4help/services/theme_service.dart';
 import 'package:here4help/constants/app_colors.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 
 class RatingsPage extends StatefulWidget {
   const RatingsPage({super.key});
@@ -158,7 +158,7 @@ class _RatingsPageState extends State<RatingsPage>
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       child: ListTile(
-        leading: Icon(Icons.event_note, color: AppColors.primary),
+        leading: const Icon(Icons.event_note, color: AppColors.primary),
         title: Row(
           children: [
             Expanded(
@@ -184,11 +184,11 @@ class _RatingsPageState extends State<RatingsPage>
             if (task['review'] != null)
               Text(task['review'],
                   style: const TextStyle(color: Colors.black87)),
-            Consumer<ThemeService>(
-              builder: (context, themeService, child) {
+            Consumer<ThemeConfigManager>(
+              builder: (context, themeManager, child) {
                 return Text('${task['price']} NTD',
                     style:
-                        TextStyle(color: themeService.currentTheme.secondary));
+                        TextStyle(color: themeManager.currentTheme.secondary));
               },
             ),
             if (!task['reviewed'])
@@ -248,9 +248,9 @@ class _RatingsPageState extends State<RatingsPage>
         Container(
           color: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Row(
+          child: const Row(
             children: [
-              const Text(
+              Text(
                 'Credit Score',
                 style: TextStyle(
                   color: Color(0xFF2563EB),
@@ -258,7 +258,7 @@ class _RatingsPageState extends State<RatingsPage>
                   fontSize: 16,
                 ),
               ),
-              const Spacer(),
+              Spacer(),
               Text(
                 '4.9',
                 style: TextStyle(

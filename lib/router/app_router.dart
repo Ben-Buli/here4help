@@ -91,7 +91,7 @@ final GoRouter appRouter = GoRouter(
 
               // 精確匹配或前綴匹配
               if (currentPath == pagePath) return true;
-              if (currentPath.startsWith(pagePath + '/')) return true;
+              if (currentPath.startsWith('$pagePath/')) return true;
 
               return false;
             })

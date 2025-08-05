@@ -3,8 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:go_router/go_router.dart';
-import 'package:here4help/services/theme_service.dart';
-import 'package:here4help/widgets/theme_aware_components.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 
 /// 任務投遞應徵履歷表單頁面
 class TaskApplyPage extends StatefulWidget {
@@ -170,15 +169,15 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                         ),
                       );
                     },
-                    child: Consumer<ThemeService>(
-                      builder: (context, themeService, child) {
+                    child: Consumer<ThemeConfigManager>(
+                      builder: (context, themeManager, child) {
                         return Text(
                           taskTitle,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 20,
                             decoration: TextDecoration.underline,
-                            color: themeService.currentTheme.primary,
+                            color: themeManager.currentTheme.primary,
                           ),
                         );
                       },
@@ -227,12 +226,12 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                     ),
                   ],
                   const SizedBox(height: 16),
-                  Consumer<ThemeService>(
-                    builder: (context, themeService, child) {
+                  Consumer<ThemeConfigManager>(
+                    builder: (context, themeManager, child) {
                       return Text(
                         'After applying, please wait patiently for the employer\'s reply.\nPolite inquiries can increase favorability.',
                         style:
-                            TextStyle(color: themeService.currentTheme.primary),
+                            TextStyle(color: themeManager.currentTheme.primary),
                       );
                     },
                   ),

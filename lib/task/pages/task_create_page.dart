@@ -12,7 +12,7 @@ import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/task/services/university_service.dart'; // 使用 UniversityService
 import 'package:here4help/task/services/language_service.dart'; // 使用 LanguageService
-import 'package:here4help/services/theme_service.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/widgets/theme_aware_components.dart';
 import 'package:here4help/constants/app_colors.dart';
 
@@ -181,7 +181,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
             Container(
               width: double.infinity,
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.black)),
+                border: Border(bottom: BorderSide(color: Colors.grey)),
               ),
               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 0),
               child: Text(
@@ -314,7 +314,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                     onTap: () => _showLocationPicker(context),
                     child: Container(
                       decoration: const BoxDecoration(
-                        border: Border(bottom: BorderSide(color: Colors.black)),
+                        border: Border(bottom: BorderSide(color: Colors.grey)),
                       ),
                       padding: const EdgeInsets.symmetric(
                           vertical: 14, horizontal: 0),
@@ -346,14 +346,15 @@ class _PostFormPageState extends State<TaskCreatePage> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const Icon(Icons.chevron_right),
+                          const Icon(Icons.chevron_right,
+                              color: AppColors.primary),
                         ],
                       ),
                     ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.my_location),
+                  icon: const Icon(Icons.my_location, color: AppColors.primary),
                   tooltip: 'Use current location',
                   onPressed: _useCurrentLocation,
                 ),
@@ -379,7 +380,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 filled: _errorFields.contains('Time'),
                 fillColor:
                     _errorFields.contains('Time') ? Colors.pink.shade50 : null,
-                suffixIcon: const Icon(Icons.calendar_today),
+                suffixIcon:
+                    const Icon(Icons.calendar_today, color: AppColors.primary),
               ),
               onTap: () async {
                 _errorFields.remove('Time');
@@ -414,7 +416,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
                       fillColor: _errorFields.contains('Posting period')
                           ? Colors.pink.shade50
                           : null,
-                      suffixIcon: const Icon(Icons.calendar_today),
+                      suffixIcon: const Icon(Icons.calendar_today,
+                          color: AppColors.primary),
                     ),
                     onTap: () async {
                       _errorFields.remove('Posting period');
@@ -479,7 +482,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
                       fillColor: _errorFields.contains('Posting period')
                           ? Colors.pink.shade50
                           : null,
-                      suffixIcon: const Icon(Icons.calendar_today),
+                      suffixIcon: const Icon(Icons.calendar_today,
+                          color: AppColors.primary),
                     ),
                     onTap: () async {
                       _errorFields.remove('Posting period');
@@ -565,7 +569,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
                             ),
                           ),
                           IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.grey),
+                            icon: const Icon(Icons.delete,
+                                color: AppColors.primary),
                             onPressed: () async {
                               final hasValue = _applicationQuestions[index]
                                   .trim()
@@ -581,6 +586,9 @@ class _PostFormPageState extends State<TaskCreatePage> {
                                       TextButton(
                                         onPressed: () =>
                                             Navigator.pop(context, false),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: AppColors.primary,
+                                        ),
                                         child: const Text('Cancel'),
                                       ),
                                       TextButton(
@@ -613,6 +621,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 alignment: Alignment.centerLeft,
                 child: ElevatedButton(
                   onPressed: _addApplicationQuestion,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
                   child: const Text('Add an Application Question'),
                 ),
               ),
@@ -643,13 +655,27 @@ class _PostFormPageState extends State<TaskCreatePage> {
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.all(8.0),
-                                  child: TextField(
-                                    controller: searchController,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Search language',
-                                      prefixIcon: Icon(Icons.search),
-                                    ),
-                                    onChanged: (_) => setState(() {}),
+                                  child: Consumer<ThemeConfigManager>(
+                                    builder: (context, themeManager, child) {
+                                      return TextField(
+                                        controller: searchController,
+                                        style: TextStyle(
+                                          color: themeManager.inputTextColor,
+                                        ),
+                                        decoration: InputDecoration(
+                                          hintText: 'Search language',
+                                          hintStyle: TextStyle(
+                                            color:
+                                                themeManager.inputHintTextColor,
+                                          ),
+                                          prefixIcon: Icon(
+                                            Icons.search,
+                                            color: themeManager.inputTextColor,
+                                          ),
+                                        ),
+                                        onChanged: (_) => setState(() {}),
+                                      );
+                                    },
                                   ),
                                 ),
                                 Expanded(
@@ -708,9 +734,9 @@ class _PostFormPageState extends State<TaskCreatePage> {
                                   children: [
                                     OutlinedButton(
                                       style: TextButton.styleFrom(
-                                        foregroundColor: Colors.redAccent,
+                                        foregroundColor: AppColors.primary,
                                         side: const BorderSide(
-                                            color: Colors.redAccent),
+                                            color: AppColors.primary),
                                       ),
                                       onPressed: () =>
                                           Navigator.pop(context, null),
@@ -719,8 +745,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                                     const SizedBox(width: 12),
                                     ElevatedButton(
                                       style: TextButton.styleFrom(
-                                        backgroundColor:
-                                            const Color(0xFF3A85FF),
+                                        backgroundColor: AppColors.primary,
                                         foregroundColor: Colors.white,
                                       ),
                                       onPressed: () =>
@@ -748,9 +773,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
               child: Container(
                 padding:
                     const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.black12),
-                  borderRadius: BorderRadius.circular(6),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Colors.grey)),
                 ),
                 child: _selectedLanguages.isEmpty
                     ? const Text(
@@ -1000,13 +1024,23 @@ class _PostFormPageState extends State<TaskCreatePage> {
                     Row(
                       children: [
                         Expanded(
-                          child: TextField(
-                            controller: _locationSearchController,
-                            decoration: const InputDecoration(
-                              hintText: 'Search location',
-                            ),
-                            onSubmitted: (value) async {
-                              await _moveToSearchLocation(value, setState);
+                          child: Consumer<ThemeConfigManager>(
+                            builder: (context, themeManager, child) {
+                              return TextField(
+                                controller: _locationSearchController,
+                                style: TextStyle(
+                                  color: themeManager.inputTextColor,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: 'Search location',
+                                  hintStyle: TextStyle(
+                                    color: themeManager.inputHintTextColor,
+                                  ),
+                                ),
+                                onSubmitted: (value) async {
+                                  await _moveToSearchLocation(value, setState);
+                                },
+                              );
                             },
                           ),
                         ),

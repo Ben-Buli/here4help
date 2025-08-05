@@ -9,6 +9,7 @@ import 'package:here4help/constants/app_colors.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:here4help/config/app_config.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
@@ -608,20 +609,36 @@ class _ProfilePageState extends State<ProfilePage> {
                   value: user.gender ?? 'Not specified',
                   fieldKey: 'gender',
                   isEditing: editingField == 'gender',
-                  editWidget: DropdownButtonFormField<String>(
-                    value: user.gender,
-                    decoration: const InputDecoration(labelText: 'Gender'),
-                    items: genderOptions.map((gender) {
-                      return DropdownMenuItem(
-                        value: gender,
-                        child: Text(gender),
+                  editWidget: Consumer<ThemeConfigManager>(
+                    builder: (context, themeManager, child) {
+                      return DropdownButtonFormField<String>(
+                        value: user.gender,
+                        style: TextStyle(color: themeManager.inputTextColor),
+                        decoration: InputDecoration(
+                          labelText: 'Gender',
+                          labelStyle:
+                              TextStyle(color: themeManager.inputTextColor),
+                          filled: true,
+                          fillColor: themeManager.currentTheme.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        items: genderOptions.map((gender) {
+                          return DropdownMenuItem(
+                            value: gender,
+                            child: Text(gender,
+                                style: TextStyle(
+                                    color: themeManager.inputTextColor)),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            user = user.copyWith(gender: value);
+                            _checkForChanges();
+                          });
+                        },
                       );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        user = user.copyWith(gender: value);
-                        _checkForChanges();
-                      });
                     },
                   ),
                   onEdit: () {

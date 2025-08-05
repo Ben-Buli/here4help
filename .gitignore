@@ -82,35 +82,17 @@ admin/includes/config.php
 backend/uploads/
 backend/uploads/student_id_images/
 
-# Development and setup scripts
-database_updates/
-execute_*.php
-check_*.php
-fix_*.php
-test_*.html
-backend_example/
+# Development and setup scripts (moved to dev-tools/)
+dev-tools/php-test/
+dev-tools/test-files/
+dev-tools/scripts/
 
 # Admin panel (incomplete)
 admin/
 
-# Test files
-test_images/
-view_uploaded_images.html
-test_signup_api*.html
-
-# Shell scripts
-sync_to_mamp.sh
-setup_symlink.sh
-
-# Root level PHP files (mostly setup/utility)
+# Root level PHP files (keep only essential)
 index.php
 .htaccess
-test_api_connection.php
-check_user_login.php
-fix_user_login.php
-check_database_structure.php
-fix_database_structure.php
-test_login_flow.php
 
 # Additional Flutter/Dart ignores
 *.lock
@@ -157,3 +139,49 @@ coverage/
 # Generated files
 generated/
 generated_plugin_registrant.dart
+
+# Flutter specific additional ignores
+# Generated localization files
+lib/generated/
+lib/l10n/app_*.arb
+
+# Firebase configuration (if using)
+firebase_options.dart
+
+# Keystore files
+*.keystore
+*.jks
+
+# Google Services (already covered but being explicit)
+google-services.json
+GoogleService-Info.plist
+
+# Fastlane files
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# Code coverage
+coverage_badge.svg
+
+# FVM (Flutter Version Management)
+.fvm/flutter_sdk
+
+# Flutter Intl
+lib/l10n/intl_*.arb
+
+# Build outputs
+build/
+*.apk
+*.aab
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Performance profiling
+*.trace
+
+# Flutter web specific
+web/firebase.json
+web/.firebase/

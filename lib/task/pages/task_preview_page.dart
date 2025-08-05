@@ -162,11 +162,20 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                                 Navigator.of(context, rootNavigator: true)
                                     .pop(); // Use root navigator to close only the dialog
                               },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                              ),
                               child: const Text('CLOSE'),
                             ),
-                            const ElevatedButton(
+                            ElevatedButton(
                               onPressed: null, // Disabled Apply button
-                              child: Text('APPLY NOW'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor:
+                                    AppColors.primary.withOpacity(0.5),
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('APPLY NOW'),
                             ),
                           ],
                         )
@@ -191,7 +200,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                   // Task Title
                   Text(
                     title,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary,
@@ -305,10 +314,16 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(false),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                        ),
                         child: const Text('Cancel'),
                       ),
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(true),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                        ),
                         child: const Text('Confirm'),
                       ),
                     ],
