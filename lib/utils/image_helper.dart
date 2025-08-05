@@ -1,0 +1,61 @@
+import 'package:flutter/material.dart';
+import '../config/app_config.dart';
+import '../config/environment_config.dart';
+import 'path_mapper.dart';
+
+class ImageHelper {
+  /// 處理用戶頭像圖片路徑
+  static ImageProvider? getAvatarImage(String? avatarUrl) {
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      return null;
+    }
+
+    // 調試路徑映射
+    PathMapper.debugPathMapping(avatarUrl);
+
+    // 如果是完整的 HTTP URL，直接使用 NetworkImage
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
+      return NetworkImage(avatarUrl);
+    }
+
+    // 如果是本地資源路徑（以 assets/ 開頭）
+    if (PathMapper.isFlutterAsset(avatarUrl)) {
+      return AssetImage(avatarUrl);
+    }
+
+    // 使用 PathMapper 處理其他路徑
+    String mappedUrl = PathMapper.mapDatabasePathToUrl(avatarUrl);
+
+    // 如果映射後仍然是 assets 路徑，使用 AssetImage
+    if (PathMapper.isFlutterAsset(mappedUrl)) {
+      return AssetImage(mappedUrl);
+    }
+
+    // 否則使用 NetworkImage
+    return NetworkImage(mappedUrl);
+  }
+
+  /// 檢查圖片是否為本地資源
+  static bool isLocalAsset(String? imagePath) {
+    if (imagePath == null || imagePath.isEmpty) return false;
+    return imagePath.startsWith('assets/');
+  }
+
+  /// 檢查圖片是否為網路圖片
+  static bool isNetworkImage(String? imagePath) {
+    if (imagePath == null || imagePath.isEmpty) return false;
+    return imagePath.startsWith('http://') || imagePath.startsWith('https://');
+  }
+
+  /// 獲取預設頭像
+  static ImageProvider getDefaultAvatar() {
+    return const AssetImage('assets/images/avatar/avatar-1.png');
+  }
+
+  /// 處理圖片錯誤的回調
+  static void handleImageError(
+      BuildContext context, Object error, StackTrace? stackTrace) {
+    debugPrint('圖片載入錯誤: $error');
+    // 可以在這裡添加錯誤處理邏輯，比如顯示預設圖片
+  }
+}

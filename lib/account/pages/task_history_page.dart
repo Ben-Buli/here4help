@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:here4help/constants/app_colors.dart';
 
 class TaskHistoryPage extends StatefulWidget {
   const TaskHistoryPage({super.key});
@@ -45,7 +46,7 @@ class _TaskHistoryPageState extends State<TaskHistoryPage>
               Text(
                 '4.9',
                 style: TextStyle(
-                  color: Colors.blue[900],
+                  color: AppColors.primary,
                   fontWeight: FontWeight.bold,
                   fontSize: 22,
                 ),
@@ -57,9 +58,9 @@ class _TaskHistoryPageState extends State<TaskHistoryPage>
           color: Colors.white,
           child: TabBar(
             controller: _tabController,
-            labelColor: Colors.blue[800],
+            labelColor: AppColors.primary,
             unselectedLabelColor: Colors.grey,
-            indicatorColor: Colors.blue[800],
+            indicatorColor: AppColors.primary,
             tabs: const [
               Tab(
                 icon: Icon(Icons.assignment_outlined),
@@ -101,7 +102,7 @@ class _TaskHistoryList extends StatelessWidget {
         ListTile(
           leading: Icon(
             type == 'posted' ? Icons.assignment_outlined : Icons.check,
-            color: Colors.blue,
+            color: AppColors.primary,
           ),
           title: Text(
             type == 'posted' ? 'Posted Task Example' : 'Accepted Task Example',

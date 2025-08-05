@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:here4help/task/services/task_service.dart';
+import 'package:here4help/constants/app_colors.dart';
 
 class TaskPreviewPage extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -190,10 +191,10 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                   // Task Title
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue,
+                      color: AppColors.primary,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -342,7 +343,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
+                backgroundColor: AppColors.primary,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
                 shape: RoundedRectangleBorder(

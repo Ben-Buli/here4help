@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:here4help/constants/app_colors.dart';
 
 class PointPolicyPage extends StatelessWidget {
   const PointPolicyPage({Key? key}) : super(key: key);
@@ -83,7 +84,9 @@ class PointPolicyPage extends StatelessWidget {
           const Text(
             'Points Withdrawal Policy',
             style: TextStyle(
-                fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary),
           ),
           const SizedBox(height: 12),
           Column(
@@ -116,7 +119,7 @@ class PointPolicyPage extends StatelessWidget {
     final highlightStyle = TextStyle(
       fontSize: 15,
       fontWeight: FontWeight.bold,
-      color: Colors.blue[800],
+      color: AppColors.primary,
     );
 
     return Padding(

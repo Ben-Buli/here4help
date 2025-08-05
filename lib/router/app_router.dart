@@ -36,6 +36,7 @@ final GoRouter appRouter = GoRouter(
 
     print('🔄 路由重定向檢查: ${state.uri.path}');
     print('👤 用戶狀態: ${email != null ? "已登入 ($email)" : "未登入"}');
+    print('🔍 重定向邏輯開始...');
 
     // 定義公開頁面（不需要登入驗證）
     final publicPages = ['/login', '/signup', '/signup/student-id'];
@@ -59,6 +60,7 @@ final GoRouter appRouter = GoRouter(
     }
 
     print('✅ 保持當前路由: ${state.uri.path}');
+    print('🔍 重定向邏輯結束，返回 null');
     return null; // 保持當前路由
   },
   // 📍 應用中的所有路由定義（使用 GoRoute）
@@ -83,7 +85,16 @@ final GoRouter appRouter = GoRouter(
                   : [page];
             })
             // 過濾出與當前路徑匹配的頁面
-            .where((page) => state.uri.path.startsWith(page['path']))
+            .where((page) {
+              final pagePath = page['path'] as String;
+              final currentPath = state.uri.path;
+
+              // 精確匹配或前綴匹配
+              if (currentPath == pagePath) return true;
+              if (currentPath.startsWith(pagePath + '/')) return true;
+
+              return false;
+            })
             .toList()
             // 選擇路徑最長的匹配項目
             .reduce((bestMatch, current) {
@@ -91,6 +102,16 @@ final GoRouter appRouter = GoRouter(
                   ? current
                   : bestMatch;
             });
+
+        // 處理 actions
+        List<Widget>? actions;
+        if (pageConfig.containsKey('actionsBuilder')) {
+          final actionsBuilder = pageConfig['actionsBuilder'] as List<Widget>
+              Function(BuildContext);
+          actions = actionsBuilder(context);
+        } else {
+          actions = pageConfig['actions'] ?? AppScaffoldDefaults.defaultActions;
+        }
 
         return AppScaffold(
           title: pageConfig['title'] ?? AppScaffoldDefaults.defaultTitle,
@@ -101,7 +122,7 @@ final GoRouter appRouter = GoRouter(
           showBackArrow: pageConfig['showBackArrow'] ??
               AppScaffoldDefaults.defaultShowBackArrow,
           centerTitle: AppScaffoldDefaults.defaultCenterTitle,
-          actions: pageConfig['actions'] ?? AppScaffoldDefaults.defaultActions,
+          actions: actions,
           child: child,
         );
       },

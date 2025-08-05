@@ -15,6 +15,14 @@ class UserModel {
   final String? google_id;
   final String primary_language;
   final int permission_level;
+  final String? date_of_birth;
+  final String? gender;
+  final String? country;
+  final String? address;
+  final String? about_me;
+  final String? school;
+  final String? language_requirement;
+  final bool? is_permanent_address;
 
   UserModel({
     required this.id,
@@ -32,6 +40,14 @@ class UserModel {
     this.google_id,
     required this.primary_language,
     required this.permission_level,
+    this.date_of_birth,
+    this.gender,
+    this.country,
+    this.address,
+    this.about_me,
+    this.school,
+    this.language_requirement,
+    this.is_permanent_address,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -51,6 +67,14 @@ class UserModel {
       google_id: json['google_id'],
       primary_language: json['primary_language'] ?? 'English',
       permission_level: json['permission'] ?? 0,
+      date_of_birth: json['date_of_birth'],
+      gender: json['gender'],
+      country: json['country'],
+      address: json['address'],
+      about_me: json['about_me'],
+      school: json['school'],
+      language_requirement: json['language_requirement'],
+      is_permanent_address: json['is_permanent_address'] == 1,
     );
   }
 
@@ -71,6 +95,66 @@ class UserModel {
       'google_id': google_id,
       'primary_language': primary_language,
       'permission': permission_level,
+      'date_of_birth': date_of_birth,
+      'gender': gender,
+      'country': country,
+      'address': address,
+      'about_me': about_me,
+      'school': school,
+      'language_requirement': language_requirement,
+      'is_permanent_address': is_permanent_address == true ? 1 : 0,
     };
+  }
+
+  UserModel copyWith({
+    int? id,
+    String? name,
+    String? nickname,
+    String? email,
+    String? phone,
+    int? points,
+    String? avatar_url,
+    String? status,
+    String? provider,
+    String? created_at,
+    String? updated_at,
+    String? referral_code,
+    String? google_id,
+    String? primary_language,
+    int? permission_level,
+    String? date_of_birth,
+    String? gender,
+    String? country,
+    String? address,
+    String? about_me,
+    String? school,
+    String? language_requirement,
+    bool? is_permanent_address,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      nickname: nickname ?? this.nickname,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      points: points ?? this.points,
+      avatar_url: avatar_url ?? this.avatar_url,
+      status: status ?? this.status,
+      provider: provider ?? this.provider,
+      created_at: created_at ?? this.created_at,
+      updated_at: updated_at ?? this.updated_at,
+      referral_code: referral_code ?? this.referral_code,
+      google_id: google_id ?? this.google_id,
+      primary_language: primary_language ?? this.primary_language,
+      permission_level: permission_level ?? this.permission_level,
+      date_of_birth: date_of_birth ?? this.date_of_birth,
+      gender: gender ?? this.gender,
+      country: country ?? this.country,
+      address: address ?? this.address,
+      about_me: about_me ?? this.about_me,
+      school: school ?? this.school,
+      language_requirement: language_requirement ?? this.language_requirement,
+      is_permanent_address: is_permanent_address ?? this.is_permanent_address,
+    );
   }
 }

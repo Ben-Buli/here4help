@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:here4help/constants/app_colors.dart';
 
 class FAQPage extends StatelessWidget {
   const FAQPage({super.key});
@@ -37,7 +38,7 @@ class FAQPage extends StatelessWidget {
                       horizontal: 16.0, vertical: 8.0),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
+                      color: AppColors.primary.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     padding: const EdgeInsets.symmetric(

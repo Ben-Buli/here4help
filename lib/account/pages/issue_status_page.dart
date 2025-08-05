@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:here4help/constants/app_colors.dart';
 
 class IssueStatusPage extends StatelessWidget {
   final bool hasIssue;
@@ -53,14 +54,14 @@ class IssueStatusPage extends StatelessWidget {
       children: [
         Icon(
           isActive ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-          color: isActive ? Colors.blue : Colors.grey,
+          color: isActive ? AppColors.primary : Colors.grey,
         ),
         const SizedBox(width: 8),
         Text(
           label,
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: isActive ? Colors.blue : Colors.grey,
+            color: isActive ? AppColors.primary : Colors.grey,
           ),
         ),
         if (date != null)

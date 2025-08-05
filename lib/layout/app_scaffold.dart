@@ -117,7 +117,7 @@ class _AppScaffoldState extends State<AppScaffold> {
                       )
                     : null,
                 body: SafeArea(
-                  top: widget.showAppBar,
+                  top: true, // 總是為頂部添加安全區域，避免被瀏海遮住
                   bottom: !widget.showBottomNav,
                   child: widget.child,
                 ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:here4help/constants/app_colors.dart';
 
 class ContactUsPage extends StatelessWidget {
   const ContactUsPage({super.key});
@@ -24,7 +25,7 @@ class ContactUsPage extends StatelessWidget {
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.support_agent, color: Colors.blue),
+                        Icon(Icons.support_agent, color: AppColors.primary),
                         SizedBox(width: 8),
                         Text('Customer Support',
                             style: TextStyle(fontWeight: FontWeight.bold)),
@@ -34,7 +35,7 @@ class ContactUsPage extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue[50],
+                        color: AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: const Text('Hello! How can I assist you today?'),
@@ -57,7 +58,7 @@ class ContactUsPage extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 IconButton(
-                  icon: const Icon(Icons.send, color: Colors.blue),
+                  icon: const Icon(Icons.send, color: AppColors.primary),
                   onPressed: () {
                     // TODO: 發送訊息
                   },

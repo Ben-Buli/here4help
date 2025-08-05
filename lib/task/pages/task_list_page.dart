@@ -2,10 +2,13 @@
 
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
+import 'package:here4help/constants/app_colors.dart';
 import 'package:intl/intl.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:provider/provider.dart';
+import 'package:here4help/services/theme_service.dart';
+import 'package:here4help/widgets/theme_aware_components.dart';
 
 class TaskListPage extends StatefulWidget {
   const TaskListPage({super.key});
@@ -433,7 +436,7 @@ class _TaskListPageState extends State<TaskListPage> {
                             Text(task['title'] ?? '',
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.blue)),
+                                    color: AppColors.primary)),
                             const Icon(Icons.more_vert, size: 18),
                           ],
                         ),
@@ -477,18 +480,20 @@ class _TaskListPageState extends State<TaskListPage> {
                           ],
                         ),
                         const SizedBox(height: 10),
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.local_fire_department,
+                            const Icon(Icons.local_fire_department,
                                 color: Colors.red, size: 16),
-                            SizedBox(width: 4),
-                            Text("Popular", style: TextStyle(fontSize: 12)),
-                            SizedBox(width: 12),
-                            Icon(Icons.schedule, size: 14),
-                            SizedBox(width: 4),
-                            Text("1 day ago", style: TextStyle(fontSize: 12)),
-                            Spacer(),
-                            Icon(Icons.bookmark_border, color: Colors.blue),
+                            const SizedBox(width: 4),
+                            const Text("Popular",
+                                style: TextStyle(fontSize: 12)),
+                            const SizedBox(width: 12),
+                            const Icon(Icons.schedule, size: 14),
+                            const SizedBox(width: 4),
+                            const Text("1 day ago",
+                                style: TextStyle(fontSize: 12)),
+                            const Spacer(),
+                            const ThemeAwareIcon(icon: Icons.bookmark_border),
                           ],
                         ),
                       ],

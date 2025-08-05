@@ -1,5 +1,7 @@
 // ==================== flutter ====================
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ==================== account 模組 ====================
 import 'package:here4help/account/pages/account_page.dart';
@@ -98,18 +100,55 @@ final List<Map<String, dynamic>> shellPages = [
     'showBackArrow': true,
   },
   {
-    'path': '/task',
-    'child': const TaskListPage(),
-    'title': 'Task',
-    'showBottomNav': true,
-    'showBackArrow': true
-  },
-  {
     'path': '/task/create',
     'child': const TaskCreatePage(),
     'title': 'Posting Task',
     'showBottomNav': true,
     'showBackArrow': true
+  },
+  {
+    'path': '/task',
+    'child': const TaskListPage(),
+    'title': 'Task',
+    'showBottomNav': true,
+    'showBackArrow': true,
+    'actionsBuilder': (context) => [
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () async {
+              print('🔍 Edit Icon 被點擊，準備導航到 /chat');
+              print('🔍 當前路徑: ${GoRouterState.of(context).uri.path}');
+              print('🔍 Context 是否可用: ${context.mounted}');
+
+              // 檢查用戶登入狀態
+              final prefs = await SharedPreferences.getInstance();
+              final email = prefs.getString('user_email');
+              print('🔍 用戶登入狀態: ${email != null ? "已登入 ($email)" : "未登入"}');
+
+              print('🔍 嘗試導航...');
+
+              // 使用 GoRouter.of(context) 獲取正確的 GoRouter 實例
+              try {
+                print('🔍 執行 GoRouter.of(context).go...');
+                GoRouter.of(context).go('/task/create');
+                print('✅ GoRouter.of(context).go 執行完成');
+              } catch (e) {
+                print('❌ GoRouter.of(context).go 失敗: $e');
+                // 備用方案：使用 Navigator.push
+                try {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const ChatListPage(),
+                    ),
+                  );
+                  print('✅ Navigator.push 執行完成');
+                } catch (e2) {
+                  print('❌ Navigator.push 也失敗: $e2');
+                }
+              }
+            },
+          ),
+        ],
   },
   {
     'path': '/task/create/preview',

@@ -10,8 +10,11 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
-import 'package:here4help/task/models/university_list.dart'; // 加在 import 區塊
-import 'package:here4help/constants/language_list.dart'; // 引用 languageMap
+import 'package:here4help/task/services/university_service.dart'; // 使用 UniversityService
+import 'package:here4help/task/services/language_service.dart'; // 使用 LanguageService
+import 'package:here4help/services/theme_service.dart';
+import 'package:here4help/widgets/theme_aware_components.dart';
+import 'package:here4help/constants/app_colors.dart';
 
 const String kTaskTitleField = 'Task Title';
 const String kSalaryField = 'Salary';
@@ -47,6 +50,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
   final Set<String> _errorFields = {};
   List<String> _selectedLanguages = [];
   final List<String> _applicationQuestions = [''];
+  List<Map<String, dynamic>> _universities = [];
+  List<Map<String, dynamic>> _languages = [];
 
   @override
   void initState() {
@@ -76,6 +81,65 @@ class _PostFormPageState extends State<TaskCreatePage> {
         });
       }
     });
+
+    // 載入大學列表
+    _loadUniversities();
+    // 載入語言列表
+    _loadLanguages();
+  }
+
+  Future<void> _loadUniversities() async {
+    try {
+      final universities = await UniversityService.getUniversities();
+      setState(() {
+        _universities = universities;
+      });
+    } catch (e) {
+      // 如果無法載入大學列表，使用預設列表
+      setState(() {
+        _universities = [
+          {
+            'abbr': 'NTU',
+            'zh_name': '國立台灣大學',
+            'en_name': 'National Taiwan University'
+          },
+          {
+            'abbr': 'NCCU',
+            'zh_name': '國立政治大學',
+            'en_name': 'National Chengchi University'
+          },
+          {
+            'abbr': 'NTHU',
+            'zh_name': '國立清華大學',
+            'en_name': 'National Tsing Hua University'
+          },
+          {
+            'abbr': 'NCKU',
+            'zh_name': '國立成功大學',
+            'en_name': 'National Cheng Kung University'
+          },
+        ];
+      });
+    }
+  }
+
+  Future<void> _loadLanguages() async {
+    try {
+      final languages = await LanguageService.getLanguages();
+      setState(() {
+        _languages = languages;
+      });
+    } catch (e) {
+      // 如果無法載入語言列表，使用預設列表
+      setState(() {
+        _languages = [
+          {'code': 'en', 'name': 'English', 'native': 'English'},
+          {'code': 'zh', 'name': 'Chinese', 'native': '中文'},
+          {'code': 'ja', 'name': 'Japanese', 'native': '日本語'},
+          {'code': 'ko', 'name': 'Korean', 'native': '한국어'},
+        ];
+      });
+    }
   }
 
   void _addApplicationQuestion() {
@@ -261,11 +325,11 @@ class _PostFormPageState extends State<TaskCreatePage> {
                             child: Text(
                               // ↓↓↓ 新增：如果地點名稱在大學清單中，顯示縮寫
                               () {
-                                final matched = universityList.firstWhere(
+                                final matched = _universities.firstWhere(
                                   (uni) =>
-                                      uni['en'] == _locationLabel ||
-                                      uni['zh'] == _locationLabel,
-                                  orElse: () => {},
+                                      uni['en_name'] == _locationLabel ||
+                                      uni['zh_name'] == _locationLabel,
+                                  orElse: () => <String, dynamic>{},
                                 );
                                 if (matched.isNotEmpty) {
                                   return matched['abbr']!;
@@ -591,40 +655,45 @@ class _PostFormPageState extends State<TaskCreatePage> {
                                 Expanded(
                                   child: StatefulBuilder(
                                     builder: (context, setState) {
-                                      List<MapEntry<String, String>>
-                                          filteredList = languageMap.entries
-                                              .where((entry) => entry.value
-                                                  .toLowerCase()
-                                                  .contains(searchController
-                                                      .text
-                                                      .toLowerCase()))
+                                      List<Map<String, dynamic>> filteredList =
+                                          _languages
+                                              .where((lang) =>
+                                                  (lang['native'] ?? '')
+                                                      .toLowerCase()
+                                                      .contains(searchController
+                                                          .text
+                                                          .toLowerCase()))
                                               .toList();
 
                                       // 將已選擇的語言優先排序。
                                       filteredList.sort((a, b) {
                                         bool aSelected =
-                                            tempSelected.contains(a.key);
+                                            tempSelected.contains(a['code']);
                                         bool bSelected =
-                                            tempSelected.contains(b.key);
+                                            tempSelected.contains(b['code']);
                                         if (aSelected && !bSelected) return -1;
                                         if (!aSelected && bSelected) return 1;
-                                        return a.value.compareTo(b.value);
+                                        return (a['native'] ?? '')
+                                            .compareTo(b['native'] ?? '');
                                       });
 
                                       return ListView(
-                                        children: filteredList.map((entry) {
-                                          final isSelected =
-                                              tempSelected.contains(entry.key);
+                                        children: filteredList.map((lang) {
+                                          final isSelected = tempSelected
+                                              .contains(lang['code']);
                                           return CheckboxListTile(
                                             value: isSelected,
-                                            title: Text(entry.value),
+                                            title: Text(lang['native'] ??
+                                                lang['name'] ??
+                                                ''),
                                             onChanged: (checked) {
                                               setState(() {
                                                 if (checked == true) {
-                                                  tempSelected.add(entry.key);
+                                                  tempSelected
+                                                      .add(lang['code']);
                                                 } else {
                                                   tempSelected
-                                                      .remove(entry.key);
+                                                      .remove(lang['code']);
                                                 }
                                               });
                                             },
@@ -691,11 +760,15 @@ class _PostFormPageState extends State<TaskCreatePage> {
                     : Wrap(
                         spacing: 8,
                         runSpacing: 4,
-                        children: _selectedLanguages
-                            .map((code) => Chip(
-                                  label: Text(languageMap[code] ?? code),
-                                ))
-                            .toList(),
+                        children: _selectedLanguages.map((code) {
+                          final language = _languages.firstWhere(
+                            (lang) => lang['code'] == code,
+                            orElse: () => {'native': code},
+                          );
+                          return Chip(
+                            label: Text(language['native'] ?? code),
+                          );
+                        }).toList(),
                       ),
               ),
             ),
@@ -715,7 +788,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                         TextSpan(
                           text: 'The platform regulations',
                           style: TextStyle(
-                              color: Colors.blue,
+                              color: AppColors.primary,
                               decoration: TextDecoration.underline),
                         ),
                         TextSpan(
@@ -745,7 +818,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                         height: 48,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF3A85FF),
+                            backgroundColor: AppColors.primary,
                           ),
                           onPressed: () {
                             final user =
@@ -1070,14 +1143,14 @@ extension _MoveToSearchLocationExtension on _PostFormPageState {
   Future<void> _moveToSearchLocation(String query,
       [void Function(void Function())? dialogSetState]) async {
     if (query.trim().isEmpty) return;
-    final matched = universityList.firstWhere(
+    final matched = _universities.firstWhere(
       (uni) =>
-          uni['en']!.toLowerCase().contains(query.toLowerCase()) ||
+          uni['en_name']!.toLowerCase().contains(query.toLowerCase()) ||
           uni['abbr']!.toLowerCase() == query.toLowerCase(),
-      orElse: () => {},
+      orElse: () => <String, dynamic>{},
     );
     if (matched.isNotEmpty) {
-      query = matched['zh']!;
+      query = matched['zh_name']!;
     }
     try {
       final url = Uri.parse(

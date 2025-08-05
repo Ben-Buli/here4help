@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
+import 'package:here4help/constants/app_colors.dart';
+import 'package:here4help/services/theme_service.dart';
+import 'package:here4help/utils/image_helper.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -28,19 +31,20 @@ class HomePage extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundImage: user?.avatar_url != null &&
-                                  user!.avatar_url.isNotEmpty
-                              ? (user.avatar_url.startsWith('http')
-                                  ? NetworkImage(user.avatar_url)
-                                  : AssetImage(user.avatar_url)
-                                      as ImageProvider)
-                              : null,
-                          child: user?.avatar_url == null
-                              ? const Icon(Icons.person)
-                              : null,
-                        ),
+                        user?.avatar_url != null && user!.avatar_url.isNotEmpty
+                            ? CircleAvatar(
+                                radius: 30,
+                                backgroundImage:
+                                    ImageHelper.getAvatarImage(user.avatar_url),
+                                onBackgroundImageError:
+                                    (exception, stackTrace) {
+                                  debugPrint('頭像載入錯誤: $exception');
+                                },
+                              )
+                            : const CircleAvatar(
+                                radius: 30,
+                                child: Icon(Icons.person),
+                              ),
                         const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,7 +76,7 @@ class HomePage extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue[100],
+                        color: AppColors.primary.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Column(
@@ -206,87 +210,107 @@ class _AchievementBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Stack(
-          alignment: Alignment.center,
+    return Consumer<ThemeService>(
+      builder: (context, themeService, child) {
+        return Column(
           children: [
-            ClipPath(
-              clipper: HexagonClipper(),
-              child: Container(
-                width: 60,
-                height: 60,
-                color: Colors.black,
-              ),
-            ),
-            ClipPath(
-              clipper: HexagonClipper(),
-              child: Container(
-                width: 54,
-                height: 54,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.orange, Colors.deepOrange],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                ClipPath(
+                  clipper: HexagonClipper(),
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    color: Colors.black,
                   ),
                 ),
-                alignment: Alignment.center,
-                child: Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    foreground: Paint()
-                      ..style = PaintingStyle.stroke
-                      ..strokeWidth = 1.5
-                      ..color = Colors.deepOrange,
+                ClipPath(
+                  clipper: HexagonClipper(),
+                  child: Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          themeService.currentTheme.primary,
+                          themeService.currentTheme.secondary,
+                          themeService.currentTheme.accent,
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        foreground: Paint()
+                          ..style = PaintingStyle.stroke
+                          ..strokeWidth = 1.5
+                          ..color = themeService.currentTheme.primary,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            ClipPath(
-              clipper: HexagonClipper(),
-              child: Container(
-                width: 54,
-                height: 54,
-                alignment: Alignment.center,
-                child: Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                ClipPath(
+                  clipper: HexagonClipper(),
+                  child: Container(
+                    width: 54,
+                    height: 54,
+                    alignment: Alignment.center,
+                    child: Text(
+                      value,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: themeService.currentTheme.onPrimary,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(fontSize: 12))
           ],
-        ),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontSize: 12))
-      ],
+        );
+      },
     );
   }
 }
 
-// 六角形
+// 正六角形 - 上下左右長度一致
 class HexagonClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     final double w = size.width;
     final double h = size.height;
+
+    // 計算正六角形的邊長
     final double side = w / 2;
-    final double dx = side / 2;
-    // final double dy = height / 4;
+    final double centerX = w / 2;
+    final double centerY = h / 2;
+
+    // 正六角形的六個頂點
+    final List<Offset> points = [
+      Offset(centerX, centerY - side), // 頂點
+      Offset(centerX + side * 0.866, centerY - side * 0.5), // 右上
+      Offset(centerX + side * 0.866, centerY + side * 0.5), // 右下
+      Offset(centerX, centerY + side), // 底點
+      Offset(centerX - side * 0.866, centerY + side * 0.5), // 左下
+      Offset(centerX - side * 0.866, centerY - side * 0.5), // 左上
+    ];
 
     return Path()
-      ..moveTo(dx, 0)
-      ..lineTo(dx + side, 0)
-      ..lineTo(w, h / 2)
-      ..lineTo(dx + side, h)
-      ..lineTo(dx, h)
-      ..lineTo(0, h / 2)
+      ..moveTo(points[0].dx, points[0].dy)
+      ..lineTo(points[1].dx, points[1].dy)
+      ..lineTo(points[2].dx, points[2].dy)
+      ..lineTo(points[3].dx, points[3].dy)
+      ..lineTo(points[4].dx, points[4].dy)
+      ..lineTo(points[5].dx, points[5].dy)
       ..close();
   }
 

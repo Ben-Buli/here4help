@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:here4help/services/theme_service.dart';
+import 'package:here4help/constants/app_colors.dart';
 
 class RatingsPage extends StatefulWidget {
   const RatingsPage({super.key});
@@ -155,7 +158,7 @@ class _RatingsPageState extends State<RatingsPage>
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       child: ListTile(
-        leading: Icon(Icons.event_note, color: Colors.blue[700]),
+        leading: Icon(Icons.event_note, color: AppColors.primary),
         title: Row(
           children: [
             Expanded(
@@ -181,15 +184,20 @@ class _RatingsPageState extends State<RatingsPage>
             if (task['review'] != null)
               Text(task['review'],
                   style: const TextStyle(color: Colors.black87)),
-            Text('${task['price']} NTD',
-                style: const TextStyle(color: Colors.blueGrey)),
+            Consumer<ThemeService>(
+              builder: (context, themeService, child) {
+                return Text('${task['price']} NTD',
+                    style:
+                        TextStyle(color: themeService.currentTheme.secondary));
+              },
+            ),
             if (!task['reviewed'])
               Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton(
                   onPressed: () => _showReviewDialog(task, isPosted),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isPosted ? Colors.blue : Colors.grey,
+                    backgroundColor: isPosted ? AppColors.primary : Colors.grey,
                     minimumSize: const Size(80, 32),
                   ),
                   child: Text(isPosted ? 'Review' : 'Awaiting review'),
@@ -254,7 +262,7 @@ class _RatingsPageState extends State<RatingsPage>
               Text(
                 '4.9',
                 style: TextStyle(
-                  color: Colors.blue[900],
+                  color: AppColors.primary,
                   fontWeight: FontWeight.bold,
                   fontSize: 22,
                 ),
@@ -266,9 +274,9 @@ class _RatingsPageState extends State<RatingsPage>
           color: Colors.white,
           child: TabBar(
             controller: _tabController,
-            labelColor: Colors.blue[800],
+            labelColor: AppColors.primary,
             unselectedLabelColor: Colors.grey,
-            indicatorColor: Colors.blue[800],
+            indicatorColor: AppColors.primary,
             tabs: const [
               Tab(
                 icon: Icon(Icons.assignment_outlined),

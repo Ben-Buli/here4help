@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:here4help/constants/app_colors.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
@@ -144,13 +145,13 @@ class _WalletPageState extends State<WalletPage> {
             children: [
               ListTile(
                 leading:
-                    const Icon(Icons.add_circle_outline, color: Colors.blue),
+                    Icon(Icons.add_circle_outline, color: AppColors.primary),
                 title: const Text('Add Points'),
                 onTap: _showAddPointsDialog,
               ),
               const Divider(height: 1),
               ListTile(
-                leading: const Icon(Icons.percent, color: Colors.blue),
+                leading: Icon(Icons.percent, color: AppColors.primary),
                 title: const Text('Coupons'),
                 onTap: () {
                   // TODO: 跳轉到優惠券頁面
@@ -158,7 +159,7 @@ class _WalletPageState extends State<WalletPage> {
               ),
               const Divider(height: 1),
               ListTile(
-                leading: const Icon(Icons.info_outline, color: Colors.blue),
+                leading: Icon(Icons.info_outline, color: AppColors.primary),
                 title: const Text('Points Policies'),
                 onTap: () {
                   // TODO: 跳轉到積分政策頁面

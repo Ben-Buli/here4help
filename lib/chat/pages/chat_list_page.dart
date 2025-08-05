@@ -5,20 +5,7 @@ import 'package:here4help/task/services/task_service.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:here4help/chat/models/chat_room_model.dart';
 import 'package:intl/intl.dart';
-
-// Define statusString as a constant outside the class
-const Map<String, String> statusString = {
-  'open': 'Open',
-  'in_progress': 'In Progress',
-  'pending_confirmation': 'Pending Confirmation',
-  'dispute': 'Dispute',
-  'completed': 'Completed',
-  'applying_tasker': 'Applying (Tasker)',
-  'in_progress_tasker': 'In Progress (Tasker)',
-  'pending_confirmation_tasker': 'Pending Confirmation (Tasker)',
-  'rejected_tasker': 'Rejected (Tasker)',
-  'completed_tasker': 'Completed (Tasker)',
-};
+import 'package:here4help/constants/task_status.dart';
 
 class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
@@ -119,7 +106,7 @@ class _ChatListPageState extends State<ChatListPage>
   /// Returns the text color for status chip.
   Color _getStatusChipColor(String status, String type) {
     // Convert database status to display status if needed
-    final displayStatus = statusString[status] ?? status;
+    final displayStatus = TaskStatus.getDisplayStatus(status);
 
     // Only return text color, ignore background.
     switch (displayStatus) {
@@ -144,7 +131,7 @@ class _ChatListPageState extends State<ChatListPage>
 
   Color _getStatusChipBorderColor(String status) {
     // Convert database status to display status if needed
-    final displayStatus = statusString[status] ?? status;
+    final displayStatus = TaskStatus.getDisplayStatus(status);
 
     switch (displayStatus) {
       case 'Open':
@@ -168,16 +155,16 @@ class _ChatListPageState extends State<ChatListPage>
 
   bool _isCountdownStatus(String status) {
     // Convert database status to display status if needed
-    final displayStatus = statusString[status] ?? status;
+    final displayStatus = TaskStatus.getDisplayStatus(status);
 
-    return displayStatus == statusString['pending_confirmation'] ||
-        displayStatus == statusString['pending_confirmation_tasker'];
+    return displayStatus == TaskStatus.statusString['pending_confirmation'] ||
+        displayStatus == TaskStatus.statusString['pending_confirmation_tasker'];
   }
 
   /// 根據狀態返回進度值和顏色
   Map<String, dynamic> _getProgressData(String status) {
     // Convert database status to display status if needed
-    final displayStatus = statusString[status] ?? status;
+    final displayStatus = TaskStatus.statusString[status] ?? status;
 
     const int colorRates = 200;
     switch (displayStatus) {
@@ -516,12 +503,14 @@ class _ChatListPageState extends State<ChatListPage>
                           ),
                           if ((applierChatItem['unreadCount'] ?? 0) > 0)
                             Positioned(
-                              top: 0,
-                              right: 0,
+                              top: -2,
+                              right: -2,
                               child: Container(
-                                padding: const EdgeInsets.all(0),
-                                width: 20,
-                                height: 20,
+                                padding: const EdgeInsets.all(4),
+                                constraints: const BoxConstraints(
+                                  minWidth: 16,
+                                  minHeight: 16,
+                                ),
                                 decoration: const BoxDecoration(
                                   color: Colors.blue,
                                   shape: BoxShape.circle,
@@ -549,17 +538,17 @@ class _ChatListPageState extends State<ChatListPage>
         // 總未讀徽章（右上角）
         if ((task['unreadCount'] ?? 0) > 0)
           Positioned(
-            top: -6,
-            right: -6,
+            top: -4,
+            right: -4,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: const BoxDecoration(
                 color: Colors.blue,
                 shape: BoxShape.circle,
               ),
               constraints: const BoxConstraints(
-                minWidth: 24,
-                minHeight: 24,
+                minWidth: 20,
+                minHeight: 20,
               ),
               child: Center(
                 child: Text(
@@ -567,7 +556,7 @@ class _ChatListPageState extends State<ChatListPage>
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                    fontSize: 11,
                   ),
                 ),
               ),
@@ -649,12 +638,14 @@ class _ChatListPageState extends State<ChatListPage>
       onCountdownComplete: () {
         setState(() {
           // Convert database status to display status for comparison
-          final displayStatus = statusString[task['status']] ?? task['status'];
+          final displayStatus =
+              TaskStatus.statusString[task['status']] ?? task['status'];
 
-          if (displayStatus == statusString['pending_confirmation']) {
+          if (displayStatus ==
+              TaskStatus.statusString['pending_confirmation']) {
             task['status'] = 'completed'; // Use database status
           } else if (displayStatus ==
-              statusString['pending_confirmation_tasker']) {
+              TaskStatus.statusString['pending_confirmation_tasker']) {
             task['status'] = 'completed_tasker'; // Use database status
           }
         });
@@ -664,7 +655,7 @@ class _ChatListPageState extends State<ChatListPage>
 
   String _getProgressLabel(String status) {
     // Convert database status to display status if needed
-    final displayStatus = statusString[status] ?? status;
+    final displayStatus = TaskStatus.statusString[status] ?? status;
 
     final progressData = _getProgressData(status);
     final progress = progressData['progress'];
@@ -682,11 +673,11 @@ class _ChatListPageState extends State<ChatListPage>
   Widget build(BuildContext context) {
     final taskService = TaskService();
     final statusOrder = {
-      statusString['open']!: 0,
-      statusString['in_progress']!: 1,
-      statusString['pending_confirmation']!: 2,
-      statusString['dispute']!: 3,
-      statusString['completed']!: 4,
+      TaskStatus.statusString['open']!: 0,
+      TaskStatus.statusString['in_progress']!: 1,
+      TaskStatus.statusString['pending_confirmation']!: 2,
+      TaskStatus.statusString['dispute']!: 3,
+      TaskStatus.statusString['completed']!: 4,
     };
 
     return FutureBuilder(
@@ -700,8 +691,10 @@ class _ChatListPageState extends State<ChatListPage>
           final tasks = taskService.tasks;
           tasks.sort((a, b) {
             // Convert database status to display status for sorting
-            final displayStatusA = statusString[a['status']] ?? a['status'];
-            final displayStatusB = statusString[b['status']] ?? b['status'];
+            final displayStatusA =
+                TaskStatus.statusString[a['status']] ?? a['status'];
+            final displayStatusB =
+                TaskStatus.statusString[b['status']] ?? b['status'];
 
             final statusA = statusOrder[displayStatusA] ?? 99;
             final statusB = statusOrder[displayStatusB] ?? 99;
@@ -857,17 +850,19 @@ class _ChatListPageState extends State<ChatListPage>
   Widget _buildTaskList(bool taskerEnabled) {
     final taskService = TaskService();
     final statusOrder = {
-      statusString['open']!: 0,
-      statusString['in_progress']!: 1,
-      statusString['pending_confirmation']!: 2,
-      statusString['dispute']!: 3,
-      statusString['completed']!: 4,
+      TaskStatus.statusString['open']!: 0,
+      TaskStatus.statusString['in_progress']!: 1,
+      TaskStatus.statusString['pending_confirmation']!: 2,
+      TaskStatus.statusString['dispute']!: 3,
+      TaskStatus.statusString['completed']!: 4,
     };
     final tasks = taskService.tasks;
     tasks.sort((a, b) {
       // Convert database status to display status for sorting
-      final displayStatusA = statusString[a['status']] ?? a['status'];
-      final displayStatusB = statusString[b['status']] ?? b['status'];
+      final displayStatusA =
+          TaskStatus.statusString[a['status']] ?? a['status'];
+      final displayStatusB =
+          TaskStatus.statusString[b['status']] ?? b['status'];
 
       final statusA = statusOrder[displayStatusA] ?? 99;
       final statusB = statusOrder[displayStatusB] ?? 99;
@@ -893,7 +888,7 @@ class _ChatListPageState extends State<ChatListPage>
       final matchLocation =
           selectedLocation == null || selectedLocation == location;
       // Convert database status to display status for filtering
-      final displayStatus = statusString[status] ?? status;
+      final displayStatus = TaskStatus.statusString[status] ?? status;
       final matchStatus =
           selectedStatus == null || selectedStatus == displayStatus;
       final matchTasker = taskerEnabled
@@ -1082,7 +1077,8 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
   List<Widget> _buildApplierEndActions(BuildContext context,
       Map<String, dynamic> task, Map<String, dynamic> applierChatItem) {
     // Convert database status to display status for comparison
-    final displayStatus = statusString[task['status']] ?? task['status'];
+    final displayStatus =
+        TaskStatus.statusString[task['status']] ?? task['status'];
     List<Widget> actions = [];
 
     void addButton(String label, Color color, VoidCallback onTap,

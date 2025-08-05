@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/chat/services/global_chat_room.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:here4help/constants/task_status.dart';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, required this.data});
@@ -16,44 +17,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     with TickerProviderStateMixin {
   // 統一應徵者訊息的背景色
   final Color applierBubbleColor = Colors.grey.shade100;
-  // 狀態名稱映射
-  final Map<String, String> statusString = const {
-    'open': 'Open',
-    'in_progress': 'In Progress',
-    'in_progress_tasker': 'In Progress (Tasker)',
-    'applying_tasker': 'Applying (Tasker)',
-    'rejected_tasker': 'Rejected (Tasker)',
-    'pending_confirmation': 'Pending Confirmation',
-    'pending_confirmation_tasker': 'Pending Confirmation (Tasker)',
-    'dispute': 'Dispute',
-    'completed': 'Completed',
-    'completed_tasker': 'Completed (Tasker)',
-  };
-
-  // 狀態進度對應表，方便維護與擴充
-  static const Map<String, double> _statusProgressMap = {
-    'Open': 0.0,
-    'In Progress': 0.25,
-    'Pending Confirmation': 0.5,
-    'Completed': 1.0,
-    'Dispute': 0.75,
-    'Applying (Tasker)': 0.0,
-    'In Progress (Tasker)': 0.25,
-    'Completed (Tasker)': 1.0,
-    'Rejected (Tasker)': 0.0,
-    'Pending Confirmation (Tasker)': 0.5,
-    // 其他狀態可依需求加入
-  };
 
   Map<String, dynamic> _getProgressData(String status) {
-    // Convert database status to display status if needed
-    final displayStatus = statusString[status] ?? status;
-
-    if (_statusProgressMap.containsKey(displayStatus)) {
-      return {'progress': _statusProgressMap[displayStatus]};
-    }
-    // 不顯示進度條的狀態
-    return {'progress': null};
+    return TaskStatus.getProgressData(status);
   }
 
   final TextEditingController _controller = TextEditingController();
@@ -79,7 +45,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
     // 加強 pendingStart 處理，若不存在自動補上
     if (widget.data['task']['status'] ==
-        statusString['pending_confirmation_tasker']) {
+        TaskStatus.statusString['pending_confirmation_tasker']) {
       taskPendingStart =
           DateTime.tryParse(widget.data['task']['pendingStart'] ?? '') ??
               DateTime.now();
@@ -88,7 +54,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       remainingTime = taskPendingEnd.difference(DateTime.now());
       countdownTicker = Ticker(_onTick)..start();
     } else if (widget.data['task']['status'] ==
-        statusString['pending_confirmation']) {
+        TaskStatus.statusString['pending_confirmation']) {
       taskPendingStart =
           DateTime.tryParse(widget.data['task']['pendingStart'] ?? '') ??
               DateTime.now();
@@ -109,11 +75,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       countdownTicker.stop();
       setState(() {
         remainingTime = Duration.zero;
-        widget.data['task']['status'] = statusString['completed_tasker'];
+        widget.data['task']['status'] =
+            TaskStatus.statusString['completed_tasker'];
       });
       TaskService().updateTaskStatus(
         widget.data['task']['id'].toString(),
-        statusString['completed_tasker']!,
+        TaskStatus.statusString['completed_tasker']!,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -149,8 +116,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   @override
   void dispose() {
     if (widget.data['task']['status'] ==
-            statusString['pending_confirmation_tasker'] ||
-        widget.data['task']['status'] == statusString['pending_confirmation']) {
+            TaskStatus.statusString['pending_confirmation_tasker'] ||
+        widget.data['task']['status'] ==
+            TaskStatus.statusString['pending_confirmation']) {
       countdownTicker.dispose();
     }
     _controller.dispose();
@@ -474,9 +442,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
 
     final isInputDisabled =
-        widget.data['task']['status'] == statusString['completed'] ||
-            widget.data['task']['status'] == statusString['rejected_tasker'] ||
-            widget.data['task']['status'] == statusString['completed_tasker'];
+        widget.data['task']['status'] == TaskStatus.statusString['completed'] ||
+            widget.data['task']['status'] ==
+                TaskStatus.statusString['rejected_tasker'] ||
+            widget.data['task']['status'] ==
+                TaskStatus.statusString['completed_tasker'];
     // --- ALERT BAR SWITCH-CASE 重構 ---
     // 預設 alert bar 不會顯示，只有在特定狀態下才顯示
     Widget? alertContent;
@@ -818,42 +788,42 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   List<Widget> _buildActionButtonsByStatus() {
     final status = (widget.data['task']['status'] ?? '').toString();
     final Map<String, List<Map<String, dynamic>>> statusActions = {
-      statusString['open']!: [
+      TaskStatus.statusString['open']!: [
         {'icon': Icons.check, 'label': 'Accept'},
       ],
-      statusString['in_progress']!: [
+      TaskStatus.statusString['in_progress']!: [
         {'icon': Icons.payment, 'label': 'Pay'},
         {'icon': Icons.volume_off, 'label': 'Silence'},
         {'icon': Icons.article, 'label': 'Complaint'},
         {'icon': Icons.block, 'label': 'Block'},
       ],
-      statusString['in_progress_tasker']!: [
+      TaskStatus.statusString['in_progress_tasker']!: [
         {'icon': Icons.check_circle, 'label': 'Completed'},
         {'icon': Icons.article, 'label': 'Complaint'},
         {'icon': Icons.block, 'label': 'Block'},
       ],
-      statusString['applying_tasker']!: [
+      TaskStatus.statusString['applying_tasker']!: [
         {'icon': Icons.article, 'label': 'Complaint'},
         {'icon': Icons.block, 'label': 'Block'},
       ],
-      statusString['rejected_tasker']!: [
+      TaskStatus.statusString['rejected_tasker']!: [
         {'icon': Icons.article, 'label': 'Complaint'},
       ],
-      statusString['pending_confirmation']!: [
+      TaskStatus.statusString['pending_confirmation']!: [
         {'icon': Icons.check, 'label': 'Confirm'},
         {'icon': Icons.article, 'label': 'Complaint'},
       ],
-      statusString['pending_confirmation_tasker']!: [
+      TaskStatus.statusString['pending_confirmation_tasker']!: [
         {'icon': Icons.article, 'label': 'Complaint'},
       ],
-      statusString['dispute']!: [
+      TaskStatus.statusString['dispute']!: [
         {'icon': Icons.article, 'label': 'Complaint'},
       ],
-      statusString['completed']!: [
+      TaskStatus.statusString['completed']!: [
         {'icon': Icons.attach_money, 'label': 'Paid'},
         {'icon': Icons.reviews, 'label': 'Reviews'},
       ],
-      statusString['completed_tasker']!: [
+      TaskStatus.statusString['completed_tasker']!: [
         {'icon': Icons.reviews, 'label': 'Reviews'},
         {'icon': Icons.article, 'label': 'Complaint'},
       ],
@@ -884,7 +854,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                             Navigator.of(context).pop();
                             TaskService().updateTaskStatus(
                               widget.data['task']['id'].toString(),
-                              statusString['in_progress']!,
+                              TaskStatus.statusString['in_progress']!,
                             );
                             GlobalChatRoom().removeRoomsByTaskIdExcept(
                               widget.data['task']['id'].toString(),
@@ -920,7 +890,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                             TaskService taskService = TaskService();
                             taskService.updateTaskStatus(
                               widget.data['room']['taskId'].toString(),
-                              statusString['completed']!,
+                              TaskStatus.statusString['completed']!,
                             );
                             setState(() {});
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -951,7 +921,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                             Navigator.of(context).pop();
                             TaskService().updateTaskStatus(
                               widget.data['task']['id'].toString(),
-                              statusString['completed']!,
+                              TaskStatus.statusString['completed']!,
                             );
                             setState(() {});
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -986,7 +956,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                                 DateTime.now().toIso8601String();
                             TaskService().updateTaskStatus(
                               widget.data['task']['id'].toString(),
-                              statusString['pending_confirmation_tasker']!,
+                              TaskStatus
+                                  .statusString['pending_confirmation_tasker']!,
                             );
                             // 重新初始化倒數
                             setState(() {
@@ -1020,7 +991,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   Color _getStatusChipColor(String status) {
     // Convert database status to display status if needed
-    final displayStatus = statusString[status] ?? status;
+    final displayStatus = TaskStatus.statusString[status] ?? status;
 
     switch (displayStatus) {
       case 'Open':
@@ -1050,7 +1021,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   Color _getStatusBackgroundColor(String status) {
     // Convert database status to display status if needed
-    final displayStatus = statusString[status] ?? status;
+    final displayStatus = TaskStatus.statusString[status] ?? status;
 
     switch (displayStatus) {
       case 'Open':

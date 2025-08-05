@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_config.dart';
+import '../../utils/debug_helper.dart';
 
 class AuthService {
   static const String _tokenKey = 'auth_token';
@@ -62,6 +63,12 @@ class AuthService {
 
       if (response.statusCode == 200 && data['success']) {
         print('✅ 登入成功');
+
+        // 診斷用戶圖片信息
+        if (data['data']['user'] != null) {
+          DebugHelper.printUserImageInfo(data['data']['user']);
+        }
+
         // 儲存 token 和用戶資料
         await _saveToken(data['data']['token']);
         await _saveUserData(data['data']['user']);
