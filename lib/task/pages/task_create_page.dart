@@ -10,11 +10,14 @@ import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
-import 'package:here4help/task/services/university_service.dart'; // 使用 UniversityService
-import 'package:here4help/task/services/language_service.dart'; // 使用 LanguageService
+import 'package:here4help/task/services/university_service.dart';
+import 'package:here4help/task/services/language_service.dart';
+import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/widgets/theme_aware_components.dart';
 import 'package:here4help/constants/app_colors.dart';
+import 'package:here4help/utils/image_helper.dart';
+import 'package:here4help/utils/path_mapper.dart';
 
 const String kTaskTitleField = 'Task Title';
 const String kSalaryField = 'Salary';
@@ -43,7 +46,6 @@ class _PostFormPageState extends State<TaskCreatePage> {
   LatLng? _selectedLocation = const LatLng(25.0208, 121.5418);
   String _locationLabel = 'NCCU';
 
-  /// 搜尋地點的控制器
   final TextEditingController _locationSearchController =
       TextEditingController();
 
@@ -57,13 +59,9 @@ class _PostFormPageState extends State<TaskCreatePage> {
   void initState() {
     super.initState();
 
-    /// 初始化表單欄位
+    // 初始化表單欄位
     _titleController.text = 'Opening Bank Account (Demo)';
-    // _taskDescription =
-    //     'Help me to open a bank account in Taiwan. I am a foreigner and need assistance with the process.';
-    // _taskDescriptionController = TextEditingController();
-    // _taskDescriptionController.text = _taskDescription;
-    final formatter = NumberFormat('#,##0', 'en_US'); // 格式化三位數數字
+    final formatter = NumberFormat('#,##0', 'en_US');
     _salaryController.text = formatter.format(500);
     _locationLabel = 'NCCU';
     _locationSearchController.text = 'NCCU';
@@ -79,12 +77,12 @@ class _PostFormPageState extends State<TaskCreatePage> {
         setState(() {
           _selectedLanguages = _languageRequirement.split(',');
         });
+        // 測試頭像讀取功能
+        _testAvatarLoading();
       }
     });
 
-    // 載入大學列表
     _loadUniversities();
-    // 載入語言列表
     _loadLanguages();
   }
 
@@ -95,7 +93,6 @@ class _PostFormPageState extends State<TaskCreatePage> {
         _universities = universities;
       });
     } catch (e) {
-      // 如果無法載入大學列表，使用預設列表
       setState(() {
         _universities = [
           {
@@ -130,7 +127,6 @@ class _PostFormPageState extends State<TaskCreatePage> {
         _languages = languages;
       });
     } catch (e) {
-      // 如果無法載入語言列表，使用預設列表
       setState(() {
         _languages = [
           {'code': 'en', 'name': 'English', 'native': 'English'},
@@ -159,171 +155,482 @@ class _PostFormPageState extends State<TaskCreatePage> {
   }
 
   void _removeApplicationQuestion(int index) {
-    setState(() {
-      _applicationQuestions.removeAt(index);
-    });
+    if (index >= 0 && index < _applicationQuestions.length) {
+      setState(() {
+        _applicationQuestions.removeAt(index);
+      });
+    }
+  }
+
+  ImageProvider? _getAvatarImage() {
+    final user = Provider.of<UserService>(context, listen: false).currentUser;
+    final avatarUrl = user?.avatar_url;
+
+    // 詳細調試信息
+    debugPrint('🔍 === 頭像讀取測試 ===');
+    debugPrint('🔍 User: ${user?.name}');
+    debugPrint('🔍 User ID: ${user?.id}');
+    debugPrint('🔍 Avatar URL: $avatarUrl');
+    debugPrint('🔍 Avatar URL isNotEmpty: ${avatarUrl?.isNotEmpty}');
+    debugPrint('🔍 Avatar URL length: ${avatarUrl?.length}');
+
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      try {
+        // 檢查是否是 Flutter assets 路徑
+        final isAsset = PathMapper.isFlutterAsset(avatarUrl);
+        debugPrint('🔍 Is Flutter Asset: $isAsset');
+
+        // 檢查是否是本地資源
+        final isLocalAsset = ImageHelper.isLocalAsset(avatarUrl);
+        debugPrint('🔍 Is Local Asset: $isLocalAsset');
+
+        // 檢查是否是網路圖片
+        final isNetworkImage = ImageHelper.isNetworkImage(avatarUrl);
+        debugPrint('🔍 Is Network Image: $isNetworkImage');
+
+        // 直接測試 AssetImage 創建
+        if (avatarUrl.startsWith('assets/')) {
+          debugPrint('🔍 直接測試 AssetImage 創建...');
+          final directAssetImage = AssetImage(avatarUrl);
+          debugPrint('✅ 直接 AssetImage 創建成功: $directAssetImage');
+        }
+
+        final imageProvider = ImageHelper.getAvatarImage(avatarUrl);
+        debugPrint('✅ 成功創建 ImageProvider: $imageProvider');
+        return imageProvider;
+      } catch (e) {
+        debugPrint('❌ Error loading avatar: $e');
+        return null;
+      }
+    }
+    debugPrint('ℹ️ No avatar URL available');
+    return null;
+  }
+
+  Widget? _getAvatarChild() {
+    final user = Provider.of<UserService>(context, listen: false).currentUser;
+    final avatarUrl = user?.avatar_url;
+
+    if (avatarUrl == null || avatarUrl.isEmpty) {
+      final themeManager =
+          Provider.of<ThemeConfigManager>(context, listen: false);
+      final theme = themeManager.effectiveTheme;
+      debugPrint('ℹ️ 顯示默認頭像圖標');
+      return Icon(
+        Icons.person,
+        color: theme.primary,
+        size: 24,
+      );
+    }
+    debugPrint('ℹ️ 有頭像 URL，不顯示默認圖標');
+    return null;
+  }
+
+  /// 測試頭像讀取功能
+  void _testAvatarLoading() {
+    final user = Provider.of<UserService>(context, listen: false).currentUser;
+    debugPrint('🧪 === 頭像讀取測試開始 ===');
+    debugPrint('🧪 User: ${user?.name}');
+    debugPrint('🧪 Avatar URL: ${user?.avatar_url}');
+    debugPrint('🧪 User ID: ${user?.id}');
+    debugPrint('🧪 Email: ${user?.email}');
+
+    if (user?.avatar_url != null && user!.avatar_url.isNotEmpty) {
+      try {
+        // 直接測試 AssetImage
+        if (user.avatar_url.startsWith('assets/')) {
+          debugPrint('🧪 測試 AssetImage 創建...');
+          final assetImage = AssetImage(user.avatar_url);
+          debugPrint('✅ AssetImage 創建成功: $assetImage');
+
+          // 測試 PathMapper.isFlutterAsset
+          final isFlutterAsset = PathMapper.isFlutterAsset(user.avatar_url);
+          debugPrint('🧪 PathMapper.isFlutterAsset: $isFlutterAsset');
+        }
+
+        final imageProvider = ImageHelper.getAvatarImage(user.avatar_url);
+        debugPrint('✅ 測試成功：ImageProvider 創建成功: $imageProvider');
+      } catch (e) {
+        debugPrint('❌ 測試失敗：$e');
+      }
+    } else {
+      debugPrint('ℹ️ 測試結果：沒有頭像 URL');
+      debugPrint('ℹ️ 用戶資訊是否為空: ${user == null}');
+      if (user != null) {
+        debugPrint('ℹ️ 用戶資訊詳情:');
+        debugPrint('  - ID: ${user.id}');
+        debugPrint('  - Name: ${user.name}');
+        debugPrint('  - Email: ${user.email}');
+        debugPrint('  - Avatar URL: "${user.avatar_url}"');
+        debugPrint('  - Avatar URL 長度: ${user.avatar_url.length}');
+      }
+    }
+    debugPrint('🧪 === 頭像讀取測試結束 ===');
   }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        FocusScope.of(context).unfocus(); // 點擊空白處收鍵盤
+        FocusScope.of(context).unfocus();
       },
       child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 個人資料區塊
+              _buildPersonalInfoSection(),
+              const SizedBox(height: 16),
+
+              // 任務基本資訊
+              _buildTaskBasicInfoSection(),
+              const SizedBox(height: 16),
+
+              // 時間設定
+              _buildTimeSection(),
+              const SizedBox(height: 24),
+
+              // 申請問題
+              _buildQuestionsSection(),
+              const SizedBox(height: 24),
+
+              // 語言要求
+              _buildLanguageSection(),
+              const SizedBox(height: 24),
+
+              // 警告訊息
+              _buildWarningMessage(),
+              const SizedBox(height: 24),
+
+              // 提交按鈕
+              _buildSubmitButton(),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonalInfoSection() {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Personal Information',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: theme.primary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: Row(
+            children: [
+              Builder(
+                builder: (context) {
+                  final avatarImage = _getAvatarImage();
+                  return CircleAvatar(
+                    radius: 24,
+                    backgroundColor: theme.primary.withOpacity(0.1),
+                    backgroundImage: avatarImage,
+                    onBackgroundImageError: avatarImage != null
+                        ? (exception, stackTrace) {
+                            debugPrint('❌ Avatar loading error: $exception');
+                          }
+                        : null,
+                    child: _getAvatarChild(),
+                  );
+                },
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      Provider.of<UserService>(context, listen: false)
+                              .currentUser
+                              ?.name ??
+                          'Unknown Poster',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Task Creator',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.check_circle,
+                color: Colors.green,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTaskBasicInfoSection() {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Task Basic Information',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: theme.primary,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Task Title
+        Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Personal Data (readonly)
-            _buildLabel('Personal Data', required: false),
-            const SizedBox(height: 4),
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.grey)),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 0),
-              child: Text(
-                Provider.of<UserService>(context, listen: false)
-                        .currentUser
-                        ?.name ??
-                    'Unknow Poster',
-                style: const TextStyle(fontSize: 16),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Task Title
-            _buildLabel('Task Title',
-                required: true,
-                isError: _errorFields.contains(kTaskTitleField)),
-            const SizedBox(height: 4),
-            TextFormField(
-              controller: _titleController,
-              decoration: InputDecoration(
-                hintText: 'Enter task title',
-                hintStyle: const TextStyle(color: Colors.grey),
-                border: const UnderlineInputBorder(),
-                filled: _errorFields.contains(kTaskTitleField),
-                fillColor: _errorFields.contains(kTaskTitleField)
-                    ? Colors.pink.shade50
-                    : null,
-              ),
-              onChanged: (_) {
-                if (_errorFields.contains(kTaskTitleField)) {
-                  setState(() => _errorFields.remove(kTaskTitleField));
-                }
-              },
-            ),
-            const SizedBox(height: 12),
-
-            // Task Description
-            // _buildLabel('Task Description',
-            //     required: true,
-            //     isError: _errorFields.contains('Task Description')),
-            // const SizedBox(height: 4),
-            // TextFormField(
-            //   controller: _taskDescriptionController,
-            //   maxLength: 100,
-            //   maxLines: 3,
-            //   decoration: InputDecoration(
-            //     hintText: 'Please describe the task in detail.',
-            //     hintStyle: const TextStyle(color: Colors.grey),
-            //     border: const UnderlineInputBorder(),
-            //     filled: _errorFields.contains('Task Description'),
-            //     fillColor: _errorFields.contains('Task Description')
-            //         ? Colors.pink.shade50
-            //         : null,
-            //   ),
-            // ),
-            // const SizedBox(height: 12),
-
-            // Salary
-            _buildLabel('Reward',
-                required: true, isError: _errorFields.contains('Salary')),
-            const SizedBox(height: 4),
             Row(
               children: [
-                Expanded(
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      border: Border(bottom: BorderSide(color: Colors.black)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Text(
-                          '💰 | ',
-                          style: TextStyle(
-                            fontSize: 20,
-                            color: Colors.black54,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _salaryController,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly
-                            ],
-                            decoration: InputDecoration(
-                              hintText: '0',
-                              hintStyle: const TextStyle(
-                                  color: Color.fromARGB(255, 0, 0, 0)),
-                              border: InputBorder.none,
-                              filled: _errorFields.contains(kSalaryField),
-                              fillColor: _errorFields.contains(kSalaryField)
-                                  ? Colors.pink.shade50
-                                  : null,
-                            ),
-                            onChanged: (value) {
-                              final formatter = NumberFormat('#,##0', 'en_US');
-                              // 移除非數字
-                              final digits =
-                                  value.replaceAll(RegExp(r'[^\d]'), '');
-                              final number = int.tryParse(digits) ?? 0;
-                              final formatted = formatter.format(number);
-                              _salaryController.value = TextEditingValue(
-                                text: formatted,
-                                selection: TextSelection.collapsed(
-                                    offset: formatted.length),
-                              );
-                              if (_errorFields.contains(kSalaryField)) {
-                                setState(
-                                    () => _errorFields.remove(kSalaryField));
-                              }
-                            },
-                          ),
-                        ),
-                      ],
+                const Text(
+                  'Task Title',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Required',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _titleController,
+              decoration: InputDecoration(
+                hintText: 'Enter a clear and descriptive task title',
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide:
+                      const BorderSide(color: AppColors.primary, width: 2),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                prefixIcon: Icon(Icons.edit, color: theme.primary),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter a task title';
+                }
+                return null;
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
 
-            // Location (popup map)
-            _buildLabel('Location', required: false),
-            const SizedBox(height: 4),
+        // Salary
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Row(
               children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => _showLocationPicker(context),
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        border: Border(bottom: BorderSide(color: Colors.grey)),
+                const Text(
+                  'Reward',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Required',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey[300]!),
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.white,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.primary.withOpacity(0.1),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        bottomLeft: Radius.circular(8),
                       ),
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 14, horizontal: 0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              // ↓↓↓ 新增：如果地點名稱在大學清單中，顯示縮寫
+                    ),
+                    child: Text(
+                      '💰',
+                      style: TextStyle(
+                        fontSize: 24,
+                        color: theme.primary,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _salaryController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        hintText: '0',
+                        border: InputBorder.none, // 隱藏所有狀態下的邊框
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter a salary';
+                        }
+                        // 檢查是否為有效數字
+                        final number = double.tryParse(value);
+                        if (number == null) {
+                          return 'Please enter a valid number';
+                        }
+                        // 檢查是否小於0
+                        if (number < 0) {
+                          return 'Salary cannot be negative';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: theme.primary.withOpacity(0.1),
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(8),
+                        bottomRight: Radius.circular(8),
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '/hour',
+                        style: TextStyle(
+                          color: theme.primary,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Location
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Location',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => _showLocationPicker(context),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey[300]!),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        color: theme.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
                               () {
                                 final matched = _universities.firstWhere(
                                   (uni) =>
@@ -338,631 +645,989 @@ class _PostFormPageState extends State<TaskCreatePage> {
                                     ? _locationLabel
                                     : 'Tap to select location';
                               }(),
-                              style: TextStyle(
-                                color: _locationLabel.isNotEmpty
-                                    ? Colors.black87
-                                    : Colors.grey,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          const Icon(Icons.chevron_right,
-                              color: AppColors.primary),
-                        ],
+                            if (_locationLabel.isNotEmpty)
+                              Text(
+                                'Selected location',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.my_location, color: AppColors.primary),
-                  tooltip: 'Use current location',
-                  onPressed: _useCurrentLocation,
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Time (date picker)
-            _buildLabel('Time',
-                required: true, isError: _errorFields.contains('Time')),
-            const SizedBox(height: 4),
-            TextFormField(
-              readOnly: true,
-              controller: TextEditingController(
-                text: _taskDate != null
-                    ? _taskDate!.toLocal().toString().split(' ')[0]
-                    : '',
-              ),
-              decoration: InputDecoration(
-                hintText: 'Select date',
-                hintStyle: const TextStyle(color: Colors.grey),
-                border: const UnderlineInputBorder(),
-                filled: _errorFields.contains('Time'),
-                fillColor:
-                    _errorFields.contains('Time') ? Colors.pink.shade50 : null,
-                suffixIcon:
-                    const Icon(Icons.calendar_today, color: AppColors.primary),
-              ),
-              onTap: () async {
-                _errorFields.remove('Time');
-                _selectDate(context, (picked) {
-                  setState(() => _taskDate = picked);
-                });
-              },
-            ),
-            const SizedBox(height: 12),
-
-            // Posting period (two date pickers)
-            _buildLabel('Posting period',
-                required: true,
-                isError: _errorFields.contains('Posting period')),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                // Start date
-                Expanded(
-                  child: TextFormField(
-                    readOnly: true,
-                    controller: TextEditingController(
-                      text: _periodStart != null
-                          ? _periodStart!.toLocal().toString().substring(0, 16)
-                          : '',
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Start date (yyyy-mm-dd hh:mm)',
-                      hintStyle: const TextStyle(color: Colors.grey),
-                      border: const UnderlineInputBorder(),
-                      filled: _errorFields.contains('Posting period'),
-                      fillColor: _errorFields.contains('Posting period')
-                          ? Colors.pink.shade50
-                          : null,
-                      suffixIcon: const Icon(Icons.calendar_today,
-                          color: AppColors.primary),
-                    ),
-                    onTap: () async {
-                      _errorFields.remove('Posting period');
-                      DateTime? picked = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime(DateTime.now().year + 1),
-                      );
-                      if (picked != null) {
-                        TimeOfDay? timePicked = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay.now(),
-                        );
-                        if (timePicked != null) {
-                          DateTime combined = DateTime(
-                            picked.year,
-                            picked.month,
-                            picked.day,
-                            timePicked.hour,
-                            timePicked.minute,
-                          );
-                          if (combined.isBefore(DateTime.now())) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                    'Start date cannot be earlier than the current time.'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          } else {
-                            if (mounted) {
-                              setState(() {
-                                _periodStart = combined;
-                              });
-                            }
-                          }
-                        }
-                      }
-                    },
-                  ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 6),
-                  child: Text('-',
-                      style: TextStyle(fontSize: 16, color: Colors.black54)),
-                ),
-                // End date
-                Expanded(
-                  child: TextFormField(
-                    readOnly: true,
-                    controller: TextEditingController(
-                      text: _periodEnd != null
-                          ? _periodEnd!.toLocal().toString().substring(0, 16)
-                          : '',
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'End date (yyyy-mm-dd hh:mm)',
-                      hintStyle: const TextStyle(color: Colors.grey),
-                      border: const UnderlineInputBorder(),
-                      filled: _errorFields.contains('Posting period'),
-                      fillColor: _errorFields.contains('Posting period')
-                          ? Colors.pink.shade50
-                          : null,
-                      suffixIcon: const Icon(Icons.calendar_today,
-                          color: AppColors.primary),
-                    ),
-                    onTap: () async {
-                      _errorFields.remove('Posting period');
-                      DateTime? picked = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime(DateTime.now().year + 1),
-                      );
-                      if (picked != null) {
-                        TimeOfDay? timePicked = await showTimePicker(
-                          context: context,
-                          initialTime: TimeOfDay.now(),
-                        );
-                        if (timePicked != null) {
-                          DateTime combined = DateTime(
-                            picked.year,
-                            picked.month,
-                            picked.day,
-                            timePicked.hour,
-                            timePicked.minute,
-                          );
-                          if (_periodStart != null &&
-                              combined.isBefore(_periodStart!)) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                    'End date cannot be earlier than or equal to the start date.'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          } else {
-                            if (mounted) {
-                              setState(() {
-                                _periodEnd = combined;
-                              });
-                            }
-                          }
-                        }
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Application Question (optional)
-            Column(
-              children: List.generate(_applicationQuestions.length, (index) {
-                // Format the index as two digits (01, 02, ...)
-                final labelNumber = (index + 1).toString().padLeft(2, '0');
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildLabel('Application Question - $labelNumber',
-                          required: true),
-                      const SizedBox(height: 4),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              initialValue: _applicationQuestions[index],
-                              decoration: InputDecoration(
-                                hintText: 'Enter custom question',
-                                hintStyle: const TextStyle(color: Colors.grey),
-                                border: const UnderlineInputBorder(),
-                                filled: _errorFields
-                                    .contains('ApplicationQuestion$index'),
-                                fillColor: _errorFields
-                                        .contains('ApplicationQuestion$index')
-                                    ? Colors.pink.shade50
-                                    : null,
-                              ),
-                              onChanged: (value) {
-                                setState(() {
-                                  _applicationQuestions[index] = value;
-                                });
-                              },
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete,
-                                color: AppColors.primary),
-                            onPressed: () async {
-                              final hasValue = _applicationQuestions[index]
-                                  .trim()
-                                  .isNotEmpty;
-                              if (hasValue) {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: const Text('Confirm Delete'),
-                                    content: const Text(
-                                        'Are you sure you want to delete this question?'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, false),
-                                        style: TextButton.styleFrom(
-                                          foregroundColor: AppColors.primary,
-                                        ),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, true),
-                                        child: const Text('Delete',
-                                            style:
-                                                TextStyle(color: Colors.red)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (confirm == true) {
-                                  _removeApplicationQuestion(index);
-                                }
-                              } else {
-                                _removeApplicationQuestion(index);
-                              }
-                            },
-                          ),
-                        ],
+                      Icon(
+                        Icons.chevron_right,
+                        color: theme.primary,
                       ),
                     ],
                   ),
-                );
-              }),
-            ),
-            if (_applicationQuestions.length < 3)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: ElevatedButton(
-                  onPressed: _addApplicationQuestion,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Add an Application Question'),
                 ),
               ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
-            const SizedBox(height: 24),
+  Widget _buildTaskTitleCard() {
+    return _buildFormCard(
+      title: 'Task Title',
+      icon: Icons.title,
+      isRequired: true,
+      isError: _errorFields.contains(kTaskTitleField),
+      child: TextFormField(
+        controller: _titleController,
+        decoration: InputDecoration(
+          hintText: 'Enter a clear and descriptive task title',
+          hintStyle: TextStyle(color: Colors.grey[400]),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: AppColors.primary, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Colors.red, width: 2),
+          ),
+          filled: true,
+          fillColor: _errorFields.contains(kTaskTitleField)
+              ? Colors.red[50]
+              : Colors.white,
+          prefixIcon: Icon(
+            Icons.edit,
+            color: _errorFields.contains(kTaskTitleField)
+                ? Colors.red
+                : AppColors.primary,
+          ),
+        ),
+        onChanged: (_) {
+          if (_errorFields.contains(kTaskTitleField)) {
+            setState(() => _errorFields.remove(kTaskTitleField));
+          }
+        },
+      ),
+    );
+  }
 
-            // Required Languages (optional)
-            _buildLabel('Language Requirement',
-                required: true,
-                isError: _errorFields.contains('Language Requirement')),
-            const SizedBox(height: 4),
-            GestureDetector(
-              onTap: () async {
-                final result = await showModalBottomSheet<List<String>>(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (context) {
-                    List<String> tempSelected = List.from(_selectedLanguages);
-                    TextEditingController searchController =
-                        TextEditingController();
-                    return StatefulBuilder(
-                      builder: (context, setState) {
-                        return Padding(
-                          padding: MediaQuery.of(context).viewInsets,
-                          child: SizedBox(
-                            height: 400,
-                            child: Column(
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Consumer<ThemeConfigManager>(
-                                    builder: (context, themeManager, child) {
-                                      return TextField(
-                                        controller: searchController,
-                                        style: TextStyle(
-                                          color: themeManager.inputTextColor,
-                                        ),
-                                        decoration: InputDecoration(
-                                          hintText: 'Search language',
-                                          hintStyle: TextStyle(
-                                            color:
-                                                themeManager.inputHintTextColor,
-                                          ),
-                                          prefixIcon: Icon(
-                                            Icons.search,
-                                            color: themeManager.inputTextColor,
-                                          ),
-                                        ),
-                                        onChanged: (_) => setState(() {}),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                Expanded(
-                                  child: StatefulBuilder(
-                                    builder: (context, setState) {
-                                      List<Map<String, dynamic>> filteredList =
-                                          _languages
-                                              .where((lang) =>
-                                                  (lang['native'] ?? '')
-                                                      .toLowerCase()
-                                                      .contains(searchController
-                                                          .text
-                                                          .toLowerCase()))
-                                              .toList();
-
-                                      // 將已選擇的語言優先排序。
-                                      filteredList.sort((a, b) {
-                                        bool aSelected =
-                                            tempSelected.contains(a['code']);
-                                        bool bSelected =
-                                            tempSelected.contains(b['code']);
-                                        if (aSelected && !bSelected) return -1;
-                                        if (!aSelected && bSelected) return 1;
-                                        return (a['native'] ?? '')
-                                            .compareTo(b['native'] ?? '');
-                                      });
-
-                                      return ListView(
-                                        children: filteredList.map((lang) {
-                                          final isSelected = tempSelected
-                                              .contains(lang['code']);
-                                          return CheckboxListTile(
-                                            value: isSelected,
-                                            title: Text(lang['native'] ??
-                                                lang['name'] ??
-                                                ''),
-                                            onChanged: (checked) {
-                                              setState(() {
-                                                if (checked == true) {
-                                                  tempSelected
-                                                      .add(lang['code']);
-                                                } else {
-                                                  tempSelected
-                                                      .remove(lang['code']);
-                                                }
-                                              });
-                                            },
-                                          );
-                                        }).toList(),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    OutlinedButton(
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: AppColors.primary,
-                                        side: const BorderSide(
-                                            color: AppColors.primary),
-                                      ),
-                                      onPressed: () =>
-                                          Navigator.pop(context, null),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    ElevatedButton(
-                                      style: TextButton.styleFrom(
-                                        backgroundColor: AppColors.primary,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      onPressed: () =>
-                                          Navigator.pop(context, tempSelected),
-                                      child: const Text('Confirm'),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                );
-                if (result != null) {
-                  setState(() {
-                    _selectedLanguages = result;
-                    _languageRequirement = _selectedLanguages.join(', ');
-                  });
-                }
-              },
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Colors.grey)),
+  Widget _buildSalaryCard() {
+    return _buildFormCard(
+      title: 'Reward',
+      icon: Icons.attach_money,
+      isRequired: true,
+      isError: _errorFields.contains(kSalaryField),
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: _errorFields.contains(kSalaryField)
+                ? Colors.red
+                : Colors.grey[300]!,
+            width: _errorFields.contains(kSalaryField) ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(8),
+          color: _errorFields.contains(kSalaryField)
+              ? Colors.red[50]
+              : Colors.white,
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(8),
+                  bottomLeft: Radius.circular(8),
                 ),
-                child: _selectedLanguages.isEmpty
-                    ? const Text(
-                        'Preferred language(s) for the task taker',
-                        style: TextStyle(color: Colors.grey),
-                      )
-                    : Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: _selectedLanguages.map((code) {
-                          final language = _languages.firstWhere(
-                            (lang) => lang['code'] == code,
-                            orElse: () => {'native': code},
-                          );
-                          return Chip(
-                            label: Text(language['native'] ?? code),
-                          );
-                        }).toList(),
-                      ),
+              ),
+              child: const Icon(
+                Icons.attach_money,
+                color: AppColors.primary,
+                size: 24,
               ),
             ),
-
-            const SizedBox(height: 24),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.warning, color: Colors.red, size: 20),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: RichText(
-                    text: const TextSpan(
-                      style: TextStyle(fontSize: 12, color: Colors.black87),
-                      children: [
-                        TextSpan(text: 'Please abide by '),
-                        TextSpan(
-                          text: 'The platform regulations',
-                          style: TextStyle(
-                              color: AppColors.primary,
-                              decoration: TextDecoration.underline),
-                        ),
-                        TextSpan(
-                          text:
-                              ' and do not post false fraudulent information. Violators will be held legally responsible.',
-                        ),
-                      ],
-                    ),
-                  ),
+            Expanded(
+              child: TextFormField(
+                controller: _salaryController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(
+                  hintText: '0',
+                  border: InputBorder.none,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
-              ],
+                onChanged: (value) {
+                  final formatter = NumberFormat('#,##0', 'en_US');
+                  final digits = value.replaceAll(RegExp(r'[^\d]'), '');
+                  final number = int.tryParse(digits) ?? 0;
+                  final formatted = formatter.format(number);
+                  _salaryController.value = TextEditingValue(
+                    text: formatted,
+                    selection:
+                        TextSelection.collapsed(offset: formatted.length),
+                  );
+                  if (_errorFields.contains(kSalaryField)) {
+                    setState(() => _errorFields.remove(kSalaryField));
+                  }
+                },
+              ),
             ),
-            const SizedBox(height: 24),
-
-            LayoutBuilder(
-              builder: (context, constraints) {
-                double maxWidth = 500;
-                bool isMobile = constraints.maxWidth < 600;
-                return Align(
-                    alignment: Alignment.center,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: isMobile ? double.infinity : maxWidth,
-                      ),
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                          ),
-                          onPressed: () {
-                            final user =
-                                Provider.of<UserService>(context, listen: false)
-                                    .currentUser;
-                            final userName = user?.name ?? 'Unknown Poster';
-                            final data = {
-                              'title': _titleController.text.trim(),
-                              'salary': _salaryController.text.trim(),
-                              'location': _locationLabel.isNotEmpty
-                                  ? _locationLabel
-                                  : 'N/A',
-                              'task_date': _taskDate != null
-                                  ? _taskDate!
-                                      .toLocal()
-                                      .toString()
-                                      .split(' ')[0]
-                                  : 'N/A',
-                              'periodStart': _periodStart != null
-                                  ? _periodStart!
-                                      .toLocal()
-                                      .toString()
-                                      .split(' ')[0]
-                                  : 'N/A',
-                              'periodEnd': _periodEnd != null
-                                  ? _periodEnd!
-                                      .toLocal()
-                                      .toString()
-                                      .split(' ')[0]
-                                  : 'N/A',
-                              'application_question':
-                                  _applicationQuestions.join(' | '),
-                              'creator_name': userName,
-                              'avatar_url': user?.avatar_url ?? '',
-                              'language_requirement':
-                                  _selectedLanguages.join(','),
-                              'creator_id': user?.id ?? 'Unknown',
-                              // 'description': _taskDescriptionController.text
-                              //     .trim(), // 添加 description 值
-                            };
-
-                            // 檢查必填欄位
-                            final requiredFields = {
-                              kTaskTitleField: data['title'],
-                              // 'Task Description':
-                              //     _taskDescriptionController.text.trim(),
-                              kSalaryField: data['salary'],
-                              kTimeField: data['task_date'],
-                              kPostingPeriodField:
-                                  data['periodStart'] != 'N/A' &&
-                                      data['periodEnd'] != 'N/A'
-                            };
-
-                            _errorFields.clear();
-                            requiredFields.forEach((key, value) {
-                              if (key == kPostingPeriodField) {
-                                if (value != true) _errorFields.add(key);
-                              } else if (value == null ||
-                                  (value as String).isEmpty ||
-                                  value == 'N/A') {
-                                _errorFields.add(key);
-                              }
-                            });
-
-                            // 檢查每個 Application Question 是否為空
-                            for (int i = 0;
-                                i < _applicationQuestions.length;
-                                i++) {
-                              if (_applicationQuestions[i].trim().isEmpty) {
-                                _errorFields.add('ApplicationQuestion$i');
-                              }
-                            }
-
-                            if (_errorFields.isNotEmpty) {
-                              setState(() {});
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Please fill in all required fields.'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-
-                            // 傳遞資料到預覽頁面
-                            context.push('/task/create/preview', extra: data);
-                          },
-                          child: const Text(
-                            'Preview and save',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ));
-              },
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(8),
+                  bottomRight: Radius.circular(8),
+                ),
+              ),
+              child: Text(
+                '/hour',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
-            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildLabel(String title,
-      {bool required = false, bool isError = false}) {
-    return RichText(
-      text: TextSpan(
-        style: TextStyle(
-          fontSize: 12,
-          color: isError ? Colors.red : Colors.grey,
+  Widget _buildLocationCard() {
+    return _buildFormCard(
+      title: 'Location',
+      icon: Icons.location_on,
+      child: GestureDetector(
+        onTap: () => _showLocationPicker(context),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey[300]!),
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.location_on,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      () {
+                        final matched = _universities.firstWhere(
+                          (uni) =>
+                              uni['en_name'] == _locationLabel ||
+                              uni['zh_name'] == _locationLabel,
+                          orElse: () => <String, dynamic>{},
+                        );
+                        if (matched.isNotEmpty) {
+                          return matched['abbr']!;
+                        }
+                        return _locationLabel.isNotEmpty
+                            ? _locationLabel
+                            : 'Tap to select location';
+                      }(),
+                      style: TextStyle(
+                        color: _locationLabel.isNotEmpty
+                            ? Colors.black87
+                            : Colors.grey[500],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (_locationLabel.isNotEmpty)
+                      Text(
+                        'Selected location',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                color: AppColors.primary,
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTimeCard() {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
+    return _buildFormCard(
+      title: 'Task Date',
+      icon: Icons.calendar_today,
+      isRequired: true,
+      isError: _errorFields.contains(kTimeField),
+      child: GestureDetector(
+        onTap: () async {
+          _errorFields.remove('Time');
+          _selectDate(context, (picked) {
+            setState(() => _taskDate = picked);
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: _errorFields.contains('Time')
+                  ? Colors.red
+                  : Colors.grey[300]!,
+              width: _errorFields.contains('Time') ? 2 : 1,
+            ),
+            borderRadius: BorderRadius.circular(8),
+            color:
+                _errorFields.contains('Time') ? Colors.red[50] : Colors.white,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.calendar_today,
+                color:
+                    _errorFields.contains('Time') ? Colors.red : theme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _taskDate != null
+                      ? DateFormat('yyyy-MM-dd').format(_taskDate!)
+                      : 'Select date',
+                  style: TextStyle(
+                    color:
+                        _taskDate != null ? Colors.black87 : Colors.grey[500],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Icon(
+                Icons.arrow_drop_down,
+                color: theme.primary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPostingPeriodCard() {
+    return _buildFormCard(
+      title: 'Posting Period',
+      icon: Icons.schedule,
+      isRequired: true,
+      isError: _errorFields.contains(kPostingPeriodField),
+      child: Column(
         children: [
-          TextSpan(text: title),
-          if (required)
-            const TextSpan(
-              text: ' *',
-              style: TextStyle(color: Colors.red),
+          Row(
+            children: [
+              Expanded(
+                child: _buildDateField(
+                  'Start Date',
+                  _periodStart,
+                  (picked) async {
+                    DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(DateTime.now().year + 1),
+                    );
+                    if (picked != null) {
+                      TimeOfDay? timePicked = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (timePicked != null) {
+                        DateTime combined = DateTime(
+                          picked.year,
+                          picked.month,
+                          picked.day,
+                          timePicked.hour,
+                          timePicked.minute,
+                        );
+                        if (combined.isBefore(DateTime.now())) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Start date cannot be earlier than the current time.'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        } else {
+                          if (mounted) {
+                            setState(() {
+                              _periodStart = combined;
+                            });
+                          }
+                        }
+                      }
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Icon(Icons.arrow_forward, color: Colors.grey[400]),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildDateField(
+                  'End Date',
+                  _periodEnd,
+                  (picked) async {
+                    DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(DateTime.now().year + 1),
+                    );
+                    if (picked != null) {
+                      TimeOfDay? timePicked = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (timePicked != null) {
+                        DateTime combined = DateTime(
+                          picked.year,
+                          picked.month,
+                          picked.day,
+                          timePicked.hour,
+                          timePicked.minute,
+                        );
+                        if (_periodStart != null &&
+                            combined.isBefore(_periodStart!)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'End date cannot be earlier than or equal to the start date.'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        } else {
+                          if (mounted) {
+                            setState(() {
+                              _periodEnd = combined;
+                            });
+                          }
+                        }
+                      }
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateField(
+      String label, DateTime? date, Function(DateTime) onTap) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => onTap(date ?? DateTime.now()),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey[300]!),
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                date != null
+                    ? DateFormat('MM/dd HH:mm').format(date)
+                    : 'Select',
+                style: TextStyle(
+                  color: date != null ? Colors.black87 : Colors.grey[500],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildApplicationQuestionsCard() {
+    return _buildFormCard(
+      title: 'Application Questions',
+      icon: Icons.question_answer,
+      child: Column(
+        children: [
+          ...List.generate(_applicationQuestions.length, (index) {
+            final labelNumber = (index + 1).toString().padLeft(2, '0');
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: _errorFields.contains('ApplicationQuestion$index') ||
+                            _applicationQuestions[index].length > 500
+                        ? Colors.red
+                        : Colors.grey[300]!,
+                    width: _errorFields.contains('ApplicationQuestion$index') ||
+                            _applicationQuestions[index].length > 500
+                        ? 2
+                        : 1,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  color: _errorFields.contains('ApplicationQuestion$index') ||
+                          _applicationQuestions[index].length > 500
+                      ? Colors.red[50]
+                      : Colors.white,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Q$labelNumber',
+                            style: const TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Question ${index + 1}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (_applicationQuestions.length > 1)
+                          MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: IconButton(
+                              icon: Icon(
+                                Icons.delete_outline,
+                                color: Colors.red[400],
+                                size: 20,
+                              ),
+                              onPressed: () async {
+                                final hasValue = _applicationQuestions[index]
+                                    .trim()
+                                    .isNotEmpty;
+                                if (hasValue) {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Confirm Delete'),
+                                      content: const Text(
+                                          'Are you sure you want to delete this question?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context, true),
+                                          child: const Text('Delete',
+                                              style:
+                                                  TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    _removeApplicationQuestion(index);
+                                  }
+                                } else {
+                                  _removeApplicationQuestion(index);
+                                }
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      initialValue: _applicationQuestions[index],
+                      decoration: InputDecoration(
+                        hintText: 'Enter your question for applicants',
+                        hintStyle: TextStyle(color: Colors.grey[400]),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                      ),
+                      onChanged: (value) {
+                        setState(() {
+                          _applicationQuestions[index] = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          if (_applicationQuestions.length < 3)
+            Center(
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: TextButton.icon(
+                  onPressed: _addApplicationQuestion,
+                  icon: const Icon(Icons.add, color: AppColors.primary),
+                  label: const Text(
+                    'Add Question',
+                    style: TextStyle(color: AppColors.primary),
+                  ),
+                ),
+              ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLanguageRequirementCard() {
+    return _buildFormCard(
+      title: 'Language Requirements',
+      icon: Icons.language,
+      isRequired: true,
+      isError: _errorFields.contains('Language Requirement'),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () async {
+            final result = await showModalBottomSheet<List<String>>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) {
+                List<String> tempSelected = List.from(_selectedLanguages);
+                TextEditingController searchController =
+                    TextEditingController();
+                return Container(
+                  height: 400,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: TextField(
+                          controller: searchController,
+                          decoration: InputDecoration(
+                            hintText: 'Search languages',
+                            prefixIcon: const Icon(Icons.search),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: _languages.length,
+                          itemBuilder: (context, index) {
+                            final lang = _languages[index];
+                            final isSelected =
+                                tempSelected.contains(lang['code']);
+                            return CheckboxListTile(
+                              value: isSelected,
+                              title: Text(lang['native'] ?? lang['name'] ?? ''),
+                              onChanged: (checked) {
+                                setState(() {
+                                  if (checked == true) {
+                                    tempSelected.add(lang['code']);
+                                  } else {
+                                    tempSelected.remove(lang['code']);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(context, null),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () =>
+                                    Navigator.pop(context, tempSelected),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                ),
+                                child: const Text('Confirm'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+            if (result != null) {
+              setState(() {
+                _selectedLanguages = result;
+                _languageRequirement = _selectedLanguages.join(', ');
+              });
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: _errorFields.contains('Language Requirement')
+                    ? Colors.red
+                    : Colors.grey[300]!,
+                width: _errorFields.contains('Language Requirement') ? 2 : 1,
+              ),
+              borderRadius: BorderRadius.circular(8),
+              color: _errorFields.contains('Language Requirement')
+                  ? Colors.red[50]
+                  : Colors.white,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.language,
+                  color: _errorFields.contains('Language Requirement')
+                      ? Colors.red
+                      : AppColors.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _selectedLanguages.isEmpty
+                      ? Text(
+                          'Select preferred languages',
+                          style: TextStyle(color: Colors.grey[500]),
+                        )
+                      : Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: _selectedLanguages.map((code) {
+                            final language = _languages.firstWhere(
+                              (lang) => lang['code'] == code,
+                              orElse: () => {'native': code},
+                            );
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                language['native'] ?? code,
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                ),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWarningMessage() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange[50],
+        border: Border.all(color: Colors.orange[200]!),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.orange[700],
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Please abide by platform regulations and do not post false or fraudulent information. Violators will be held legally responsible.',
+              style: TextStyle(
+                color: Colors.orange[800],
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubmitButton() {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: theme.primary,
+          foregroundColor: theme.onPrimary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 2,
+        ),
+        onPressed: () {
+          final user =
+              Provider.of<UserService>(context, listen: false).currentUser;
+          final userName = user?.name ?? 'Unknown Poster';
+          final data = {
+            'title': _titleController.text.trim(),
+            'salary': _salaryController.text.trim(),
+            'location': _locationLabel.isNotEmpty ? _locationLabel : 'N/A',
+            'task_date': _taskDate != null
+                ? _taskDate!.toLocal().toString().split(' ')[0]
+                : 'N/A',
+            'periodStart': _periodStart != null
+                ? _periodStart!.toLocal().toString().split(' ')[0]
+                : 'N/A',
+            'periodEnd': _periodEnd != null
+                ? _periodEnd!.toLocal().toString().split(' ')[0]
+                : 'N/A',
+            'application_question': _applicationQuestions.join(' | '),
+            'creator_name': userName,
+            'avatar_url': user?.avatar_url ?? '',
+            'language_requirement': _selectedLanguages.join(','),
+            'creator_id': user?.id ?? 'Unknown',
+          };
+
+          final requiredFields = {
+            kTaskTitleField: data['title'],
+            kSalaryField: data['salary'],
+            kTimeField: data['task_date'],
+            kPostingPeriodField:
+                data['periodStart'] != 'N/A' && data['periodEnd'] != 'N/A'
+          };
+
+          _errorFields.clear();
+          requiredFields.forEach((key, value) {
+            if (key == kPostingPeriodField) {
+              if (value != true) _errorFields.add(key);
+            } else if (value == null ||
+                (value as String).isEmpty ||
+                value == 'N/A') {
+              _errorFields.add(key);
+            }
+          });
+
+          for (int i = 0; i < _applicationQuestions.length; i++) {
+            if (_applicationQuestions[i].trim().isEmpty) {
+              _errorFields.add('ApplicationQuestion$i');
+            } else if (_applicationQuestions[i].length > 500) {
+              _errorFields.add('ApplicationQuestion$i');
+            }
+          }
+
+          if (_errorFields.isNotEmpty) {
+            setState(() {});
+
+            // 檢查是否有字數超限的問題
+            bool hasLengthError = false;
+            for (int i = 0; i < _applicationQuestions.length; i++) {
+              if (_applicationQuestions[i].length > 500) {
+                hasLengthError = true;
+                break;
+              }
+            }
+
+            String errorMessage = hasLengthError
+                ? 'Please check all required fields and ensure questions are within 500 characters.'
+                : 'Please fill in all required fields.';
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMessage),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+
+          context.push('/task/create/preview', extra: data);
+        },
+        child: const Text(
+          'Preview & Submit',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFormCard({
+    required String title,
+    required IconData icon,
+    required Widget child,
+    bool isRequired = false,
+    bool isError = false,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: (isError ? Colors.red : AppColors.primary)
+                        .withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: isError ? Colors.red : AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isError ? Colors.red : Colors.black87,
+                    ),
+                  ),
+                ),
+                if (isRequired)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'Required',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            child,
+          ],
+        ),
       ),
     );
   }
@@ -979,20 +1644,6 @@ class _PostFormPageState extends State<TaskCreatePage> {
     if (picked != null) onPicked(picked);
   }
 
-  void _showError(String msg) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Incomplete Form'),
-        content: Text(msg),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context), child: const Text('OK')),
-        ],
-      ),
-    );
-  }
-
   void _showLocationPicker(BuildContext context) {
     LatLng center = _selectedLocation ?? const LatLng(25.0173, 121.5415);
 
@@ -1000,10 +1651,9 @@ class _PostFormPageState extends State<TaskCreatePage> {
       context: context,
       builder: (context) {
         bool hasSearched = false;
-        bool dialogActive = true; // 新增 flag
+        bool dialogActive = true;
         return StatefulBuilder(
           builder: (context, setState) {
-            // 只在第一次 build 時自動查詢
             if (!hasSearched) {
               hasSearched = true;
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1024,23 +1674,13 @@ class _PostFormPageState extends State<TaskCreatePage> {
                     Row(
                       children: [
                         Expanded(
-                          child: Consumer<ThemeConfigManager>(
-                            builder: (context, themeManager, child) {
-                              return TextField(
-                                controller: _locationSearchController,
-                                style: TextStyle(
-                                  color: themeManager.inputTextColor,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'Search location',
-                                  hintStyle: TextStyle(
-                                    color: themeManager.inputHintTextColor,
-                                  ),
-                                ),
-                                onSubmitted: (value) async {
-                                  await _moveToSearchLocation(value, setState);
-                                },
-                              );
+                          child: TextField(
+                            controller: _locationSearchController,
+                            decoration: const InputDecoration(
+                              hintText: 'Search location',
+                            ),
+                            onSubmitted: (value) async {
+                              await _moveToSearchLocation(value, setState);
                             },
                           ),
                         ),
@@ -1099,7 +1739,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
               actions: [
                 TextButton(
                   onPressed: () {
-                    dialogActive = false; // 關閉 Dialog 時設為 false
+                    dialogActive = false;
                     Navigator.pop(context);
                   },
                   child: const Text('Close'),
@@ -1107,7 +1747,6 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 TextButton(
                   onPressed: () {
                     dialogActive = false;
-                    // 關閉 Dialog 並回傳資料
                     Navigator.pop(context, {
                       'location': _selectedLocation,
                       'label': _locationLabel
@@ -1152,6 +1791,719 @@ class _PostFormPageState extends State<TaskCreatePage> {
       _locationLabel = label;
     });
   }
+
+  void _showError(String msg) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Incomplete Form'),
+        content: Text(msg),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context), child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
+  /// 創建任務的方法
+  Future<void> _createTask(Map<String, dynamic> taskData) async {
+    try {
+      final taskService = TaskService();
+      final success = await taskService.createTask(taskData);
+
+      if (success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('任務創建成功！'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // 導航回任務列表頁面
+          context.go('/task/list');
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('創建失敗: ${taskService.error ?? '未知錯誤'}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('創建任務時發生錯誤: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildTimeSection() {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Time Settings',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: theme.primary,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Task Date
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Task Date',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Required',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () async {
+                  _errorFields.remove('Time');
+                  _selectDate(context, (picked) {
+                    setState(() => _taskDate = picked);
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: _errorFields.contains('Time')
+                          ? Colors.red
+                          : Colors.grey[300]!,
+                      width: _errorFields.contains('Time') ? 2 : 1,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    color: _errorFields.contains('Time')
+                        ? Colors.red[50]
+                        : Colors.white,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today,
+                        color: _errorFields.contains('Time')
+                            ? Colors.red
+                            : AppColors.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _taskDate != null
+                              ? DateFormat('yyyy-MM-dd').format(_taskDate!)
+                              : 'Select date',
+                          style: TextStyle(
+                            color: _taskDate != null
+                                ? Colors.black87
+                                : Colors.grey[500],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_drop_down,
+                        color: AppColors.primary,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Posting Period
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Posting Period',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Required',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildDateField(
+                    'Start Date',
+                    _periodStart,
+                    (picked) async {
+                      DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime(DateTime.now().year + 1),
+                      );
+                      if (picked != null) {
+                        TimeOfDay? timePicked = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.now(),
+                        );
+                        if (timePicked != null) {
+                          DateTime combined = DateTime(
+                            picked.year,
+                            picked.month,
+                            picked.day,
+                            timePicked.hour,
+                            timePicked.minute,
+                          );
+                          if (combined.isBefore(DateTime.now())) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Start date cannot be earlier than the current time.'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } else {
+                            if (mounted) {
+                              setState(() {
+                                _periodStart = combined;
+                              });
+                            }
+                          }
+                        }
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Icon(Icons.arrow_forward, color: Colors.grey),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildDateField(
+                    'End Date',
+                    _periodEnd,
+                    (picked) async {
+                      DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime(DateTime.now().year + 1),
+                      );
+                      if (picked != null) {
+                        TimeOfDay? timePicked = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.now(),
+                        );
+                        if (timePicked != null) {
+                          DateTime combined = DateTime(
+                            picked.year,
+                            picked.month,
+                            picked.day,
+                            timePicked.hour,
+                            timePicked.minute,
+                          );
+                          if (_periodStart != null &&
+                              combined.isBefore(_periodStart!)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'End date cannot be earlier than or equal to the start date.'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } else {
+                            if (mounted) {
+                              setState(() {
+                                _periodEnd = combined;
+                              });
+                            }
+                          }
+                        }
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuestionsSection() {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Application Questions',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: theme.primary,
+          ),
+        ),
+        const SizedBox(height: 16),
+        ...List.generate(_applicationQuestions.length, (index) {
+          final labelNumber = (index + 1).toString().padLeft(2, '0');
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: _errorFields.contains('ApplicationQuestion$index')
+                      ? Colors.red
+                      : Colors.grey[300]!,
+                  width: _errorFields.contains('ApplicationQuestion$index')
+                      ? 2
+                      : 1,
+                ),
+                borderRadius: BorderRadius.circular(8),
+                color: _errorFields.contains('ApplicationQuestion$index')
+                    ? Colors.red[50]
+                    : Colors.white,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: theme.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Q-$labelNumber',
+                          style: TextStyle(
+                            color: theme.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Question ${index + 1}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (_applicationQuestions.length > 1)
+                        IconButton(
+                          icon: Icon(
+                            Icons.delete,
+                            color: Colors.red[400],
+                            size: 20,
+                          ),
+                          onPressed: () async {
+                            // 確保索引在有效範圍內
+                            if (index >= 0 &&
+                                index < _applicationQuestions.length) {
+                              final hasValue = _applicationQuestions[index]
+                                  .trim()
+                                  .isNotEmpty;
+                              if (hasValue) {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Confirm Delete'),
+                                    content: Text(
+                                        'Are you sure you want to delete question ${index + 1}?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(context, true),
+                                        child: const Text('Delete',
+                                            style:
+                                                TextStyle(color: Colors.red)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) {
+                                  _removeApplicationQuestion(index);
+                                }
+                              } else {
+                                _removeApplicationQuestion(index);
+                              }
+                            }
+                          },
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        initialValue: _applicationQuestions[index],
+                        maxLength: 500, // 設定字數上限為500字
+                        maxLines: 4, // 限制最大行數
+                        decoration: InputDecoration(
+                          hintText:
+                              'Enter your question for applicants (max 500 characters)',
+                          hintStyle: TextStyle(color: Colors.grey[400]),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide.none,
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                          counterText: '', // 隱藏預設的字數計數器
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            _applicationQuestions[index] = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${_applicationQuestions[index].length}/500 characters',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _applicationQuestions[index].length > 500
+                                  ? Colors.red
+                                  : _applicationQuestions[index].length > 450
+                                      ? Colors.orange
+                                      : Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          if (_applicationQuestions[index].length > 480)
+                            Row(
+                              children: [
+                                Icon(
+                                  _applicationQuestions[index].length > 500
+                                      ? Icons.error_outline
+                                      : Icons.warning_amber_rounded,
+                                  size: 16,
+                                  color:
+                                      _applicationQuestions[index].length > 500
+                                          ? Colors.red
+                                          : Colors.orange,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _applicationQuestions[index].length > 500
+                                      ? '字數超限'
+                                      : '接近字數上限',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: _applicationQuestions[index].length >
+                                            500
+                                        ? Colors.red
+                                        : Colors.orange,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+        if (_applicationQuestions.length < 3)
+          Center(
+            child: TextButton.icon(
+              onPressed: _addApplicationQuestion,
+              icon: const Icon(Icons.add, color: AppColors.primary),
+              label: const Text(
+                'Add Question',
+                style: TextStyle(color: AppColors.primary),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildLanguageSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text(
+              'Language Requirements',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                'Required',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        GestureDetector(
+          onTap: () async {
+            final result = await showModalBottomSheet<List<String>>(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) {
+                List<String> tempSelected = List.from(_selectedLanguages);
+                TextEditingController searchController =
+                    TextEditingController();
+                return Container(
+                  height: 400,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: TextField(
+                          controller: searchController,
+                          decoration: InputDecoration(
+                            hintText: 'Search languages',
+                            prefixIcon: const Icon(Icons.search),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: _languages.length,
+                          itemBuilder: (context, index) {
+                            final lang = _languages[index];
+                            final isSelected =
+                                tempSelected.contains(lang['code']);
+                            return CheckboxListTile(
+                              value: isSelected,
+                              title: Text(lang['native'] ?? lang['name'] ?? ''),
+                              onChanged: (checked) {
+                                setState(() {
+                                  if (checked == true) {
+                                    tempSelected.add(lang['code']);
+                                  } else {
+                                    tempSelected.remove(lang['code']);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(context, null),
+                                child: const Text('Cancel'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () =>
+                                    Navigator.pop(context, tempSelected),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primary,
+                                ),
+                                child: const Text('Confirm'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+            if (result != null) {
+              setState(() {
+                _selectedLanguages = result;
+                _languageRequirement = _selectedLanguages.join(', ');
+              });
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: _errorFields.contains('Language Requirement')
+                    ? Colors.red
+                    : Colors.grey[300]!,
+                width: _errorFields.contains('Language Requirement') ? 2 : 1,
+              ),
+              borderRadius: BorderRadius.circular(8),
+              color: _errorFields.contains('Language Requirement')
+                  ? Colors.red[50]
+                  : Colors.white,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.language,
+                  color: _errorFields.contains('Language Requirement')
+                      ? Colors.red
+                      : AppColors.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _selectedLanguages.isEmpty
+                      ? Text(
+                          'Select preferred languages',
+                          style: TextStyle(color: Colors.grey[500]),
+                        )
+                      : Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: _selectedLanguages.map((code) {
+                            final language = _languages.firstWhere(
+                              (lang) => lang['code'] == code,
+                              orElse: () => {'native': code},
+                            );
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                language['native'] ?? code,
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                ),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 String _extractLandmarkName(String displayName) {
@@ -1159,7 +2511,6 @@ String _extractLandmarkName(String displayName) {
 }
 
 Future<String> _reverseGeocode(LatLng point) async {
-  // 使用 Nominatim API 反向地理編碼, 預設英語地圖
   final url =
       Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json'
           '&lat=${point.latitude}&lon=${point.longitude}&accept-language=en');
@@ -1172,7 +2523,6 @@ Future<String> _reverseGeocode(LatLng point) async {
   }
 }
 
-// 新增搜尋功能
 extension _MoveToSearchLocationExtension on _PostFormPageState {
   Future<void> _moveToSearchLocation(String query,
       [void Function(void Function())? dialogSetState]) async {

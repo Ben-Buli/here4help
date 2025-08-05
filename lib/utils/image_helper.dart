@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // Added for kDebugMode
 import 'path_mapper.dart';
 
 class ImageHelper {
@@ -8,16 +9,18 @@ class ImageHelper {
       return null;
     }
 
-    // 調試路徑映射
-    PathMapper.debugPathMapping(avatarUrl);
+    // 調試路徑映射（僅在調試模式下）
+    if (kDebugMode) {
+      PathMapper.debugPathMapping(avatarUrl);
+    }
 
     // 如果是完整的 HTTP URL，直接使用 NetworkImage
     if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
       return NetworkImage(avatarUrl);
     }
 
-    // 如果是本地資源路徑（以 assets/ 開頭）
-    if (PathMapper.isFlutterAsset(avatarUrl)) {
+    // 如果是本地資源路徑（以 assets/ 開頭），直接使用 AssetImage
+    if (avatarUrl.startsWith('assets/')) {
       return AssetImage(avatarUrl);
     }
 
@@ -25,7 +28,7 @@ class ImageHelper {
     String mappedUrl = PathMapper.mapDatabasePathToUrl(avatarUrl);
 
     // 如果映射後仍然是 assets 路徑，使用 AssetImage
-    if (PathMapper.isFlutterAsset(mappedUrl)) {
+    if (mappedUrl.startsWith('assets/')) {
       return AssetImage(mappedUrl);
     }
 

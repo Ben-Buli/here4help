@@ -12,15 +12,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // 引入資料庫配置
 require_once '../../config/database.php';
 
-// 簡單的 token 驗證函數（實際應該使用 JWT 庫）
+// 簡單的 token 驗證函數（使用 base64 編碼的 JSON）
 function validateToken($token) {
     try {
-        $payload = json_decode(base64_decode($token), true);
-        if (!$payload || !isset($payload['user_id']) || $payload['exp'] < time()) {
+        error_log("Debug: Validating token = " . $token);
+        
+        // 嘗試 base64 解碼
+        $decoded = base64_decode($token);
+        if ($decoded === false) {
+            error_log("Debug: Failed to base64 decode token");
             return null;
         }
+        
+        error_log("Debug: Decoded token = " . $decoded);
+        
+        $payload = json_decode($decoded, true);
+        if (!$payload) {
+            error_log("Debug: Failed to JSON decode payload");
+            return null;
+        }
+        
+        error_log("Debug: Decoded payload = " . print_r($payload, true));
+        
+        // 檢查必要欄位
+        if (!isset($payload['user_id']) || !isset($payload['exp'])) {
+            error_log("Debug: Missing required fields in payload");
+            return null;
+        }
+        
+        // 檢查是否過期
+        if ($payload['exp'] < time()) {
+            error_log("Debug: Token expired");
+            return null;
+        }
+        
+        error_log("Debug: Token validation successful - user_id = " . $payload['user_id']);
         return $payload;
     } catch (Exception $e) {
+        error_log("Debug: Token validation exception = " . $e->getMessage());
         return null;
     }
 }
@@ -28,15 +57,62 @@ function validateToken($token) {
 try {
     $db = Database::getInstance();
     
-    // 獲取 Authorization header
-    $headers = getallheaders();
-    $auth_header = $headers['Authorization'] ?? '';
+    // 獲取 Authorization header - 使用多種方法
+    $auth_header = '';
+    
+    // 方法1: 檢查 $_SERVER['HTTP_AUTHORIZATION']
+    if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+        $auth_header = $_SERVER['HTTP_AUTHORIZATION'];
+        error_log("Debug: Found Authorization header in HTTP_AUTHORIZATION: " . $auth_header);
+    }
+    // 方法2: 檢查 $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+    elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        $auth_header = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+        error_log("Debug: Found Authorization header in REDIRECT_HTTP_AUTHORIZATION: " . $auth_header);
+    }
+    // 方法3: 使用 getallheaders()
+    elseif (function_exists('getallheaders')) {
+        $headers = getallheaders();
+        if (isset($headers['Authorization'])) {
+            $auth_header = $headers['Authorization'];
+            error_log("Debug: Found Authorization header in getallheaders(): " . $auth_header);
+        } else {
+            error_log("Debug: Authorization header not found in getallheaders()");
+            error_log("Debug: Available headers: " . print_r($headers, true));
+        }
+    }
+    // 方法4: 使用 apache_request_headers()
+    elseif (function_exists('apache_request_headers')) {
+        $apache_headers = apache_request_headers();
+        if (isset($apache_headers['Authorization'])) {
+            $auth_header = $apache_headers['Authorization'];
+            error_log("Debug: Found Authorization header in apache_request_headers(): " . $auth_header);
+        } else {
+            error_log("Debug: Authorization header not found in apache_request_headers()");
+        }
+    }
+    // 方法5: 檢查 $_SERVER 中的所有可能的 header
+    else {
+        error_log("Debug: Checking all $_SERVER variables for Authorization header");
+        foreach ($_SERVER as $key => $value) {
+            if (strpos($key, 'HTTP_') === 0) {
+                error_log("Debug: $key = $value");
+            }
+        }
+    }
+    
+    // 調試信息
+    error_log("Debug: Final Authorization header = " . $auth_header);
+    error_log("Debug: HTTP_AUTHORIZATION = " . ($_SERVER['HTTP_AUTHORIZATION'] ?? 'not set'));
+    error_log("Debug: REDIRECT_HTTP_AUTHORIZATION = " . ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? 'not set'));
     
     if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $matches)) {
+        error_log("Debug: Authorization header is empty or invalid format");
         throw new Exception('Authorization header required');
     }
     
     $token = $matches[1];
+    error_log("Debug: Extracted token: " . substr($token, 0, 20) . "...");
     $payload = validateToken($token);
     
     if (!$payload) {
@@ -54,6 +130,9 @@ try {
             throw new Exception('User not found');
         }
         
+        // 調試信息
+        error_log("Debug: User found - ID: {$user['id']}, Name: {$user['name']}, Avatar: {$user['avatar_url']}");
+        
         $userData = [
             'id' => $user['id'],
             'name' => $user['name'],
@@ -61,7 +140,7 @@ try {
             'phone' => $user['phone'],
             'nickname' => $user['nickname'],
             'google_id' => $user['google_id'],
-            'avatar_url' => $user['avatar_url'],
+            'avatar_url' => $user['avatar_url'] ?? '', // 確保avatar_url不為null
             'points' => (int)$user['points'],
             'status' => $user['status'],
             'provider' => $user['provider'],
@@ -71,6 +150,8 @@ try {
             'primary_language' => $user['primary_language'] ?? 'English',
             'permission' => (int)($user['permission'] ?? 0)
         ];
+        
+        error_log("Debug: Returning user data - avatar_url: {$userData['avatar_url']}");
         
         echo json_encode([
             'success' => true,

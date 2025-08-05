@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import '../../config/app_config.dart';
 import '../../utils/debug_helper.dart';
 
@@ -124,22 +125,36 @@ class AuthService {
         throw Exception('No token available');
       }
 
+      debugPrint('🔍 調用 getProfile API...');
+      debugPrint('🔍 Token: ${token.substring(0, 10)}...');
+      debugPrint('🔍 API URL: ${AppConfig.profileUrl}');
+
+      final headers = {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      };
+
+      debugPrint('🔍 Headers: $headers');
+
       final response = await http.get(
         Uri.parse(AppConfig.profileUrl),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
       );
+
+      debugPrint('🔍 API 回應狀態碼: ${response.statusCode}');
+      debugPrint('🔍 API 回應內容: ${response.body}');
 
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success']) {
+        debugPrint('✅ getProfile 成功: ${data['data']}');
         return data['data'];
       } else {
+        debugPrint('❌ getProfile 失敗: ${data['message']}');
         throw Exception(data['message'] ?? 'Failed to get profile');
       }
     } catch (e) {
+      debugPrint('❌ getProfile 錯誤: $e');
       throw Exception('Failed to get profile: $e');
     }
   }
@@ -160,7 +175,15 @@ class AuthService {
   // 獲取 token
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
+    final token = prefs.getString(_tokenKey);
+    debugPrint(
+        '🔍 getToken: ${token != null ? 'Token found' : 'No token found'}');
+    if (token != null) {
+      debugPrint('🔍 Token length: ${token.length}');
+      debugPrint(
+          '🔍 Token preview: ${token.substring(0, token.length > 10 ? 10 : token.length)}...');
+    }
+    return token;
   }
 
   // 獲取用戶資料
@@ -177,6 +200,8 @@ class AuthService {
   static Future<void> _saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
+    debugPrint(
+        '✅ Token saved: ${token.substring(0, token.length > 10 ? 10 : token.length)}...');
   }
 
   // 儲存用戶資料
