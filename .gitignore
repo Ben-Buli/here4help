@@ -98,6 +98,9 @@ index.php
 *.lock
 *.g.dart
 *.freezed.dart
+
+# Development and planning files
+docs/TODO_LIST.md
 *.mocks.dart
 
 # Environment files
