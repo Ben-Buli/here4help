@@ -24,6 +24,9 @@ class ThemeScheme {
   final List<Color>? backgroundGradient; // 背景漸層色彩
   final AlignmentGeometry? gradientBegin; // 漸層起始位置
   final AlignmentGeometry? gradientEnd; // 漸層結束位置
+  // 新增 backArrowColor 與 backArrowColorInactive
+  final Color backArrowColor;
+  final Color backArrowColorInactive;
 
   const ThemeScheme({
     required this.name,
@@ -47,6 +50,8 @@ class ThemeScheme {
     this.backgroundGradient,
     this.gradientBegin,
     this.gradientEnd,
+    required this.backArrowColor,
+    required this.backArrowColorInactive,
   });
 
   /// 主要風格 - 毛玻璃紫色系 (Main Style)
@@ -67,6 +72,8 @@ class ThemeScheme {
     success: Color(0xFF10B981), // 綠色成功
     warning: Color(0xFFF59E0B), // 橙色警告
     shadow: Color(0x1A8B5CF6), // 紫色陰影
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// Meta 商業網站風格 (Meta Business Style) - 淡紫色主題
@@ -96,6 +103,8 @@ class ThemeScheme {
     ],
     gradientBegin: Alignment.topLeft,
     gradientEnd: Alignment.bottomRight,
+    backArrowColor: Color(0xFF1C1E21),
+    backArrowColorInactive: Color(0x4D1C1E21),
   );
 
   /// 商業漸層風格 (Business Gradient) - 淺粉紅到淺黃色到淺藍色
@@ -128,6 +137,8 @@ class ThemeScheme {
     ],
     gradientBegin: Alignment.topLeft,
     gradientEnd: Alignment.bottomRight,
+    backArrowColor: Color(0xFF1F2937),
+    backArrowColorInactive: Color(0x4D1F2937),
   );
 
   /// 莫蘭迪藍色系
@@ -148,6 +159,8 @@ class ThemeScheme {
     success: Color(0xFF8FBC8F),
     warning: Color(0xFFD4A574),
     shadow: Color(0xFF5A6B7A),
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// 莫蘭迪綠色系 - 抹茶綠
@@ -168,6 +181,8 @@ class ThemeScheme {
     success: Color(0xFF7B8A95),
     warning: Color(0xFFD4A574),
     shadow: Color(0xFF5A7A5A),
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// 莫蘭迪紫色系
@@ -188,6 +203,8 @@ class ThemeScheme {
     success: Color(0xFF8FBC8F),
     warning: Color(0xFFD4A574),
     shadow: Color(0xFF7A5A7A),
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// 莫蘭迪粉色系
@@ -208,6 +225,8 @@ class ThemeScheme {
     success: Color(0xFF8FBC8F),
     warning: Color(0xFFD4A574),
     shadow: Color(0xFF7A5A6B),
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// 莫蘭迪橙色系
@@ -228,6 +247,8 @@ class ThemeScheme {
     success: Color(0xFF8FBC8F),
     warning: Color(0xFF7B8A95),
     shadow: Color(0xFF7A6B5A),
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// 莫蘭迪檸檬黃色系
@@ -248,6 +269,8 @@ class ThemeScheme {
     success: Color(0xFF8FBC8F),
     warning: Color(0xFF7B8A95),
     shadow: Color(0xFF7A7A5A),
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// 海灘日落主題 - Ocean 風格
@@ -278,6 +301,8 @@ class ThemeScheme {
     ],
     gradientBegin: Alignment.topLeft,
     gradientEnd: Alignment.bottomRight,
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// 海洋漸層主題 - 基於 Pacific Ocean 色卡 (海洋漸層)
@@ -307,6 +332,8 @@ class ThemeScheme {
     ],
     gradientBegin: Alignment.topLeft,
     gradientEnd: Alignment.bottomRight,
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// 沙灘足跡主題 - 基於第三張色卡 (沙灘足跡)
@@ -337,6 +364,8 @@ class ThemeScheme {
     ],
     gradientBegin: Alignment.topLeft,
     gradientEnd: Alignment.bottomRight,
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// Pantone 奶茶色主題 - 基於 Pantone 482C/481C/480C 色卡
@@ -367,6 +396,8 @@ class ThemeScheme {
     ],
     gradientBegin: Alignment(-1.0, -1.0), // 45度漸層 - 左上角
     gradientEnd: Alignment(1.0, 1.0), // 45度漸層 - 右下角
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// 簡約靜物主題 - 基於簡約靜物色卡
@@ -387,6 +418,8 @@ class ThemeScheme {
     success: Color(0xFF38A169), // 綠色成功
     warning: Color(0xFFD69E2E), // 橙色警告
     shadow: Color(0x1A5A6B7A), // 藍灰色陰影
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// 毛玻璃模糊主題 - 支援背景模糊效果
@@ -409,6 +442,8 @@ class ThemeScheme {
     shadow: Color(0x1A8B5CF6), // 紫色陰影
     backgroundBlur: 10.0, // 背景模糊 10px
     surfaceBlur: 5.0, // 表面模糊 5px
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// 毛玻璃藍灰色主題 - Blue Grey 色系
@@ -431,6 +466,8 @@ class ThemeScheme {
     shadow: Color(0x1A546E7A), // 藍灰色陰影
     backgroundBlur: 12.0, // 背景模糊 12px
     surfaceBlur: 6.0, // 表面模糊 6px
+    backArrowColor: Colors.white,
+    backArrowColorInactive: Color(0x4DFFFFFF),
   );
 
   /// 所有可用主題
@@ -464,7 +501,6 @@ class ThemeScheme {
   /// 轉換為 Material ThemeData
   ThemeData toThemeData() {
     // 為 Meta 商業風格添加特殊配置
-    final bool isMetaBusiness = name == 'meta_business_style';
 
     return ThemeData(
       scaffoldBackgroundColor: background,
@@ -732,6 +768,8 @@ class ThemeScheme {
       backgroundGradient: darkBackgroundGradient,
       gradientBegin: gradientBegin,
       gradientEnd: gradientEnd,
+      backArrowColor: backArrowColor,
+      backArrowColorInactive: backArrowColorInactive,
     );
   }
 
@@ -936,6 +974,8 @@ class ThemeScheme {
       'backgroundGradient': backgroundGradient?.map((c) => c.value).toList(),
       'gradientBegin': gradientBegin.toString(),
       'gradientEnd': gradientEnd.toString(),
+      'backArrowColor': backArrowColor.value,
+      'backArrowColorInactive': backArrowColorInactive.value,
     };
   }
 
@@ -966,6 +1006,9 @@ class ThemeScheme {
             .toList(),
         gradientBegin: _parseAlignment(json['gradientBegin']),
         gradientEnd: _parseAlignment(json['gradientEnd']),
+        backArrowColor: Color(json['backArrowColor'] ?? 0xFF000000),
+        backArrowColorInactive:
+            Color(json['backArrowColorInactive'] ?? 0xFF000000),
       );
     } catch (e) {
       debugPrint('解析主題 JSON 失敗: $e');
