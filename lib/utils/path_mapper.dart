@@ -90,30 +90,6 @@ class PathMapper {
   /// 調試路徑映射
   static void debugPathMapping(String? originalPath) {
     if (!kDebugMode) return;
-
-    print('🔍 路徑映射調試');
-    print('📁 原始路徑: $originalPath');
-
-    if (originalPath == null || originalPath.isEmpty) {
-      print('❌ 路徑為空');
-      return;
-    }
-
-    if (isFlutterAsset(originalPath)) {
-      print('✅ Flutter assets 路徑');
-      print('📦 資源路徑: $originalPath');
-    } else if (isBackendUpload(originalPath)) {
-      print('✅ 後端上傳檔案');
-      String mappedUrl = mapDatabasePathToUrl(originalPath);
-      print('🌐 映射 URL: $mappedUrl');
-    } else if (isTestImage(originalPath)) {
-      print('✅ 測試圖片');
-      String mappedUrl = mapDatabasePathToUrl(originalPath);
-      print('🌐 映射 URL: $mappedUrl');
-    } else {
-      print('⚠️ 未知路徑類型');
-      String mappedUrl = mapDatabasePathToUrl(originalPath);
-      print('🌐 預設映射 URL: $mappedUrl');
-    }
+    // Debug print statements removed
   }
 }

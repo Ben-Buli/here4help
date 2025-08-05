@@ -14,7 +14,6 @@ import 'package:here4help/task/services/university_service.dart';
 import 'package:here4help/task/services/language_service.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/services/theme_config_manager.dart';
-import 'package:here4help/widgets/theme_aware_components.dart';
 import 'package:here4help/constants/app_colors.dart';
 import 'package:here4help/utils/image_helper.dart';
 import 'package:here4help/utils/path_mapper.dart';
@@ -166,44 +165,28 @@ class _PostFormPageState extends State<TaskCreatePage> {
     final user = Provider.of<UserService>(context, listen: false).currentUser;
     final avatarUrl = user?.avatar_url;
 
-    // 詳細調試信息
-    debugPrint('🔍 === 頭像讀取測試 ===');
-    debugPrint('🔍 User: ${user?.name}');
-    debugPrint('🔍 User ID: ${user?.id}');
-    debugPrint('🔍 Avatar URL: $avatarUrl');
-    debugPrint('🔍 Avatar URL isNotEmpty: ${avatarUrl?.isNotEmpty}');
-    debugPrint('🔍 Avatar URL length: ${avatarUrl?.length}');
-
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       try {
         // 檢查是否是 Flutter assets 路徑
         final isAsset = PathMapper.isFlutterAsset(avatarUrl);
-        debugPrint('🔍 Is Flutter Asset: $isAsset');
 
         // 檢查是否是本地資源
         final isLocalAsset = ImageHelper.isLocalAsset(avatarUrl);
-        debugPrint('🔍 Is Local Asset: $isLocalAsset');
 
         // 檢查是否是網路圖片
         final isNetworkImage = ImageHelper.isNetworkImage(avatarUrl);
-        debugPrint('🔍 Is Network Image: $isNetworkImage');
 
         // 直接測試 AssetImage 創建
         if (avatarUrl.startsWith('assets/')) {
-          debugPrint('🔍 直接測試 AssetImage 創建...');
           final directAssetImage = AssetImage(avatarUrl);
-          debugPrint('✅ 直接 AssetImage 創建成功: $directAssetImage');
         }
 
         final imageProvider = ImageHelper.getAvatarImage(avatarUrl);
-        debugPrint('✅ 成功創建 ImageProvider: $imageProvider');
         return imageProvider;
       } catch (e) {
-        debugPrint('❌ Error loading avatar: $e');
         return null;
       }
     }
-    debugPrint('ℹ️ No avatar URL available');
     return null;
   }
 
@@ -215,57 +198,34 @@ class _PostFormPageState extends State<TaskCreatePage> {
       final themeManager =
           Provider.of<ThemeConfigManager>(context, listen: false);
       final theme = themeManager.effectiveTheme;
-      debugPrint('ℹ️ 顯示默認頭像圖標');
       return Icon(
         Icons.person,
         color: theme.primary,
         size: 24,
       );
     }
-    debugPrint('ℹ️ 有頭像 URL，不顯示默認圖標');
     return null;
   }
 
   /// 測試頭像讀取功能
   void _testAvatarLoading() {
     final user = Provider.of<UserService>(context, listen: false).currentUser;
-    debugPrint('🧪 === 頭像讀取測試開始 ===');
-    debugPrint('🧪 User: ${user?.name}');
-    debugPrint('🧪 Avatar URL: ${user?.avatar_url}');
-    debugPrint('🧪 User ID: ${user?.id}');
-    debugPrint('🧪 Email: ${user?.email}');
 
     if (user?.avatar_url != null && user!.avatar_url.isNotEmpty) {
       try {
         // 直接測試 AssetImage
         if (user.avatar_url.startsWith('assets/')) {
-          debugPrint('🧪 測試 AssetImage 創建...');
           final assetImage = AssetImage(user.avatar_url);
-          debugPrint('✅ AssetImage 創建成功: $assetImage');
 
           // 測試 PathMapper.isFlutterAsset
           final isFlutterAsset = PathMapper.isFlutterAsset(user.avatar_url);
-          debugPrint('🧪 PathMapper.isFlutterAsset: $isFlutterAsset');
         }
 
         final imageProvider = ImageHelper.getAvatarImage(user.avatar_url);
-        debugPrint('✅ 測試成功：ImageProvider 創建成功: $imageProvider');
       } catch (e) {
-        debugPrint('❌ 測試失敗：$e');
-      }
-    } else {
-      debugPrint('ℹ️ 測試結果：沒有頭像 URL');
-      debugPrint('ℹ️ 用戶資訊是否為空: ${user == null}');
-      if (user != null) {
-        debugPrint('ℹ️ 用戶資訊詳情:');
-        debugPrint('  - ID: ${user.id}');
-        debugPrint('  - Name: ${user.name}');
-        debugPrint('  - Email: ${user.email}');
-        debugPrint('  - Avatar URL: "${user.avatar_url}"');
-        debugPrint('  - Avatar URL 長度: ${user.avatar_url.length}');
+        // Error handling
       }
     }
-    debugPrint('🧪 === 頭像讀取測試結束 ===');
   }
 
   @override

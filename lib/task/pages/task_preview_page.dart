@@ -337,9 +337,9 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                   // 先新增任務
                   await taskService.createTask(widget.data);
 
-                  print(taskService.tasks.length); // 任務有無加進去
+                  // 移除 debug print
                   if (taskService.tasks.isNotEmpty) {
-                    print(taskService.tasks.last['title']); // 看最後一筆是否你剛剛輸入的
+                    // 可在此處加上正式的資料處理或提示
                   }
 
                   if (mounted) {

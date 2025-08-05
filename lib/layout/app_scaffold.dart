@@ -43,29 +43,45 @@ class _AppScaffoldState extends State<AppScaffold> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final currentPath = GoRouterState.of(context).uri.toString();
-    if (currentPath.isNotEmpty &&
-        (_routeHistory.isEmpty || _routeHistory.last != currentPath)) {
-      _routeHistory.add(currentPath);
+
+    if (currentPath.isNotEmpty) {
+      // 檢查是否已經有相同的路徑
+      if (_routeHistory.isEmpty || _routeHistory.last != currentPath) {
+        _routeHistory.add(currentPath);
+      }
     }
   }
 
   void _handleBack() {
     try {
-      final popped = Navigator.of(context).maybePop();
-      popped.then((didPop) {
-        if (!didPop) {
-          if (_routeHistory.length > 1) {
-            final current = _routeHistory.removeLast();
-            final previous = _routeHistory.last;
-            if (!_nonReturnableRoutes.contains(previous)) {
-              context.go(previous);
-              _routeHistory.removeLast();
-            }
+      if (_routeHistory.length > 1) {
+        // 找到最近的可返回路徑
+        String? targetPath;
+        int targetIndex = -1;
+
+        for (int i = _routeHistory.length - 2; i >= 0; i--) {
+          final previousPath = _routeHistory[i];
+
+          if (!_nonReturnableRoutes.contains(previousPath)) {
+            targetPath = previousPath;
+            targetIndex = i;
+            break;
           }
         }
-      });
+
+        if (targetPath != null && targetIndex >= 0) {
+          // 移除當前路徑和目標路徑之後的所有路徑
+          _routeHistory.removeRange(targetIndex + 1, _routeHistory.length);
+          context.go(targetPath);
+        } else {
+          Navigator.of(context).maybePop();
+        }
+      } else {
+        Navigator.of(context).maybePop();
+      }
     } catch (e) {
-      debugPrint('Back navigation error: $e');
+      // 備用方案
+      Navigator.of(context).maybePop();
     }
   }
 
@@ -134,17 +150,13 @@ class _AppScaffoldState extends State<AppScaffold> {
               backgroundColor: Colors.transparent,
               elevation: 0,
               centerTitle: widget.centerTitle,
-              leading: widget.showBackArrow
+              leading: widget.showBackArrow && _canGoBack()
                   ? IconButton(
                       icon: Icon(
                         Icons.arrow_back_ios_new,
                         color: _getBackArrowColor(themeManager),
                       ),
-                      onPressed: (_routeHistory.length > 1 &&
-                              !_nonReturnableRoutes.contains(
-                                  _routeHistory[_routeHistory.length - 2]))
-                          ? _handleBack
-                          : null,
+                      onPressed: _handleBack,
                     )
                   : null,
               title: Text(
@@ -193,19 +205,19 @@ class _AppScaffoldState extends State<AppScaffold> {
             onTap: (index) {
               switch (index) {
                 case 0:
-                  context.push('/task/create');
+                  context.go('/task/create');
                   break;
                 case 1:
-                  context.push('/task');
+                  context.go('/task');
                   break;
                 case 2:
-                  context.push('/home');
+                  context.go('/home');
                   break;
                 case 3:
-                  context.push('/chat');
+                  context.go('/chat');
                   break;
                 case 4:
-                  context.push('/account');
+                  context.go('/account');
                   break;
               }
             },
@@ -239,70 +251,9 @@ class _AppScaffoldState extends State<AppScaffold> {
 
   /// 獲取返回箭頭的顏色
   Color _getBackArrowColor(ThemeConfigManager themeManager) {
-    final bool canGoBack = _routeHistory.length > 1 &&
-        !_nonReturnableRoutes.contains(_routeHistory[_routeHistory.length - 2]);
-
-    if (canGoBack) {
-      // 可以返回時使用亮色系
-      final style = themeManager.themeStyle;
-      switch (style) {
-        case 'ocean':
-          return Colors.white; // 海洋主題使用純白色
-        case 'morandi':
-          return Colors.white; // 莫蘭迪主題使用白色
-        case 'glassmorphism':
-        case 'business':
-          // 商業主題使用深色文字
-          return const Color(0xFF2D3748); // 深灰文字
-        default:
-          // 檢查特定主題
-          if (themeManager.currentTheme.name == 'sandy_footprints' ||
-              themeManager.currentTheme.name == 'sandy_footprints_dark') {
-            return Colors.white; // Sandy 主題使用白色
-          }
-          // Meta 主題使用深色文字
-          if (themeManager.currentTheme.name == 'meta_business_style' ||
-              themeManager.currentTheme.name == 'meta_business_style_dark') {
-            return const Color(0xFF1C1E21); // 深灰文字
-          }
-          // 彩虹主題使用深色文字
-          if (themeManager.currentTheme.name == 'business_gradient' ||
-              themeManager.currentTheme.name == 'business_gradient_dark') {
-            return const Color(0xFF1F2937); // 深灰文字
-          }
-          return Colors.white; // 其他主題使用白色
-      }
-    } else {
-      // 不能返回時使用暗色系
-      final style = themeManager.themeStyle;
-      switch (style) {
-        case 'ocean':
-          return Colors.white.withOpacity(0.3); // 海洋主題使用半透明白色
-        case 'morandi':
-          return Colors.white.withOpacity(0.3); // 莫蘭迪主題使用半透明白色
-        case 'glassmorphism':
-        case 'business':
-          // 商業主題使用半透明深色
-          return const Color(0xFF2D3748).withOpacity(0.3); // 半透明深灰
-        default:
-          // 檢查特定主題
-          if (themeManager.currentTheme.name == 'sandy_footprints' ||
-              themeManager.currentTheme.name == 'sandy_footprints_dark') {
-            return Colors.white.withOpacity(0.3); // Sandy 主題使用半透明白色
-          }
-          // Meta 主題使用半透明深色
-          if (themeManager.currentTheme.name == 'meta_business_style' ||
-              themeManager.currentTheme.name == 'meta_business_style_dark') {
-            return const Color(0xFF1C1E21).withOpacity(0.3); // 半透明深灰
-          }
-          // 彩虹主題使用半透明深色
-          if (themeManager.currentTheme.name == 'business_gradient' ||
-              themeManager.currentTheme.name == 'business_gradient_dark') {
-            return const Color(0xFF1F2937).withOpacity(0.3); // 半透明深灰
-          }
-          return Colors.white.withOpacity(0.3); // 其他主題使用半透明白色
-      }
-    }
+    return _canGoBack()
+        ? themeManager.currentTheme.backArrowColor
+        : themeManager.currentTheme.backArrowColorInactive;
   }
 
   int _getCurrentIndex(BuildContext context) {
@@ -313,5 +264,22 @@ class _AppScaffoldState extends State<AppScaffold> {
     if (location.startsWith('/chat')) return 3;
     if (location.startsWith('/account')) return 4;
     return 2; // 預設 Home
+  }
+
+  bool _canGoBack() {
+    if (_routeHistory.length <= 1) {
+      return false;
+    }
+
+    // 檢查是否有可返回的路由
+    for (int i = _routeHistory.length - 2; i >= 0; i--) {
+      final previousPath = _routeHistory[i];
+
+      if (!_nonReturnableRoutes.contains(previousPath)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }
