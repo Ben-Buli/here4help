@@ -1,6 +1,4 @@
 import 'package:flutter/foundation.dart';
-import '../config/environment_config.dart';
-import 'image_helper.dart';
 
 class DebugHelper {
   /// 診斷用戶頭像路徑問題

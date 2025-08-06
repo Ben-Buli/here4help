@@ -153,7 +153,7 @@ final List<Map<String, dynamic>> shellPages = [
   {
     'path': '/task/create/preview',
     'builder': (context, state) {
-      return TaskPreviewPage(data: state as Map<String, dynamic>);
+      return const TaskPreviewPage();
     },
     'title': 'Task Preview',
     'showBottomNav': false,

@@ -1,42 +1,106 @@
 // home_page.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/constants/app_colors.dart';
 
 class TaskPreviewPage extends StatefulWidget {
-  final Map<String, dynamic> data;
-
-  const TaskPreviewPage({super.key, required this.data});
+  const TaskPreviewPage({super.key});
 
   @override
   State<TaskPreviewPage> createState() => _TaskPreviewPageState();
 }
 
 class _TaskPreviewPageState extends State<TaskPreviewPage> {
+  Map<String, dynamic>? taskData;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTaskData();
+  }
+
+  Future<void> _loadTaskData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final taskDataString = prefs.getString('taskData');
+
+      if (taskDataString != null) {
+        final data = jsonDecode(taskDataString) as Map<String, dynamic>;
+        setState(() {
+          taskData = data;
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+        // 如果沒有資料，返回上一頁
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No task data found')),
+          );
+          context.pop();
+        }
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading task data: $e')),
+        );
+        context.pop();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    widget.data['id'] = UniqueKey().toString();
-    widget.data['acceptor_id'] = '';
-    widget.data['status'] = 'Open'; // 預設狀態為 Open
-    widget.data['creator_confirmed'] = '0';
-    widget.data['acceptor_confirmed'] = '0';
-    widget.data['cancel_reason'] = '';
-    widget.data['fail_reason'] = '';
-    widget.data['creator_name'] = widget.data['creator_name'] ?? 'Anonymous';
-    widget.data['updated_at'] = DateTime.now().toIso8601String();
-    widget.data['created_at'] = DateTime.now().toIso8601String();
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (taskData == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text('No task data available'),
+        ),
+      );
+    }
+
+    // 設置預設值
+    taskData!['id'] = UniqueKey().toString();
+    taskData!['acceptor_id'] = '';
+    taskData!['status'] = 'Open'; // 預設狀態為 Open
+    taskData!['creator_confirmed'] = '0';
+    taskData!['acceptor_confirmed'] = '0';
+    taskData!['cancel_reason'] = '';
+    taskData!['fail_reason'] = '';
+    taskData!['creator_name'] = taskData!['creator_name'] ?? 'Anonymous';
+    taskData!['description'] =
+        taskData!['description'] ?? 'No description provided';
+    taskData!['updated_at'] = DateTime.now().toIso8601String();
+    taskData!['created_at'] = DateTime.now().toIso8601String();
 
     // Extract data with fallback values
-    final title = widget.data['title']?.toString() ?? 'N/A';
-    final location = widget.data['location']?.toString() ?? 'N/A';
-    final salary = widget.data['salary']?.toString() ?? 'N/A';
-    final date = widget.data['task_date']?.toString() ?? 'N/A';
-    final creatorName = widget.data['creator_name']?.toString() ?? 'N/A';
-    final creatorAvatarUrl = widget.data['avatar_url']?.toString();
+    final title = taskData!['title']?.toString() ?? 'N/A';
+    final location = taskData!['location']?.toString() ?? 'N/A';
+    final salary = taskData!['salary']?.toString() ?? 'N/A';
+    final date = taskData!['task_date']?.toString() ?? 'N/A';
+    final creatorName = taskData!['creator_name']?.toString() ?? 'N/A';
+    final creatorAvatarUrl = taskData!['avatar_url']?.toString();
 
     final languageRequirement =
-        widget.data['language_requirement']?.toString() ?? 'N/A';
+        taskData!['language_requirement']?.toString() ?? 'N/A';
 
     // Render preview page
     return SingleChildScrollView(
@@ -66,22 +130,21 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                             style: const TextStyle(
                                 fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        if ((widget.data['description']?.toString().trim() ??
-                                '')
+                        if ((taskData!['description']?.toString().trim() ?? '')
                             .isNotEmpty) ...[
                           const Text(
                             'Task Description',
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
-                          Text(widget.data['description']!.toString().trim()),
+                          Text(taskData!['description']!.toString().trim()),
                           const SizedBox(height: 12),
                         ],
                         const Text(
                           'Application Question:',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        ...((widget.data['application_question']?.toString() ??
+                        ...((taskData!['application_question']?.toString() ??
                                 'No description provided')
                             .split('|')
                             .asMap()
@@ -332,24 +395,44 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
 
                 if (confirm == true) {
                   final taskService = TaskService();
-                  await taskService.loadTasks();
 
-                  // 先新增任務
-                  await taskService.createTask(widget.data);
+                  try {
+                    // 創建任務
+                    final success = await taskService.createTask(taskData!);
 
-                  // 移除 debug print
-                  if (taskService.tasks.isNotEmpty) {
-                    // 可在此處加上正式的資料處理或提示
-                  }
+                    if (success) {
+                      // 清除 SharedPreferences 中的資料
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.remove('taskData');
 
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Task posted successfully!')),
-                    );
-                    // go 改成 push 之後，資料才會即時傳到 task list
-                    // 因為 go 會直接跳到 task list，沒有回到上一頁
-                    context.push('/task');
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Task posted successfully!')),
+                        );
+                        // 導航到任務大廳並刷新
+                        context.go('/task');
+                      }
+                    } else {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                                'Failed to post task: ${taskService.error ?? 'Unknown error'}'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error posting task: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
