@@ -206,6 +206,29 @@ class TaskFormViewModel extends ChangeNotifier {
     };
   }
 
+  // 獲取任務數據（與原始版本兼容）
+  Map<String, dynamic> getTaskData() {
+    // 需要從UserService獲取用戶信息，這裡先返回基本數據
+    // 用戶信息將在TaskCreatePageRefactored中處理
+    return {
+      'title': titleController.text.trim(),
+      'description': taskDescriptionController.text.trim(),
+      'salary': salaryController.text.trim(),
+      'location': locationLabel.isNotEmpty ? locationLabel : 'N/A',
+      'task_date': taskDate != null
+          ? taskDate!.toLocal().toString().split(' ')[0]
+          : 'N/A',
+      'periodStart': periodStart != null
+          ? periodStart!.toLocal().toString().split(' ')[0]
+          : 'N/A',
+      'periodEnd': periodEnd != null
+          ? periodEnd!.toLocal().toString().split(' ')[0]
+          : 'N/A',
+      'application_question': applicationQuestions.join(' | '),
+      'language_requirement': selectedLanguages.join(','),
+    };
+  }
+
   // 清理資源
   @override
   void dispose() {
