@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/task/services/university_service.dart';
 import 'package:here4help/task/services/language_service.dart';
@@ -40,8 +41,6 @@ class _PostFormPageState extends State<TaskCreatePage> {
   DateTime? _periodStart;
   DateTime? _periodEnd;
 
-  final String _taskDescription = '';
-
   LatLng? _selectedLocation = const LatLng(25.0208, 121.5418);
   String _locationLabel = 'NCCU';
 
@@ -60,6 +59,9 @@ class _PostFormPageState extends State<TaskCreatePage> {
 
     // 初始化表單欄位
     _titleController.text = 'Opening Bank Account (Demo)';
+    _taskDescriptionController = TextEditingController(
+        text:
+            'Need help with opening a bank account. Looking for someone who can guide me through the process and accompany me to the bank.');
     final formatter = NumberFormat('#,##0', 'en_US');
     _salaryController.text = formatter.format(500);
     _locationLabel = 'NCCU';
@@ -628,6 +630,74 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   ),
                 ),
               ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Description
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  'Description',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Required',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _taskDescriptionController,
+              maxLines: 4,
+              maxLength: 1000,
+              decoration: InputDecoration(
+                hintText: 'Enter a detailed description of your task',
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide:
+                      const BorderSide(color: AppColors.primary, width: 2),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                prefixIcon: Icon(Icons.description, color: theme.primary),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter a task description';
+                }
+                return null;
+              },
             ),
           ],
         ),
@@ -1425,12 +1495,13 @@ class _PostFormPageState extends State<TaskCreatePage> {
           ),
           elevation: 2,
         ),
-        onPressed: () {
+        onPressed: () async {
           final user =
               Provider.of<UserService>(context, listen: false).currentUser;
           final userName = user?.name ?? 'Unknown Poster';
           final data = {
             'title': _titleController.text.trim(),
+            'description': _taskDescriptionController.text.trim(),
             'salary': _salaryController.text.trim(),
             'location': _locationLabel.isNotEmpty ? _locationLabel : 'N/A',
             'task_date': _taskDate != null
@@ -1454,7 +1525,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
             kSalaryField: data['salary'],
             kTimeField: data['task_date'],
             kPostingPeriodField:
-                data['periodStart'] != 'N/A' && data['periodEnd'] != 'N/A'
+                data['periodStart'] != 'N/A' && data['periodEnd'] != 'N/A',
+            'Description': data['description'],
           };
 
           _errorFields.clear();
@@ -1501,7 +1573,25 @@ class _PostFormPageState extends State<TaskCreatePage> {
             return;
           }
 
-          context.push('/task/create/preview', extra: data);
+          // 使用 SharedPreferences 儲存資料
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('taskData', jsonEncode(data));
+
+            // 導航到預覽頁面
+            if (mounted) {
+              context.push('/task/create/preview');
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error saving task data: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
         },
         child: const Text(
           'Preview & Submit',

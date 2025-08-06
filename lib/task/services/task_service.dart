@@ -176,4 +176,122 @@ class TaskService extends ChangeNotifier {
   Future<void> reloadTasks() async {
     await loadTasks();
   }
+
+  /// 檢查任務資料空欄位
+  Future<Map<String, dynamic>> checkEmptyTaskFields() async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final response = await http.get(
+        Uri.parse(
+            '${AppConfig.apiBaseUrl}/backend/api/tasks/generate-sample-data.php?action=check'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success']) {
+          return data['data'];
+        } else {
+          _error = data['message'] ?? 'Failed to check empty fields';
+          return {};
+        }
+      } else {
+        _error = 'HTTP ${response.statusCode}: Failed to check empty fields';
+        return {};
+      }
+    } catch (e) {
+      _error = 'Network error: $e';
+      debugPrint('TaskService checkEmptyTaskFields error: $e');
+      return {};
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// 為空欄位生成資料
+  Future<Map<String, dynamic>> fillEmptyTaskFields() async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final response = await http.get(
+        Uri.parse(
+            '${AppConfig.apiBaseUrl}/backend/api/tasks/generate-sample-data.php?action=fill'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success']) {
+          // 重新載入任務列表
+          await loadTasks();
+          return data['data'];
+        } else {
+          _error = data['message'] ?? 'Failed to fill empty fields';
+          return {};
+        }
+      } else {
+        _error = 'HTTP ${response.statusCode}: Failed to fill empty fields';
+        return {};
+      }
+    } catch (e) {
+      _error = 'Network error: $e';
+      debugPrint('TaskService fillEmptyTaskFields error: $e');
+      return {};
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// 生成範例任務資料
+  Future<Map<String, dynamic>> generateSampleTasks({int count = 8}) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      final response = await http
+          .post(
+            Uri.parse(
+                '${AppConfig.apiBaseUrl}/backend/api/tasks/generate-sample-data.php'),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({'count': count}),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success']) {
+          // 重新載入任務列表
+          await loadTasks();
+          return data['data'];
+        } else {
+          _error = data['message'] ?? 'Failed to generate sample tasks';
+          return {};
+        }
+      } else {
+        _error = 'HTTP ${response.statusCode}: Failed to generate sample tasks';
+        return {};
+      }
+    } catch (e) {
+      _error = 'Network error: $e';
+      debugPrint('TaskService generateSampleTasks error: $e');
+      return {};
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 }

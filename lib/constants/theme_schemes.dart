@@ -19,6 +19,7 @@ class ThemeScheme {
   final Color success;
   final Color warning;
   final Color shadow;
+  final Color outlineVariant; // 新增 outlineVariant 屬性
   final double? backgroundBlur; // 背景模糊強度
   final double? surfaceBlur; // 表面模糊強度
   final List<Color>? backgroundGradient; // 背景漸層色彩
@@ -45,6 +46,7 @@ class ThemeScheme {
     required this.success,
     required this.warning,
     required this.shadow,
+    required this.outlineVariant, // 新增 outlineVariant 參數
     this.backgroundBlur,
     this.surfaceBlur,
     this.backgroundGradient,
@@ -72,6 +74,7 @@ class ThemeScheme {
     success: Color(0xFF10B981), // 綠色成功
     warning: Color(0xFFF59E0B), // 橙色警告
     shadow: Color(0x1A8B5CF6), // 紫色陰影
+    outlineVariant: Color(0xFF8B5CF6), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
   );
@@ -94,6 +97,7 @@ class ThemeScheme {
     success: Color(0xFF42B883), // 成功綠
     warning: Color(0xFFFF9500), // 警告橙
     shadow: Color(0x1A8B5CF6), // 紫色陰影
+    outlineVariant: Color(0xFF8B5CF6), // 新增 outlineVariant
     backgroundBlur: 10.0, // 背景模糊效果
     surfaceBlur: 5.0, // 表面模糊效果
     backgroundGradient: [
@@ -125,6 +129,7 @@ class ThemeScheme {
     success: Color(0xFF10B981), // 成功綠
     warning: Color(0xFFF59E0B), // 警告橙
     shadow: Color(0x1A6366F1), // 靛藍色陰影
+    outlineVariant: Color(0xFF6366F1), // 新增 outlineVariant
     backgroundBlur: 8.0, // 背景模糊效果
     surfaceBlur: 4.0, // 表面模糊效果
     backgroundGradient: [
@@ -159,6 +164,7 @@ class ThemeScheme {
     success: Color(0xFF8FBC8F),
     warning: Color(0xFFD4A574),
     shadow: Color(0xFF5A6B7A),
+    outlineVariant: Color(0xFF6B7A85), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
   );
@@ -181,6 +187,7 @@ class ThemeScheme {
     success: Color(0xFF7B8A95),
     warning: Color(0xFFD4A574),
     shadow: Color(0xFF5A7A5A),
+    outlineVariant: Color(0xFF6A8A6A), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
   );
@@ -203,6 +210,7 @@ class ThemeScheme {
     success: Color(0xFF8FBC8F),
     warning: Color(0xFFD4A574),
     shadow: Color(0xFF7A5A7A),
+    outlineVariant: Color(0xFF8B7A85), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
   );
@@ -225,6 +233,7 @@ class ThemeScheme {
     success: Color(0xFF8FBC8F),
     warning: Color(0xFFD4A574),
     shadow: Color(0xFF7A5A6B),
+    outlineVariant: Color(0xFFA55566), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
   );
@@ -247,6 +256,7 @@ class ThemeScheme {
     success: Color(0xFF8FBC8F),
     warning: Color(0xFF7B8A95),
     shadow: Color(0xFF7A6B5A),
+    outlineVariant: Color(0xFFC49564), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
   );
@@ -269,6 +279,7 @@ class ThemeScheme {
     success: Color(0xFF8FBC8F),
     warning: Color(0xFF7B8A95),
     shadow: Color(0xFF7A7A5A),
+    outlineVariant: Color(0xFFB4A864), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
   );
@@ -291,6 +302,7 @@ class ThemeScheme {
     success: Color(0xFF38A169), // 綠色成功
     warning: Color(0xFFD69E2E), // 橙色警告
     shadow: Color(0x1A00BCD4), // 碧綠色陰影
+    outlineVariant: Color(0xFF00BCD4), // 新增 outlineVariant
     backgroundGradient: [
       Color(0xFFFDFCF7), // 極淺米色 (左上角 - 明亮)
       Color(0xFFF5F0E8), // 淺米色
@@ -323,6 +335,7 @@ class ThemeScheme {
     success: Color(0xFF38A169), // 綠色成功
     warning: Color(0xFFD69E2E), // 橙色警告
     shadow: Color(0x1A1182A4), // 主要色陰影
+    outlineVariant: Color(0xFF1182A4), // 新增 outlineVariant
     backgroundGradient: [
       Color(0xFFE6E2D8), // 更淡的淺沙色 (左上角 - 最明亮)
       Color(0xFF7BC8D1), // 更淡的淺青藍色
@@ -354,6 +367,7 @@ class ThemeScheme {
     success: Color(0xFF38A169), // 綠色成功
     warning: Color(0xFFD69E2E), // 橙色警告
     shadow: Color(0x1A20B2AA), // 海綠色陰影
+    outlineVariant: Color(0xFF20B2AA), // 新增 outlineVariant
     backgroundGradient: [
       Color(0xFFFDFCF7), // 米白色 (左上角 - 明亮)
       Color(0xFFF5F0E8), // 淺米色
@@ -386,6 +400,7 @@ class ThemeScheme {
     success: Color(0xFF38A169), // 綠色成功
     warning: Color(0xFFD69E2E), // 橙色警告
     shadow: Color(0x1A8B6B5A), // 棕色陰影
+    outlineVariant: Color(0xFF8B6B5A), // 新增 outlineVariant
     backgroundGradient: [
       Color(0xFFFDFCF7), // 極淺奶油色 (左上角 - 明亮)
       Color(0xFFF5F0E8), // 淺米色
@@ -418,6 +433,7 @@ class ThemeScheme {
     success: Color(0xFF38A169), // 綠色成功
     warning: Color(0xFFD69E2E), // 橙色警告
     shadow: Color(0x1A5A6B7A), // 藍灰色陰影
+    outlineVariant: Color(0xFF5A6B7A), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
   );
@@ -440,6 +456,7 @@ class ThemeScheme {
     success: Color(0xFF10B981), // 綠色成功
     warning: Color(0xFFF59E0B), // 橙色警告
     shadow: Color(0x1A8B5CF6), // 紫色陰影
+    outlineVariant: Color(0x80FFFFFF), // 新增 outlineVariant
     backgroundBlur: 10.0, // 背景模糊 10px
     surfaceBlur: 5.0, // 表面模糊 5px
     backArrowColor: Colors.white,
@@ -464,6 +481,7 @@ class ThemeScheme {
     success: Color(0xFF10B981), // 綠色成功
     warning: Color(0xFFF59E0B), // 橙色警告
     shadow: Color(0x1A546E7A), // 藍灰色陰影
+    outlineVariant: Color(0x805C7C8A), // 新增 outlineVariant
     backgroundBlur: 12.0, // 背景模糊 12px
     surfaceBlur: 6.0, // 表面模糊 6px
     backArrowColor: Colors.white,
@@ -763,6 +781,7 @@ class ThemeScheme {
       success: _convertToDarkSuccess(success),
       warning: _convertToDarkWarning(warning),
       shadow: _convertToDarkShadow(shadow),
+      outlineVariant: _convertToDarkOutlineVariant(outlineVariant), // 新增 outlineVariant
       backgroundBlur: backgroundBlur,
       surfaceBlur: surfaceBlur,
       backgroundGradient: darkBackgroundGradient,
@@ -921,6 +940,19 @@ class ThemeScheme {
     ).toColor();
   }
 
+  /// 轉換 outlineVariant 為 Dark Mode
+  Color _convertToDarkOutlineVariant(Color color) {
+    final HSLColor hsl = HSLColor.fromColor(color);
+
+    // 確保 outlineVariant 在 Dark Mode 中也是亮色系
+    return HSLColor.fromAHSL(
+      hsl.alpha,
+      hsl.hue,
+      hsl.saturation * 0.1, // 進一步降低飽和度，避免過於鮮豔
+      0.98, // 極高亮度，確保文字清晰可見
+    ).toColor();
+  }
+
   /// 創建 Rainbow 主題的 Dark Mode 漸層
   List<Color> _createRainbowDarkGradient() {
     // 基於原始彩虹漸層顏色創建低飽和度偏暗版本
@@ -969,6 +1001,7 @@ class ThemeScheme {
       'success': success.value,
       'warning': warning.value,
       'shadow': shadow.value,
+      'outlineVariant': outlineVariant.value, // 新增 outlineVariant
       'backgroundBlur': backgroundBlur,
       'surfaceBlur': surfaceBlur,
       'backgroundGradient': backgroundGradient?.map((c) => c.value).toList(),
@@ -999,6 +1032,7 @@ class ThemeScheme {
         success: Color(json['success'] ?? 0xFF000000),
         warning: Color(json['warning'] ?? 0xFF000000),
         shadow: Color(json['shadow'] ?? 0xFF000000),
+        outlineVariant: Color(json['outlineVariant'] ?? 0xFF000000), // 新增 outlineVariant
         backgroundBlur: json['backgroundBlur']?.toDouble(),
         surfaceBlur: json['surfaceBlur']?.toDouble(),
         backgroundGradient: (json['backgroundGradient'] as List?)

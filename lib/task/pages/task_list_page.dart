@@ -589,414 +589,400 @@ class _TaskListPageState extends State<TaskListPage> {
     // 排序任務列表
     final sortedTasks = sortTasks(filteredOwnTasks);
 
-    return Scaffold(
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Consumer<ThemeConfigManager>(
-              builder: (context, themeManager, child) {
-                final theme = themeManager.effectiveTheme;
-                return TextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  onChanged: (value) {
-                    setState(() {
-                      searchQuery = value.toLowerCase();
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Search...',
-                    hintStyle:
-                        TextStyle(color: theme.onSurface.withOpacity(0.5)),
-                    prefixIcon: Icon(Icons.search,
-                        color: theme.onSurface.withOpacity(0.7)),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: Icon(Icons.clear,
-                                color: theme.onSurface.withOpacity(0.7)),
-                            onPressed: () {
-                              setState(() {
-                                _searchController.clear();
-                                searchQuery = '';
-                              });
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: theme.surface.withOpacity(0.8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: theme.secondary.withOpacity(0.3)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          BorderSide(color: theme.secondary.withOpacity(0.3)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: theme.primary, width: 2),
-                    ),
-                  ),
-                  style: TextStyle(color: theme.onSurface),
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
+    return Consumer<ThemeConfigManager>(
+      builder: (context, themeManager, child) {
+        final theme = themeManager.effectiveTheme;
+        return Container(
+            color: theme.background,
+            child: Column(
               children: [
-                // 篩選按鈕
-                IconButton(
-                  onPressed: () => _showFilterDialog(),
-                  icon: const Icon(Icons.filter_list),
-                  tooltip: 'Filter Options',
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: TextField(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    onChanged: (value) {
+                      setState(() {
+                        searchQuery = value.toLowerCase();
+                      });
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Search...',
+                      hintStyle:
+                          TextStyle(color: theme.onSurface.withOpacity(0.5)),
+                      prefixIcon: Icon(Icons.search,
+                          color: theme.onSurface.withOpacity(0.7)),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(Icons.clear,
+                                  color: theme.onSurface.withOpacity(0.7)),
+                              onPressed: () {
+                                setState(() {
+                                  _searchController.clear();
+                                  searchQuery = '';
+                                });
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: theme.surface.withOpacity(0.8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            BorderSide(color: theme.secondary.withOpacity(0.3)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide:
+                            BorderSide(color: theme.secondary.withOpacity(0.3)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: theme.primary, width: 2),
+                      ),
+                    ),
+                    style: TextStyle(color: theme.onSurface),
+                  ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Consumer<ThemeConfigManager>(
-                    builder: (context, themeManager, child) {
-                      final theme = themeManager.effectiveTheme;
-                      return DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        hint: Text('Location',
-                            style: TextStyle(
-                                color: theme.onSurface.withOpacity(0.7))),
-                        value: selectedLocation,
-                        style: TextStyle(color: theme.onSurface),
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: theme.surface.withOpacity(0.8),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(
-                                color: theme.secondary.withOpacity(0.3)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      // 篩選按鈕
+                      IconButton(
+                        onPressed: () => _showFilterDialog(),
+                        icon: const Icon(Icons.filter_list),
+                        tooltip: 'Filter Options',
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          hint: Text('Location',
+                              style: TextStyle(
+                                  color: theme.onSurface.withOpacity(0.7))),
+                          value: selectedLocation,
+                          style: TextStyle(color: theme.onSurface),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: theme.surface.withOpacity(0.8),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                  color: theme.secondary.withOpacity(0.3)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                  color: theme.secondary.withOpacity(0.3)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide:
+                                  BorderSide(color: theme.primary, width: 2),
+                            ),
                           ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(
-                                color: theme.secondary.withOpacity(0.3)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                BorderSide(color: theme.primary, width: 2),
-                          ),
+                          items: locations
+                              .map((loc) => DropdownMenuItem(
+                                    value: loc,
+                                    child: Text(loc,
+                                        style:
+                                            TextStyle(color: theme.onSurface)),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedLocation = value;
+                            });
+                          },
                         ),
-                        items: locations
-                            .map((loc) => DropdownMenuItem(
-                                  value: loc,
-                                  child: Text(loc,
-                                      style: TextStyle(color: theme.onSurface)),
-                                ))
-                            .toList(),
-                        onChanged: (value) {
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          hint: Text('Language',
+                              style: TextStyle(
+                                  color: theme.onSurface.withOpacity(0.7))),
+                          value: selectedLanguage,
+                          style: TextStyle(color: theme.onSurface),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: theme.surface.withOpacity(0.8),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                  color: theme.secondary.withOpacity(0.3)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                  color: theme.secondary.withOpacity(0.3)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide:
+                                  BorderSide(color: theme.primary, width: 2),
+                            ),
+                          ),
+                          items: languages
+                              .map((lang) => DropdownMenuItem(
+                                    value: lang,
+                                    child: Text(lang,
+                                        style:
+                                            TextStyle(color: theme.onSurface)),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedLanguage = value;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          isExpanded: true,
+                          hint: Text('Status',
+                              style: TextStyle(
+                                  color: theme.onSurface.withOpacity(0.7))),
+                          value: selectedStatus,
+                          style: TextStyle(color: theme.onSurface),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: theme.surface.withOpacity(0.8),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                  color: theme.secondary.withOpacity(0.3)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                  color: theme.secondary.withOpacity(0.3)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide:
+                                  BorderSide(color: theme.primary, width: 2),
+                            ),
+                          ),
+                          items: statuses
+                              .map((status) => DropdownMenuItem(
+                                    value: status,
+                                    child: Text(status,
+                                        style:
+                                            TextStyle(color: theme.onSurface)),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedStatus = value;
+                            });
+                          },
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () {
                           setState(() {
-                            selectedLocation = value;
+                            _searchController.clear();
+                            searchQuery = '';
+                            selectedLocation = null;
+                            selectedLanguage = null;
+                            selectedStatus = null;
                           });
                         },
+                        icon: const Icon(Icons.refresh),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: sortedTasks.length,
+                    itemBuilder: (context, index) {
+                      final task = sortedTasks[index];
+                      final date = task['task_date'];
+                      String dateLabel = '';
+                      if (date != null && date.toString().isNotEmpty) {
+                        try {
+                          final parsedDate = DateTime.tryParse(date.toString());
+                          if (parsedDate != null) {
+                            dateLabel = DateFormat('MM/dd').format(parsedDate);
+                          }
+                        } catch (e) {
+                          dateLabel = '';
+                        }
+                      }
+
+                      final userName =
+                          task['creator_name']?.toString() ?? 'N/A Poster';
+                      final title = task['title']?.toString() ?? '';
+                      final location = task['location']?.toString() ?? '';
+                      final salary = task['salary']?.toString() ?? '0';
+                      final languageRequirement =
+                          task['language_requirement']?.toString() ?? '-';
+
+                      return GestureDetector(
+                        onTap: () => _showTaskDetailDialog(task),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: theme.surface.withOpacity(0.9),
+                            border: Border.all(
+                                color: theme.secondary.withOpacity(0.2)),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      title.isNotEmpty
+                                          ? title
+                                          : 'Untitled Task',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: theme.primary,
+                                          fontSize: 14),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(Icons.more_vert,
+                                      size: 18, color: theme.onSurface),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Icon(Icons.person_outline,
+                                      size: 14,
+                                      color: theme.onSurface.withOpacity(0.7)),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      userName.isNotEmpty
+                                          ? userName
+                                          : 'Unknown User',
+                                      style: TextStyle(
+                                          fontSize: 12, color: theme.onSurface),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Icon(Icons.access_time,
+                                      size: 14,
+                                      color: theme.onSurface.withOpacity(0.7)),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      dateLabel,
+                                      style: TextStyle(
+                                          fontSize: 12, color: theme.onSurface),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.location_on_outlined,
+                                      size: 14,
+                                      color: theme.onSurface.withOpacity(0.7)),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      location.isNotEmpty
+                                          ? location
+                                          : 'No Location',
+                                      style: TextStyle(
+                                          fontSize: 12, color: theme.onSurface),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Icon(Icons.monetization_on_outlined,
+                                      size: 14,
+                                      color: theme.onSurface.withOpacity(0.7)),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      'NT\$$salary / hour',
+                                      style: TextStyle(
+                                          fontSize: 12, color: theme.onSurface),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.chat_outlined,
+                                      size: 14,
+                                      color: theme.onSurface.withOpacity(0.7)),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      languageRequirement,
+                                      style: TextStyle(
+                                          fontSize: 12, color: theme.onSurface),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Icon(Icons.local_fire_department,
+                                      color: Colors.red, size: 16),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      "Popular",
+                                      style: TextStyle(
+                                          fontSize: 12, color: theme.onSurface),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Icon(Icons.schedule,
+                                      size: 14,
+                                      color: theme.onSurface.withOpacity(0.7)),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      "1 day ago",
+                                      style: TextStyle(
+                                          fontSize: 12, color: theme.onSurface),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  ThemeAwareIcon(icon: Icons.bookmark_border),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       );
                     },
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Consumer<ThemeConfigManager>(
-                    builder: (context, themeManager, child) {
-                      final theme = themeManager.effectiveTheme;
-                      return DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        hint: Text('Language',
-                            style: TextStyle(
-                                color: theme.onSurface.withOpacity(0.7))),
-                        value: selectedLanguage,
-                        style: TextStyle(color: theme.onSurface),
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: theme.surface.withOpacity(0.8),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(
-                                color: theme.secondary.withOpacity(0.3)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(
-                                color: theme.secondary.withOpacity(0.3)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                BorderSide(color: theme.primary, width: 2),
-                          ),
-                        ),
-                        items: languages
-                            .map((lang) => DropdownMenuItem(
-                                  value: lang,
-                                  child: Text(lang,
-                                      style: TextStyle(color: theme.onSurface)),
-                                ))
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedLanguage = value;
-                          });
-                        },
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Consumer<ThemeConfigManager>(
-                    builder: (context, themeManager, child) {
-                      final theme = themeManager.effectiveTheme;
-                      return DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        hint: Text('Status',
-                            style: TextStyle(
-                                color: theme.onSurface.withOpacity(0.7))),
-                        value: selectedStatus,
-                        style: TextStyle(color: theme.onSurface),
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: theme.surface.withOpacity(0.8),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(
-                                color: theme.secondary.withOpacity(0.3)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(
-                                color: theme.secondary.withOpacity(0.3)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide:
-                                BorderSide(color: theme.primary, width: 2),
-                          ),
-                        ),
-                        items: statuses
-                            .map((status) => DropdownMenuItem(
-                                  value: status,
-                                  child: Text(status,
-                                      style: TextStyle(color: theme.onSurface)),
-                                ))
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedStatus = value;
-                          });
-                        },
-                      );
-                    },
-                  ),
-                ),
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _searchController.clear();
-                      searchQuery = '';
-                      selectedLocation = null;
-                      selectedLanguage = null;
-                      selectedStatus = null;
-                    });
-                  },
-                  icon: const Icon(Icons.refresh),
                 ),
               ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: sortedTasks.length,
-              itemBuilder: (context, index) {
-                final task = sortedTasks[index];
-                final date = task['task_date'];
-                String dateLabel = '';
-                if (date != null && date.toString().isNotEmpty) {
-                  try {
-                    final parsedDate = DateTime.tryParse(date.toString());
-                    if (parsedDate != null) {
-                      dateLabel = DateFormat('MM/dd').format(parsedDate);
-                    }
-                  } catch (e) {
-                    dateLabel = '';
-                  }
-                }
-
-                final userName =
-                    task['creator_name']?.toString() ?? 'N/A Poster';
-                final title = task['title']?.toString() ?? '';
-                final location = task['location']?.toString() ?? '';
-                final salary = task['salary']?.toString() ?? '0';
-                final languageRequirement =
-                    task['language_requirement']?.toString() ?? '-';
-
-                return GestureDetector(
-                  onTap: () => _showTaskDetailDialog(task),
-                  child: Consumer<ThemeConfigManager>(
-                    builder: (context, themeManager, child) {
-                      final theme = themeManager.effectiveTheme;
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: theme.surface.withOpacity(0.9),
-                          border: Border.all(
-                              color: theme.secondary.withOpacity(0.2)),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    title.isNotEmpty ? title : 'Untitled Task',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: theme.primary,
-                                        fontSize: 14),
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 2,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Icon(Icons.more_vert,
-                                    size: 18, color: theme.onSurface),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(Icons.person_outline,
-                                    size: 14,
-                                    color: theme.onSurface.withOpacity(0.7)),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    userName.isNotEmpty
-                                        ? userName
-                                        : 'Unknown User',
-                                    style: TextStyle(
-                                        fontSize: 12, color: theme.onSurface),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Icon(Icons.access_time,
-                                    size: 14,
-                                    color: theme.onSurface.withOpacity(0.7)),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    dateLabel,
-                                    style: TextStyle(
-                                        fontSize: 12, color: theme.onSurface),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Icon(Icons.location_on_outlined,
-                                    size: 14,
-                                    color: theme.onSurface.withOpacity(0.7)),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    location.isNotEmpty
-                                        ? location
-                                        : 'No Location',
-                                    style: TextStyle(
-                                        fontSize: 12, color: theme.onSurface),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Icon(Icons.monetization_on_outlined,
-                                    size: 14,
-                                    color: theme.onSurface.withOpacity(0.7)),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    'NT\$$salary / hour',
-                                    style: TextStyle(
-                                        fontSize: 12, color: theme.onSurface),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Icon(Icons.chat_outlined,
-                                    size: 14,
-                                    color: theme.onSurface.withOpacity(0.7)),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    languageRequirement,
-                                    style: TextStyle(
-                                        fontSize: 12, color: theme.onSurface),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Icon(Icons.local_fire_department,
-                                    color: Colors.red, size: 16),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    "Popular",
-                                    style: TextStyle(
-                                        fontSize: 12, color: theme.onSurface),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Icon(Icons.schedule,
-                                    size: 14,
-                                    color: theme.onSurface.withOpacity(0.7)),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    "1 day ago",
-                                    style: TextStyle(
-                                        fontSize: 12, color: theme.onSurface),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                ThemeAwareIcon(icon: Icons.bookmark_border),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+            ));
+      },
     );
   }
 }
