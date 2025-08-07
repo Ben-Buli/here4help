@@ -61,7 +61,7 @@ class _ChatListPageState extends State<ChatListPage>
               children: [
                 Text('Title: ${task['title'] ?? 'N/A'}'),
                 Text('Location: ${task['location']}'),
-                Text('Salary: ${task['salary']}'),
+                Text('Salary: ${task['reward_point'] ?? task['salary']}'),
                 Text(
                     'Date: ${DateFormat('MM/dd').format(DateTime.parse(task['task_date']))}'),
                 Text('Language Requirement: ${task['language_requirement']}'),
@@ -318,7 +318,9 @@ class _ChatListPageState extends State<ChatListPage>
                               children: [
                                 const Text('💰'),
                                 const SizedBox(width: 6),
-                                Expanded(child: Text('${task['salary']}')),
+                                Expanded(
+                                    child: Text(
+                                        '${task['reward_point'] ?? task['salary']}')),
                               ],
                             ),
                           ),

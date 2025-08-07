@@ -549,11 +549,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                         Text(widget.data['task']['description'] ??
                             'No description'),
                         const SizedBox(height: 8),
-                        const Text('Salary:',
+                        const Text('Reward Point:',
                             style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text(widget.data['task']['salary'] != null
-                            ? 'NT\$${widget.data['task']['salary']}'
-                            : '—'),
+                        Text(widget.data['task']['reward_point'] != null
+                            ? 'NT\$${widget.data['task']['reward_point']}'
+                            : widget.data['task']['salary'] != null
+                                ? 'NT\$${widget.data['task']['salary']}'
+                                : 'N/A'),
                         const SizedBox(height: 8),
                         const Text('Request Language:',
                             style: TextStyle(fontWeight: FontWeight.bold)),
@@ -896,7 +898,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                   content: Text(
-                                      'Task confirmed! Salary paid to the creator.')),
+                                      'Task confirmed! Reward point paid to the creator.')),
                             );
                           },
                           child: const Text('Confirm'),
