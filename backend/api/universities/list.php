@@ -12,12 +12,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-    $stmt = $pdo->prepare("SELECT id, zh_name, en_name, abbr FROM universities ORDER BY zh_name ASC");
-    $stmt->execute();
-    $universities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $db = Database::getInstance();
+    
+    $sql = "SELECT id, zh_name, en_name, abbr FROM universities ORDER BY zh_name ASC";
+    $universities = $db->fetchAll($sql);
 
     Response::success($universities, 'Universities retrieved successfully');
 

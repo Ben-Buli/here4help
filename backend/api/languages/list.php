@@ -12,12 +12,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-    $stmt = $pdo->prepare("SELECT id, code, name, native FROM languages ORDER BY name ASC");
-    $stmt->execute();
-    $languages = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $db = Database::getInstance();
+    
+    $sql = "SELECT id, code, name, native FROM languages ORDER BY name ASC";
+    $languages = $db->fetchAll($sql);
 
     Response::success($languages, 'Languages retrieved successfully');
 

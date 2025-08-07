@@ -23,7 +23,7 @@ if (!$input) {
 }
 
 // 驗證必填欄位
-$requiredFields = ['title', 'description', 'salary', 'location', 'task_date', 'language_requirement'];
+$requiredFields = ['title', 'description', 'reward_point', 'location', 'task_date', 'language_requirement'];
 $errors = [];
 
 foreach ($requiredFields as $field) {
@@ -55,7 +55,7 @@ try {
     }
     
     // 插入任務資料
-    $sql = "INSERT INTO tasks (id, creator_name, title, description, salary, location, task_date, status, language_requirement, hashtags, created_at, updated_at) 
+    $sql = "INSERT INTO tasks (id, creator_name, title, description, reward_point, location, task_date, status, language_requirement, hashtags, created_at, updated_at) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
     
     $params = [
@@ -63,7 +63,7 @@ try {
         $input['creator_name'] ?? null,
         $input['title'],
         $input['description'],
-        $input['salary'],
+        $input['reward_point'] ?? $input['salary'] ?? '0', // 支援舊的 salary 欄位
         $input['location'],
         $input['task_date'],
         $input['status'] ?? 'Open',

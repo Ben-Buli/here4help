@@ -79,7 +79,7 @@ class TaskService extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 30));
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
         if (data['success']) {
           // 重新載入任務列表

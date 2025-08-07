@@ -25,115 +25,107 @@ class TaskDataGenerator {
     // 範例任務資料
     private $sampleTasks = [
         [
-            'title' => '協助搬家整理',
-            'description' => '需要協助整理房間和打包物品，主要是書籍和衣物。希望有經驗的人幫忙，工作時間約4小時。',
-            'salary' => '800',
-            'location' => '台北市信義區',
-            'task_date' => '2024-12-25',
-            'language_requirement' => '中文',
-            'hashtags' => ['搬家', '整理', '台北'],
+            'title' => 'Help with English Conversation',
+            'description' => 'Looking for someone to practice English conversation with. Need help with daily conversation skills.',
+            'reward_point' => '800',
+            'location' => 'NTU',
+            'task_date' => '2025-01-15',
+            'language_requirement' => 'English',
+            'hashtags' => ['English', 'Conversation', 'Practice'],
             'application_questions' => [
-                '您有搬家整理的經驗嗎？',
-                '您可以在12月25日上午9點開始工作嗎？',
-                '您能搬運重物嗎？'
+                'Do you have experience teaching English?',
+                'What is your native language?'
             ]
         ],
         [
-            'title' => '英文家教輔導',
-            'description' => '尋找英文家教，主要輔導國中英文課程。每週2次，每次2小時，希望有教學經驗。',
-            'salary' => '1200',
-            'location' => '新北市板橋區',
-            'task_date' => '2024-12-20',
-            'language_requirement' => '英文',
-            'hashtags' => ['家教', '英文', '教育'],
+            'title' => 'Japanese Translation Help',
+            'description' => 'Need help translating a short document from Japanese to English. Document is about 500 words.',
+            'reward_point' => '1200',
+            'location' => 'NCCU',
+            'task_date' => '2025-01-20',
+            'language_requirement' => 'Japanese,English',
+            'hashtags' => ['Japanese', 'Translation', 'Document'],
             'application_questions' => [
-                '您有英文教學經驗嗎？',
-                '您的英文程度如何？',
-                '您能配合週二和週四的課程時間嗎？'
+                'Do you have experience with Japanese translation?',
+                'What is your Japanese proficiency level?'
             ]
         ],
         [
-            'title' => '寵物照顧服務',
-            'description' => '需要照顧兩隻貓咪，包括餵食、清理貓砂、陪伴玩耍。主人出差3天，需要愛貓人士。',
-            'salary' => '1500',
-            'location' => '台中市西區',
-            'task_date' => '2024-12-22',
-            'language_requirement' => '中文',
-            'hashtags' => ['寵物', '照顧', '貓咪'],
+            'title' => 'Math Tutoring for High School Student',
+            'description' => 'Looking for a tutor to help with high school mathematics. Topics include algebra and calculus.',
+            'reward_point' => '1500',
+            'location' => 'NTHU',
+            'task_date' => '2025-01-25',
+            'language_requirement' => 'Chinese,English',
+            'hashtags' => ['Math', 'Tutoring', 'Education'],
             'application_questions' => [
-                '您有照顧貓咪的經驗嗎？',
-                '您能每天來家裡2次嗎？',
-                '您對貓毛過敏嗎？'
+                'What is your educational background in mathematics?',
+                'Do you have experience tutoring high school students?'
             ]
         ],
         [
-            'title' => '網站設計協助',
-            'description' => '需要協助設計小型企業網站，使用WordPress。希望有相關經驗的設計師幫忙。',
-            'salary' => '3000',
-            'location' => '高雄市前金區',
-            'task_date' => '2024-12-28',
-            'language_requirement' => '中文',
-            'hashtags' => ['網站設計', 'WordPress', '設計'],
+            'title' => 'Website Design Consultation',
+            'description' => 'Need consultation for a small business website design. Looking for modern and user-friendly design suggestions.',
+            'reward_point' => '3000',
+            'location' => 'NCKU',
+            'task_date' => '2025-01-30',
+            'language_requirement' => 'English',
+            'hashtags' => ['Design', 'Website', 'Consultation'],
             'application_questions' => [
-                '您有WordPress網站設計經驗嗎？',
-                '您能提供作品集嗎？',
-                '您預計需要多少時間完成？'
+                'What is your experience with website design?',
+                'Can you provide examples of your previous work?'
             ]
         ],
         [
-            'title' => '活動攝影師',
-            'description' => '公司年終聚餐需要攝影師，活動時間約3小時。需要專業攝影設備和經驗。',
-            'salary' => '2500',
-            'location' => '桃園市中壢區',
-            'task_date' => '2024-12-30',
-            'language_requirement' => '中文',
-            'hashtags' => ['攝影', '活動', '年終'],
+            'title' => 'Photography for Event',
+            'description' => 'Need a photographer for a small corporate event. Event will be held in Taipei.',
+            'reward_point' => '2500',
+            'location' => 'NTU',
+            'task_date' => '2025-02-05',
+            'language_requirement' => 'Chinese',
+            'hashtags' => ['Photography', 'Event', 'Corporate'],
             'application_questions' => [
-                '您有活動攝影經驗嗎？',
-                '您使用什麼攝影設備？',
-                '您能提供作品集嗎？'
+                'Do you have experience with event photography?',
+                'What equipment do you use?'
             ]
         ],
         [
-            'title' => '翻譯文件協助',
-            'description' => '需要將中文文件翻譯成英文，約2000字。希望有翻譯經驗的人協助。',
-            'salary' => '1000',
-            'location' => '台南市東區',
-            'task_date' => '2024-12-23',
-            'language_requirement' => '英文',
-            'hashtags' => ['翻譯', '文件', '中英'],
+            'title' => 'Cooking Class Assistant',
+            'description' => 'Looking for an assistant for a cooking class. Need help with preparation and cleanup.',
+            'reward_point' => '1000',
+            'location' => 'NCCU',
+            'task_date' => '2025-02-10',
+            'language_requirement' => 'Chinese,English',
+            'hashtags' => ['Cooking', 'Class', 'Assistant'],
             'application_questions' => [
-                '您有文件翻譯經驗嗎？',
-                '您的英文程度如何？',
-                '您能在3天內完成嗎？'
+                'Do you have experience in cooking or food preparation?',
+                'Are you comfortable working in a kitchen environment?'
             ]
         ],
         [
-            'title' => '居家清潔服務',
-            'description' => '需要居家清潔服務，主要是客廳和廚房。希望有清潔經驗的人幫忙。',
-            'salary' => '600',
-            'location' => '新竹市東區',
-            'task_date' => '2024-12-24',
-            'language_requirement' => '中文',
-            'hashtags' => ['清潔', '居家', '服務'],
+            'title' => 'Data Entry Work',
+            'description' => 'Need help with data entry work. Simple Excel spreadsheet work.',
+            'reward_point' => '600',
+            'location' => 'NTHU',
+            'task_date' => '2025-02-15',
+            'language_requirement' => 'Chinese',
+            'hashtags' => ['Data Entry', 'Excel', 'Office'],
             'application_questions' => [
-                '您有居家清潔經驗嗎？',
-                '您能提供清潔用品嗎？',
-                '您預計需要多少時間？'
+                'Do you have experience with Excel?',
+                'How fast can you type?'
             ]
         ],
         [
-            'title' => '程式開發協助',
-            'description' => '需要協助開發簡單的Android應用程式，功能是計算器。希望有Android開發經驗。',
-            'salary' => '5000',
-            'location' => '台北市大安區',
-            'task_date' => '2024-12-31',
-            'language_requirement' => '中文',
-            'hashtags' => ['程式開發', 'Android', '應用程式'],
+            'title' => 'Business Plan Review',
+            'description' => 'Need someone to review and provide feedback on a business plan.',
+            'reward_point' => '5000',
+            'location' => 'NCKU',
+            'task_date' => '2025-02-20',
+            'language_requirement' => 'English',
+            'hashtags' => ['Business', 'Plan', 'Review'],
             'application_questions' => [
-                '您有Android開發經驗嗎？',
-                '您使用什麼開發工具？',
-                '您能提供作品集嗎？'
+                'What is your background in business?',
+                'Do you have experience reviewing business plans?'
             ]
         ]
     ];
@@ -181,7 +173,7 @@ class TaskDataGenerator {
                 }
                 
                 // 插入任務資料
-                $sql = "INSERT INTO tasks (id, creator_name, title, description, salary, location, task_date, status, language_requirement, hashtags, created_at, updated_at) 
+                $sql = "INSERT INTO tasks (id, creator_name, title, description, reward_point, location, task_date, status, language_requirement, hashtags, created_at, updated_at) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
                 
                 $params = [
@@ -189,7 +181,7 @@ class TaskDataGenerator {
                     $creatorName,
                     $taskData['title'],
                     $taskData['description'],
-                    $taskData['salary'],
+                    $taskData['reward_point'],
                     $taskData['location'],
                     $taskData['task_date'],
                     'Open',
@@ -230,12 +222,12 @@ class TaskDataGenerator {
      */
     public function checkEmptyFields() {
         try {
-            $sql = "SELECT id, creator_name, title, description, salary, location, task_date, language_requirement 
+            $sql = "SELECT id, creator_name, title, description, reward_point, location, task_date, language_requirement 
                     FROM tasks 
                     WHERE creator_name IS NULL 
                        OR title IS NULL 
                        OR description IS NULL 
-                       OR salary IS NULL 
+                       OR reward_point IS NULL 
                        OR location IS NULL 
                        OR task_date IS NULL 
                        OR language_requirement IS NULL";
@@ -279,9 +271,9 @@ class TaskDataGenerator {
                     $params[] = $taskData['description'];
                 }
                 
-                if (empty($task['salary'])) {
-                    $updateFields[] = "salary = ?";
-                    $params[] = $taskData['salary'];
+                if (empty($task['reward_point'])) {
+                    $updateFields[] = "reward_point = ?";
+                    $params[] = $taskData['reward_point'];
                 }
                 
                 if (empty($task['location'])) {
@@ -312,7 +304,7 @@ class TaskDataGenerator {
                             'creator_name' => empty($task['creator_name']),
                             'title' => empty($task['title']),
                             'description' => empty($task['description']),
-                            'salary' => empty($task['salary']),
+                            'reward_point' => empty($task['reward_point']),
                             'location' => empty($task['location']),
                             'task_date' => empty($task['task_date']),
                             'language_requirement' => empty($task['language_requirement'])
