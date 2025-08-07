@@ -17,10 +17,9 @@ import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/constants/app_colors.dart';
 import 'package:here4help/utils/image_helper.dart';
-import 'package:here4help/utils/path_mapper.dart';
 
 const String kTaskTitleField = 'Task Title';
-const String kSalaryField = 'Salary';
+const String kRewardPointField = 'Reward Point';
 const String kTimeField = 'Time';
 const String kPostingPeriodField = 'Posting period';
 
@@ -33,7 +32,7 @@ class TaskCreatePage extends StatefulWidget {
 
 class _PostFormPageState extends State<TaskCreatePage> {
   final MapController _mapController = MapController();
-  final TextEditingController _salaryController = TextEditingController();
+  final TextEditingController _rewardPointController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
   late final TextEditingController _taskDescriptionController;
   String _languageRequirement = '';
@@ -49,9 +48,11 @@ class _PostFormPageState extends State<TaskCreatePage> {
 
   final Set<String> _errorFields = {};
   List<String> _selectedLanguages = [];
-  final List<String> _applicationQuestions = [''];
+  final List<String> _applicationQuestions = [];
   List<Map<String, dynamic>> _universities = [];
   List<Map<String, dynamic>> _languages = [];
+  bool _showApplicationQuestionErrors =
+      false; // 新增：控制是否顯示 application questions 錯誤提示
 
   @override
   void initState() {
@@ -63,25 +64,16 @@ class _PostFormPageState extends State<TaskCreatePage> {
         text:
             'Need help with opening a bank account. Looking for someone who can guide me through the process and accompany me to the bank.');
     final formatter = NumberFormat('#,##0', 'en_US');
-    _salaryController.text = formatter.format(500);
+    _rewardPointController.text = formatter.format(500);
     _locationLabel = 'NCCU';
     _locationSearchController.text = 'NCCU';
     final now = DateTime.now();
     _taskDate = DateTime(now.year, now.month, now.day, now.hour, now.minute);
     _periodStart = DateTime(2025, 9, 10, 12, 0);
     _periodEnd = DateTime(2025, 9, 10, 13, 0);
-    _applicationQuestions[0] = 'Do you have relevant experience?';
+    // 初始化為空列表，讓用戶可以自由添加問題
+    _applicationQuestions.clear();
     _languageRequirement = 'English,Japanese';
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        setState(() {
-          _selectedLanguages = _languageRequirement.split(',');
-        });
-        // 測試頭像讀取功能
-        _testAvatarLoading();
-      }
-    });
 
     _loadUniversities();
     _loadLanguages();
@@ -126,6 +118,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
       final languages = await LanguageService.getLanguages();
       setState(() {
         _languages = languages;
+        // 設置初始選中的語言
+        _selectedLanguages = _getLanguageCodesFromNames(_languageRequirement);
       });
     } catch (e) {
       setState(() {
@@ -135,20 +129,85 @@ class _PostFormPageState extends State<TaskCreatePage> {
           {'code': 'ja', 'name': 'Japanese', 'native': '日本語'},
           {'code': 'ko', 'name': 'Korean', 'native': '한국어'},
         ];
+        // 設置初始選中的語言
+        _selectedLanguages = _getLanguageCodesFromNames(_languageRequirement);
       });
     }
   }
 
+  // 根據語言名稱獲取語言代碼
+  List<String> _getLanguageCodesFromNames(String languageNames) {
+    List<String> codes = [];
+    List<String> names = languageNames
+        .split(',')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+
+    // 如果語言列表還沒有加載，返回空列表
+    if (_languages.isEmpty) {
+      return codes;
+    }
+
+    for (String name in names) {
+      // 嘗試匹配語言名稱或原生名稱
+      final matchedLanguage = _languages.firstWhere(
+        (lang) {
+          final langName = lang['name']?.toString().toLowerCase() ?? '';
+          final langNative = lang['native']?.toString().toLowerCase() ?? '';
+          final searchName = name.toLowerCase();
+
+          return langName.contains(searchName) ||
+              langNative.contains(searchName) ||
+              searchName.contains(langName) ||
+              searchName.contains(langNative);
+        },
+        orElse: () => <String, dynamic>{},
+      );
+
+      if (matchedLanguage.isNotEmpty && matchedLanguage['name'] != null) {
+        codes.add(matchedLanguage['name']!);
+      }
+    }
+
+    return codes;
+  }
+
   void _addApplicationQuestion() {
-    if (_applicationQuestions.isEmpty ||
-        _applicationQuestions.last.trim().isNotEmpty) {
+    // 檢查是否有未填寫的問題
+    bool hasEmptyQuestion = false;
+    for (int i = 0; i < _applicationQuestions.length; i++) {
+      if (_applicationQuestions[i].trim().isEmpty) {
+        hasEmptyQuestion = true;
+        break;
+      }
+    }
+
+    if (hasEmptyQuestion) {
+      // 設置顯示錯誤狀態
+      setState(() {
+        _showApplicationQuestionErrors = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Please fill in all existing questions before adding a new one.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (_applicationQuestions.length < 3) {
       setState(() {
         _applicationQuestions.add('');
+        _showApplicationQuestionErrors = false; // 重置錯誤顯示狀態
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please complete the previous question first.'),
+          content: Text('You can add up to 3 questions maximum.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -160,73 +219,6 @@ class _PostFormPageState extends State<TaskCreatePage> {
       setState(() {
         _applicationQuestions.removeAt(index);
       });
-    }
-  }
-
-  ImageProvider? _getAvatarImage() {
-    final user = Provider.of<UserService>(context, listen: false).currentUser;
-    final avatarUrl = user?.avatar_url;
-
-    if (avatarUrl != null && avatarUrl.isNotEmpty) {
-      try {
-        // 檢查是否是 Flutter assets 路徑
-        final isAsset = PathMapper.isFlutterAsset(avatarUrl);
-
-        // 檢查是否是本地資源
-        final isLocalAsset = ImageHelper.isLocalAsset(avatarUrl);
-
-        // 檢查是否是網路圖片
-        final isNetworkImage = ImageHelper.isNetworkImage(avatarUrl);
-
-        // 直接測試 AssetImage 創建
-        if (avatarUrl.startsWith('assets/')) {
-          final directAssetImage = AssetImage(avatarUrl);
-        }
-
-        final imageProvider = ImageHelper.getAvatarImage(avatarUrl);
-        return imageProvider;
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
-  }
-
-  Widget? _getAvatarChild() {
-    final user = Provider.of<UserService>(context, listen: false).currentUser;
-    final avatarUrl = user?.avatar_url;
-
-    if (avatarUrl == null || avatarUrl.isEmpty) {
-      final themeManager =
-          Provider.of<ThemeConfigManager>(context, listen: false);
-      final theme = themeManager.effectiveTheme;
-      return Icon(
-        Icons.person,
-        color: theme.primary,
-        size: 24,
-      );
-    }
-    return null;
-  }
-
-  /// 測試頭像讀取功能
-  void _testAvatarLoading() {
-    final user = Provider.of<UserService>(context, listen: false).currentUser;
-
-    if (user?.avatar_url != null && user!.avatar_url.isNotEmpty) {
-      try {
-        // 直接測試 AssetImage
-        if (user.avatar_url.startsWith('assets/')) {
-          final assetImage = AssetImage(user.avatar_url);
-
-          // 測試 PathMapper.isFlutterAsset
-          final isFlutterAsset = PathMapper.isFlutterAsset(user.avatar_url);
-        }
-
-        final imageProvider = ImageHelper.getAvatarImage(user.avatar_url);
-      } catch (e) {
-        // Error handling
-      }
     }
   }
 
@@ -277,81 +269,106 @@ class _PostFormPageState extends State<TaskCreatePage> {
   }
 
   Widget _buildPersonalInfoSection() {
-    final themeManager =
-        Provider.of<ThemeConfigManager>(context, listen: false);
-    final theme = themeManager.effectiveTheme;
+    final userService = Provider.of<UserService>(context, listen: true);
+    final user = userService.currentUser;
+    final userName = user?.name ?? 'Unknown User';
+    final avatarUrl = user?.avatar_url ?? '';
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Personal Information',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: theme.primary,
-          ),
+    // Debug: 打印用戶資訊
+    debugPrint(
+        '🔍 PersonalInfoSection - User: ${user?.name}, Avatar: ${user?.avatar_url}');
+
+    // 如果正在載入用戶資料，顯示載入狀態
+    if (userService.isLoading) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[300]!),
         ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.grey[50],
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey[300]!),
-          ),
-          child: Row(
-            children: [
-              Builder(
-                builder: (context) {
-                  final avatarImage = _getAvatarImage();
-                  return CircleAvatar(
-                    radius: 24,
-                    backgroundColor: theme.primary.withOpacity(0.1),
-                    backgroundImage: avatarImage,
-                    onBackgroundImageError: avatarImage != null
-                        ? (exception, stackTrace) {
-                            debugPrint('❌ Avatar loading error: $exception');
-                          }
-                        : null,
-                    child: _getAvatarChild(),
-                  );
-                },
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: Colors.grey[300],
+              backgroundImage: ImageHelper.getDefaultAvatar(),
+              child: const CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Loading...',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Task Creator',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      Provider.of<UserService>(context, listen: false)
-                              .currentUser
-                              ?.name ??
-                          'Unknown Poster',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      'Task Creator',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
+            ),
+            const CircularProgressIndicator(strokeWidth: 2),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Row(
+        children: [
+          // 用戶頭貼
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: Colors.grey[300],
+            backgroundImage: ImageHelper.getAvatarImage(avatarUrl) ??
+                ImageHelper.getDefaultAvatar(),
+            child: ImageHelper.getAvatarImage(avatarUrl) == null
+                ? Icon(Icons.person, color: Colors.grey[600])
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  userName,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const Icon(
-                Icons.check_circle,
-                color: Colors.green,
-                size: 20,
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  'Task Creator',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+          Icon(Icons.check_circle, color: Colors.green),
+        ],
+      ),
     );
   }
 
@@ -391,13 +408,13 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: theme.error.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Required',
                     style: TextStyle(
-                      color: Colors.red,
+                      color: theme.error,
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),
@@ -421,8 +438,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide:
-                      const BorderSide(color: AppColors.primary, width: 2),
+                  borderSide: BorderSide(color: theme.primary, width: 2),
                 ),
                 filled: true,
                 fillColor: Colors.white,
@@ -439,14 +455,14 @@ class _PostFormPageState extends State<TaskCreatePage> {
         ),
         const SizedBox(height: 16),
 
-        // Salary
+        // Reward Point
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 const Text(
-                  'Reward',
+                  'Reward Point',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -457,13 +473,13 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: theme.error.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Required',
                     style: TextStyle(
-                      color: Colors.red,
+                      color: theme.error,
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),
@@ -482,13 +498,6 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: theme.primary.withOpacity(0.1),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(8),
-                        bottomLeft: Radius.circular(8),
-                      ),
-                    ),
                     child: Text(
                       '💰',
                       style: TextStyle(
@@ -499,8 +508,11 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   ),
                   Expanded(
                     child: TextFormField(
-                      controller: _salaryController,
+                      controller: _rewardPointController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
                       decoration: const InputDecoration(
                         hintText: '0',
                         border: InputBorder.none, // 隱藏所有狀態下的邊框
@@ -511,19 +523,21 @@ class _PostFormPageState extends State<TaskCreatePage> {
                         focusedErrorBorder: InputBorder.none,
                         contentPadding:
                             EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        filled: true,
+                        fillColor: Colors.white,
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Please enter a salary';
+                          return 'Please enter a reward point';
                         }
                         // 檢查是否為有效數字
-                        final number = double.tryParse(value);
+                        final number = int.tryParse(value);
                         if (number == null) {
-                          return 'Please enter a valid number';
+                          return 'Please enter a valid integer';
                         }
-                        // 檢查是否小於0
-                        if (number < 0) {
-                          return 'Salary cannot be negative';
+                        // 檢查是否大於0
+                        if (number <= 0) {
+                          return 'Reward point must be greater than 0';
                         }
                         return null;
                       },
@@ -532,13 +546,6 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: theme.primary.withOpacity(0.1),
-                      borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(8),
-                        bottomRight: Radius.circular(8),
-                      ),
-                    ),
                     child: Center(
                       child: Text(
                         '/hour',
@@ -653,13 +660,13 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: theme.error.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Required',
                     style: TextStyle(
-                      color: Colors.red,
+                      color: theme.error,
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),
@@ -685,8 +692,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide:
-                      const BorderSide(color: AppColors.primary, width: 2),
+                  borderSide: BorderSide(color: theme.primary, width: 2),
                 ),
                 filled: true,
                 fillColor: Colors.white,
@@ -706,6 +712,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
   }
 
   Widget _buildTaskTitleCard() {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
     return _buildFormCard(
       title: 'Task Title',
       icon: Icons.title,
@@ -726,21 +736,21 @@ class _PostFormPageState extends State<TaskCreatePage> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppColors.primary, width: 2),
+            borderSide: BorderSide(color: theme.primary, width: 2),
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Colors.red, width: 2),
+            borderSide: BorderSide(color: theme.error, width: 2),
           ),
           filled: true,
           fillColor: _errorFields.contains(kTaskTitleField)
-              ? Colors.red[50]
+              ? theme.error.withOpacity(0.1)
               : Colors.white,
           prefixIcon: Icon(
             Icons.edit,
             color: _errorFields.contains(kTaskTitleField)
-                ? Colors.red
-                : AppColors.primary,
+                ? theme.error
+                : theme.primary,
           ),
         ),
         onChanged: (_) {
@@ -752,23 +762,27 @@ class _PostFormPageState extends State<TaskCreatePage> {
     );
   }
 
-  Widget _buildSalaryCard() {
+  Widget _buildRewardPointCard() {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
     return _buildFormCard(
-      title: 'Reward',
+      title: 'Reward Point',
       icon: Icons.attach_money,
       isRequired: true,
-      isError: _errorFields.contains(kSalaryField),
+      isError: _errorFields.contains(kRewardPointField),
       child: Container(
         decoration: BoxDecoration(
           border: Border.all(
-            color: _errorFields.contains(kSalaryField)
-                ? Colors.red
+            color: _errorFields.contains(kRewardPointField)
+                ? theme.error
                 : Colors.grey[300]!,
-            width: _errorFields.contains(kSalaryField) ? 2 : 1,
+            width: _errorFields.contains(kRewardPointField) ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(8),
-          color: _errorFields.contains(kSalaryField)
-              ? Colors.red[50]
+          color: _errorFields.contains(kRewardPointField)
+              ? theme.error.withOpacity(0.1)
               : Colors.white,
         ),
         child: Row(
@@ -776,21 +790,21 @@ class _PostFormPageState extends State<TaskCreatePage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: theme.primary.withOpacity(0.1),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(8),
                   bottomLeft: Radius.circular(8),
                 ),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.attach_money,
-                color: AppColors.primary,
+                color: theme.primary,
                 size: 24,
               ),
             ),
             Expanded(
               child: TextFormField(
-                controller: _salaryController,
+                controller: _rewardPointController,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: const InputDecoration(
@@ -804,13 +818,13 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   final digits = value.replaceAll(RegExp(r'[^\d]'), '');
                   final number = int.tryParse(digits) ?? 0;
                   final formatted = formatter.format(number);
-                  _salaryController.value = TextEditingValue(
+                  _rewardPointController.value = TextEditingValue(
                     text: formatted,
                     selection:
                         TextSelection.collapsed(offset: formatted.length),
                   );
-                  if (_errorFields.contains(kSalaryField)) {
-                    setState(() => _errorFields.remove(kSalaryField));
+                  if (_errorFields.contains(kRewardPointField)) {
+                    setState(() => _errorFields.remove(kRewardPointField));
                   }
                 },
               ),
@@ -825,7 +839,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 ),
               ),
               child: Text(
-                '/hour',
+                '/point',
                 style: TextStyle(
                   color: Colors.grey[600],
                   fontWeight: FontWeight.w500,
@@ -839,6 +853,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
   }
 
   Widget _buildLocationCard() {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
     return _buildFormCard(
       title: 'Location',
       icon: Icons.location_on,
@@ -853,9 +871,9 @@ class _PostFormPageState extends State<TaskCreatePage> {
           ),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.location_on,
-                color: AppColors.primary,
+                color: theme.primary,
                 size: 20,
               ),
               const SizedBox(width: 12),
@@ -896,9 +914,9 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right,
-                color: AppColors.primary,
+                color: theme.primary,
               ),
             ],
           ),
@@ -929,20 +947,21 @@ class _PostFormPageState extends State<TaskCreatePage> {
           decoration: BoxDecoration(
             border: Border.all(
               color: _errorFields.contains('Time')
-                  ? Colors.red
+                  ? theme.error
                   : Colors.grey[300]!,
               width: _errorFields.contains('Time') ? 2 : 1,
             ),
             borderRadius: BorderRadius.circular(8),
-            color:
-                _errorFields.contains('Time') ? Colors.red[50] : Colors.white,
+            color: _errorFields.contains('Time')
+                ? theme.error.withOpacity(0.1)
+                : Colors.white,
           ),
           child: Row(
             children: [
               Icon(
                 Icons.calendar_today,
                 color:
-                    _errorFields.contains('Time') ? Colors.red : theme.primary,
+                    _errorFields.contains('Time') ? theme.error : theme.primary,
                 size: 20,
               ),
               const SizedBox(width: 12),
@@ -970,6 +989,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
   }
 
   Widget _buildPostingPeriodCard() {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
     return _buildFormCard(
       title: 'Posting Period',
       icon: Icons.schedule,
@@ -1005,10 +1028,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
                         );
                         if (combined.isBefore(DateTime.now())) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
+                            SnackBar(
+                              content: const Text(
                                   'Start date cannot be earlier than the current time.'),
-                              backgroundColor: Colors.red,
+                              backgroundColor: theme.error,
                             ),
                           );
                         } else {
@@ -1053,10 +1076,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
                         if (_periodStart != null &&
                             combined.isBefore(_periodStart!)) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
+                            SnackBar(
+                              content: const Text(
                                   'End date cannot be earlier than or equal to the start date.'),
-                              backgroundColor: Colors.red,
+                              backgroundColor: theme.error,
                             ),
                           );
                         } else {
@@ -1120,6 +1143,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
   }
 
   Widget _buildApplicationQuestionsCard() {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
     return _buildFormCard(
       title: 'Application Questions',
       icon: Icons.question_answer,
@@ -1134,18 +1161,21 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 decoration: BoxDecoration(
                   border: Border.all(
                     color: _errorFields.contains('ApplicationQuestion$index') ||
-                            _applicationQuestions[index].length > 500
-                        ? Colors.red
+                            (_showApplicationQuestionErrors &&
+                                _applicationQuestions[index].trim().isEmpty)
+                        ? theme.error
                         : Colors.grey[300]!,
                     width: _errorFields.contains('ApplicationQuestion$index') ||
-                            _applicationQuestions[index].length > 500
+                            (_showApplicationQuestionErrors &&
+                                _applicationQuestions[index].trim().isEmpty)
                         ? 2
                         : 1,
                   ),
                   borderRadius: BorderRadius.circular(8),
                   color: _errorFields.contains('ApplicationQuestion$index') ||
-                          _applicationQuestions[index].length > 500
-                      ? Colors.red[50]
+                          (_showApplicationQuestionErrors &&
+                              _applicationQuestions[index].trim().isEmpty)
+                      ? theme.error.withValues(alpha: 0.1)
                       : Colors.white,
                 ),
                 child: Column(
@@ -1157,13 +1187,13 @@ class _PostFormPageState extends State<TaskCreatePage> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: theme.primary.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             'Q$labelNumber',
-                            style: const TextStyle(
-                              color: AppColors.primary,
+                            style: TextStyle(
+                              color: theme.primary,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -1184,7 +1214,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                             child: IconButton(
                               icon: Icon(
                                 Icons.delete_outline,
-                                color: Colors.red[400],
+                                color: theme.error,
                                 size: 20,
                               ),
                               onPressed: () async {
@@ -1194,22 +1224,33 @@ class _PostFormPageState extends State<TaskCreatePage> {
                                 if (hasValue) {
                                   final confirm = await showDialog<bool>(
                                     context: context,
-                                    builder: (context) => AlertDialog(
+                                    builder: (BuildContext dialogContext) =>
+                                        AlertDialog(
                                       title: const Text('Confirm Delete'),
                                       content: const Text(
                                           'Are you sure you want to delete this question?'),
                                       actions: [
                                         TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, false),
+                                          onPressed: () {
+                                            if (Navigator.canPop(
+                                                dialogContext)) {
+                                              Navigator.of(dialogContext)
+                                                  .pop(false);
+                                            }
+                                          },
                                           child: const Text('Cancel'),
                                         ),
                                         TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context, true),
-                                          child: const Text('Delete',
-                                              style:
-                                                  TextStyle(color: Colors.red)),
+                                          onPressed: () {
+                                            if (Navigator.canPop(
+                                                dialogContext)) {
+                                              Navigator.of(dialogContext)
+                                                  .pop(true);
+                                            }
+                                          },
+                                          child: Text('Delete',
+                                              style: TextStyle(
+                                                  color: theme.error)),
                                         ),
                                       ],
                                     ),
@@ -1241,8 +1282,83 @@ class _PostFormPageState extends State<TaskCreatePage> {
                       onChanged: (value) {
                         setState(() {
                           _applicationQuestions[index] = value;
+                          // 如果用戶開始填寫問題，清除錯誤顯示狀態
+                          if (value.trim().isNotEmpty &&
+                              _showApplicationQuestionErrors) {
+                            _showApplicationQuestionErrors = false;
+                          }
                         });
                       },
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${_applicationQuestions[index].length}/500 characters',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _applicationQuestions[index].length > 500
+                                ? theme.error
+                                : _applicationQuestions[index].length > 450
+                                    ? Colors.orange
+                                    : Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (_applicationQuestions[index].length > 480)
+                          Row(
+                            children: [
+                              Icon(
+                                _applicationQuestions[index].length > 500
+                                    ? Icons.error_outline
+                                    : Icons.warning_amber_rounded,
+                                size: 16,
+                                color: _applicationQuestions[index].length > 500
+                                    ? theme.error
+                                    : Colors.orange,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _applicationQuestions[index].length > 500
+                                    ? '字數超限'
+                                    : '接近字數上限',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color:
+                                      _applicationQuestions[index].length > 500
+                                          ? theme.error
+                                          : Colors.orange,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        // 顯示未填寫問題的錯誤提示
+                        if (_showApplicationQuestionErrors &&
+                            _applicationQuestions[index].trim().isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  size: 16,
+                                  color: theme.error,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Please fill in this question',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.error,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -1251,15 +1367,16 @@ class _PostFormPageState extends State<TaskCreatePage> {
           }),
           if (_applicationQuestions.length < 3)
             Center(
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: TextButton.icon(
-                  onPressed: _addApplicationQuestion,
-                  icon: const Icon(Icons.add, color: AppColors.primary),
-                  label: const Text(
-                    'Add Question',
-                    style: TextStyle(color: AppColors.primary),
-                  ),
+              child: OutlinedButton.icon(
+                onPressed: _addApplicationQuestion,
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: theme.primary),
+                  backgroundColor: theme.primary.withValues(alpha: 0.1),
+                ),
+                icon: Icon(Icons.add, color: theme.primary),
+                label: Text(
+                  'Add Question',
+                  style: TextStyle(color: theme.primary),
                 ),
               ),
             ),
@@ -1268,15 +1385,44 @@ class _PostFormPageState extends State<TaskCreatePage> {
     );
   }
 
-  Widget _buildLanguageRequirementCard() {
-    return _buildFormCard(
-      title: 'Language Requirements',
-      icon: Icons.language,
-      isRequired: true,
-      isError: _errorFields.contains('Language Requirement'),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
+  Widget _buildLanguageSection() {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Language Requirements',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: theme.primary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: theme.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                'Required',
+                style: TextStyle(
+                  color: theme.error,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        GestureDetector(
           onTap: () async {
             final result = await showModalBottomSheet<List<String>>(
               context: context,
@@ -1286,89 +1432,140 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 List<String> tempSelected = List.from(_selectedLanguages);
                 TextEditingController searchController =
                     TextEditingController();
-                return Container(
-                  height: 400,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.only(top: 8),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
+                List<Map<String, dynamic>> filteredLanguages =
+                    List.from(_languages);
+
+                return StatefulBuilder(
+                  builder: (context, setState) {
+                    return Container(
+                      height: 400,
+                      decoration: BoxDecoration(
+                        color: theme.surface,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: TextField(
-                          controller: searchController,
-                          decoration: InputDecoration(
-                            hintText: 'Search languages',
-                            prefixIcon: const Icon(Icons.search),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
+                      child: Column(
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.only(top: 8),
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: theme.outlineVariant,
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: _languages.length,
-                          itemBuilder: (context, index) {
-                            final lang = _languages[index];
-                            final isSelected =
-                                tempSelected.contains(lang['code']);
-                            return CheckboxListTile(
-                              value: isSelected,
-                              title: Text(lang['native'] ?? lang['name'] ?? ''),
-                              onChanged: (checked) {
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: TextField(
+                              controller: searchController,
+                              decoration: InputDecoration(
+                                hintText: 'Search languages',
+                                prefixIcon:
+                                    Icon(Icons.search, color: theme.primary),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide:
+                                      BorderSide(color: theme.outlineVariant),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide:
+                                      BorderSide(color: theme.outlineVariant),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(color: theme.primary),
+                                ),
+                              ),
+                              onChanged: (value) {
                                 setState(() {
-                                  if (checked == true) {
-                                    tempSelected.add(lang['code']);
+                                  if (value.trim().isEmpty) {
+                                    filteredLanguages = List.from(_languages);
                                   } else {
-                                    tempSelected.remove(lang['code']);
+                                    filteredLanguages =
+                                        _languages.where((lang) {
+                                      final name = lang['name']
+                                              ?.toString()
+                                              .toLowerCase() ??
+                                          '';
+                                      final native = lang['native']
+                                              ?.toString()
+                                              .toLowerCase() ??
+                                          '';
+                                      final searchTerm = value.toLowerCase();
+                                      return name.contains(searchTerm) ||
+                                          native.contains(searchTerm);
+                                    }).toList();
                                   }
                                 });
                               },
-                            );
-                          },
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.pop(context, null),
-                                child: const Text('Cancel'),
-                              ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () =>
-                                    Navigator.pop(context, tempSelected),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
+                          ),
+                          Expanded(
+                            child: ListView.builder(
+                              itemCount: filteredLanguages.length,
+                              itemBuilder: (context, index) {
+                                final lang = filteredLanguages[index];
+                                final isSelected =
+                                    tempSelected.contains(lang['name']);
+                                return CheckboxListTile(
+                                  value: isSelected,
+                                  title: Text(
+                                    lang['name'] ?? lang['native'] ?? '',
+                                    style: TextStyle(color: theme.onSurface),
+                                  ),
+                                  activeColor: theme.primary,
+                                  onChanged: (checked) {
+                                    setState(() {
+                                      if (checked == true) {
+                                        tempSelected.add(lang['name']);
+                                      } else {
+                                        tempSelected.remove(lang['name']);
+                                      }
+                                    });
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () {
+                                      if (Navigator.canPop(context)) {
+                                        Navigator.of(context).pop(null);
+                                      }
+                                    },
+                                    child: const Text('Cancel'),
+                                  ),
                                 ),
-                                child: const Text('Confirm'),
-                              ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      if (Navigator.canPop(context)) {
+                                        Navigator.of(context).pop(tempSelected);
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: theme.primary,
+                                    ),
+                                    child: const Text('Confirm'),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 );
               },
             );
@@ -1384,22 +1581,22 @@ class _PostFormPageState extends State<TaskCreatePage> {
             decoration: BoxDecoration(
               border: Border.all(
                 color: _errorFields.contains('Language Requirement')
-                    ? Colors.red
-                    : Colors.grey[300]!,
+                    ? theme.error
+                    : theme.outlineVariant,
                 width: _errorFields.contains('Language Requirement') ? 2 : 1,
               ),
               borderRadius: BorderRadius.circular(8),
               color: _errorFields.contains('Language Requirement')
-                  ? Colors.red[50]
-                  : Colors.white,
+                  ? theme.error.withValues(alpha: 0.1)
+                  : theme.surface,
             ),
             child: Row(
               children: [
                 Icon(
                   Icons.language,
                   color: _errorFields.contains('Language Requirement')
-                      ? Colors.red
-                      : AppColors.primary,
+                      ? theme.error
+                      : theme.primary,
                   size: 20,
                 ),
                 const SizedBox(width: 12),
@@ -1407,27 +1604,24 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   child: _selectedLanguages.isEmpty
                       ? Text(
                           'Select preferred languages',
-                          style: TextStyle(color: Colors.grey[500]),
+                          style: TextStyle(
+                              color: theme.onSurface.withValues(alpha: 0.6)),
                         )
                       : Wrap(
                           spacing: 8,
                           runSpacing: 4,
-                          children: _selectedLanguages.map((code) {
-                            final language = _languages.firstWhere(
-                              (lang) => lang['code'] == code,
-                              orElse: () => {'native': code},
-                            );
+                          children: _selectedLanguages.map((name) {
                             return Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
+                                color: theme.primary.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                language['native'] ?? code,
-                                style: const TextStyle(
-                                  color: AppColors.primary,
+                                name,
+                                style: TextStyle(
+                                  color: theme.primary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -1436,31 +1630,35 @@ class _PostFormPageState extends State<TaskCreatePage> {
                           }).toList(),
                         ),
                 ),
-                const Icon(
+                Icon(
                   Icons.arrow_drop_down,
-                  color: AppColors.primary,
+                  color: theme.primary,
                 ),
               ],
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _buildWarningMessage() {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.orange[50],
-        border: Border.all(color: Colors.orange[200]!),
+        color: theme.error.withOpacity(0.1),
+        border: Border.all(color: theme.error.withOpacity(0.3)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
           Icon(
             Icons.warning_amber_rounded,
-            color: Colors.orange[700],
+            color: theme.error,
             size: 24,
           ),
           const SizedBox(width: 12),
@@ -1468,7 +1666,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
             child: Text(
               'Please abide by platform regulations and do not post false or fraudulent information. Violators will be held legally responsible.',
               style: TextStyle(
-                color: Colors.orange[800],
+                color: theme.error,
                 fontSize: 14,
               ),
             ),
@@ -1502,8 +1700,21 @@ class _PostFormPageState extends State<TaskCreatePage> {
           final data = {
             'title': _titleController.text.trim(),
             'description': _taskDescriptionController.text.trim(),
-            'salary': _salaryController.text.trim(),
-            'location': _locationLabel.isNotEmpty ? _locationLabel : 'N/A',
+            'reward_point':
+                _formatRewardPoint(_rewardPointController.text.trim()),
+            'location': () {
+              // 檢查是否有匹配的大學
+              final matched = _universities.firstWhere(
+                (uni) =>
+                    uni['en_name'] == _locationLabel ||
+                    uni['zh_name'] == _locationLabel,
+                orElse: () => <String, dynamic>{},
+              );
+              if (matched.isNotEmpty) {
+                return matched['abbr']!; // 返回大學縮寫
+              }
+              return _locationLabel.isNotEmpty ? _locationLabel : 'N/A';
+            }(),
             'task_date': _taskDate != null
                 ? _taskDate!.toLocal().toString().split(' ')[0]
                 : 'N/A',
@@ -1522,7 +1733,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
 
           final requiredFields = {
             kTaskTitleField: data['title'],
-            kSalaryField: data['salary'],
+            kRewardPointField: data['reward_point'],
             kTimeField: data['task_date'],
             kPostingPeriodField:
                 data['periodStart'] != 'N/A' && data['periodEnd'] != 'N/A',
@@ -1567,7 +1778,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(errorMessage),
-                backgroundColor: Colors.red,
+                backgroundColor: theme.error,
               ),
             );
             return;
@@ -1580,14 +1791,23 @@ class _PostFormPageState extends State<TaskCreatePage> {
 
             // 導航到預覽頁面
             if (mounted) {
-              context.push('/task/create/preview');
+              try {
+                context.push('/task/create/preview');
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Navigation error: $e'),
+                    backgroundColor: theme.error,
+                  ),
+                );
+              }
             }
           } catch (e) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Error saving task data: $e'),
-                  backgroundColor: Colors.red,
+                  backgroundColor: theme.error,
                 ),
               );
             }
@@ -1611,6 +1831,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
     bool isRequired = false,
     bool isError = false,
   }) {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -1634,13 +1858,13 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: (isError ? Colors.red : AppColors.primary)
+                    color: (isError ? theme.error : theme.primary)
                         .withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     icon,
-                    color: isError ? Colors.red : AppColors.primary,
+                    color: isError ? theme.error : theme.primary,
                     size: 20,
                   ),
                 ),
@@ -1651,7 +1875,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: isError ? Colors.red : Colors.black87,
+                      color: isError ? theme.error : Colors.black87,
                     ),
                   ),
                 ),
@@ -1660,13 +1884,13 @@ class _PostFormPageState extends State<TaskCreatePage> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: theme.error.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Required',
                       style: TextStyle(
-                        color: Colors.red,
+                        color: theme.error,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1695,11 +1919,16 @@ class _PostFormPageState extends State<TaskCreatePage> {
   }
 
   void _showLocationPicker(BuildContext context) {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
     LatLng center = _selectedLocation ?? const LatLng(25.0173, 121.5415);
 
     showDialog(
       context: context,
-      builder: (context) {
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) {
         bool hasSearched = false;
         bool dialogActive = true;
         return StatefulBuilder(
@@ -1775,8 +2004,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
                                   width: 40,
                                   height: 40,
                                   point: _selectedLocation!,
-                                  child: const Icon(Icons.location_pin,
-                                      color: Colors.red, size: 40),
+                                  child: Icon(Icons.location_pin,
+                                      color: theme.primary, size: 40),
                                 ),
                               ],
                             ),
@@ -1790,17 +2019,21 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 TextButton(
                   onPressed: () {
                     dialogActive = false;
-                    Navigator.pop(context);
+                    if (Navigator.canPop(dialogContext)) {
+                      Navigator.of(dialogContext).pop();
+                    }
                   },
                   child: const Text('Close'),
                 ),
                 TextButton(
                   onPressed: () {
                     dialogActive = false;
-                    Navigator.pop(context, {
-                      'location': _selectedLocation,
-                      'label': _locationLabel
-                    });
+                    if (Navigator.canPop(dialogContext)) {
+                      Navigator.of(dialogContext).pop({
+                        'location': _selectedLocation,
+                        'label': _locationLabel
+                      });
+                    }
                   },
                   child: const Text('Confirm Location'),
                 ),
@@ -1843,14 +2076,23 @@ class _PostFormPageState extends State<TaskCreatePage> {
   }
 
   void _showError(String msg) {
+    if (!mounted) return;
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Incomplete Form'),
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('Location Error'),
         content: Text(msg),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context), child: const Text('OK')),
+            onPressed: () {
+              if (Navigator.canPop(dialogContext)) {
+                Navigator.of(dialogContext).pop();
+              }
+            },
+            child: const Text('OK'),
+          ),
         ],
       ),
     );
@@ -1858,6 +2100,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
 
   /// 創建任務的方法
   Future<void> _createTask(Map<String, dynamic> taskData) async {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+
     try {
       final taskService = TaskService();
       final success = await taskService.createTask(taskData);
@@ -1871,14 +2117,25 @@ class _PostFormPageState extends State<TaskCreatePage> {
             ),
           );
           // 導航回任務列表頁面
-          context.go('/task/list');
+          if (mounted) {
+            try {
+              context.go('/task/list');
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Navigation error: $e'),
+                  backgroundColor: theme.error,
+                ),
+              );
+            }
+          }
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('創建失敗: ${taskService.error ?? '未知錯誤'}'),
-              backgroundColor: Colors.red,
+              backgroundColor: theme.error,
             ),
           );
         }
@@ -1888,7 +2145,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('創建任務時發生錯誤: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: theme.error,
           ),
         );
       }
@@ -1931,13 +2188,13 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: theme.error.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Required',
                     style: TextStyle(
-                      color: Colors.red,
+                      color: theme.error,
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1960,13 +2217,13 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   decoration: BoxDecoration(
                     border: Border.all(
                       color: _errorFields.contains('Time')
-                          ? Colors.red
+                          ? theme.error
                           : Colors.grey[300]!,
                       width: _errorFields.contains('Time') ? 2 : 1,
                     ),
                     borderRadius: BorderRadius.circular(8),
                     color: _errorFields.contains('Time')
-                        ? Colors.red[50]
+                        ? theme.error.withOpacity(0.1)
                         : Colors.white,
                   ),
                   child: Row(
@@ -1974,8 +2231,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
                       Icon(
                         Icons.calendar_today,
                         color: _errorFields.contains('Time')
-                            ? Colors.red
-                            : AppColors.primary,
+                            ? theme.error
+                            : theme.primary,
                         size: 20,
                       ),
                       const SizedBox(width: 12),
@@ -1992,9 +2249,9 @@ class _PostFormPageState extends State<TaskCreatePage> {
                           ),
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         Icons.arrow_drop_down,
-                        color: AppColors.primary,
+                        color: theme.primary,
                       ),
                     ],
                   ),
@@ -2023,13 +2280,13 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: theme.error.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Required',
                     style: TextStyle(
-                      color: Colors.red,
+                      color: theme.error,
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),
@@ -2066,10 +2323,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
                           );
                           if (combined.isBefore(DateTime.now())) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
+                              SnackBar(
+                                content: const Text(
                                     'Start date cannot be earlier than the current time.'),
-                                backgroundColor: Colors.red,
+                                backgroundColor: theme.error,
                               ),
                             );
                           } else {
@@ -2114,10 +2371,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
                           if (_periodStart != null &&
                               combined.isBefore(_periodStart!)) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
+                              SnackBar(
+                                content: const Text(
                                     'End date cannot be earlier than or equal to the start date.'),
-                                backgroundColor: Colors.red,
+                                backgroundColor: theme.error,
                               ),
                             );
                           } else {
@@ -2157,61 +2414,71 @@ class _PostFormPageState extends State<TaskCreatePage> {
           ),
         ),
         const SizedBox(height: 16),
-        ...List.generate(_applicationQuestions.length, (index) {
-          final labelNumber = (index + 1).toString().padLeft(2, '0');
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: _errorFields.contains('ApplicationQuestion$index')
-                      ? Colors.red
-                      : Colors.grey[300]!,
-                  width: _errorFields.contains('ApplicationQuestion$index')
-                      ? 2
-                      : 1,
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _applicationQuestions.length,
+          itemBuilder: (context, index) {
+            final labelNumber = (index + 1).toString().padLeft(2, '0');
+            return Padding(
+              key: ValueKey('question_$index'),
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: _errorFields.contains('ApplicationQuestion$index') ||
+                            (_showApplicationQuestionErrors &&
+                                _applicationQuestions[index].trim().isEmpty)
+                        ? theme.error
+                        : Colors.grey[300]!,
+                    width: _errorFields.contains('ApplicationQuestion$index') ||
+                            (_showApplicationQuestionErrors &&
+                                _applicationQuestions[index].trim().isEmpty)
+                        ? 2
+                        : 1,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  color: _errorFields.contains('ApplicationQuestion$index') ||
+                          (_showApplicationQuestionErrors &&
+                              _applicationQuestions[index].trim().isEmpty)
+                      ? theme.error.withValues(alpha: 0.1)
+                      : Colors.white,
                 ),
-                borderRadius: BorderRadius.circular(8),
-                color: _errorFields.contains('ApplicationQuestion$index')
-                    ? Colors.red[50]
-                    : Colors.white,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: theme.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'Q-$labelNumber',
-                          style: TextStyle(
-                            color: theme.primary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: theme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Q-$labelNumber',
+                            style: TextStyle(
+                              color: theme.primary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Question ${index + 1}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Question ${index + 1}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ),
-                      if (_applicationQuestions.length > 1)
                         IconButton(
                           icon: Icon(
                             Icons.delete,
-                            color: Colors.red[400],
+                            color: theme.error,
                             size: 20,
                           ),
                           onPressed: () async {
@@ -2224,22 +2491,31 @@ class _PostFormPageState extends State<TaskCreatePage> {
                               if (hasValue) {
                                 final confirm = await showDialog<bool>(
                                   context: context,
-                                  builder: (context) => AlertDialog(
+                                  builder: (BuildContext dialogContext) =>
+                                      AlertDialog(
                                     title: const Text('Confirm Delete'),
                                     content: Text(
                                         'Are you sure you want to delete question ${index + 1}?'),
                                     actions: [
                                       TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, false),
+                                        onPressed: () {
+                                          if (Navigator.canPop(dialogContext)) {
+                                            Navigator.of(dialogContext)
+                                                .pop(false);
+                                          }
+                                        },
                                         child: const Text('Cancel'),
                                       ),
                                       TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, true),
-                                        child: const Text('Delete',
+                                        onPressed: () {
+                                          if (Navigator.canPop(dialogContext)) {
+                                            Navigator.of(dialogContext)
+                                                .pop(true);
+                                          }
+                                        },
+                                        child: Text('Delete',
                                             style:
-                                                TextStyle(color: Colors.red)),
+                                                TextStyle(color: theme.error)),
                                       ),
                                     ],
                                   ),
@@ -2253,304 +2529,134 @@ class _PostFormPageState extends State<TaskCreatePage> {
                             }
                           },
                         ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextFormField(
-                        initialValue: _applicationQuestions[index],
-                        maxLength: 500, // 設定字數上限為500字
-                        maxLines: 4, // 限制最大行數
-                        decoration: InputDecoration(
-                          hintText:
-                              'Enter your question for applicants (max 500 characters)',
-                          hintStyle: TextStyle(color: Colors.grey[400]),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide.none,
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[50],
-                          counterText: '', // 隱藏預設的字數計數器
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            _applicationQuestions[index] = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${_applicationQuestions[index].length}/500 characters',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _applicationQuestions[index].length > 500
-                                  ? Colors.red
-                                  : _applicationQuestions[index].length > 450
-                                      ? Colors.orange
-                                      : Colors.grey[600],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          if (_applicationQuestions[index].length > 480)
-                            Row(
-                              children: [
-                                Icon(
-                                  _applicationQuestions[index].length > 500
-                                      ? Icons.error_outline
-                                      : Icons.warning_amber_rounded,
-                                  size: 16,
-                                  color:
-                                      _applicationQuestions[index].length > 500
-                                          ? Colors.red
-                                          : Colors.orange,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _applicationQuestions[index].length > 500
-                                      ? '字數超限'
-                                      : '接近字數上限',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: _applicationQuestions[index].length >
-                                            500
-                                        ? Colors.red
-                                        : Colors.orange,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-        if (_applicationQuestions.length < 3)
-          Center(
-            child: TextButton.icon(
-              onPressed: _addApplicationQuestion,
-              icon: const Icon(Icons.add, color: AppColors.primary),
-              label: const Text(
-                'Add Question',
-                style: TextStyle(color: AppColors.primary),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildLanguageSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Text(
-              'Language Requirements',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Text(
-                'Required',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        GestureDetector(
-          onTap: () async {
-            final result = await showModalBottomSheet<List<String>>(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (context) {
-                List<String> tempSelected = List.from(_selectedLanguages);
-                TextEditingController searchController =
-                    TextEditingController();
-                return Container(
-                  height: 400,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
+                      ],
                     ),
-                  ),
-                  child: Column(
-                    children: [
-                      Container(
-                        margin: const EdgeInsets.only(top: 8),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: TextField(
-                          controller: searchController,
+                    const SizedBox(height: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextFormField(
+                          initialValue: _applicationQuestions[index],
+                          maxLength: 500, // 設定字數上限為500字
+                          maxLines: 4, // 限制最大行數
                           decoration: InputDecoration(
-                            hintText: 'Search languages',
-                            prefixIcon: const Icon(Icons.search),
+                            hintText:
+                                'Job seekers must answer questions before applying, helping you screen talents faster',
+                            hintStyle: TextStyle(color: Colors.grey[400]),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide.none,
                             ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                            counterText: '', // 隱藏預設的字數計數器
                           ),
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: _languages.length,
-                          itemBuilder: (context, index) {
-                            final lang = _languages[index];
-                            final isSelected =
-                                tempSelected.contains(lang['code']);
-                            return CheckboxListTile(
-                              value: isSelected,
-                              title: Text(lang['native'] ?? lang['name'] ?? ''),
-                              onChanged: (checked) {
-                                setState(() {
-                                  if (checked == true) {
-                                    tempSelected.add(lang['code']);
-                                  } else {
-                                    tempSelected.remove(lang['code']);
-                                  }
-                                });
-                              },
-                            );
+                          onChanged: (value) {
+                            setState(() {
+                              _applicationQuestions[index] = value;
+                              // 如果用戶開始填寫問題，清除錯誤顯示狀態
+                              if (value.trim().isNotEmpty &&
+                                  _showApplicationQuestionErrors) {
+                                _showApplicationQuestionErrors = false;
+                              }
+                            });
                           },
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.pop(context, null),
-                                child: const Text('Cancel'),
+                            Text(
+                              '${_applicationQuestions[index].length}/500 characters',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: _applicationQuestions[index].length > 500
+                                    ? theme.error
+                                    : _applicationQuestions[index].length > 450
+                                        ? Colors.orange
+                                        : Colors.grey[600],
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () =>
-                                    Navigator.pop(context, tempSelected),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
+                            if (_applicationQuestions[index].length > 480)
+                              Row(
+                                children: [
+                                  Icon(
+                                    _applicationQuestions[index].length > 500
+                                        ? Icons.error_outline
+                                        : Icons.warning_amber_rounded,
+                                    size: 16,
+                                    color: _applicationQuestions[index].length >
+                                            500
+                                        ? theme.error
+                                        : Colors.orange,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _applicationQuestions[index].length > 500
+                                        ? '字數超限'
+                                        : '接近字數上限',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color:
+                                          _applicationQuestions[index].length >
+                                                  500
+                                              ? theme.error
+                                              : Colors.orange,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            // 顯示未填寫問題的錯誤提示
+                            if (_showApplicationQuestionErrors &&
+                                _applicationQuestions[index].trim().isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.error_outline,
+                                      size: 16,
+                                      color: theme.error,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Please fill in this question',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: theme.error,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                child: const Text('Confirm'),
                               ),
-                            ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-            if (result != null) {
-              setState(() {
-                _selectedLanguages = result;
-                _languageRequirement = _selectedLanguages.join(', ');
-              });
-            }
-          },
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: _errorFields.contains('Language Requirement')
-                    ? Colors.red
-                    : Colors.grey[300]!,
-                width: _errorFields.contains('Language Requirement') ? 2 : 1,
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              borderRadius: BorderRadius.circular(8),
-              color: _errorFields.contains('Language Requirement')
-                  ? Colors.red[50]
-                  : Colors.white,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.language,
-                  color: _errorFields.contains('Language Requirement')
-                      ? Colors.red
-                      : AppColors.primary,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _selectedLanguages.isEmpty
-                      ? Text(
-                          'Select preferred languages',
-                          style: TextStyle(color: Colors.grey[500]),
-                        )
-                      : Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: _selectedLanguages.map((code) {
-                            final language = _languages.firstWhere(
-                              (lang) => lang['code'] == code,
-                              orElse: () => {'native': code},
-                            );
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                language['native'] ?? code,
-                                style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                ),
-                const Icon(
-                  Icons.arrow_drop_down,
-                  color: AppColors.primary,
-                ),
-              ],
+            );
+          },
+        ),
+        if (_applicationQuestions.length < 3)
+          Center(
+            child: OutlinedButton.icon(
+              onPressed: _addApplicationQuestion,
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: theme.primary),
+                backgroundColor: theme.primary.withValues(alpha: 0.1),
+              ),
+              icon: Icon(Icons.add, color: theme.primary),
+              label: Text(
+                'Add Question',
+                style: TextStyle(color: theme.primary),
+              ),
             ),
           ),
-        ),
       ],
     );
   }
@@ -2577,26 +2683,34 @@ extension _MoveToSearchLocationExtension on _PostFormPageState {
   Future<void> _moveToSearchLocation(String query,
       [void Function(void Function())? dialogSetState]) async {
     if (query.trim().isEmpty) return;
+
+    // 檢查大學匹配 - 優先檢查縮寫，然後檢查英文名稱
     final matched = _universities.firstWhere(
       (uni) =>
+          uni['abbr']!.toLowerCase() == query.toLowerCase() ||
           uni['en_name']!.toLowerCase().contains(query.toLowerCase()) ||
-          uni['abbr']!.toLowerCase() == query.toLowerCase(),
+          uni['zh_name']!.toLowerCase().contains(query.toLowerCase()),
       orElse: () => <String, dynamic>{},
     );
+
     if (matched.isNotEmpty) {
+      // 如果找到匹配的大學，使用中文名稱進行搜尋
       query = matched['zh_name']!;
     }
+
     try {
       final url = Uri.parse(
           'https://nominatim.openstreetmap.org/search?q=$query&format=json&countrycodes=tw&accept-language=en');
       final response =
           await http.get(url, headers: {'User-Agent': 'flutter_app'});
+
       if (response.statusCode == 200) {
         final List results = json.decode(response.body);
         if (results.isNotEmpty) {
           final lat = double.parse(results[0]['lat']);
           final lon = double.parse(results[0]['lon']);
           LatLng newCenter = LatLng(lat, lon);
+
           if (dialogSetState != null) {
             dialogSetState(() {
               _selectedLocation = newCenter;
@@ -2608,6 +2722,7 @@ extension _MoveToSearchLocationExtension on _PostFormPageState {
               _mapController.move(newCenter, _mapController.camera.zoom);
             });
           }
+
           final label = await _reverseGeocode(newCenter);
           if (dialogSetState != null) {
             dialogSetState(() {
@@ -2619,13 +2734,36 @@ extension _MoveToSearchLocationExtension on _PostFormPageState {
             });
           }
         } else {
-          if (mounted) _showError('Location not found.');
+          if (mounted) {
+            _showError('Location not found. Please try a different address.');
+          }
         }
       } else {
-        if (mounted) _showError('Location not found.');
+        if (mounted) {
+          _showError(
+              'Unable to search location. Please check your internet connection.');
+        }
       }
     } catch (e) {
-      if (mounted) _showError('Failed to search location: $e');
+      if (mounted) {
+        _showError('Failed to search location. Please try again.');
+      }
+    }
+  }
+
+  // 格式化 reward_point，移除格式化字符並返回純數字
+  String _formatRewardPoint(String value) {
+    if (value.isEmpty) return '0';
+    try {
+      // 移除所有非數字字符（除了小數點）
+      final cleanValue = value.replaceAll(RegExp(r'[^\d.]'), '');
+      if (cleanValue.isEmpty) return '0';
+
+      final num = double.tryParse(cleanValue);
+      if (num == null) return '0';
+      return num.toStringAsFixed(0); // 返回整數格式
+    } catch (e) {
+      return '0';
     }
   }
 }
