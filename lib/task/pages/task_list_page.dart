@@ -284,7 +284,8 @@ class _TaskListPageState extends State<TaskListPage> {
                                     fontWeight: FontWeight.bold,
                                     color: theme.onSurface)),
                             TextSpan(
-                                text: '💰 ${task['salary'] ?? "0"}',
+                                text:
+                                    '💰 ${task['reward_point'] ?? task['salary'] ?? "0"}',
                                 style: TextStyle(color: theme.onSurface)),
                           ],
                         )),
@@ -821,7 +822,8 @@ class _TaskListPageState extends State<TaskListPage> {
                           task['creator_name']?.toString() ?? 'N/A Poster';
                       final title = task['title']?.toString() ?? '';
                       final location = task['location']?.toString() ?? '';
-                      final salary = task['salary']?.toString() ?? '0';
+                      final rewardPoint =
+                          task['reward_point']?.toString() ?? '0';
                       final languageRequirement =
                           task['language_requirement']?.toString() ?? '-';
 
@@ -917,7 +919,7 @@ class _TaskListPageState extends State<TaskListPage> {
                                   const SizedBox(width: 4),
                                   Flexible(
                                     child: Text(
-                                      'NT\$$salary / hour',
+                                      'NT\$$rewardPoint / hour',
                                       style: TextStyle(
                                           fontSize: 12, color: theme.onSurface),
                                       overflow: TextOverflow.ellipsis,

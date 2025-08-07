@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/constants/app_colors.dart';
+import 'package:here4help/services/theme_config_manager.dart';
+import 'package:provider/provider.dart';
 
 class TaskPreviewPage extends StatefulWidget {
   const TaskPreviewPage({super.key});
@@ -94,13 +96,47 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
     // Extract data with fallback values
     final title = taskData!['title']?.toString() ?? 'N/A';
     final location = taskData!['location']?.toString() ?? 'N/A';
-    final salary = taskData!['salary']?.toString() ?? 'N/A';
+    final rewardPoint = taskData!['reward_point']?.toString() ??
+        taskData!['salary']?.toString() ??
+        'N/A';
     final date = taskData!['task_date']?.toString() ?? 'N/A';
     final creatorName = taskData!['creator_name']?.toString() ?? 'N/A';
     final creatorAvatarUrl = taskData!['avatar_url']?.toString();
 
     final languageRequirement =
         taskData!['language_requirement']?.toString() ?? 'N/A';
+
+    // 將語言代碼轉換為語言名稱
+    String getLanguageDisplayName(String languageCodes,
+        {bool forCard = false}) {
+      if (languageCodes == 'N/A' || languageCodes.isEmpty) return 'N/A';
+
+      List<String> names = languageCodes
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+
+      // 根據語言數量決定顯示方式
+      if (names.isEmpty) return 'N/A';
+      if (names.length == 1) return names.first;
+      if (names.length == 2) return names.join(', ');
+      if (names.length >= 3) {
+        // 如果是任務卡顯示，則省略；如果是 dialog 顯示，則完整顯示
+        if (forCard) {
+          return '${names.first}...';
+        } else {
+          return names.join(', ');
+        }
+      }
+
+      return names.join(', ');
+    }
+
+    final languageDisplayName =
+        getLanguageDisplayName(languageRequirement, forCard: true);
+    final languageDisplayNameFull =
+        getLanguageDisplayName(languageRequirement, forCard: false);
 
     // Render preview page
     return SingleChildScrollView(
@@ -126,9 +162,13 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(title,
-                            style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text(
+                          title,
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.visible,
+                          maxLines: null,
+                        ),
                         const SizedBox(height: 8),
                         if ((taskData!['description']?.toString().trim() ?? '')
                             .isNotEmpty) ...[
@@ -137,24 +177,52 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
-                          Text(taskData!['description']!.toString().trim()),
+                          Text(
+                            taskData!['description']!.toString().trim(),
+                            overflow: TextOverflow.visible,
+                            maxLines: null,
+                          ),
                           const SizedBox(height: 12),
                         ],
                         const Text(
                           'Application Question:',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        ...((taskData!['application_question']?.toString() ??
-                                'No description provided')
-                            .split('|')
-                            .asMap()
-                            .entries
-                            .map((entry) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child:
-                                      Text('${entry.key + 1}. ${entry.value}'),
-                                ))
-                            .toList()),
+                        ...(() {
+                          final questions =
+                              taskData!['application_question']?.toString() ??
+                                  '';
+                          if (questions.isEmpty || questions.trim().isEmpty) {
+                            return [
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Text(
+                                  'No additional questions',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ),
+                            ];
+                          }
+
+                          return questions
+                              .split('|')
+                              .where((q) => q.trim().isNotEmpty)
+                              .toList()
+                              .asMap()
+                              .entries
+                              .map((entry) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: Text(
+                                      '${entry.key + 1}. ${entry.value.trim()}',
+                                      overflow: TextOverflow.visible,
+                                      maxLines: null,
+                                    ),
+                                  ))
+                              .toList();
+                        })(),
                         const SizedBox(height: 12),
                         RichText(
                           text: TextSpan(
@@ -164,7 +232,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                                 text: 'Reward: ',
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
-                              TextSpan(text: salary),
+                              TextSpan(text: rewardPoint),
                             ],
                           ),
                         ),
@@ -212,7 +280,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                                 text: 'Language Requirement: ',
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
-                              TextSpan(text: languageRequirement),
+                              TextSpan(text: languageDisplayNameFull),
                             ],
                           ),
                         ),
@@ -226,7 +294,11 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                                     .pop(); // Use root navigator to close only the dialog
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
+                                backgroundColor:
+                                    Provider.of<ThemeConfigManager>(context,
+                                            listen: false)
+                                        .effectiveTheme
+                                        .primary,
                                 foregroundColor: Colors.white,
                               ),
                               child: const Text('CLOSE'),
@@ -235,7 +307,11 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                               onPressed: null, // Disabled Apply button
                               style: ElevatedButton.styleFrom(
                                 backgroundColor:
-                                    AppColors.primary.withOpacity(0.5),
+                                    Provider.of<ThemeConfigManager>(context,
+                                            listen: false)
+                                        .effectiveTheme
+                                        .primary
+                                        .withOpacity(0.5),
                                 foregroundColor: Colors.white,
                               ),
                               child: const Text('APPLY NOW'),
@@ -263,11 +339,16 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                   // Task Title
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
+                      color: Provider.of<ThemeConfigManager>(context,
+                              listen: false)
+                          .effectiveTheme
+                          .primary,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                   const SizedBox(height: 12),
 
@@ -284,7 +365,13 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                               children: [
                                 const Icon(Icons.person_outline, size: 16),
                                 const SizedBox(width: 6),
-                                Text(creatorName),
+                                Expanded(
+                                  child: Text(
+                                    creatorName,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -294,7 +381,13 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                               children: [
                                 const Icon(Icons.access_time, size: 16),
                                 const SizedBox(width: 6),
-                                Text(date),
+                                Expanded(
+                                  child: Text(
+                                    date,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -305,7 +398,13 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                                 const Icon(Icons.location_on_outlined,
                                     size: 16),
                                 const SizedBox(width: 6),
-                                Text(location),
+                                Expanded(
+                                  child: Text(
+                                    location,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -315,7 +414,13 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                               children: [
                                 const Icon(Icons.attach_money, size: 16),
                                 const SizedBox(width: 6),
-                                Text('$salary / hour'),
+                                Expanded(
+                                  child: Text(
+                                    '$rewardPoint / hour',
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -325,7 +430,13 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                               children: [
                                 const Icon(Icons.language, size: 16),
                                 const SizedBox(width: 6),
-                                Text(languageRequirement.replaceAll(',', ', ')),
+                                Expanded(
+                                  child: Text(
+                                    languageDisplayName,
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -350,15 +461,25 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
           // Warning and submit button
           const Divider(),
           const SizedBox(height: 8),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.warning, color: Colors.red, size: 24),
-              SizedBox(width: 8),
+              Icon(Icons.warning,
+                  color: Provider.of<ThemeConfigManager>(context, listen: false)
+                      .effectiveTheme
+                      .error,
+                  size: 24),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Please abide by The platform regulations and do not post false fraudulent information. Violators will be held legally responsible.',
-                  style: TextStyle(fontSize: 12),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color:
+                        Provider.of<ThemeConfigManager>(context, listen: false)
+                            .effectiveTheme
+                            .error,
+                  ),
                   textAlign: TextAlign.left,
                 ),
               ),
@@ -378,14 +499,22 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(false),
                         style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primary,
+                          foregroundColor: Provider.of<ThemeConfigManager>(
+                                  context,
+                                  listen: false)
+                              .effectiveTheme
+                              .primary,
                         ),
                         child: const Text('Cancel'),
                       ),
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(true),
                         style: TextButton.styleFrom(
-                          foregroundColor: AppColors.primary,
+                          foregroundColor: Provider.of<ThemeConfigManager>(
+                                  context,
+                                  listen: false)
+                              .effectiveTheme
+                              .primary,
                         ),
                         child: const Text('Confirm'),
                       ),
@@ -397,8 +526,37 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                   final taskService = TaskService();
 
                   try {
+                    // 準備發送到後端的數據，只包含資料庫需要的欄位
+                    final Map<String, dynamic> taskDataForApi = {
+                      'title': taskData!['title'] ?? '',
+                      'description': taskData!['description'] ?? '',
+                      'reward_point': _formatRewardPoint(
+                          taskData!['reward_point'] ??
+                              taskData!['salary'] ??
+                              '0'),
+                      'location': taskData!['location'] ?? '',
+                      'task_date': taskData!['task_date'] ?? '',
+                      'language_requirement':
+                          taskData!['language_requirement'] ?? '',
+                      'creator_name': taskData!['creator_name'] ?? 'Anonymous',
+                      'status': 'Open',
+                    };
+
+                    // 如果有申請問題，添加到數據中
+                    if (taskData!['application_question'] != null &&
+                        taskData!['application_question']
+                            .toString()
+                            .isNotEmpty) {
+                      final questions = taskData!['application_question']
+                          .toString()
+                          .split(' | ');
+                      taskDataForApi['application_questions'] =
+                          questions.where((q) => q.trim().isNotEmpty).toList();
+                    }
+
                     // 創建任務
-                    final success = await taskService.createTask(taskData!);
+                    final success =
+                        await taskService.createTask(taskDataForApi);
 
                     if (success) {
                       // 清除 SharedPreferences 中的資料
@@ -419,7 +577,11 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                           SnackBar(
                             content: Text(
                                 'Failed to post task: ${taskService.error ?? 'Unknown error'}'),
-                            backgroundColor: Colors.red,
+                            backgroundColor: Provider.of<ThemeConfigManager>(
+                                    context,
+                                    listen: false)
+                                .effectiveTheme
+                                .error,
                           ),
                         );
                       }
@@ -429,7 +591,11 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Error posting task: $e'),
-                          backgroundColor: Colors.red,
+                          backgroundColor: Provider.of<ThemeConfigManager>(
+                                  context,
+                                  listen: false)
+                              .effectiveTheme
+                              .error,
                         ),
                       );
                     }
@@ -441,7 +607,10 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor:
+                    Provider.of<ThemeConfigManager>(context, listen: false)
+                        .effectiveTheme
+                        .primary,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
                 shape: RoundedRectangleBorder(
@@ -455,5 +624,20 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
         ],
       ),
     );
+  }
+
+  String _formatRewardPoint(String value) {
+    if (value.isEmpty) return '0';
+    try {
+      // 移除所有非數字字符（除了小數點）
+      final cleanValue = value.replaceAll(RegExp(r'[^\d.]'), '');
+      if (cleanValue.isEmpty) return '0';
+
+      final num = double.tryParse(cleanValue);
+      if (num == null) return '0';
+      return num.toStringAsFixed(0); // 返回整數格式
+    } catch (e) {
+      return '0';
+    }
   }
 }

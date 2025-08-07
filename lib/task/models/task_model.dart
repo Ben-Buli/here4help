@@ -51,17 +51,16 @@ class TaskModel {
   final String? acceptorId;
   final String title;
   final String description;
-  final String salary;
+  final String rewardPoint;
   final String location;
   final String taskDate;
   final String status;
-  final String creatorConfirmed;
-  final String acceptorConfirmed;
+  final String? creatorConfirmed;
+  final String? acceptorConfirmed;
   final String? cancelReason;
   final String? failReason;
-  final String languageRequirement;
-  final List<ApplicationQuestionModel>? applicationQuestions;
-  final List<String>? hashtags;
+  final String? languageRequirement;
+  final String? hashtags;
   final String createdAt;
   final String updatedAt;
 
@@ -71,52 +70,51 @@ class TaskModel {
     this.acceptorId,
     required this.title,
     required this.description,
-    required this.salary,
+    required this.rewardPoint,
     required this.location,
     required this.taskDate,
     required this.status,
-    required this.creatorConfirmed,
-    required this.acceptorConfirmed,
+    this.creatorConfirmed,
+    this.acceptorConfirmed,
     this.cancelReason,
     this.failReason,
-    required this.languageRequirement,
-    this.applicationQuestions,
+    this.languageRequirement,
     this.hashtags,
     required this.createdAt,
     required this.updatedAt,
   });
 
-  factory TaskModel.fromMap(Map<String, dynamic> map) {
+  factory TaskModel.fromJson(Map<String, dynamic> map) {
     return TaskModel(
-      id: map['id'],
+      id: map['id'] ?? '',
       creatorName: map['creator_name'],
       acceptorId: map['acceptor_id'],
-      title: map['title'],
-      description: map['description'],
-      salary: map['salary'],
-      location: map['location'],
-      taskDate: map['task_date'],
-      status: map['status'],
+      title: map['title'] ?? '',
+      description: map['description'] ?? '',
+      rewardPoint:
+          map['reward_point'] ?? map['salary'] ?? '0', // 支援舊的 salary 欄位
+      location: map['location'] ?? '',
+      taskDate: map['task_date'] ?? '',
+      status: map['status'] ?? '',
       creatorConfirmed: map['creator_confirmed'],
       acceptorConfirmed: map['acceptor_confirmed'],
       cancelReason: map['cancel_reason'],
       failReason: map['fail_reason'],
       languageRequirement: map['language_requirement'],
-      createdAt: map['created_at'],
-      updatedAt: map['updated_at'],
-      hashtags:
-          map['hashtags'] != null ? List<String>.from(map['hashtags']) : null,
+      hashtags: map['hashtags'],
+      createdAt: map['created_at'] ?? '',
+      updatedAt: map['updated_at'] ?? '',
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       'id': id,
       'creator_name': creatorName,
       'acceptor_id': acceptorId,
       'title': title,
       'description': description,
-      'salary': salary,
+      'reward_point': rewardPoint,
       'location': location,
       'task_date': taskDate,
       'status': status,

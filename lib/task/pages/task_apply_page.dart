@@ -136,7 +136,8 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                               const Text('Reward:',
                                   style:
                                       TextStyle(fontWeight: FontWeight.bold)),
-                              Text('💰 ${task['salary']}'),
+                              Text(
+                                  '💰 ${task['reward_point'] ?? task['salary']}'),
                               const SizedBox(height: 8),
                               const Text('Request Language:',
                                   style:

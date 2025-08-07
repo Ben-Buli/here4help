@@ -13,25 +13,24 @@ class TaskFormValidators {
     return null;
   }
 
-  /// 驗證薪資
-  static String? validateSalary(String? value) {
+  static String? validateRewardPoint(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'Salary is required';
+      return 'Reward point is required';
     }
 
     // 移除所有非數字字符
     final digits = value.replaceAll(RegExp(r'[^\d]'), '');
     if (digits.isEmpty) {
-      return 'Please enter a valid salary';
+      return 'Please enter a valid reward point';
     }
 
-    final salary = int.tryParse(digits);
-    if (salary == null || salary <= 0) {
-      return 'Salary must be greater than 0';
+    final rewardPoint = int.tryParse(digits);
+    if (rewardPoint == null || rewardPoint <= 0) {
+      return 'Reward point must be greater than 0';
     }
 
-    if (salary > 10000) {
-      return 'Salary cannot exceed 10,000';
+    if (rewardPoint > 10000) {
+      return 'Reward point cannot exceed 10,000';
     }
 
     return null;
@@ -125,7 +124,7 @@ class TaskFormValidators {
   /// 綜合驗證表單
   static Map<String, String> validateForm({
     required String title,
-    required String salary,
+    required String rewardPoint,
     required String description,
     required DateTime? taskDate,
     required List<String> languages,
@@ -143,9 +142,9 @@ class TaskFormValidators {
     }
 
     // 驗證薪資
-    final salaryError = validateSalary(salary);
-    if (salaryError != null) {
-      errors['Salary'] = salaryError;
+    final rewardPointError = validateRewardPoint(rewardPoint);
+    if (rewardPointError != null) {
+      errors['Reward Point'] = rewardPointError;
     }
 
     // 驗證描述
