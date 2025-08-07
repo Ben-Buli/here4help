@@ -3,6 +3,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/constants/theme_schemes.dart';
 
 /// 主題配置管理器 - 提供更優化的主題配置系統
+///
+/// 這個類負責管理應用程序的主題配置，包括：
+/// - 主題切換和持久化
+/// - 主題模式管理（淺色/深色/系統）
+/// - 主題預設管理
+/// - 主題驗證和建議
+///
+/// 使用示例：
+/// ```dart
+/// final themeManager = ThemeConfigManager();
+/// await themeManager.setTheme(ThemeScheme.morandiBlue);
+/// await themeManager.setThemeMode(AppThemeMode.system);
+/// ```
 class ThemeConfigManager extends ChangeNotifier {
   static const String _themeKey = 'selected_theme';
   static const String _themeModeKey = 'theme_mode';
@@ -21,6 +34,13 @@ class ThemeConfigManager extends ChangeNotifier {
   }
 
   /// 載入所有配置
+  ///
+  /// 從 SharedPreferences 中載入保存的主題配置，包括：
+  /// - 主題設定：載入上次選擇的主題
+  /// - 主題模式：載入主題模式設置（淺色/深色/系統）
+  /// - 主題預設：載入主題預設配置
+  ///
+  /// 如果載入失敗，會使用默認配置並記錄錯誤信息。
   Future<void> _loadConfiguration() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -46,17 +66,23 @@ class ThemeConfigManager extends ChangeNotifier {
   }
 
   /// 載入主題預設
+  ///
+  /// 從 SharedPreferences 中載入保存的主題預設配置。
+  /// 目前總是初始化默認預設配置，未來可以根據保存的 JSON 來恢復自定義配置。
+  ///
+  /// 如果載入失敗，會使用默認預設配置並記錄錯誤信息。
   Future<void> _loadThemePresets() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final presetsJson = prefs.getString(_themePresetsKey);
 
+      // 目前總是初始化預設配置，未來可以根據保存的 JSON 來恢復自定義配置
       if (presetsJson != null) {
-        // 這裡可以解析保存的預設配置
-        _initializeDefaultPresets();
-      } else {
-        _initializeDefaultPresets();
+        // TODO: 解析保存的預設配置
+        debugPrint('發現保存的主題預設配置，但尚未實現解析功能');
       }
+
+      _initializeDefaultPresets();
     } catch (e) {
       debugPrint('載入主題預設失敗: $e');
       _initializeDefaultPresets();
@@ -64,6 +90,14 @@ class ThemeConfigManager extends ChangeNotifier {
   }
 
   /// 初始化預設主題配置
+  ///
+  /// 創建預設的主題集合，包括：
+  /// - 莫蘭迪色系合集：包含5個莫蘭迪風格主題
+  /// - 海洋風格合集：包含3個海洋風格主題
+  /// - 商業風格合集：包含3個商業風格主題
+  /// - 毛玻璃風格合集：包含2個毛玻璃風格主題
+  ///
+  /// 這些預設配置用於組織和管理相關的主題。
   void _initializeDefaultPresets() {
     _themePresets = {
       'morandi_collection': const ThemePreset(
@@ -115,6 +149,17 @@ class ThemeConfigManager extends ChangeNotifier {
   }
 
   /// 切換主題
+  ///
+  /// 切換到指定的主題，並將設置保存到 SharedPreferences。
+  /// 只有在主題名稱不同時才會進行切換和保存操作。
+  ///
+  /// 參數：
+  /// - [theme]: 要切換到的主題
+  ///
+  /// 使用示例：
+  /// ```dart
+  /// await themeManager.setTheme(ThemeScheme.morandiBlue);
+  /// ```
   Future<void> setTheme(ThemeScheme theme) async {
     if (_currentTheme.name != theme.name) {
       _currentTheme = theme;
@@ -130,12 +175,34 @@ class ThemeConfigManager extends ChangeNotifier {
   }
 
   /// 切換到指定主題名稱
+  ///
+  /// 根據主題名稱切換到對應的主題。
+  /// 如果主題名稱不存在，會使用默認主題。
+  ///
+  /// 參數：
+  /// - [themeName]: 要切換到的主題名稱
+  ///
+  /// 使用示例：
+  /// ```dart
+  /// await themeManager.setThemeByName('morandi_blue');
+  /// ```
   Future<void> setThemeByName(String themeName) async {
     final theme = ThemeScheme.getByName(themeName);
     await setTheme(theme);
   }
 
   /// 設定主題模式
+  ///
+  /// 設定主題模式（淺色/深色/系統），並將設置保存到 SharedPreferences。
+  /// 只有在模式不同時才會進行切換和保存操作。
+  ///
+  /// 參數：
+  /// - [mode]: 要設定的主題模式
+  ///
+  /// 使用示例：
+  /// ```dart
+  /// await themeManager.setThemeMode(AppThemeMode.system);
+  /// ```
   Future<void> setThemeMode(AppThemeMode mode) async {
     if (_themeMode != mode) {
       _themeMode = mode;
@@ -151,6 +218,9 @@ class ThemeConfigManager extends ChangeNotifier {
   }
 
   /// 獲取所有可用主題（包括自定義主題）
+  ///
+  /// 返回所有可用的主題列表，包括內建主題和自定義主題。
+  /// 目前只返回內建主題，未來可以擴展支持自定義主題。
   List<ThemeScheme> get allThemes {
     final List<ThemeScheme> allThemes = [...ThemeScheme.allThemes];
     return allThemes;
@@ -199,6 +269,18 @@ class ThemeConfigManager extends ChangeNotifier {
   }
 
   /// 根據主題名稱判斷所屬類型
+  ///
+  /// 根據主題名稱將主題分類到不同的組別：
+  /// - `Morandi`: 莫蘭迪風格主題組
+  /// - `Ocean`: 海洋風格主題組
+  /// - `Business`: 商業風格主題組
+  /// - `Glassmorphism`: 毛玻璃風格主題組
+  /// - `Other`: 其他主題組
+  ///
+  /// 參數：
+  /// - [theme]: 要分類的主題
+  ///
+  /// 返回主題組名稱。
   String _getThemeGroup(ThemeScheme theme) {
     // 移除 _dark 後綴來判斷原始主題類型
     String baseName = theme.name.replaceAll('_dark', '');
@@ -237,52 +319,77 @@ class ThemeConfigManager extends ChangeNotifier {
   }
 
   /// 獲取實際生效的主題（考慮 Theme Mode 設置）
+  ///
+  /// 這個方法會根據當前的主題模式設置返回實際生效的主題：
+  /// - [AppThemeMode.light]: 返回淺色主題
+  /// - [AppThemeMode.dark]: 返回深色主題
+  /// - [AppThemeMode.system]: 根據系統設置返回對應主題
+  ///
+  /// 如果當前主題已經是目標模式，則直接返回；否則會自動生成對應模式的主題。
   ThemeScheme get effectiveTheme {
-    // 如果當前主題已經是 Dark Mode，直接返回
-    if (_currentTheme.name.endsWith('_dark')) {
-      return _currentTheme;
-    }
-
     // 根據 Theme Mode 決定是否使用 Dark Mode
     switch (_themeMode) {
       case AppThemeMode.light:
         // Light Mode：確保使用 Light 主題
-        if (_currentTheme.name.endsWith('_dark')) {
-          // 如果當前是 Dark 主題，找到對應的 Light 主題
-          String lightThemeName = _currentTheme.name.replaceAll('_dark', '');
-          return ThemeScheme.getByName(lightThemeName);
-        }
-        return _currentTheme;
-
+        return _getLightTheme();
       case AppThemeMode.dark:
         // Dark Mode：使用 Dark 主題
-        if (!_currentTheme.name.endsWith('_dark')) {
-          // 如果當前是 Light 主題，生成對應的 Dark 主題
-          return _currentTheme.toDarkMode();
-        }
-        return _currentTheme;
-
+        return _getDarkTheme();
       case AppThemeMode.system:
         // System Mode：根據系統設置決定
         final Brightness brightness =
             WidgetsBinding.instance.platformDispatcher.platformBrightness;
-        if (brightness == Brightness.dark) {
-          // 系統是 Dark Mode
-          if (!_currentTheme.name.endsWith('_dark')) {
-            return _currentTheme.toDarkMode();
-          }
-        } else {
-          // 系統是 Light Mode
-          if (_currentTheme.name.endsWith('_dark')) {
-            String lightThemeName = _currentTheme.name.replaceAll('_dark', '');
-            return ThemeScheme.getByName(lightThemeName);
-          }
-        }
-        return _currentTheme;
+        return brightness == Brightness.dark
+            ? _getDarkTheme()
+            : _getLightTheme();
     }
   }
 
+  /// 獲取 Light 主題
+  ///
+  /// 如果當前主題是 Dark 主題，則返回對應的 Light 主題；
+  /// 否則直接返回當前主題。
+  ///
+  /// 返回 Light 主題。
+  ThemeScheme _getLightTheme() {
+    if (_currentTheme.name.endsWith('_dark')) {
+      // 如果當前是 Dark 主題，找到對應的 Light 主題
+      String lightThemeName = _currentTheme.name.replaceAll('_dark', '');
+      return ThemeScheme.getByName(lightThemeName);
+    }
+    return _currentTheme;
+  }
+
+  /// 獲取 Dark 主題
+  ///
+  /// 如果當前主題是 Light 主題，則生成對應的 Dark 主題；
+  /// 否則直接返回當前主題。
+  ///
+  /// 返回 Dark 主題。
+  ThemeScheme _getDarkTheme() {
+    if (!_currentTheme.name.endsWith('_dark')) {
+      // 如果當前是 Light 主題，生成對應的 Dark 主題
+      return _currentTheme.toDarkMode();
+    }
+    return _currentTheme;
+  }
+
   /// 驗證主題配置
+  ///
+  /// 檢查主題配置是否有效，包括：
+  /// - 必要屬性檢查（名稱、顯示名稱）
+  /// - 顏色對比度檢查（符合 WCAG AA 標準）
+  ///
+  /// 返回 `true` 表示主題配置有效，`false` 表示無效。
+  ///
+  /// 使用示例：
+  /// ```dart
+  /// if (themeManager.validateTheme(theme)) {
+  ///   await themeManager.setTheme(theme);
+  /// } else {
+  ///   print('主題配置無效');
+  /// }
+  /// ```
   bool validateTheme(ThemeScheme theme) {
     // 檢查必要屬性
     if (theme.name.isEmpty || theme.displayName.isEmpty) {
@@ -310,12 +417,31 @@ class ThemeConfigManager extends ChangeNotifier {
   }
 
   /// 檢查顏色對比度
+  ///
+  /// 根據 WCAG 2.1 標準檢查背景色和前景色的對比度。
+  /// 使用相對亮度計算對比度比率，確保符合可訪問性標準。
+  ///
+  /// 參數：
+  /// - [background]: 背景顏色
+  /// - [foreground]: 前景顏色（通常是文字顏色）
+  ///
+  /// 返回 `true` 表示對比度符合標準（≥3.0），`false` 表示不符合。
+  ///
+  /// 參考：https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html
   bool _checkColorContrast(Color background, Color foreground) {
-    // 簡化的對比度檢查
+    // 計算相對亮度
     final double luminance1 = background.computeLuminance();
     final double luminance2 = foreground.computeLuminance();
-    final double contrast = (luminance1 + 0.05) / (luminance2 + 0.05);
-    return contrast >= 3.0 || contrast <= 1 / 3.0; // WCAG AA 標準
+
+    // 確保較亮的顏色在分子位置
+    final double lighter = luminance1 > luminance2 ? luminance1 : luminance2;
+    final double darker = luminance1 > luminance2 ? luminance2 : luminance1;
+
+    // 計算對比度比率 (WCAG 2.1 標準)
+    final double contrast = (lighter + 0.05) / (darker + 0.05);
+
+    // WCAG AA 標準：正常文字需要 4.5:1，大文字需要 3:1
+    return contrast >= 3.0;
   }
 
   /// 獲取主題建議
@@ -327,6 +453,18 @@ class ThemeConfigManager extends ChangeNotifier {
   }
 
   /// 獲取主題風格
+  ///
+  /// 根據主題名稱判斷主題所屬的風格類型：
+  /// - `morandi`: 莫蘭迪風格主題
+  /// - `ocean`: 海洋風格主題
+  /// - `glassmorphism`: 毛玻璃風格主題
+  /// - `business`: 商業風格主題
+  /// - `default`: 默認風格主題
+  ///
+  /// 參數：
+  /// - [theme]: 要檢查的主題
+  ///
+  /// 返回主題風格字符串。
   String _getThemeStyle(ThemeScheme theme) {
     if (theme.name.startsWith('morandi_')) {
       return 'morandi';
@@ -359,6 +497,15 @@ class ThemeConfigManager extends ChangeNotifier {
   }
 
   /// 獲取 AppBar 文字顏色
+  ///
+  /// 根據當前主題風格返回適合的 AppBar 文字顏色：
+  /// - 海洋主題：白色文字
+  /// - 莫蘭迪主題：白色文字
+  /// - Glassmorphism 主題：主題主要色
+  /// - 商業主題：根據具體主題返回深色或主要色文字
+  /// - 其他主題：主題主要色
+  ///
+  /// 這個方法確保 AppBar 文字在不同主題下都有良好的可讀性。
   Color get appBarTextColor {
     final theme = effectiveTheme;
     final style = _getThemeStyle(theme);
@@ -403,19 +550,28 @@ class ThemeConfigManager extends ChangeNotifier {
   }
 
   /// 獲取 AppBar 背景漸層
+  ///
+  /// 根據當前主題風格返回適合的 AppBar 背景漸層：
+  /// - 海洋主題：海藍色漸層
+  /// - 莫蘭迪主題：主題主要色漸層
+  /// - Glassmorphism 主題：純白色背景
+  /// - 商業主題：白色半透明毛玻璃效果
+  /// - 其他主題：主題主要色和次要色漸層
+  ///
+  /// 返回的漸層顏色列表可以直接用於 LinearGradient 的 colors 屬性。
   List<Color> get appBarGradient {
     final theme = effectiveTheme;
     final style = _getThemeStyle(effectiveTheme);
     switch (style) {
       case 'ocean':
         return [
-          const Color(0xFF3B82F6).withOpacity(0.9), // 海藍色
-          const Color(0xFF60A5FA).withOpacity(0.8), // 中藍色
+          const Color(0xFF3B82F6).withValues(alpha: 0.9), // 海藍色
+          const Color(0xFF60A5FA).withValues(alpha: 0.8), // 中藍色
         ];
       case 'morandi':
         return [
           theme.primary, // 莫蘭迪主題使用主要色
-          theme.primary.withOpacity(0.8), // 稍微透明的版本
+          theme.primary.withValues(alpha: 0.8), // 稍微透明的版本
         ];
       case 'glassmorphism':
         return [
@@ -427,34 +583,34 @@ class ThemeConfigManager extends ChangeNotifier {
         if (theme.name == 'meta_business_style' ||
             theme.name == 'meta_business_style_dark') {
           return [
-            Colors.white.withOpacity(0.3), // 白色半透明
-            Colors.white.withOpacity(0.2), // 更透明的白色
+            Colors.white.withValues(alpha: 1), // 白色半透明
+            Colors.white.withValues(alpha: 0.2), // 更透明的白色
           ];
         }
         // 彩虹主題使用白色半透明模糊毛玻璃背景
         if (theme.name == 'business_gradient' ||
             theme.name == 'business_gradient_dark') {
           return [
-            Colors.white.withOpacity(0.3), // 白色半透明
-            Colors.white.withOpacity(0.2), // 更透明的白色
+            Colors.white.withValues(alpha: 0.3), // 白色半透明
+            Colors.white.withValues(alpha: 0.2), // 更透明的白色
           ];
         }
         // 其他商業主題使用白色半透明模糊毛玻璃風格
         return [
-          Colors.white.withOpacity(0.3), // 白色半透明
-          Colors.white.withOpacity(0.2), // 更透明的白色
+          Colors.white.withValues(alpha: 1), // 白色半透明
+          Colors.white.withValues(alpha: 0.2), // 更透明的白色
         ];
       default:
         // Beach 主題使用碧綠色背景
         if (theme.name == 'beach_sunset' || theme.name == 'beach_sunset_dark') {
           return [
-            const Color(0xFF00BCD4).withOpacity(0.9), // 碧綠色
-            const Color(0xFF26C6DA).withOpacity(0.8), // 淺碧綠色
+            const Color(0xFF00BCD4).withValues(alpha: 0.9), // 碧綠色
+            const Color(0xFF26C6DA).withValues(alpha: 0.8), // 淺碧綠色
           ];
         }
         return [
-          theme.primary.withOpacity(0.8),
-          theme.secondary.withOpacity(0.6),
+          theme.primary.withValues(alpha: 0.8),
+          theme.secondary.withValues(alpha: 0.6),
         ];
     }
   }
@@ -472,7 +628,7 @@ class ThemeConfigManager extends ChangeNotifier {
       case 'business':
         return Colors.white; // Business 主題使用純白色，不透明
       default:
-        return Colors.white.withOpacity(0.2); // 半透明白色
+        return Colors.white.withValues(alpha: 0.2); // 半透明白色
     }
   }
 
@@ -482,19 +638,19 @@ class ThemeConfigManager extends ChangeNotifier {
     final style = _getThemeStyle(effectiveTheme);
     switch (style) {
       case 'ocean':
-        return const Color(0xFF3B82F6).withOpacity(0.9); // 海藍色半透明
+        return const Color(0xFF3B82F6).withValues(alpha: 0.9); // 海藍色半透明
       case 'morandi':
-        return theme.primary.withOpacity(0.9); // 莫蘭迪主題使用主要色半透明
+        return theme.primary.withValues(alpha: 0.9); // 莫蘭迪主題使用主要色半透明
       case 'glassmorphism':
         return Colors.white; // Glassmorphism 主題使用純白色，不透明
       case 'business':
-        return Colors.white.withOpacity(0.3); // Business 主題使用半透明白色
+        return Colors.white.withValues(alpha: 0.3); // Business 主題使用半透明白色
       default:
         // Beach 主題使用碧綠色半透明背景
         if (theme.name == 'beach_sunset' || theme.name == 'beach_sunset_dark') {
-          return const Color(0xFF00BCD4).withOpacity(0.3); // 碧綠色半透明
+          return const Color(0xFF00BCD4).withValues(alpha: 0.3); // 碧綠色半透明
         }
-        return Colors.white.withOpacity(0.2); // 標準主題使用半透明白色
+        return Colors.white.withValues(alpha: 0.2); // 標準主題使用半透明白色
     }
   }
 
@@ -520,17 +676,23 @@ class ThemeConfigManager extends ChangeNotifier {
     final style = _getThemeStyle(effectiveTheme);
     switch (style) {
       case 'ocean':
-        return Colors.white.withOpacity(0.7); // 半透明白色
+        return Colors.white.withValues(alpha: 0.7); // 半透明白色
       case 'morandi':
-        return Colors.white.withOpacity(0.6); // 莫蘭迪主題使用半透明白色（在深色背景上）
+        return Colors.white.withValues(alpha: 0.6); // 莫蘭迪主題使用半透明白色（在深色背景上）
       case 'glassmorphism':
       case 'business':
       default:
-        return theme.onSurface.withOpacity(0.7); // 半透明深色
+        return theme.onSurface.withValues(alpha: 0.7); // 半透明深色
     }
   }
 
   /// 獲取輸入框文字顏色 - 確保在 Dark Mode 下使用亮色文字
+  ///
+  /// 根據當前主題模式返回適合的輸入框文字顏色：
+  /// - Dark Mode：白色文字
+  /// - Light Mode：主題文字顏色
+  ///
+  /// 這個方法確保輸入框文字在不同主題模式下都有良好的可讀性。
   Color get inputTextColor {
     final theme = effectiveTheme;
     // 在 Dark Mode 下使用亮色文字，在 Light Mode 下使用暗色文字
@@ -542,28 +704,152 @@ class ThemeConfigManager extends ChangeNotifier {
   }
 
   /// 獲取輸入框提示文字顏色 - 確保在 Dark Mode 下使用亮色文字
+  ///
+  /// 根據當前主題模式返回適合的輸入框提示文字顏色：
+  /// - Dark Mode：半透明白色文字
+  /// - Light Mode：半透明主題文字顏色
+  ///
+  /// 這個方法確保輸入框提示文字在不同主題模式下都有良好的可讀性。
   Color get inputHintTextColor {
     final theme = effectiveTheme;
     // 在 Dark Mode 下使用亮色提示文字，在 Light Mode 下使用暗色提示文字
     if (_isDarkMode(theme)) {
-      return Colors.white.withOpacity(0.7); // Dark Mode 使用半透明白色
+      return Colors.white.withValues(alpha: 0.7); // Dark Mode 使用半透明白色
     } else {
-      return theme.onSurface.withOpacity(0.7); // Light Mode 使用半透明主題文字顏色
+      return theme.onSurface.withValues(alpha: 0.7); // Light Mode 使用半透明主題文字顏色
     }
   }
 
   /// 檢查是否為 Dark Mode 主題
+  ///
+  /// 根據主題名稱和當前主題模式設置判斷是否為 Dark Mode：
+  /// - 如果主題名稱以 '_dark' 結尾，返回 true
+  /// - 如果主題模式設置為 dark，返回 true
+  /// - 如果主題模式設置為 system 且系統為深色模式，返回 true
+  /// - 其他情況返回 false
+  ///
+  /// 參數：
+  /// - [theme]: 要檢查的主題
+  ///
+  /// 返回 `true` 表示為 Dark Mode，`false` 表示為 Light Mode。
   bool _isDarkMode(ThemeScheme theme) {
-    return theme.name.contains('_dark') ||
-        theme.name.contains('dark') ||
-        (themeMode == AppThemeMode.dark) ||
-        (themeMode == AppThemeMode.system &&
-            WidgetsBinding.instance.platformDispatcher.platformBrightness ==
-                Brightness.dark);
+    // 檢查主題名稱是否包含 dark 後綴
+    if (theme.name.endsWith('_dark')) {
+      return true;
+    }
+
+    // 檢查主題模式設置
+    switch (_themeMode) {
+      case AppThemeMode.dark:
+        return true;
+      case AppThemeMode.light:
+        return false;
+      case AppThemeMode.system:
+        // 根據系統設置決定
+        return WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+            Brightness.dark;
+    }
+  }
+
+  /// 檢查當前主題是否為指定主題
+  bool isCurrentTheme(ThemeScheme theme) {
+    return _currentTheme.name == theme.name;
+  }
+
+  /// 檢查當前主題是否為指定主題名稱
+  bool isCurrentThemeByName(String themeName) {
+    return _currentTheme.name == themeName;
+  }
+
+  /// 獲取當前主題的詳細信息
+  ///
+  /// 返回包含當前主題詳細信息的 Map，包括：
+  /// - `name`: 主題名稱
+  /// - `displayName`: 主題顯示名稱
+  /// - `isDarkMode`: 是否為深色模式
+  /// - `themeMode`: 主題模式顯示名稱
+  /// - `style`: 主題風格類型
+  ///
+  /// 使用示例：
+  /// ```dart
+  /// final info = themeManager.getCurrentThemeInfo();
+  /// print('當前主題：${info['displayName']}');
+  /// print('是否深色模式：${info['isDarkMode']}');
+  /// ```
+  Map<String, dynamic> getCurrentThemeInfo() {
+    final theme = effectiveTheme;
+    return {
+      'name': theme.name,
+      'displayName': theme.displayName,
+      'isDarkMode': _isDarkMode(theme),
+      'themeMode': _themeMode.displayName,
+      'style': _getThemeStyle(theme),
+    };
+  }
+
+  /// 獲取主題切換歷史（簡單實現）
+  List<String> getThemeHistory() {
+    // TODO: 實現主題切換歷史記錄
+    return [_currentTheme.name];
+  }
+
+  /// 檢查主題是否為預設主題
+  bool isDefaultTheme(ThemeScheme theme) {
+    return theme.name == ThemeScheme.morandiBlue.name;
+  }
+
+  /// 獲取推薦主題列表
+  ///
+  /// 根據當前主題風格推薦相似的主題，最多返回3個推薦主題。
+  ///
+  /// 推薦策略：
+  /// 1. 優先推薦與當前主題相同風格的其他主題
+  /// 2. 如果推薦不足3個，則添加其他風格的主題
+  /// 3. 排除當前正在使用的主題
+  ///
+  /// 返回的主題列表按推薦優先級排序。
+  List<ThemeScheme> getRecommendedThemes() {
+    final currentStyle = _getThemeStyle(effectiveTheme);
+    final recommendations = <ThemeScheme>[];
+
+    // 根據當前主題風格推薦相似主題
+    for (final theme in ThemeScheme.allThemes) {
+      if (_getThemeStyle(theme) == currentStyle &&
+          theme.name != effectiveTheme.name) {
+        recommendations.add(theme);
+      }
+    }
+
+    // 如果推薦不足，添加其他風格的主題
+    if (recommendations.length < 3) {
+      for (final theme in ThemeScheme.allThemes) {
+        if (!recommendations.contains(theme) &&
+            theme.name != effectiveTheme.name) {
+          recommendations.add(theme);
+          if (recommendations.length >= 3) break;
+        }
+      }
+    }
+
+    return recommendations.take(3).toList();
   }
 }
 
 /// 主題預設類別
+///
+/// 代表一組相關的主題集合，用於組織和管理主題。
+/// 每個預設包含多個相關的主題，並提供描述和圖標。
+///
+/// 使用示例：
+/// ```dart
+/// final preset = ThemePreset(
+///   name: 'morandi_collection',
+///   displayName: '莫蘭迪色系合集',
+///   description: '優雅的莫蘭迪色系主題集合',
+///   themes: [ThemeScheme.morandiBlue, ThemeScheme.morandiGreen],
+///   icon: Icons.palette,
+/// );
+/// ```
 class ThemePreset {
   final String name;
   final String displayName;
@@ -578,6 +864,28 @@ class ThemePreset {
     required this.themes,
     required this.icon,
   });
+
+  /// 獲取主題數量
+  int get themeCount => themes.length;
+
+  /// 檢查是否包含指定主題
+  bool containsTheme(ThemeScheme theme) {
+    return themes.any((t) => t.name == theme.name);
+  }
+
+  /// 檢查是否包含指定主題名稱
+  bool containsThemeByName(String themeName) {
+    return themes.any((t) => t.name == themeName);
+  }
+
+  /// 獲取主題名稱列表
+  List<String> get themeNames => themes.map((t) => t.name).toList();
+
+  /// 檢查是否為空
+  bool get isEmpty => themes.isEmpty;
+
+  /// 檢查是否不為空
+  bool get isNotEmpty => themes.isNotEmpty;
 
   Map<String, dynamic> toJson() {
     return {
@@ -600,11 +908,74 @@ class ThemePreset {
       icon: IconData(json['icon'], fontFamily: 'MaterialIcons'),
     );
   }
+
+  @override
+  String toString() {
+    return 'ThemePreset(name: $name, displayName: $displayName, themeCount: $themeCount)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is ThemePreset &&
+        other.name == name &&
+        other.displayName == displayName;
+  }
+
+  @override
+  int get hashCode => name.hashCode ^ displayName.hashCode;
 }
 
 /// 主題模式枚舉
+///
+/// 定義了應用程序支持的主題模式：
+/// - [light]: 淺色模式，始終使用淺色主題
+/// - [dark]: 深色模式，始終使用深色主題
+/// - [system]: 系統模式，根據系統設置自動切換
+///
+/// 使用示例：
+/// ```dart
+/// await themeManager.setThemeMode(AppThemeMode.system);
+/// print(AppThemeMode.system.displayName); // 輸出：跟隨系統
+/// ```
 enum AppThemeMode {
   light,
   dark,
-  system,
+  system;
+
+  /// 獲取顯示名稱
+  String get displayName {
+    switch (this) {
+      case AppThemeMode.light:
+        return '淺色模式';
+      case AppThemeMode.dark:
+        return '深色模式';
+      case AppThemeMode.system:
+        return '跟隨系統';
+    }
+  }
+
+  /// 獲取英文顯示名稱
+  String get displayNameEn {
+    switch (this) {
+      case AppThemeMode.light:
+        return 'Light Mode';
+      case AppThemeMode.dark:
+        return 'Dark Mode';
+      case AppThemeMode.system:
+        return 'System';
+    }
+  }
+
+  /// 獲取圖標
+  IconData get icon {
+    switch (this) {
+      case AppThemeMode.light:
+        return Icons.light_mode;
+      case AppThemeMode.dark:
+        return Icons.dark_mode;
+      case AppThemeMode.system:
+        return Icons.settings_system_daydream;
+    }
+  }
 }

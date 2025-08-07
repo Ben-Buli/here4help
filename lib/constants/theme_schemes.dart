@@ -28,6 +28,19 @@ class ThemeScheme {
   // 新增 backArrowColor 與 backArrowColorInactive
   final Color backArrowColor;
   final Color backArrowColorInactive;
+  
+  // 新增 task_create_page.dart 需要的顏色屬性
+  final Color cardBackground; // 卡片背景色
+  final Color cardBorder; // 卡片邊框色
+  final Color inputBackground; // 輸入框背景色
+  final Color inputBorder; // 輸入框邊框色
+  final Color hintText; // 提示文字顏色
+  final Color disabledText; // 禁用文字顏色
+  final Color divider; // 分割線顏色
+  final Color overlay; // 遮罩顏色
+  final Color successBackground; // 成功背景色
+  final Color warningBackground; // 警告背景色
+  final Color errorBackground; // 錯誤背景色
 
   const ThemeScheme({
     required this.name,
@@ -54,6 +67,17 @@ class ThemeScheme {
     this.gradientEnd,
     required this.backArrowColor,
     required this.backArrowColorInactive,
+    this.cardBackground = const Color(0xFFFFFFFF), // 白色
+    this.cardBorder = const Color(0xFFE5E7EB), // 淺灰色
+    this.inputBackground = const Color(0xFFFFFFFF), // 白色
+    this.inputBorder = const Color(0xFFD1D5DB), // 中灰色
+    this.hintText = const Color(0xFF9CA3AF), // 深灰色
+    this.disabledText = const Color(0xFF6B7280), // 中深灰色
+    this.divider = const Color(0xFFF3F4F6), // 極淺灰色
+    this.overlay = const Color(0x80000000), // 半透明黑色
+    this.successBackground = const Color(0xFFD1FAE5), // 淺綠色
+    this.warningBackground = const Color(0xFFFEF3C7), // 淺橙色
+    this.errorBackground = const Color(0xFFFEE2E2), // 淺紅色
   });
 
   /// 主要風格 - 毛玻璃紫色系 (Main Style)
@@ -77,6 +101,17 @@ class ThemeScheme {
     outlineVariant: Color(0xFF8B5CF6), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
+    cardBackground: Color(0xFFFFFFFF), // 白色卡片背景
+    cardBorder: Color(0xFFE5E7EB), // 淺灰色邊框
+    inputBackground: Color(0xFFFFFFFF), // 白色輸入框背景
+    inputBorder: Color(0xFFD1D5DB), // 中灰色輸入框邊框
+    hintText: Color(0xFF9CA3AF), // 深灰色提示文字
+    disabledText: Color(0xFF6B7280), // 中深灰色禁用文字
+    divider: Color(0xFFF3F4F6), // 極淺灰色分割線
+    overlay: Color(0x80000000), // 半透明黑色遮罩
+    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
+    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
+    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// Meta 商業網站風格 (Meta Business Style) - 淡紫色主題
@@ -87,7 +122,7 @@ class ThemeScheme {
     secondary: Color(0xFFA78BFA), // 淺紫色 (次要色)
     accent: Color(0xFF7C3AED), // 深紫色 (強調色)
     background: Color(0xFFF8F7FF), // 淺紫背景
-    surface: Color(0x80FFFFFF), // 半透明白色表面
+    surface: Color.fromARGB(255, 255, 255, 255), // 半透明白色表面
     onPrimary: Color(0xFFFFFFFF), // 白色文字
     onSecondary: Color(0xFFFFFFFF), // 白色文字
     onBackground: Color(0xFF1C1E21), // 深灰文字
@@ -109,6 +144,17 @@ class ThemeScheme {
     gradientEnd: Alignment.bottomRight,
     backArrowColor: Color(0xFF1C1E21),
     backArrowColorInactive: Color(0x4D1C1E21),
+    cardBackground: Color(0xFFFFFFFF), // 白色卡片背景
+    cardBorder: Color(0xFFE5E7EB), // 淺灰色邊框
+    inputBackground: Color(0xFFFFFFFF), // 白色輸入框背景
+    inputBorder: Color(0xFFD1D5DB), // 中灰色輸入框邊框
+    hintText: Color(0xFF9CA3AF), // 深灰色提示文字
+    disabledText: Color(0xFF6B7280), // 中深灰色禁用文字
+    divider: Color(0xFFF3F4F6), // 極淺灰色分割線
+    overlay: Color(0x80000000), // 半透明黑色遮罩
+    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
+    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
+    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 商業漸層風格 (Business Gradient) - 淺粉紅到淺黃色到淺藍色
@@ -144,6 +190,17 @@ class ThemeScheme {
     gradientEnd: Alignment.bottomRight,
     backArrowColor: Color(0xFF1F2937),
     backArrowColorInactive: Color(0x4D1F2937),
+    cardBackground: Color(0xFFFFFFFF), // 白色卡片背景
+    cardBorder: Color(0xFFE5E7EB), // 淺灰色邊框
+    inputBackground: Color(0xFFFFFFFF), // 白色輸入框背景
+    inputBorder: Color(0xFFD1D5DB), // 中灰色輸入框邊框
+    hintText: Color(0xFF9CA3AF), // 深灰色提示文字
+    disabledText: Color(0xFF6B7280), // 中深灰色禁用文字
+    divider: Color(0xFFF3F4F6), // 極淺灰色分割線
+    overlay: Color(0x80000000), // 半透明黑色遮罩
+    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
+    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
+    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 莫蘭迪藍色系
@@ -167,6 +224,17 @@ class ThemeScheme {
     outlineVariant: Color(0xFF6B7A85), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
+    cardBackground: Color(0xFFF8FAFC), // 淺藍色卡片背景
+    cardBorder: Color(0xFFE2E8F0), // 淺藍灰色邊框
+    inputBackground: Color(0xFFF8FAFC), // 淺藍色輸入框背景
+    inputBorder: Color(0xFFCBD5E1), // 中藍灰色輸入框邊框
+    hintText: Color(0xFF64748B), // 深藍灰色提示文字
+    disabledText: Color(0xFF475569), // 中深藍灰色禁用文字
+    divider: Color(0xFFF1F5F9), // 極淺藍灰色分割線
+    overlay: Color(0x80000000), // 半透明黑色遮罩
+    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
+    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
+    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 莫蘭迪綠色系 - 抹茶綠
@@ -190,6 +258,17 @@ class ThemeScheme {
     outlineVariant: Color(0xFF6A8A6A), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
+    cardBackground: Color(0xFFF8FCF8), // 淺綠色卡片背景
+    cardBorder: Color(0xFFE2F0E2), // 淺綠色邊框
+    inputBackground: Color(0xFFF8FCF8), // 淺綠色輸入框背景
+    inputBorder: Color(0xFFCBD5CB), // 中綠色輸入框邊框
+    hintText: Color(0xFF647864), // 深綠色提示文字
+    disabledText: Color(0xFF475547), // 中深綠色禁用文字
+    divider: Color(0xFFF1F5F1), // 極淺綠色分割線
+    overlay: Color(0x80000000), // 半透明黑色遮罩
+    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
+    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
+    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 莫蘭迪紫色系
@@ -213,6 +292,17 @@ class ThemeScheme {
     outlineVariant: Color(0xFF8B7A85), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
+    cardBackground: Color(0xFFFCF8FC), // 淺紫色卡片背景
+    cardBorder: Color(0xFFF0E8F0), // 淺紫色邊框
+    inputBackground: Color(0xFFFCF8FC), // 淺紫色輸入框背景
+    inputBorder: Color(0xFFE5D5E5), // 中紫色輸入框邊框
+    hintText: Color(0xFF786478), // 深紫色提示文字
+    disabledText: Color(0xFF574857), // 中深紫色禁用文字
+    divider: Color(0xFFF5F1F5), // 極淺紫色分割線
+    overlay: Color(0x80000000), // 半透明黑色遮罩
+    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
+    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
+    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 莫蘭迪粉色系
@@ -236,6 +326,17 @@ class ThemeScheme {
     outlineVariant: Color(0xFFA55566), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
+    cardBackground: Color(0xFFFCF8FA), // 淺粉色卡片背景
+    cardBorder: Color(0xFFF0E8EA), // 淺粉色邊框
+    inputBackground: Color(0xFFFCF8FA), // 淺粉色輸入框背景
+    inputBorder: Color(0xFFE5D5D9), // 中粉色輸入框邊框
+    hintText: Color(0xFF78646B), // 深粉色提示文字
+    disabledText: Color(0xFF574857), // 中深粉色禁用文字
+    divider: Color(0xFFF5F1F3), // 極淺粉色分割線
+    overlay: Color(0x80000000), // 半透明黑色遮罩
+    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
+    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
+    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 莫蘭迪橙色系
@@ -259,6 +360,17 @@ class ThemeScheme {
     outlineVariant: Color(0xFFC49564), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
+    cardBackground: Color(0xFFFCFAF8), // 淺橙色卡片背景
+    cardBorder: Color(0xFFF0EAE0), // 淺橙色邊框
+    inputBackground: Color(0xFFFCFAF8), // 淺橙色輸入框背景
+    inputBorder: Color(0xFFE5D5C5), // 中橙色輸入框邊框
+    hintText: Color(0xFF78645A), // 深橙色提示文字
+    disabledText: Color(0xFF574857), // 中深橙色禁用文字
+    divider: Color(0xFFF5F1ED), // 極淺橙色分割線
+    overlay: Color(0x80000000), // 半透明黑色遮罩
+    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
+    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
+    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 莫蘭迪檸檬黃色系
@@ -442,11 +554,11 @@ class ThemeScheme {
   static const ThemeScheme glassmorphismBlur = ThemeScheme(
     name: 'glassmorphism_blur',
     displayName: 'Glassmorphism Blur',
-    primary: Color(0x80FFFFFF), // 半透明白色
-    secondary: Color(0x80FFFFFF), // 半透明白色
+    primary: Color.fromARGB(255, 94, 94, 94), // 半透明白色
+    secondary: Color.fromARGB(223, 255, 255, 255), // 半透明白色
     accent: Color(0xFF8B5CF6), // 紫色強調
     background: Color(0xFFF8F7FF), // 淺紫背景
-    surface: Color(0x80FFFFFF), // 半透明白色表面
+    surface: Color.fromARGB(255, 255, 255, 255), // 半透明白色表面
     onPrimary: Color(0xFF2D3748), // 深色文字
     onSecondary: Color(0xFF2D3748), // 深色文字
     onBackground: Color(0xFF2D3748), // 深色文字
@@ -781,7 +893,8 @@ class ThemeScheme {
       success: _convertToDarkSuccess(success),
       warning: _convertToDarkWarning(warning),
       shadow: _convertToDarkShadow(shadow),
-      outlineVariant: _convertToDarkOutlineVariant(outlineVariant), // 新增 outlineVariant
+      outlineVariant:
+          _convertToDarkOutlineVariant(outlineVariant), // 新增 outlineVariant
       backgroundBlur: backgroundBlur,
       surfaceBlur: surfaceBlur,
       backgroundGradient: darkBackgroundGradient,
@@ -1032,7 +1145,8 @@ class ThemeScheme {
         success: Color(json['success'] ?? 0xFF000000),
         warning: Color(json['warning'] ?? 0xFF000000),
         shadow: Color(json['shadow'] ?? 0xFF000000),
-        outlineVariant: Color(json['outlineVariant'] ?? 0xFF000000), // 新增 outlineVariant
+        outlineVariant:
+            Color(json['outlineVariant'] ?? 0xFF000000), // 新增 outlineVariant
         backgroundBlur: json['backgroundBlur']?.toDouble(),
         surfaceBlur: json['surfaceBlur']?.toDouble(),
         backgroundGradient: (json['backgroundGradient'] as List?)
