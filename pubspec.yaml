@@ -21,8 +21,15 @@ dependencies:
   provider: ^6.1.0
   http: ^1.4.0
   flutter_slidable: ^3.0.0
-  # Google 登入套件 (不需要 Firebase)
+  # Google 登入套件 (跨平台)
   google_sign_in: ^6.2.1
+  googleapis_auth: ^1.4.1
+  # Facebook 登入套件
+  flutter_facebook_auth: ^6.0.4
+  # Apple 登入套件
+  sign_in_with_apple: ^5.0.0
+  # 平台檢測
+  universal_platform: ^1.0.0+1
   image_picker: ^1.0.7
 
 dev_dependencies:

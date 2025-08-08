@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/auth/models/user_model.dart';
-import 'package:here4help/auth/services/google_auth_service.dart';
+import 'package:here4help/auth/services/platform_auth_service.dart';
 import 'package:here4help/auth/services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
@@ -22,6 +22,9 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController passwordController = TextEditingController();
   bool isLoading = false;
   bool rememberMe = false;
+
+  // 跨平台第三方登入服務
+  final PlatformAuthService _platformAuthService = PlatformAuthService();
 
   @override
   void initState() {
@@ -168,15 +171,14 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  // Google 登入處理
+  // 跨平台 Google 登入處理
   Future<void> _handleGoogleLogin() async {
     setState(() {
       isLoading = true;
     });
 
     try {
-      final googleAuthService = GoogleAuthService();
-      final userData = await googleAuthService.signInWithGoogle();
+      final userData = await _platformAuthService.signInWithGoogle();
 
       if (userData != null) {
         // 儲存用戶資料到本地
@@ -221,7 +223,129 @@ class _LoginPageState extends State<LoginPage> {
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Google 登入錯誤: $e')),
+        SnackBar(content: Text('Google 登入錯誤：$e')),
+      );
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  // 跨平台 Facebook 登入處理
+  Future<void> _handleFacebookLogin() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final userData = await _platformAuthService.signInWithFacebook();
+
+      if (userData != null) {
+        // 儲存用戶資料到本地
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+            'auth_token', 'Bearer ${userData['token'] ?? ''}');
+        await prefs.setString('user_email', userData['email'] ?? '');
+        await prefs.setInt('user_permission', userData['permission'] ?? 0);
+        await prefs.setString('user_name', userData['name'] ?? '');
+        await prefs.setInt('user_points', userData['points'] ?? 0);
+        await prefs.setString('user_avatarUrl', userData['avatar_url'] ?? '');
+        await prefs.setString(
+            'user_primaryLang', userData['primary_language'] ?? '');
+
+        // 更新 Provider
+        Provider.of<UserService>(context, listen: false).setUser(UserModel(
+          id: userData['id'],
+          name: userData['name'],
+          nickname: userData['nickname'] ?? userData['name'],
+          email: userData['email'],
+          phone: userData['phone'] ?? '',
+          points: userData['points'] ?? 0,
+          avatar_url: userData['avatar_url'] ?? '',
+          status: userData['status'] ?? 'active',
+          provider: userData['provider'] ?? 'email',
+          created_at: userData['created_at'] ?? '',
+          updated_at: userData['updated_at'] ?? '',
+          referral_code: userData['referral_code'],
+          google_id: userData['google_id'],
+          primary_language: userData['primary_language'] ?? 'English',
+          permission_level: userData['permission'] ?? 0,
+        ));
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Facebook 登入成功：${userData['email']}')),
+        );
+        context.go('/home');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Facebook 登入失敗，請重試')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Facebook 登入錯誤：$e')),
+      );
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  // 跨平台 Apple 登入處理
+  Future<void> _handleAppleLogin() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final userData = await _platformAuthService.signInWithApple();
+
+      if (userData != null) {
+        // 儲存用戶資料到本地
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+            'auth_token', 'Bearer ${userData['token'] ?? ''}');
+        await prefs.setString('user_email', userData['email'] ?? '');
+        await prefs.setInt('user_permission', userData['permission'] ?? 0);
+        await prefs.setString('user_name', userData['name'] ?? '');
+        await prefs.setInt('user_points', userData['points'] ?? 0);
+        await prefs.setString('user_avatarUrl', userData['avatar_url'] ?? '');
+        await prefs.setString(
+            'user_primaryLang', userData['primary_language'] ?? '');
+
+        // 更新 Provider
+        Provider.of<UserService>(context, listen: false).setUser(UserModel(
+          id: userData['id'],
+          name: userData['name'],
+          nickname: userData['nickname'] ?? userData['name'],
+          email: userData['email'],
+          phone: userData['phone'] ?? '',
+          points: userData['points'] ?? 0,
+          avatar_url: userData['avatar_url'] ?? '',
+          status: userData['status'] ?? 'active',
+          provider: userData['provider'] ?? 'email',
+          created_at: userData['created_at'] ?? '',
+          updated_at: userData['updated_at'] ?? '',
+          referral_code: userData['referral_code'],
+          google_id: userData['google_id'],
+          primary_language: userData['primary_language'] ?? 'English',
+          permission_level: userData['permission'] ?? 0,
+        ));
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Apple 登入成功：${userData['email']}')),
+        );
+        context.go('/home');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Apple 登入失敗，請重試')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Apple 登入錯誤：$e')),
       );
     } finally {
       setState(() {
@@ -232,120 +356,138 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Column(
-              children: [
-                Image.asset(
-                  'assets/icon/app_icon_bordered.png',
-                  width: 100,
-                  height: 100,
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Theme.of(context).colorScheme.primary,
+              Theme.of(context).colorScheme.secondary,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Card(
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Here4Help',
-                  style: TextStyle(
-                    fontStyle: FontStyle.italic,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Welcome Back',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        TextFormField(
+                          controller: emailController,
+                          decoration: const InputDecoration(
+                            labelText: 'Email',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return '請輸入 Email';
+                            }
+                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                                .hasMatch(value)) {
+                              return '請輸入有效的 Email 格式';
+                            }
+                            return null;
+                          },
+                          onFieldSubmitted: (_) => _submitForm(),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: passwordController,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Password',
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return '請輸入密碼';
+                            }
+                            return null;
+                          },
+                          onFieldSubmitted: (_) => _submitForm(),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: rememberMe,
+                              onChanged: (value) {
+                                setState(() {
+                                  rememberMe = value ?? false;
+                                });
+                              },
+                            ),
+                            const Text('Remember me'),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor:
+                                  Theme.of(context).colorScheme.primary,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                            onPressed: _submitForm,
+                            child: const Text(
+                              'Login',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Divider(thickness: 1),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'SIGN UP WITH',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 12),
+                        // 跨平台第三方登入按鈕
+                        Column(
+                          children: [
+                            _buildSocialButton(Icons.g_mobiledata, 'Google',
+                                _handleGoogleLogin),
+                            _buildSocialButton(Icons.facebook, 'Facebook',
+                                _handleFacebookLogin),
+                            _buildSocialButton(Icons.email, 'Email', () {
+                              context.go('/signup');
+                            }),
+                            // 只在 iOS 和 Web 顯示 Apple 登入
+                            if (_platformAuthService.isIOS ||
+                                _platformAuthService.isWeb)
+                              _buildSocialButton(
+                                  Icons.apple, 'Apple', _handleAppleLogin),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            TextFormField(
-              controller: emailController,
-              decoration: const InputDecoration(
-                labelText: 'Account',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return '請輸入帳號';
-                }
-                return null;
-              },
-              onFieldSubmitted: (_) => _submitForm(),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Password',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return '請輸入密碼';
-                }
-                return null;
-              },
-              onFieldSubmitted: (_) => _submitForm(),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Checkbox(
-                  value: rememberMe,
-                  onChanged: (value) {
-                    setState(() {
-                      rememberMe = value ?? false;
-                    });
-                  },
-                ),
-                const Text('Remember me'),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                onPressed: _submitForm,
-                child: const Text(
-                  'Login',
-                  style: TextStyle(color: Colors.white),
-                ),
               ),
             ),
-            const SizedBox(height: 24),
-            const Divider(thickness: 1),
-            const SizedBox(height: 12),
-            const Text(
-              'SIGN UP WITH',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            // 第三方登入按鈕
-            Column(
-              children: [
-                _buildSocialButton(
-                    Icons.g_mobiledata, 'Google', _handleGoogleLogin),
-                _buildSocialButton(Icons.facebook, 'Facebook', () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Facebook 登入功能正在開發中...')),
-                  );
-                }),
-                _buildSocialButton(Icons.email, 'Email', () {
-                  context.go('/signup');
-                }),
-                _buildSocialButton(Icons.apple, 'Apple', () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Apple 登入功能正在開發中...')),
-                  );
-                }),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );

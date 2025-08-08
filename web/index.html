@@ -37,8 +37,97 @@
 
   <title>here4help</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Google OAuth 2.0 JavaScript SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  
+  <!-- Facebook JavaScript SDK -->
+  <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
+  
+  <!-- Apple Sign-In JavaScript SDK -->
+  <script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
+  
+  <!-- 第三方登入初始化腳本 -->
+  <script>
+    // Google OAuth 2.0 初始化
+    function initGoogleAuth() {
+      google.accounts.id.initialize({
+        client_id: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
+        callback: handleGoogleCredentialResponse
+      });
+    }
+
+    function handleGoogleCredentialResponse(response) {
+      // 處理 Google 登入回應
+      console.log('Google 登入成功:', response);
+      // 發送資料到 Flutter
+      if (window.flutter_inappwebview) {
+        window.flutter_inappwebview.callHandler('handleGoogleLogin', response);
+      }
+    }
+
+    // Facebook SDK 初始化
+    window.fbAsyncInit = function() {
+      FB.init({
+        appId: 'YOUR_FACEBOOK_APP_ID',
+        cookie: true,
+        xfbml: true,
+        version: 'v18.0'
+      });
+    };
+
+    function handleFacebookLogin() {
+      FB.login(function(response) {
+        if (response.authResponse) {
+          console.log('Facebook 登入成功:', response);
+          // 發送資料到 Flutter
+          if (window.flutter_inappwebview) {
+            window.flutter_inappwebview.callHandler('handleFacebookLogin', response);
+          }
+        }
+      }, {scope: 'email,public_profile'});
+    }
+
+    // Apple Sign-In 初始化
+    function initAppleSignIn() {
+      AppleID.auth.init({
+        clientId: 'com.example.here4help.service',
+        scope: 'email name',
+        redirectURI: window.location.origin + '/apple-callback',
+        state: 'origin:web'
+      });
+    }
+
+    function handleAppleSignIn() {
+      AppleID.auth.signIn().then(function(response) {
+        console.log('Apple 登入成功:', response);
+        // 發送資料到 Flutter
+        if (window.flutter_inappwebview) {
+          window.flutter_inappwebview.callHandler('handleAppleLogin', response);
+        }
+      }).catch(function(error) {
+        console.error('Apple 登入失敗:', error);
+      });
+    }
+
+    // 頁面載入完成後初始化
+    window.addEventListener('load', function() {
+      // 延遲初始化，確保 SDK 已載入
+      setTimeout(function() {
+        if (typeof google !== 'undefined') {
+          initGoogleAuth();
+        }
+        if (typeof FB !== 'undefined') {
+          // Facebook SDK 已在 fbAsyncInit 中初始化
+        }
+        if (typeof AppleID !== 'undefined') {
+          initAppleSignIn();
+        }
+      }, 1000);
+    });
+  </script>
 </body>
 </html>
