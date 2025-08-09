@@ -241,26 +241,56 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       ElevatedButton(
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                content: const Text(
-                                  'You have successfully applied.\nPlease wait patiently for the task poster’s response',
-                                  textAlign: TextAlign.center,
-                                ),
-                                actionsAlignment: MainAxisAlignment.center,
-                                actions: [
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      Navigator.of(context).pop(); // 關閉 Dialog
-                                      context.go('/task'); // 前往 Task List
-                                    },
-                                    child: const Text('Back to Task List'),
+                        onPressed: () async {
+                          if (!_formKey.currentState!.validate()) return;
+                          try {
+                            final userService = context.read<UserService>();
+                            await userService.ensureUserLoaded();
+                            final currentUser = userService.currentUser;
+                            if (currentUser == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Please login first')),
+                              );
+                              return;
+                            }
+
+                            final taskService = TaskService();
+                            final intro = _selfIntroController.text.trim();
+                            final q1 = _englishController.text.trim();
+
+                            await taskService.applyForTask(
+                              taskId: taskId,
+                              userId: currentUser.id,
+                              coverLetter: intro,
+                              introduction: intro,
+                              q1: q1.isEmpty ? null : q1,
+                            );
+
+                            if (mounted) {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  content: const Text(
+                                    'You have successfully applied.\nPlease wait patiently for the task poster’s response',
+                                    textAlign: TextAlign.center,
                                   ),
-                                ],
-                              ),
+                                  actionsAlignment: MainAxisAlignment.center,
+                                  actions: [
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        Navigator.of(context).pop();
+                                        context.go('/chat');
+                                      },
+                                      child: const Text('Go to Chat'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Apply failed: $e')),
                             );
                           }
                         },

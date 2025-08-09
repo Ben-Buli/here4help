@@ -9,6 +9,7 @@ import 'package:here4help/auth/services/user_service.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/widgets/theme_aware_components.dart';
+import 'package:here4help/task/services/language_service.dart';
 
 class TaskListPage extends StatefulWidget {
   const TaskListPage({super.key});
@@ -27,12 +28,17 @@ class _TaskListPageState extends State<TaskListPage> {
   String? selectedStatus; // 新增狀態篩選
   String sortBy = 'updated_at'; // 新增排序選項
   bool sortDesc = true; // 新增排序方向
+  bool showMyTasksOnly = false; // 是否顯示我的任務
+  bool showAppliedOnly = false; // 是否只顯示已應徵
+  final TextEditingController _languageSearchCtrl = TextEditingController();
+  List<Map<String, dynamic>> _languages = [];
 
   // 根據目前選擇的語言，取得可用的地點
   List<String> getAvailableLocations() {
     final filtered = tasks.where((task) {
       final language = (task['language_requirement'] ?? '').toString();
-      final status = (task['status'] ?? '').toString();
+      final status =
+          (task['status_display'] ?? task['status'] ?? '').toString();
       return (selectedLanguage == null || language == selectedLanguage) &&
           (selectedStatus == null ||
               status.toLowerCase() == selectedStatus!.toLowerCase());
@@ -48,7 +54,8 @@ class _TaskListPageState extends State<TaskListPage> {
   List<String> getAvailableLanguages() {
     final filtered = tasks.where((task) {
       final location = (task['location'] ?? '').toString();
-      final status = (task['status'] ?? '').toString();
+      final status =
+          (task['status_display'] ?? task['status'] ?? '').toString();
       return (selectedLocation == null || location == selectedLocation) &&
           (selectedStatus == null ||
               status.toLowerCase() == selectedStatus!.toLowerCase());
@@ -63,7 +70,7 @@ class _TaskListPageState extends State<TaskListPage> {
   // 取得可用的狀態選項
   List<String> getAvailableStatuses() {
     return tasks
-        .map((e) => (e['status'] ?? '').toString())
+        .map((e) => (e['status_display'] ?? e['status'] ?? '').toString())
         .toSet()
         .where((e) => e.isNotEmpty)
         .toList();
@@ -72,9 +79,11 @@ class _TaskListPageState extends State<TaskListPage> {
   // 排序任務列表
   List<Map<String, dynamic>> sortTasks(List<Map<String, dynamic>> taskList) {
     taskList.sort((a, b) {
-      // 首先按狀態排序：Open 優先
-      final statusA = (a['status'] ?? '').toString().toLowerCase();
-      final statusB = (b['status'] ?? '').toString().toLowerCase();
+      // 首先按狀態排序：Open 優先（以顯示文字）
+      final statusA =
+          (a['status_display'] ?? a['status'] ?? '').toString().toLowerCase();
+      final statusB =
+          (b['status_display'] ?? b['status'] ?? '').toString().toLowerCase();
 
       if (statusA == 'open' && statusB != 'open') return -1;
       if (statusA != 'open' && statusB == 'open') return 1;
@@ -135,6 +144,7 @@ class _TaskListPageState extends State<TaskListPage> {
   void initState() {
     super.initState();
     _loadGlobalTasks();
+    _loadLanguages();
     // 移除 search bar 自動 focus 功能
   }
 
@@ -155,6 +165,14 @@ class _TaskListPageState extends State<TaskListPage> {
   Future<void> _loadGlobalTasks() async {
     final taskService = TaskService();
     await taskService.loadTasks();
+    // 載入我的應徵，供按鈕禁用判斷
+    try {
+      final currentUser =
+          Provider.of<UserService>(context, listen: false).currentUser;
+      if (currentUser != null) {
+        await taskService.loadMyApplications(currentUser.id);
+      }
+    } catch (_) {}
 
     // 新增 unreadCount 計算邏輯
     for (final task in taskService.tasks) {
@@ -167,7 +185,9 @@ class _TaskListPageState extends State<TaskListPage> {
         applier['unreadCount'] = calculateUnreadCount(applier, task);
       }
 
-      final status = (task['status'] ?? '').toString().toLowerCase();
+      final status = (task['status_display'] ?? task['status'] ?? '')
+          .toString()
+          .toLowerCase();
       if (status.toLowerCase() == 'open') {
         task['unreadCount'] = visibleAppliers
             .map((ap) => ap['unreadCount'] as int)
@@ -188,10 +208,19 @@ class _TaskListPageState extends State<TaskListPage> {
     });
   }
 
+  Future<void> _loadLanguages() async {
+    try {
+      _languages = await LanguageService.getLanguages();
+      setState(() {});
+    } catch (_) {}
+  }
+
   // 新增 unread_service 工具函式
   int calculateUnreadCount(
       Map<String, dynamic> applier, Map<String, dynamic> task) {
-    final status = (task['status'] ?? '').toString().toLowerCase();
+    final status = (task['status_display'] ?? task['status'] ?? '')
+        .toString()
+        .toLowerCase();
 
     if (status == 'pending confirmation') {
       return 1;
@@ -214,6 +243,17 @@ class _TaskListPageState extends State<TaskListPage> {
   /// 彈出任務詳情對話框
   void _showTaskDetailDialog(Map<String, dynamic> task) {
     final taskPrimaryLanguage = task['language_requirement'] ?? '-';
+    final userService = Provider.of<UserService>(context, listen: false);
+    final currentUserId = userService.currentUser?.id;
+    final taskService = TaskService();
+    final String taskId = (task['id'] ?? '').toString();
+    final bool isOwner = (task['creator_id']?.toString() ?? '') ==
+        (currentUserId?.toString() ?? '');
+    final bool alreadyApplied = taskService.myApplications.any((app) {
+      final aid = (app['id'] ?? app['task_id']).toString();
+      return aid == taskId;
+    });
+    final bool canApply = !isOwner && !alreadyApplied;
 
     showDialog(
       context: context,
@@ -338,7 +378,7 @@ class _TaskListPageState extends State<TaskListPage> {
                                     color: theme.onSurface)),
                             TextSpan(
                                 text:
-                                    'UserName: ${task['creator_name'] ?? 'N/A'}\n',
+                                    'UserName: ${task['creator_name'] ?? 'N/A'}${isOwner ? ' (You)' : ''}\n',
                                 style: TextStyle(color: theme.onSurface)),
                             TextSpan(
                                 text: 'Rating: ⭐️ 4.7 (18 reviews)',
@@ -359,48 +399,61 @@ class _TaskListPageState extends State<TaskListPage> {
                               child: const Text('CLOSE'),
                             ),
                             ElevatedButton(
-                              onPressed: () async {
-                                final userService = Provider.of<UserService>(
-                                    context,
-                                    listen: false);
-                                await userService.ensureUserLoaded();
+                              onPressed: canApply
+                                  ? () async {
+                                      final userService =
+                                          Provider.of<UserService>(context,
+                                              listen: false);
+                                      await userService.ensureUserLoaded();
 
-                                final userId = userService.currentUser?.id;
+                                      final userId =
+                                          userService.currentUser?.id;
 
-                                if (userId == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text('User not logged in.')),
-                                  );
-                                  return;
-                                }
+                                      if (userId == null) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                              content:
+                                                  Text('User not logged in.')),
+                                        );
+                                        return;
+                                      }
 
-                                debugPrint(
-                                    'APPLY button pressed for userId: $userId');
-                                final data = {
-                                  'userId': userId,
-                                  'taskId': task['id'],
-                                };
+                                      debugPrint(
+                                          'APPLY button pressed for userId: $userId');
+                                      final data = {
+                                        'userId': userId,
+                                        'taskId': task['id'],
+                                      };
 
-                                debugPrint(
-                                    'Navigating to TaskApplyPage with data: $data');
+                                      debugPrint(
+                                          'Navigating to TaskApplyPage with data: $data');
 
-                                if (task['id'] != null) {
-                                  if (Navigator.canPop(dialogContext)) {
-                                    Navigator.pop(dialogContext);
-                                  }
-                                  context.push('/task/apply', extra: data);
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                          'Task ID not found. Please check.'),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-                                }
-                              },
-                              child: const Text('APPLY NOW'),
+                                      if (task['id'] != null) {
+                                        if (Navigator.canPop(dialogContext)) {
+                                          Navigator.pop(dialogContext);
+                                        }
+                                        context.push('/task/apply',
+                                            extra: data);
+                                      } else {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                                'Task ID not found. Please check.'),
+                                            backgroundColor: Colors.red,
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  : null,
+                              child: Text(
+                                isOwner
+                                    ? 'POSTED BY YOU'
+                                    : (alreadyApplied
+                                        ? 'APPLIED'
+                                        : 'APPLY NOW'),
+                              ),
                             ),
                           ],
                         )
@@ -418,10 +471,6 @@ class _TaskListPageState extends State<TaskListPage> {
 
   /// 彈出篩選選單對話框
   void _showFilterDialog() {
-    final locations = getAvailableLocations();
-    final languages = getAvailableLanguages();
-    final statuses = getAvailableStatuses();
-
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -434,7 +483,7 @@ class _TaskListPageState extends State<TaskListPage> {
               backgroundColor: theme.surface,
               child: ConstrainedBox(
                 constraints: BoxConstraints(
-                  maxWidth: 400,
+                  maxWidth: 420,
                   maxHeight: MediaQuery.of(context).size.height * 0.7,
                 ),
                 child: Padding(
@@ -447,7 +496,7 @@ class _TaskListPageState extends State<TaskListPage> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Filter Options',
+                              '篩選選項',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
@@ -457,92 +506,68 @@ class _TaskListPageState extends State<TaskListPage> {
                             IconButton(
                               onPressed: () {
                                 setState(() {
-                                  selectedLocation = null;
-                                  selectedLanguage = null;
-                                  selectedStatus = null;
+                                  showMyTasksOnly = false;
+                                  showAppliedOnly = false;
+                                  sortDesc = true;
                                 });
                                 Navigator.pop(dialogContext);
                               },
                               icon: Icon(Icons.clear, color: theme.onSurface),
-                              tooltip: 'Clear all filters',
+                              tooltip: '清除並關閉',
                             ),
                           ],
                         ),
-                        const SizedBox(height: 15),
-                        Text(
-                          'Location',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: theme.onSurface),
+                        const SizedBox(height: 12),
+                        SwitchListTile(
+                          title: Text('是否顯示我的任務',
+                              style: TextStyle(color: theme.onSurface)),
+                          value: showMyTasksOnly,
+                          onChanged: (v) => setState(() => showMyTasksOnly = v),
                         ),
-                        ...locations
-                            .map((loc) => CheckboxListTile(
-                                  title: Text(loc,
-                                      style: TextStyle(color: theme.onSurface)),
-                                  value: selectedLocation == loc,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      selectedLocation = value! ? loc : null;
-                                    });
-                                    Navigator.pop(dialogContext);
-                                  },
-                                ))
-                            .toList(),
-                        const SizedBox(height: 15),
-                        Text(
-                          'Language',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: theme.onSurface),
+                        SwitchListTile(
+                          title: Text('顯示已應徵任務',
+                              style: TextStyle(color: theme.onSurface)),
+                          value: showAppliedOnly,
+                          onChanged: (v) => setState(() => showAppliedOnly = v),
                         ),
-                        ...languages
-                            .map((lang) => CheckboxListTile(
-                                  title: Text(lang,
-                                      style: TextStyle(color: theme.onSurface)),
-                                  value: selectedLanguage == lang,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      selectedLanguage = value! ? lang : null;
-                                    });
-                                    Navigator.pop(dialogContext);
-                                  },
-                                ))
-                            .toList(),
-                        const SizedBox(height: 15),
-                        Text(
-                          'Status',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: theme.onSurface),
+                        const SizedBox(height: 8),
+                        Text('按照更新日期排序',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: theme.onSurface)),
+                        RadioListTile<bool>(
+                          value: true,
+                          groupValue: sortDesc,
+                          onChanged: (v) =>
+                              setState(() => sortDesc = v ?? true),
+                          title: const Text('Z-A (新到舊)'),
                         ),
-                        ...statuses
-                            .map((status) => CheckboxListTile(
-                                  title: Text(status,
-                                      style: TextStyle(color: theme.onSurface)),
-                                  value: selectedStatus == status,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      selectedStatus = value! ? status : null;
-                                    });
-                                    Navigator.pop(dialogContext);
-                                  },
-                                ))
-                            .toList(),
-                        const SizedBox(height: 20),
+                        RadioListTile<bool>(
+                          value: false,
+                          groupValue: sortDesc,
+                          onChanged: (v) =>
+                              setState(() => sortDesc = v ?? false),
+                          title: const Text('A-Z (舊到新)'),
+                        ),
+                        const SizedBox(height: 12),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            OutlinedButton(
+                            TextButton(
                               onPressed: () {
+                                setState(() {
+                                  showMyTasksOnly = false;
+                                  showAppliedOnly = false;
+                                  sortDesc = true;
+                                });
                                 Navigator.pop(dialogContext);
                               },
-                              child: const Text('CANCEL'),
+                              child: const Text('重設'),
                             ),
+                            const SizedBox(width: 12),
                             ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(dialogContext);
-                              },
-                              child: const Text('APPLY FILTERS'),
+                              onPressed: () => Navigator.pop(dialogContext),
+                              child: const Text('套用'),
                             ),
                           ],
                         ),
@@ -562,33 +587,59 @@ class _TaskListPageState extends State<TaskListPage> {
   Widget build(BuildContext context) {
     // 取得根據篩選條件的可用選項
     final locations = getAvailableLocations();
-    final languages = getAvailableLanguages();
+    final languagesDb = [
+      'All',
+      ..._languages
+          .map((e) => (e['name'] ?? '').toString())
+          .where((e) => e.isNotEmpty)
+    ];
     final statuses = getAvailableStatuses();
+
+    final currentUserId = Provider.of<UserService>(context, listen: false)
+        .currentUser
+        ?.id
+        ?.toString();
+    final myAppliedIds = TaskService()
+        .myApplications
+        .map((e) => (e['task_id'] ?? e['id']).toString())
+        .toSet();
 
     final filteredTasks = tasks.where((task) {
       final title = (task['title'] ?? '').toString().toLowerCase();
       final description = (task['description'] ?? '').toString().toLowerCase();
       final location = (task['location'] ?? '').toString();
       final language = (task['language_requirement'] ?? '').toString();
-      final status = (task['status'] ?? '').toString().toLowerCase();
+      final status = (task['status_display'] ?? task['status'] ?? '')
+          .toString()
+          .toLowerCase();
+      final creatorId = task['creator_id']?.toString();
+      final isMine = (currentUserId != null && creatorId == currentUserId);
+      final applied = myAppliedIds.contains((task['id'] ?? '').toString());
 
       final matchQuery =
           title.contains(searchQuery) || description.contains(searchQuery);
-      final matchLocation =
-          selectedLocation == null || location == selectedLocation;
-      final matchLanguage =
-          selectedLanguage == null || language == selectedLanguage;
-      final matchStatus =
-          selectedStatus == null || status == selectedStatus!.toLowerCase();
+      final matchLocation = selectedLocation == null ||
+          selectedLocation == 'All' ||
+          location == selectedLocation;
+      final matchLanguage = selectedLanguage == null ||
+          selectedLanguage == 'All' ||
+          language == selectedLanguage;
+      final matchStatus = selectedStatus == null ||
+          selectedStatus == 'All' ||
+          status == selectedStatus!.toLowerCase();
+      final matchMine = !showMyTasksOnly || isMine;
+      final matchApplied = !showAppliedOnly || applied;
 
-      return matchQuery && matchLocation && matchLanguage && matchStatus;
+      return matchQuery &&
+          matchLocation &&
+          matchLanguage &&
+          matchStatus &&
+          matchMine &&
+          matchApplied;
     }).toList();
 
-    // 過濾自己的任務
-    final filteredOwnTasks = filterOwnTasks(filteredTasks);
-
-    // 排序任務列表
-    final sortedTasks = sortTasks(filteredOwnTasks);
+    // 排序任務列表（呈現所有任務，不再過濾自己發布的）
+    final sortedTasks = sortTasks(filteredTasks);
 
     return Consumer<ThemeConfigManager>(
       builder: (context, themeManager, child) {
@@ -726,7 +777,7 @@ class _TaskListPageState extends State<TaskListPage> {
                                   BorderSide(color: theme.primary, width: 2),
                             ),
                           ),
-                          items: languages
+                          items: languagesDb
                               .map((lang) => DropdownMenuItem(
                                     value: lang,
                                     child: Text(lang,
@@ -740,6 +791,11 @@ class _TaskListPageState extends State<TaskListPage> {
                             });
                           },
                         ),
+                      ),
+                      IconButton(
+                        onPressed: _showLanguageSearchDialog,
+                        icon: const Icon(Icons.search),
+                        tooltip: '搜尋語言',
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -792,9 +848,60 @@ class _TaskListPageState extends State<TaskListPage> {
                             selectedLocation = null;
                             selectedLanguage = null;
                             selectedStatus = null;
+                            showMyTasksOnly = false;
+                            showAppliedOnly = false;
+                            sortDesc = true;
                           });
                         },
                         icon: const Icon(Icons.refresh),
+                      ),
+                    ],
+                  ),
+                ),
+                // 第二排：toggle 與排序
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Row(children: [
+                          Switch(
+                            value: showMyTasksOnly,
+                            onChanged: (v) =>
+                                setState(() => showMyTasksOnly = v),
+                          ),
+                          Text('顯示我的任務',
+                              style: TextStyle(color: theme.onSurface)),
+                        ]),
+                      ),
+                      Expanded(
+                        child: Row(children: [
+                          Switch(
+                            value: showAppliedOnly,
+                            onChanged: (v) =>
+                                setState(() => showAppliedOnly = v),
+                          ),
+                          Text('只顯示已應徵',
+                              style: TextStyle(color: theme.onSurface)),
+                        ]),
+                      ),
+                      Expanded(
+                        child: Row(children: [
+                          Radio<bool>(
+                            value: true,
+                            groupValue: sortDesc,
+                            onChanged: (v) =>
+                                setState(() => sortDesc = v ?? true),
+                          ),
+                          const Text('更新日期 Z-A'),
+                          Radio<bool>(
+                            value: false,
+                            groupValue: sortDesc,
+                            onChanged: (v) =>
+                                setState(() => sortDesc = v ?? false),
+                          ),
+                          const Text('更新日期 A-Z'),
+                        ]),
                       ),
                     ],
                   ),
@@ -818,8 +925,17 @@ class _TaskListPageState extends State<TaskListPage> {
                         }
                       }
 
-                      final userName =
+                      final currentUserId =
+                          Provider.of<UserService>(context, listen: false)
+                              .currentUser
+                              ?.id
+                              ?.toString();
+                      final isOwner = (task['creator_id']?.toString() ?? '') ==
+                          (currentUserId ?? '');
+                      final userNameBase =
                           task['creator_name']?.toString() ?? 'N/A Poster';
+                      final userName =
+                          isOwner ? '$userNameBase (You)' : userNameBase;
                       final title = task['title']?.toString() ?? '';
                       final location = task['location']?.toString() ?? '';
                       final rewardPoint =

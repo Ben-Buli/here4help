@@ -4,14 +4,14 @@ class TaskStatus {
   static const Map<String, String> statusString = {
     'open': 'Open',
     'in_progress': 'In Progress',
-    'in_progress_tasker': 'In Progress (Tasker)',
-    'applying_tasker': 'Applying (Tasker)',
-    'rejected_tasker': 'Rejected (Tasker)',
+    'in_progress_tasker': 'In Progress',
+    'applying_tasker': 'Applying',
+    'rejected_tasker': 'Rejected',
     'pending_confirmation': 'Pending Confirmation',
-    'pending_confirmation_tasker': 'Pending Confirmation (Tasker)',
+    'pending_confirmation_tasker': 'Pending Confirmation',
     'dispute': 'Dispute',
     'completed': 'Completed',
-    'completed_tasker': 'Completed (Tasker)',
+    'completed_tasker': 'Completed',
   };
 
   // 狀態進度對應表
@@ -21,11 +21,8 @@ class TaskStatus {
     'Pending Confirmation': 0.5,
     'Completed': 1.0,
     'Dispute': 0.75,
-    'Applying (Tasker)': 0.0,
-    'In Progress (Tasker)': 0.25,
-    'Completed (Tasker)': 1.0,
-    'Rejected (Tasker)': 0.0,
-    'Pending Confirmation (Tasker)': 0.5,
+    'Applying': 0.0,
+    'Rejected': 0.0,
   };
 
   // 狀態排序權重

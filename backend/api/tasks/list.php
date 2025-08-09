@@ -30,8 +30,14 @@ try {
     $params = [];
     
     if ($status) {
-        $whereConditions[] = "status = ?";
-        $params[] = $status;
+        // 支援傳入 code 或 id
+        if (is_numeric($status)) {
+            $whereConditions[] = "t.status_id = ?";
+            $params[] = (int)$status;
+        } else {
+            $whereConditions[] = "s.code = ?";
+            $params[] = $status;
+        }
     }
     
     if ($location) {
@@ -50,7 +56,23 @@ try {
     }
     
     // 查詢任務列表
-    $sql = "SELECT * FROM tasks $whereClause ORDER BY created_at DESC LIMIT ? OFFSET ?";
+    // 使用別名並 JOIN 狀態與建立者（僅帶必要欄位）
+    $sql = "SELECT 
+              t.*, 
+              s.id AS status_id,
+              s.code AS status_code,
+              s.display_name AS status_display,
+              s.progress_ratio,
+              s.sort_order,
+              u.id AS creator_id,
+              u.name AS creator_name,
+              u.avatar_url AS creator_avatar
+            FROM tasks t
+            LEFT JOIN task_statuses s ON t.status_id = s.id
+            LEFT JOIN users u ON t.creator_id = u.id
+            $whereClause
+            ORDER BY t.created_at DESC 
+            LIMIT ? OFFSET ?";
     $params[] = $limit;
     $params[] = $offset;
     
@@ -71,7 +93,9 @@ try {
     }
     
     // 獲取總數
-    $countSql = "SELECT COUNT(*) as total FROM tasks $whereClause";
+    $countSql = "SELECT COUNT(*) as total FROM tasks t 
+                 LEFT JOIN task_statuses s ON t.status_id = s.id
+                 $whereClause";
     $totalResult = $db->fetch($countSql, array_slice($params, 0, -2));
     $total = $totalResult['total'];
     

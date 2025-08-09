@@ -54,19 +54,63 @@ try {
         $hashtags = implode(',', $input['hashtags']);
     }
     
-    // 插入任務資料
-    $sql = "INSERT INTO tasks (id, creator_name, title, description, reward_point, location, task_date, status, language_requirement, hashtags, created_at, updated_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+    // 解析狀態：支援 status_id / status_code / status(舊文字)
+    $statusId = null;
+    $statusText = $input['status'] ?? null; // 舊欄位相容
+    if (!empty($input['status_id'])) {
+        $statusId = (int)$input['status_id'];
+    } elseif (!empty($input['status_code'])) {
+        $row = $db->fetch('SELECT id, display_name FROM task_statuses WHERE code = ?', [$input['status_code']]);
+        if ($row) {
+            $statusId = (int)$row['id'];
+            $statusText = $row['display_name'];
+        }
+    } elseif (!empty($statusText)) {
+        $normalized = strtolower(str_replace(' ', '_', $statusText));
+        $row = $db->fetch('SELECT id, display_name FROM task_statuses WHERE code = ?', [$normalized]);
+        if ($row) {
+            $statusId = (int)$row['id'];
+            $statusText = $row['display_name'];
+        }
+    }
+    // 預設狀態 open
+    if ($statusId === null) {
+        $row = $db->fetch("SELECT id, display_name FROM task_statuses WHERE code = 'open' LIMIT 1", []);
+        if ($row) {
+            $statusId = (int)$row['id'];
+            $statusText = $row['display_name'];
+        } else {
+            $statusText = $statusText ?: 'Open';
+        }
+    }
+
+    // 建立者/接案者
+    $creatorId = !empty($input['creator_id']) ? (int)$input['creator_id'] : null;
+    $acceptorId = !empty($input['acceptor_id']) ? (int)$input['acceptor_id'] : null;
+
+    // 插入任務資料（僅以 status_id 表示狀態，不再寫入舊欄位 status）
+    $sql = "INSERT INTO tasks (
+              id, creator_id, acceptor_id,
+              title, description, reward_point, location, task_date,
+              status_id, language_requirement, hashtags,
+              created_at, updated_at
+            ) VALUES (
+              ?, ?, ?,
+              ?, ?, ?, ?, ?,
+              ?, ?, ?,
+              NOW(), NOW()
+            )";
     
     $params = [
         $taskId,
-        $input['creator_name'] ?? null,
+        $creatorId,
+        $acceptorId,
         $input['title'],
         $input['description'],
         $input['reward_point'] ?? $input['salary'] ?? '0', // 支援舊的 salary 欄位
         $input['location'],
         $input['task_date'],
-        $input['status'] ?? 'Open',
+        $statusId,
         $input['language_requirement'],
         $hashtags
     ];
@@ -85,7 +129,10 @@ try {
     }
     
     // 獲取創建的任務資料
-    $taskSql = "SELECT * FROM tasks WHERE id = ?";
+    $taskSql = "SELECT t.*, s.code AS status_code, s.display_name AS status_display
+                FROM tasks t
+                LEFT JOIN task_statuses s ON t.status_id = s.id
+                WHERE t.id = ?";
     $task = $db->fetch($taskSql, [$taskId]);
     
     // 獲取申請問題

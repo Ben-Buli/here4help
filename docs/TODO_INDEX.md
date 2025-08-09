@@ -6,10 +6,22 @@
 - **當前版本**: v3.2.9
 - **下個版本**: v3.3.0 (聊天室功能)
 
-## 🚀 今日任務 (Day 1 - 8/8)
-- **20**: 聊天室列表頁面優化
-- **21**: 聊天室詳情頁面 Socket.IO 整合  
-- **26**: 未讀訊息通知系統
+## 🚀 今日任務 (Day 2 - 8/9)
+- **20**: 聊天室列表頁面優化（收尾）
+  - 未讀數聚合與顯示（含 Navbar badge）
+  - Posted/My Works 改用真實資料（applications 與 acceptor_id）
+  - 任務資訊 Bottom Sheet 最終版（行為與按鈕位置調整）
+- **21**: 聊天室詳情頁面（HTTP 先行 + Socket 規劃）  
+  - 建立 `chat/rooms/open_or_get.php`、`chat/messages/send.php`
+  - /chat/detail 顯示 system message（application_resume）
+  - 完成讀取歷史訊息與送出訊息（HTTP 版）
+- **26**: 未讀訊息通知系統（MVP）
+  - 後端提供未讀快照 API（依任務狀態過濾）
+  - 前端整合全域未讀數與清除機制
+- **27（部分）**: 資料庫遷移執行
+  - 執行 `creator_id` 回填與 `creator_name` 刪除
+  - 前端移除殘留 `creator_name` 寫入，全面使用 JOIN 的 `creator_name`
+  - 確認 `status_id/status_code` 一致性，修正殘留 `status` 字串引用
 
 ## 📋 任務分類
 
@@ -24,9 +36,9 @@
 ### 📋 待執行 (46個)
 
 #### 🗓️ Day 1 - 聊天室功能 (3個)
-- 20: 聊天室列表優化
-- 21: Socket.IO 整合
-- 26: 未讀通知系統
+- 20: 聊天室列表優化（進度延後至 8/9 收尾）
+- 21: Socket.IO 整合（8/9 先做 HTTP 版，Socket 列入規劃）
+- 26: 未讀通知系統（8/9 納入 MVP 實作）
 
 #### 🗓️ Day 2 - 用戶權限 (3個)
 - 22: 用戶權限系統

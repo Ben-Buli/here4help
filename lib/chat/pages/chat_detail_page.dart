@@ -81,6 +81,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       TaskService().updateTaskStatus(
         widget.data['task']['id'].toString(),
         TaskStatus.statusString['completed_tasker']!,
+        statusCode: 'completed',
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -857,6 +858,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                             TaskService().updateTaskStatus(
                               widget.data['task']['id'].toString(),
                               TaskStatus.statusString['in_progress']!,
+                              statusCode: 'in_progress',
                             );
                             GlobalChatRoom().removeRoomsByTaskIdExcept(
                               widget.data['task']['id'].toString(),
@@ -893,6 +895,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                             taskService.updateTaskStatus(
                               widget.data['room']['taskId'].toString(),
                               TaskStatus.statusString['completed']!,
+                              statusCode: 'completed',
                             );
                             setState(() {});
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -924,6 +927,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                             TaskService().updateTaskStatus(
                               widget.data['task']['id'].toString(),
                               TaskStatus.statusString['completed']!,
+                              statusCode: 'completed',
                             );
                             setState(() {});
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -960,6 +964,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                               widget.data['task']['id'].toString(),
                               TaskStatus
                                   .statusString['pending_confirmation_tasker']!,
+                              statusCode: 'pending_confirmation',
                             );
                             // 重新初始化倒數
                             setState(() {

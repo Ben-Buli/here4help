@@ -1696,7 +1696,6 @@ class _PostFormPageState extends State<TaskCreatePage> {
         onPressed: () async {
           final user =
               Provider.of<UserService>(context, listen: false).currentUser;
-          final userName = user?.name ?? 'Unknown Poster';
           final data = {
             'title': _titleController.text.trim(),
             'description': _taskDescriptionController.text.trim(),
@@ -1725,7 +1724,6 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 ? _periodEnd!.toLocal().toString().split(' ')[0]
                 : 'N/A',
             'application_question': _applicationQuestions.join(' | '),
-            'creator_name': userName,
             'avatar_url': user?.avatar_url ?? '',
             'language_requirement': _selectedLanguages.join(','),
             'creator_id': user?.id ?? 'Unknown',

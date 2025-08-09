@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/constants/app_colors.dart';
 import 'package:here4help/services/theme_config_manager.dart';
+import 'package:here4help/auth/services/user_service.dart';
 import 'package:provider/provider.dart';
 
 class TaskPreviewPage extends StatefulWidget {
@@ -87,6 +88,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
     taskData!['acceptor_confirmed'] = '0';
     taskData!['cancel_reason'] = '';
     taskData!['fail_reason'] = '';
+    // creator_name 僅用於預覽顯示，送 API 將以 creator_id 為準
     taskData!['creator_name'] = taskData!['creator_name'] ?? 'Anonymous';
     taskData!['description'] =
         taskData!['description'] ?? 'No description provided';
@@ -538,8 +540,16 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                       'task_date': taskData!['task_date'] ?? '',
                       'language_requirement':
                           taskData!['language_requirement'] ?? '',
-                      'creator_name': taskData!['creator_name'] ?? 'Anonymous',
-                      'status': 'Open',
+                      // 僅送必要欄位；建立者用 creator_id（由登入用戶）
+                      // 預覽中的 creator_name 僅作顯示
+                      'creator_id':
+                          Provider.of<UserService>(context, listen: false)
+                                  .currentUser
+                                  ?.id
+                                  ?.toString() ??
+                              '',
+                      // 初始狀態以 status_code 傳遞
+                      'status_code': 'open',
                     };
 
                     // 如果有申請問題，添加到數據中

@@ -38,6 +38,14 @@ class AppConfig {
     return '$apiBaseUrl/backend/api/tasks/create.php';
   }
 
+  static String get taskUpdateUrl {
+    return '$apiBaseUrl/backend/api/tasks/update.php';
+  }
+
+  static String get taskStatusesUrl {
+    return '$apiBaseUrl/backend/api/tasks/statuses.php';
+  }
+
   // 推薦碼相關 API
   static String get referralCodeUrl {
     return '$apiBaseUrl/backend/api/referral/get-referral-code.php';
@@ -49,5 +57,26 @@ class AppConfig {
 
   static String get referralCodeListUrl {
     return '$apiBaseUrl/backend/api/referral/list-referral-codes.php';
+  }
+
+  // Applications
+  static String get applicationsListByUserUrl {
+    return '$apiBaseUrl/backend/api/tasks/applications/list_by_user.php';
+  }
+
+  static String get applicationsListByTaskUrl {
+    return '$apiBaseUrl/backend/api/tasks/applications/list_by_task.php';
+  }
+
+  static String get applicationApplyUrl {
+    return '$apiBaseUrl/backend/api/tasks/applications/apply.php';
+  }
+
+  static String get applicationApproveUrl {
+    return '$apiBaseUrl/backend/api/tasks/applications/approve.php';
+  }
+
+  static String get applicationRejectUrl {
+    return '$apiBaseUrl/backend/api/tasks/applications/reject.php';
   }
 }

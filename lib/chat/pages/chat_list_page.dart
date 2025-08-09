@@ -1,4 +1,6 @@
 // home_page.dart
+import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:here4help/task/services/task_service.dart';
@@ -6,6 +8,9 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:here4help/chat/models/chat_room_model.dart';
 import 'package:intl/intl.dart';
 import 'package:here4help/constants/task_status.dart';
+import 'package:here4help/services/notification_service.dart';
+import 'package:provider/provider.dart';
+import 'package:here4help/auth/services/user_service.dart';
 
 class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
@@ -28,18 +33,90 @@ class _ChatListPageState extends State<ChatListPage>
   bool taskerFilterEnabled = false;
   late TabController _tabController;
 
+  // 未讀通知占位（任務 26 會替換成實作）
+  final NotificationService _notificationService =
+      NotificationServicePlaceholder();
+  Map<String, int> _unreadByTask = const {};
+  Map<String, int> _unreadByRoom = const {};
+  int _totalUnread = 0;
+  StreamSubscription<int>? _totalSub;
+  StreamSubscription<Map<String, int>>? _taskSub;
+  StreamSubscription<Map<String, int>>? _roomSub;
+
+  // Posted Tasks 應徵者資料快取
+  Map<String, List<Map<String, dynamic>>> _applicationsByTask = {};
+
   @override
   void initState() {
     super.initState();
-    _taskFuture = TaskService().loadTasks();
+    _taskFuture = Future.wait([
+      TaskService().loadTasks(),
+      TaskService().loadStatuses(),
+      _loadApplicationsForPostedTasks(),
+    ]);
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
         setState(() {
           taskerFilterEnabled = _tabController.index == 1;
+          // 重設搜尋與篩選
+          _searchController.clear();
+          searchQuery = '';
+          selectedLocation = null;
+          selectedHashtag = null;
+          selectedStatus = null;
         });
       }
     });
+
+    // 初始化未讀占位並訂閱
+    _notificationService.init(userId: 'placeholder');
+    _totalSub = _notificationService.observeTotalUnread().listen((v) {
+      if (!mounted) return;
+      setState(() => _totalUnread = v);
+    });
+    _taskSub = _notificationService.observeUnreadByTask().listen((m) {
+      if (!mounted) return;
+      setState(() => _unreadByTask = m);
+    });
+    _roomSub = _notificationService.observeUnreadByRoom().listen((m) {
+      if (!mounted) return;
+      setState(() => _unreadByRoom = m);
+    });
+  }
+
+  // 整理 My Works 清單：把 tasks 與 myApplications 合併，並標記 client 狀態
+  List<Map<String, dynamic>> _composeMyWorks(
+      TaskService service, int? currentUserId) {
+    final allTasks = List<Map<String, dynamic>>.from(service.tasks);
+    final apps = service.myApplications;
+    final Set<String> appliedTaskIds =
+        apps.map((e) => (e['id'] ?? e['task_id']).toString()).toSet();
+
+    // 標記 applied_by_me 與覆蓋顯示狀態
+    for (final t in allTasks) {
+      final id = (t['id'] ?? '').toString();
+      if (appliedTaskIds.contains(id)) {
+        t['applied_by_me'] = true;
+        // 來自 API 的 client 狀態優先
+        final app = apps.firstWhere(
+            (e) => (e['id'] == id) || (e['task_id']?.toString() == id),
+            orElse: () => {});
+        if (app.isNotEmpty) {
+          t['status_display'] =
+              app['client_status_display'] ?? t['status_display'];
+          t['status_code'] = app['client_status_code'] ?? t['status_code'];
+        }
+      }
+    }
+
+    // My Works 準則：被指派給我 或 我應徵過
+    return allTasks.where((t) {
+      final acceptorIsMe = (t['acceptor_id']?.toString() ?? '') ==
+          (currentUserId?.toString() ?? '');
+      final appliedByMe = t['applied_by_me'] == true;
+      return acceptorIsMe || appliedByMe;
+    }).toList();
   }
 
   @override
@@ -47,38 +124,344 @@ class _ChatListPageState extends State<ChatListPage>
     _tabController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _totalSub?.cancel();
+    _taskSub?.cancel();
+    _roomSub?.cancel();
+    _notificationService.dispose();
     super.dispose();
   }
 
+  String _displayStatus(Map<String, dynamic> task) {
+    final dynamic display = task['status_display'];
+    if (display != null && display is String && display.isNotEmpty) {
+      return display;
+    }
+    final dynamic codeOrLegacy = task['status_code'] ?? task['status'];
+    final mapped = TaskStatus.statusString[codeOrLegacy] ?? codeOrLegacy;
+    return (mapped ?? '').toString();
+  }
+
   void _showTaskInfoDialog(Map<String, dynamic> task) {
-    showDialog(
+    final colorScheme = Theme.of(context).colorScheme;
+    final isPostedTab = !taskerFilterEnabled;
+    final displayStatus = _displayStatus(task);
+    final canEditDelete = isPostedTab && displayStatus == 'Open';
+
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Task Info'),
-          content: SingleChildScrollView(
-            child: ListBody(
-              children: [
-                Text('Title: ${task['title'] ?? 'N/A'}'),
-                Text('Location: ${task['location']}'),
-                Text('Salary: ${task['reward_point'] ?? task['salary']}'),
-                Text(
-                    'Date: ${DateFormat('MM/dd').format(DateTime.parse(task['task_date']))}'),
-                Text('Language Requirement: ${task['language_requirement']}'),
-                Text(
-                    'Hashtags: ${(task['hashtags'] as List<dynamic>).join(', ')}'),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
+        return DraggableScrollableSheet(
+          initialChildSize: 1.0,
+          minChildSize: 0.5,
+          maxChildSize: 1.0,
+          expand: true,
+          builder: (context, scrollController) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  child: Container(
+                    color:
+                        Theme.of(context).colorScheme.surface.withOpacity(0.9),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 8),
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.black26,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.assignment_outlined,
+                                      color: colorScheme.primary),
+                                  const SizedBox(width: 8),
+                                  const Expanded(
+                                    child: Text('Task Info',
+                                        style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600)),
+                                  ),
+                                  Chip(
+                                    label: Text(
+                                      displayStatus,
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                    backgroundColor: colorScheme
+                                        .primaryContainer
+                                        .withOpacity(0.25),
+                                    side: BorderSide(
+                                        color: colorScheme.primary
+                                            .withOpacity(0.4)),
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6),
+                                  ),
+                                ],
+                              ),
+                              if (canEditDelete) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(8),
+                                      onTap: () {
+                                        Navigator.of(context).pop();
+                                        context.push('/task/create');
+                                      },
+                                      child: const Padding(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.edit_outlined, size: 18),
+                                            SizedBox(height: 2),
+                                            Text('Edit',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight:
+                                                        FontWeight.w600)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(8),
+                                      onTap: () async {
+                                        Navigator.of(context).pop();
+                                        await _confirmAndDeleteTask(task);
+                                      },
+                                      child: const Padding(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.delete_outline,
+                                                size: 18,
+                                                color: Colors.redAccent),
+                                            SizedBox(height: 2),
+                                            Text('Delete',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Colors.redAccent)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        Expanded(
+                          child: ListView(
+                            controller: scrollController,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 12),
+                            children: [
+                              _infoRow(
+                                  Icons.title, 'Title', task['title'] ?? 'N/A'),
+                              _infoRow(Icons.person_outline, 'Poster',
+                                  (task['creator_name'] ?? 'N/A').toString()),
+                              _infoRow(Icons.place_outlined, 'Location',
+                                  '${task['location']}'),
+                              _infoRow(Icons.paid_outlined, 'Reward',
+                                  '${task['reward_point'] ?? task['salary']}'),
+                              _infoRow(
+                                  Icons.event_outlined,
+                                  'Date',
+                                  DateFormat('yyyy-MM-dd').format(
+                                      DateTime.parse(task['task_date']))),
+                              _infoRow(Icons.language_outlined, 'Language',
+                                  '${task['language_requirement']}'),
+                              const SizedBox(height: 8),
+                              const Divider(height: 16),
+                              _infoMultilineRow(
+                                Icons.description_outlined,
+                                'Description',
+                                (task['description'] ??
+                                        'No description provided')
+                                    .toString(),
+                              ),
+                              const SizedBox(height: 8),
+                              _infoRow(
+                                  Icons.schedule_outlined,
+                                  'Created',
+                                  _formatDateTimeString(
+                                      task['created_at']?.toString())),
+                              _infoRow(
+                                  Icons.update,
+                                  'Updated',
+                                  _formatDateTimeString(
+                                      task['updated_at']?.toString())),
+                              const SizedBox(height: 16),
+                              Center(
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(24),
+                                  onTap: () => Navigator.of(context).pop(),
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                        vertical: 4.0, horizontal: 8.0),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.close),
+                                        SizedBox(height: 2),
+                                        Text('Close',
+                                            style: TextStyle(fontSize: 11)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
         );
       },
     );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: colorScheme.primary),
+          const SizedBox(width: 8),
+          SizedBox(
+              width: 88,
+              child: Text(label,
+                  style: const TextStyle(fontWeight: FontWeight.w600))),
+          const SizedBox(width: 8),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
+  // 多行內容資訊列
+  Widget _infoMultilineRow(IconData icon, String label, String value) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: colorScheme.primary),
+          const SizedBox(width: 8),
+          SizedBox(
+              width: 88,
+              child: Text(label,
+                  style: const TextStyle(fontWeight: FontWeight.w600))),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              softWrap: true,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDateTimeString(String? input) {
+    if (input == null || input.isEmpty) return 'N/A';
+    try {
+      final dt = DateTime.parse(input);
+      return DateFormat('yyyy-MM-dd HH:mm').format(dt);
+    } catch (_) {
+      return input;
+    }
+  }
+
+  Future<void> _confirmAndDeleteTask(Map<String, dynamic> task) async {
+    final confirm = await _showDoubleConfirmDialog(
+        'Delete Task', 'Are you sure you want to delete this task?');
+    if (confirm != true) return;
+
+    // Loading 動畫（不要 await，否則會阻塞後續 pop）
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(width: 12),
+            Text('Deleting...'),
+          ],
+        ),
+      ),
+    );
+
+    // 模擬延遲與執行刪除
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    setState(() {
+      TaskService().tasks.removeWhere((t) => t['id'] == task['id']);
+    });
+
+    // 關閉 Loading 並顯示成功效果
+    if (mounted) Navigator.of(context).pop();
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 12),
+            Text('Deleted'),
+          ],
+        ),
+      ),
+    );
+    // 自動關閉成功提示
+    await Future.delayed(const Duration(milliseconds: 900));
+    if (mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<bool?> _showDoubleConfirmDialog(String title, String content) {
@@ -194,58 +577,63 @@ class _ChatListPageState extends State<ChatListPage>
     }
   }
 
-  /// 修改卡片內容，添加進度條
+  /// 修改卡片內容，添加進度條（點擊卡片顯示懸浮視窗）
   Widget _taskCardWithProgressBar(Map<String, dynamic> task) {
-    final progressData = _getProgressData(task['status']);
+    final String displayStatus = _displayStatus(task);
+    final progressData = _getProgressData(displayStatus);
     final progress = progressData['progress'];
     final color = progressData['color'];
 
-    return Card(
-      clipBehavior: Clip.hardEdge,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
-            if (progress != null) ...[
-              // 進度條
-              SizedBox(
-                height: 30, // 確保容器高度足夠
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    LinearProgressIndicator(
-                      value: _getProgressData(task['status'])['progress'],
-                      backgroundColor: Colors.grey[300],
-                      color: _getProgressData(task['status'])['color'],
-                      minHeight: 20,
-                    ),
-                    Text(
-                      _getProgressLabel(task['status']),
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+    return InkWell(
+      onTap: () => _showTaskInfoDialog(task),
+      borderRadius: BorderRadius.circular(12),
+      child: Card(
+        clipBehavior: Clip.hardEdge,
+        margin: const EdgeInsets.only(bottom: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 4,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               const SizedBox(height: 8),
-            ] else ...[
-              // 顯示 Label 或 Chip
-              Chip(
-                label: Text(task['status']),
-                backgroundColor: Colors.transparent,
-                labelStyle: const TextStyle(color: Colors.red),
-                side: const BorderSide(color: Colors.red),
-              ),
+              if (progress != null) ...[
+                // 進度條
+                SizedBox(
+                  height: 30, // 確保容器高度足夠
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      LinearProgressIndicator(
+                        value: _getProgressData(displayStatus)['progress'],
+                        backgroundColor: Colors.grey[300],
+                        color: _getProgressData(displayStatus)['color'],
+                        minHeight: 20,
+                      ),
+                      Text(
+                        _getProgressLabel(displayStatus),
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ] else ...[
+                // 顯示 Label 或 Chip
+                Chip(
+                  label: Text(displayStatus),
+                  backgroundColor: Colors.transparent,
+                  labelStyle: const TextStyle(color: Colors.red),
+                  side: const BorderSide(color: Colors.red),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -253,148 +641,144 @@ class _ChatListPageState extends State<ChatListPage>
 
   Widget _taskCardWithapplierChatItems(
       Map<String, dynamic> task, List<Map<String, dynamic>> applierChatItems) {
-    // Calculate unreadCount: sum of all applierChatItems' unreadCount
-    int taskUnreadCount = 0;
     // applierChatItems with isHidden == true are filtered out
     final visibleapplierChatItems =
         applierChatItems.where((ap) => ap['isHidden'] != true).toList();
-    for (final ap in visibleapplierChatItems) {
-      ap['unreadCount'] ??= (ap['questionReply'] != '' ? 1 : 0) +
-          (ap['sentMessages']?.length ?? 0);
-      taskUnreadCount += (ap['unreadCount'] ?? 0) as int;
-    }
-    // Store unreadCount in task for badge
-    task['unreadCount'] = taskUnreadCount;
+    final taskUnreadCount = _unreadByTask[task['id']] ?? 0;
 
     Widget cardContent = Stack(
       clipBehavior: Clip.none,
       children: [
-        Card(
-          clipBehavior: Clip.hardEdge,
-          margin: const EdgeInsets.only(bottom: 12),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          elevation: 4,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_isCountdownStatus(task['status'])) ...[
-                  _buildCountdownTimer(task),
-                  const SizedBox(height: 8),
-                ],
-                Text(
-                  task['title'] ?? 'N/A',
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold),
-                  maxLines: null,
-                  softWrap: true,
-                ),
-                // 格狀排版的 task 資訊（上下欄對齊、左右有間隔，無背景色與圓角）- new layout
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                  child: Column(
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(Icons.location_on,
-                                    size: 16, color: Colors.grey[700]),
-                                const SizedBox(width: 6),
-                                Expanded(child: Text('${task['location']}')),
-                              ],
+        InkWell(
+          onTap: () => _showTaskInfoDialog(task),
+          borderRadius: BorderRadius.circular(12),
+          child: Card(
+            clipBehavior: Clip.hardEdge,
+            margin: const EdgeInsets.only(bottom: 12),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 4,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_isCountdownStatus(_displayStatus(task))) ...[
+                    _buildCountdownTimer(task),
+                    const SizedBox(height: 8),
+                  ],
+                  Text(
+                    task['title'] ?? 'N/A',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold),
+                    maxLines: null,
+                    softWrap: true,
+                  ),
+                  // 格狀排版的 task 資訊（上下欄對齊、左右有間隔，無背景色與圓角）- new layout
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                    child: Column(
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.location_on,
+                                      size: 16, color: Colors.grey[700]),
+                                  const SizedBox(width: 6),
+                                  Expanded(child: Text('${task['location']}')),
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('💰'),
-                                const SizedBox(width: 6),
-                                Expanded(
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('💰'),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                      child: Text(
+                                          '${task['reward_point'] ?? task['salary']}')),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('📅'),
+                                  const SizedBox(width: 6),
+                                  Expanded(
                                     child: Text(
-                                        '${task['reward_point'] ?? task['salary']}')),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('📅'),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    DateFormat('yyyy-MM-dd').format(
-                                        DateTime.parse(task['task_date'])),
+                                      DateFormat('yyyy-MM-dd').format(
+                                          DateTime.parse(task['task_date'])),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('🌐'),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                    child: Text(
-                                        '${task['language_requirement']}')),
-                              ],
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('🌐'),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                      child: Text(
+                                          '${task['language_requirement']}')),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      // 顯示進度條
+                      SizedBox(
+                        height: 30, // 確保容器高度足夠
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            LinearProgressIndicator(
+                              value: _getProgressData(
+                                  _displayStatus(task))['progress'],
+                              backgroundColor: Colors.grey[300],
+                              color: _getProgressData(
+                                  _displayStatus(task))['color'],
+                              minHeight: 20,
+                            ),
+                            Text(
+                              _getProgressLabel(_displayStatus(task)),
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                ),
-                Wrap(
-                  spacing: 6,
-                  children: [
-                    // 顯示進度條
-                    SizedBox(
-                      height: 30, // 確保容器高度足夠
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          LinearProgressIndicator(
-                            value: _getProgressData(task['status'])['progress'],
-                            backgroundColor: Colors.grey[300],
-                            color: _getProgressData(task['status'])['color'],
-                            minHeight: 20,
-                          ),
-                          Text(
-                            _getProgressLabel(task['status']),
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                ...visibleapplierChatItems.map(
-                  (applierChatItem) => SlidableAutoCloseBehavior(
-                    child: Slidable(
+                  const SizedBox(height: 8),
+                  ...visibleapplierChatItems.map(
+                    (applierChatItem) => Slidable(
                       key: ValueKey(applierChatItem['id']),
                       startActionPane: ActionPane(
                         motion: const DrawerMotion(),
@@ -503,7 +887,7 @@ class _ChatListPageState extends State<ChatListPage>
                               },
                             ),
                           ),
-                          if ((applierChatItem['unreadCount'] ?? 0) > 0)
+                          if (((_unreadByRoom[applierChatItem['id']] ?? 0)) > 0)
                             Positioned(
                               top: -2,
                               right: -2,
@@ -519,7 +903,7 @@ class _ChatListPageState extends State<ChatListPage>
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
-                                  '${applierChatItem['unreadCount']}',
+                                  '${_unreadByRoom[applierChatItem['id']] ?? 0}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -532,13 +916,13 @@ class _ChatListPageState extends State<ChatListPage>
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
         // 總未讀徽章（右上角）
-        if ((task['unreadCount'] ?? 0) > 0)
+        if (taskUnreadCount > 0)
           Positioned(
             top: -4,
             right: -4,
@@ -554,7 +938,7 @@ class _ChatListPageState extends State<ChatListPage>
               ),
               child: Center(
                 child: Text(
-                  '${task['unreadCount']}',
+                  '$taskUnreadCount',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -567,70 +951,8 @@ class _ChatListPageState extends State<ChatListPage>
       ],
     );
 
-    if (task['status'] == 'Open') {
-      return SlidableAutoCloseBehavior(
-        child: Slidable(
-          key: ValueKey(task['id']),
-          startActionPane: ActionPane(
-            motion: const DrawerMotion(),
-            children: [
-              Flexible(
-                child: GestureDetector(
-                  onTap: () {
-                    _showTaskInfoDialog(task);
-                    Slidable.of(context)?.close();
-                  },
-                  child: Container(
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
-                    child: const Text(
-                      'Edit',
-                      style: TextStyle(
-                          color: Colors.black, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          endActionPane: ActionPane(
-            motion: const DrawerMotion(),
-            children: [
-              Flexible(
-                child: GestureDetector(
-                  onTap: () async {
-                    final confirm = await _showDoubleConfirmDialog(
-                        'Delete Task',
-                        'Are you sure you want to delete this task?');
-                    if (confirm == true) {
-                      setState(() {
-                        TaskService()
-                            .tasks
-                            .removeWhere((t) => t['id'] == task['id']);
-                      });
-                    }
-                    Slidable.of(context)?.close();
-                  },
-                  child: Container(
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
-                    child: const Text(
-                      'Delete',
-                      style: TextStyle(
-                          color: Colors.black, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          child: cardContent,
-        ),
-      );
-    } else {
-      // For non-Open tasks, ensure consistent wrapping for future-proofing
-      return SlidableAutoCloseBehavior(child: cardContent);
-    }
+    // 外層左右滑動移除：直接返回卡片內容（點擊卡片顯示懸浮視窗）
+    return cardContent;
   }
 
   /// 倒數計時器：Pending Confirmation 狀態下顯示，倒數7天（以 updated_at 起算），結束時自動設為 Completed
@@ -661,7 +983,7 @@ class _ChatListPageState extends State<ChatListPage>
 
     final progressData = _getProgressData(status);
     final progress = progressData['progress'];
-    if (displayStatus == 'Rejected (Tasker)') {
+    if (displayStatus == 'Rejected') {
       return displayStatus; // 不顯示百分比
     }
     if (progress == null) {
@@ -675,11 +997,11 @@ class _ChatListPageState extends State<ChatListPage>
   Widget build(BuildContext context) {
     final taskService = TaskService();
     final statusOrder = {
-      TaskStatus.statusString['open']!: 0,
-      TaskStatus.statusString['in_progress']!: 1,
-      TaskStatus.statusString['pending_confirmation']!: 2,
-      TaskStatus.statusString['dispute']!: 3,
-      TaskStatus.statusString['completed']!: 4,
+      'Open': 0,
+      'In Progress': 1,
+      'Pending Confirmation': 2,
+      'Dispute': 3,
+      'Completed': 4,
     };
 
     return FutureBuilder(
@@ -694,9 +1016,9 @@ class _ChatListPageState extends State<ChatListPage>
           tasks.sort((a, b) {
             // Convert database status to display status for sorting
             final displayStatusA =
-                TaskStatus.statusString[a['status']] ?? a['status'];
+                (a['status_display'] ?? a['status']) as String? ?? '';
             final displayStatusB =
-                TaskStatus.statusString[b['status']] ?? b['status'];
+                (b['status_display'] ?? b['status']) as String? ?? '';
 
             final statusA = statusOrder[displayStatusA] ?? 99;
             final statusB = statusOrder[displayStatusB] ?? 99;
@@ -714,12 +1036,12 @@ class _ChatListPageState extends State<ChatListPage>
               .toSet()
               .toList()
             ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-          final statusOptions = filteredTasksForDropdown
-              .map((e) => (e['status'] ?? '').toString())
+          // 從後端 `task_statuses` 取狀態顯示名稱
+          final service = TaskService();
+          final statusOptions = service.statuses
+              .map((e) => (e['display_name'] ?? '').toString())
               .where((e) => e.isNotEmpty)
-              .toSet()
-              .toList()
-            ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+              .toList();
 
           return DefaultTabController(
             length: 2,
@@ -805,10 +1127,12 @@ class _ChatListPageState extends State<ChatListPage>
                           value: selectedStatus,
                           hint: const Text('Status'),
                           underline: Container(height: 1, color: Colors.grey),
-                          items: statusOptions.map((status) {
-                            return DropdownMenuItem(
-                                value: status, child: Text(status));
-                          }).toList(),
+                          items: statusOptions
+                              .map((status) => DropdownMenuItem(
+                                    value: status,
+                                    child: Text(status),
+                                  ))
+                              .toList(),
                           onChanged: (value) {
                             setState(() {
                               selectedStatus = value;
@@ -851,20 +1175,27 @@ class _ChatListPageState extends State<ChatListPage>
 
   Widget _buildTaskList(bool taskerEnabled) {
     final taskService = TaskService();
+    final currentUserId = context.read<UserService>().currentUser?.id;
+    if (taskerEnabled && currentUserId != null) {
+      // 確保載入我的應徵
+      taskService.loadMyApplications(currentUserId);
+    }
     final statusOrder = {
-      TaskStatus.statusString['open']!: 0,
-      TaskStatus.statusString['in_progress']!: 1,
-      TaskStatus.statusString['pending_confirmation']!: 2,
-      TaskStatus.statusString['dispute']!: 3,
-      TaskStatus.statusString['completed']!: 4,
+      'Open': 0,
+      'In Progress': 1,
+      'Pending Confirmation': 2,
+      'Dispute': 3,
+      'Completed': 4,
     };
-    final tasks = taskService.tasks;
+    final tasks = taskerEnabled
+        ? _composeMyWorks(taskService, currentUserId)
+        : taskService.tasks;
     tasks.sort((a, b) {
       // Convert database status to display status for sorting
       final displayStatusA =
-          TaskStatus.statusString[a['status']] ?? a['status'];
+          (a['status_display'] ?? a['status']) as String? ?? '';
       final displayStatusB =
-          TaskStatus.statusString[b['status']] ?? b['status'];
+          (b['status_display'] ?? b['status']) as String? ?? '';
 
       final statusA = statusOrder[displayStatusA] ?? 99;
       final statusB = statusOrder[displayStatusB] ?? 99;
@@ -880,7 +1211,7 @@ class _ChatListPageState extends State<ChatListPage>
       final hashtags = (task['hashtags'] as List<dynamic>? ?? [])
           .map((h) => h.toString())
           .toList();
-      final status = (task['status'] ?? '').toString();
+      final status = _displayStatus(task);
       final description = (task['description'] ?? '').toString().toLowerCase();
       final query = searchQuery.toLowerCase();
       final matchQuery = query.isEmpty ||
@@ -889,28 +1220,271 @@ class _ChatListPageState extends State<ChatListPage>
           description.contains(query);
       final matchLocation =
           selectedLocation == null || selectedLocation == location;
-      // Convert database status to display status for filtering
-      final displayStatus = TaskStatus.statusString[status] ?? status;
+      final displayStatus = status;
       final matchStatus =
           selectedStatus == null || selectedStatus == displayStatus;
-      final matchTasker = taskerEnabled
-          ? ((task['hashtags'] as List<dynamic>? ?? [])
-              .map((e) => e.toString().toLowerCase())
-              .contains('tasker'))
-          : !((task['hashtags'] as List<dynamic>? ?? [])
-              .map((e) => e.toString().toLowerCase())
-              .contains('tasker'));
+      // My Works：接受者是我，或我有應徵紀錄
+      final isMyWork = taskerEnabled
+          ? ((task['acceptor_id']?.toString() == currentUserId?.toString()) ||
+              (task['applied_by_me'] == true))
+          : (task['creator_id']?.toString() != currentUserId?.toString());
+      final matchTasker = taskerEnabled ? isMyWork : !isMyWork;
       return matchQuery && matchLocation && matchStatus && matchTasker;
     }).toList();
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: filteredTasks.map((task) {
-        final applierChatItems = chatRoomModel
-            .where((applierChatItem) => applierChatItem['taskId'] == task['id'])
-            .toList();
-        return _taskCardWithapplierChatItems(task, applierChatItems);
-      }).toList(),
+    return SlidableAutoCloseBehavior(
+      child: ListView(
+        padding: const EdgeInsets.all(12),
+        children: filteredTasks.map((task) {
+          final taskId = task['id'].toString();
+
+          // 判斷是否為 Posted Tasks 模式
+          final isPostedTasksTab = _tabController.index == 0;
+          final userService = context.read<UserService>();
+          final currentUserId = userService.currentUser?.id;
+          final isMyTask = currentUserId != null &&
+              (task['creator_id'] == currentUserId ||
+                  task['creator_id']?.toString() == currentUserId.toString());
+
+          List<Map<String, dynamic>> applierChatItems;
+
+          if (isPostedTasksTab && isMyTask) {
+            // Posted Tasks: 使用真實應徵者資料
+            final applications = _applicationsByTask[taskId] ?? [];
+            applierChatItems =
+                _convertApplicationsToApplierChatItems(applications);
+          } else {
+            // My Works 或非我的任務: 使用 demo 資料（暫時）
+            applierChatItems = chatRoomModel
+                .where((applierChatItem) =>
+                    applierChatItem['taskId'] == task['id'])
+                .toList();
+          }
+
+          return _taskCardWithapplierChatItems(task, applierChatItems);
+        }).toList(),
+      ),
     );
+  }
+
+  /// 載入所有我發布任務的應徵者資料
+  Future<void> _loadApplicationsForPostedTasks() async {
+    final userService = context.read<UserService>();
+    final currentUserId = userService.currentUser?.id;
+    if (currentUserId == null) return;
+
+    final taskService = TaskService();
+    final myPostedTasks = taskService.tasks.where((task) {
+      final creatorId = task['creator_id'];
+      return creatorId == currentUserId ||
+          creatorId?.toString() == currentUserId.toString();
+    }).toList();
+
+    for (final task in myPostedTasks) {
+      try {
+        final applications =
+            await taskService.loadApplicationsByTask(task['id'].toString());
+        _applicationsByTask[task['id'].toString()] = applications;
+      } catch (e) {
+        debugPrint('Failed to load applications for task ${task['id']}: $e');
+      }
+    }
+  }
+
+  /// 指派應徵者
+  Future<void> _approveApplication(
+      Map<String, dynamic> task, Map<String, dynamic> applierChatItem) async {
+    try {
+      final userService = context.read<UserService>();
+      final currentUserId = userService.currentUser?.id;
+      if (currentUserId == null) {
+        throw Exception('User not logged in');
+      }
+
+      final taskId = task['id'].toString();
+      final userId = applierChatItem['user_id'];
+
+      if (userId == null) {
+        throw Exception('Invalid applier user ID');
+      }
+
+      // 顯示載入對話框
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Approving application...'),
+            ],
+          ),
+        ),
+      );
+
+      final result = await TaskService().approveApplication(
+        taskId: taskId,
+        userId: userId,
+        posterId: currentUserId,
+      );
+
+      if (mounted) Navigator.of(context).pop(); // 關閉載入對話框
+
+      // 更新本地快取
+      setState(() {
+        // 更新任務狀態
+        task['status_id'] = result['status_id'];
+        task['status_code'] = result['status_code'];
+        task['status_display'] = result['status_display'];
+        task['acceptor_id'] = userId;
+
+        // 更新應徵者狀態
+        applierChatItem['application_status'] = 'accepted';
+
+        // 更新其他應徵者為 rejected
+        final taskApplications = _applicationsByTask[taskId] ?? [];
+        for (final app in taskApplications) {
+          if (app['user_id'] != userId) {
+            app['application_status'] = 'rejected';
+          }
+        }
+      });
+
+      // 重新載入該任務的應徵者資料
+      _loadApplicationsForPostedTasks();
+
+      // 顯示成功訊息
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Application approved successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // 關閉載入對話框
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to approve application: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 拒絕應徵者
+  Future<void> _rejectApplication(
+      Map<String, dynamic> task, Map<String, dynamic> applierChatItem) async {
+    try {
+      final userService = context.read<UserService>();
+      final currentUserId = userService.currentUser?.id;
+      if (currentUserId == null) {
+        throw Exception('User not logged in');
+      }
+
+      final taskId = task['id'].toString();
+      final userId = applierChatItem['user_id'];
+
+      if (userId == null) {
+        throw Exception('Invalid applier user ID');
+      }
+
+      // 顯示確認對話框
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Reject Application'),
+          content: Text(
+              'Are you sure you want to reject ${applierChatItem['name']}\'s application?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Reject'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) return;
+
+      // 顯示載入對話框
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Rejecting application...'),
+            ],
+          ),
+        ),
+      );
+
+      await TaskService().rejectApplication(
+        taskId: taskId,
+        userId: userId,
+        posterId: currentUserId,
+      );
+
+      if (mounted) Navigator.of(context).pop(); // 關閉載入對話框
+
+      // 更新本地快取
+      setState(() {
+        applierChatItem['application_status'] = 'rejected';
+      });
+
+      // 顯示成功訊息
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Application rejected'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // 關閉載入對話框
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to reject application: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 將應徵者資料轉換為聊天室格式
+  List<Map<String, dynamic>> _convertApplicationsToApplierChatItems(
+      List<Map<String, dynamic>> applications) {
+    return applications.map((app) {
+      return {
+        'id': 'app_${app['application_id'] ?? app['user_id']}',
+        'taskId': app['task_id'],
+        'name': app['applier_name'] ?? 'Anonymous',
+        'rating': 4.0, // 預設評分，未來可從 API 取得
+        'reviewsCount': 0, // 預設評論數，未來可從 API 取得
+        'questionReply': app['cover_letter'] ?? '',
+        'sentMessages': [app['cover_letter'] ?? 'Applied for this task'],
+        'user_id': app['user_id'],
+        'application_id': app['application_id'],
+        'application_status': app['application_status'] ?? 'applied',
+        'answers_json': app['answers_json'],
+        'created_at': app['created_at'],
+        'isMuted': false,
+        'isHidden': false,
+      };
+    }).toList();
   }
 }
 
@@ -1128,46 +1702,56 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
     }
 
     if (displayStatus == 'Open') {
-      addButton('Read', Colors.blue[100]!, () {
-        setState(() {
-          int unread = applierChatItem['unreadCount'] ?? 0;
-          applierChatItem['unreadCount'] = 0;
-          task['unreadCount'] = (task['unreadCount'] ?? 0) - unread;
-          if (task['unreadCount']! < 0) task['unreadCount'] = 0;
+      // 檢查是否為真實應徵者（有 application_id）
+      final isRealApplication = applierChatItem['application_id'] != null;
+      final applicationStatus = applierChatItem['application_status'];
+
+      if (isRealApplication && applicationStatus == 'applied') {
+        // 真實應徵者：顯示 Approve/Reject 按鈕
+        addButton('Approve', Colors.green[200]!, () async {
+          await _approveApplication(task, applierChatItem);
+        }, icon: Icons.check);
+
+        addButton('Reject', Colors.red[200]!, () async {
+          await _rejectApplication(task, applierChatItem);
+        }, icon: Icons.close);
+      } else {
+        // Demo 資料或其他狀態：顯示原本按鈕
+        addButton('Read', Colors.blue[100]!, () {
+          _notificationService.markRoomRead(
+            roomId: applierChatItem['id'],
+            upToMessageId: 'latest',
+          );
         });
-      });
-      addButton('Hide', Colors.orange[100]!, () {
-        setState(() {
+        addButton('Hide', Colors.orange[100]!, () {
           applierChatItem['isHidden'] = true;
         });
-      });
-      addButton('Delete', Colors.red[100]!, () async {
-        final confirm = await _showDoubleConfirmDialog('Delete applierChatItem',
-            'Are you sure you want to delete this applierChatItem?');
-        if (confirm == true) {
-          setState(() {
+        addButton('Delete', Colors.red[100]!, () async {
+          final confirm = await _showDoubleConfirmDialog(
+              'Delete applierChatItem',
+              'Are you sure you want to delete this applierChatItem?');
+          if (confirm == true) {
             applierChatItem['isHidden'] = true;
-          });
-        }
-      });
+          }
+        });
+      }
     } else if (displayStatus == 'In Progress' ||
         displayStatus == 'Dispute' ||
         displayStatus == 'Completed') {
       addButton('Read', Colors.blue[100]!, () {
-        setState(() {
-          int unread = applierChatItem['unreadCount'] ?? 0;
-          applierChatItem['unreadCount'] = 0;
-          task['unreadCount'] = (task['unreadCount'] ?? 0) - unread;
-          if (task['unreadCount']! < 0) task['unreadCount'] = 0;
-        });
+        _notificationService.markRoomRead(
+          roomId: applierChatItem['id'],
+          upToMessageId: 'latest',
+        );
       });
     } else if (displayStatus == 'Pending Confirmation') {
       addButton('Confirm', Colors.green[100]!, () {
-        TaskService()
-            .updateTaskStatus(task['id'], 'completed'); // Use database status
-        setState(() {
-          task['status'] = 'completed'; // Use database status
-        });
+        TaskService().updateTaskStatus(
+          task['id'],
+          'completed',
+          statusCode: 'completed',
+        ); // Use database status
+        task['status'] = 'completed'; // Use database status
       });
     }
 

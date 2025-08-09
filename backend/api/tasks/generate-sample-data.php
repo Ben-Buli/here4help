@@ -155,7 +155,9 @@ class TaskDataGenerator {
             
             for ($i = 0; $i < $count; $i++) {
                 $taskData = $this->sampleTasks[$i % count($this->sampleTasks)];
-                $creatorName = $this->sampleUsers[$i % count($this->sampleUsers)];
+                // 隨機指派一個已存在用戶作為 creator_id（若無法找到，預設為 2）
+                $creatorIdRow = $this->db->fetch("SELECT id FROM users ORDER BY RAND() LIMIT 1");
+                $creatorId = $creatorIdRow ? (int)$creatorIdRow['id'] : 2;
                 
                 // 生成 UUID
                 $taskId = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
@@ -173,18 +175,21 @@ class TaskDataGenerator {
                 }
                 
                 // 插入任務資料
-                $sql = "INSERT INTO tasks (id, creator_name, title, description, reward_point, location, task_date, status, language_requirement, hashtags, created_at, updated_at) 
+                $statusRow = $this->db->fetch("SELECT id FROM task_statuses WHERE code = 'open' LIMIT 1");
+                $statusId = $statusRow ? (int)$statusRow['id'] : null;
+
+                $sql = "INSERT INTO tasks (id, creator_id, title, description, reward_point, location, task_date, status_id, language_requirement, hashtags, created_at, updated_at) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
                 
                 $params = [
                     $taskId,
-                    $creatorName,
+                    $creatorId,
                     $taskData['title'],
                     $taskData['description'],
                     $taskData['reward_point'],
                     $taskData['location'],
                     $taskData['task_date'],
-                    'Open',
+                    $statusId,
                     $taskData['language_requirement'],
                     $hashtags
                 ];
@@ -204,9 +209,9 @@ class TaskDataGenerator {
                 
                 $generatedTasks[] = [
                     'id' => $taskId,
-                    'creator_name' => $creatorName,
+                    'creator_id' => $creatorId,
                     'title' => $taskData['title'],
-                    'status' => 'Open'
+                    'status_code' => 'open'
                 ];
             }
             
@@ -222,9 +227,9 @@ class TaskDataGenerator {
      */
     public function checkEmptyFields() {
         try {
-            $sql = "SELECT id, creator_name, title, description, reward_point, location, task_date, language_requirement 
+            $sql = "SELECT id, creator_id, title, description, reward_point, location, task_date, language_requirement 
                     FROM tasks 
-                    WHERE creator_name IS NULL 
+                    WHERE creator_id IS NULL 
                        OR title IS NULL 
                        OR description IS NULL 
                        OR reward_point IS NULL 
@@ -250,15 +255,16 @@ class TaskDataGenerator {
             
             foreach ($emptyTasks as $task) {
                 $taskData = $this->sampleTasks[array_rand($this->sampleTasks)];
-                $creatorName = $this->sampleUsers[array_rand($this->sampleUsers)];
+                $creatorIdRow = $this->db->fetch("SELECT id FROM users ORDER BY RAND() LIMIT 1");
+                $creatorId = $creatorIdRow ? (int)$creatorIdRow['id'] : 2;
                 
                 $updateFields = [];
                 $params = [];
                 
                 // 檢查並填充空欄位
-                if (empty($task['creator_name'])) {
-                    $updateFields[] = "creator_name = ?";
-                    $params[] = $creatorName;
+                if (empty($task['creator_id'])) {
+                    $updateFields[] = "creator_id = ?";
+                    $params[] = $creatorId;
                 }
                 
                 if (empty($task['title'])) {
@@ -301,7 +307,7 @@ class TaskDataGenerator {
                     $filledTasks[] = [
                         'id' => $task['id'],
                         'updated_fields' => array_keys(array_filter([
-                            'creator_name' => empty($task['creator_name']),
+                            'creator_id' => empty($task['creator_id']),
                             'title' => empty($task['title']),
                             'description' => empty($task['description']),
                             'reward_point' => empty($task['reward_point']),
