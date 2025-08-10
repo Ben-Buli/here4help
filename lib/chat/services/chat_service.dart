@@ -149,7 +149,7 @@ class ChatService {
     required String taskId,
     required int creatorId,
     required int participantId,
-    String type = 'task',
+    String type = 'application',
   }) async {
     try {
       final token = await AuthService.getToken();

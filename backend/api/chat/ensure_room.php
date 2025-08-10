@@ -39,7 +39,7 @@ try {
   $task_id = isset($input['task_id']) ? (string)$input['task_id'] : '';
   $creator_id = isset($input['creator_id']) ? (int)$input['creator_id'] : 0;
   $participant_id = isset($input['participant_id']) ? (int)$input['participant_id'] : 0;
-  $type = isset($input['type']) ? (string)$input['type'] : 'task';
+  $type = isset($input['type']) ? (string)$input['type'] : 'application';
 
   if ($task_id === '' || $creator_id <= 0 || $participant_id <= 0) {
     Response::validationError([

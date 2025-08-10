@@ -83,7 +83,7 @@ try {
       cm.from_user_id,
       cm.message,
       cm.created_at,
-      u.username as sender_name,
+      u.name as sender_name,
       u.avatar_url as sender_avatar
     FROM chat_messages cm
     LEFT JOIN users u ON cm.from_user_id = u.id

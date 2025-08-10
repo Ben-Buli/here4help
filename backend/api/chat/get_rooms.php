@@ -72,9 +72,9 @@ try {
       t.status_id,
       ts.name as task_status,
       ts.display_name as task_status_display,
-      creator.username as creator_name,
-      creator.avatar_url as creator_avatar,
-      participant.username as participant_name,
+              creator.name as creator_name,
+        creator.avatar_url as creator_avatar,
+        participant.name as participant_name,
       participant.avatar_url as participant_avatar,
       -- 最新訊息
       latest_msg.message as last_message,

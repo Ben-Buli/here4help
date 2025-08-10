@@ -9,6 +9,8 @@ import 'package:http/http.dart' as http;
 import 'package:here4help/config/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/utils/image_helper.dart';
+import 'package:here4help/chat/services/chat_service.dart';
+import 'package:here4help/chat/services/socket_service.dart';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, required this.data});
@@ -26,13 +28,20 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   // 當前登入用戶 ID
   int? _currentUserId;
 
+  // 聊天訊息列表（從資料庫載入）
+  List<Map<String, dynamic>> _chatMessages = [];
+  bool _isLoadingMessages = false;
+
+  // Socket.IO 服務
+  final SocketService _socketService = SocketService();
+  String? _currentRoomId;
+
   Map<String, dynamic> _getProgressData(String status) {
     return TaskStatus.getProgressData(status);
   }
 
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  final List<Map<String, String>> _messages = [];
   // 模擬任務狀態
   String taskStatus = 'pending confirmation';
 
@@ -48,7 +57,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   @override
   void initState() {
     super.initState();
-    _loadCurrentUserId(); // 載入當前用戶 ID
+    _loadCurrentUserId();
+    _initializeChat(); // 載入當前用戶 ID
 
     final now = DateTime.now();
     joinTime =
@@ -90,6 +100,112 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       debugPrint('🔍 當前登入用戶 ID: $_currentUserId');
     } catch (e) {
       debugPrint('❌ 無法載入當前用戶 ID: $e');
+    }
+  }
+
+  /// 初始化聊天室
+  Future<void> _initializeChat() async {
+    await _loadChatMessages();
+    await _setupSocket();
+  }
+
+  /// 設置 Socket.IO 連接
+  Future<void> _setupSocket() async {
+    try {
+      // 連接 Socket.IO
+      await _socketService.connect();
+
+      // 設置事件監聽器
+      _socketService.onMessageReceived = _onMessageReceived;
+      _socketService.onUnreadUpdate = _onUnreadUpdate;
+
+      // 加入當前聊天室
+      _currentRoomId = widget.data['room']['id']?.toString() ??
+          widget.data['room']['roomId']?.toString();
+
+      if (_currentRoomId != null) {
+        _socketService.joinRoom(_currentRoomId!);
+        // 標記為已讀
+        _socketService.markRoomAsRead(_currentRoomId!);
+      }
+
+      debugPrint('✅ Socket setup completed for room: $_currentRoomId');
+    } catch (e) {
+      debugPrint('❌ Socket setup failed: $e');
+    }
+  }
+
+  /// 處理收到的即時訊息
+  void _onMessageReceived(Map<String, dynamic> messageData) {
+    debugPrint('📨 Received real-time message: $messageData');
+
+    // 檢查是否為當前聊天室的訊息
+    final roomId = messageData['roomId']?.toString();
+    if (roomId == _currentRoomId) {
+      // 重新載入訊息列表以獲取最新訊息
+      _loadChatMessages();
+    }
+  }
+
+  /// 處理未讀訊息更新
+  void _onUnreadUpdate(Map<String, dynamic> unreadData) {
+    debugPrint('🔔 Unread update: $unreadData');
+    // 這裡可以更新 UI 中的未讀徽章
+  }
+
+  /// 格式化訊息時間
+  String _formatMessageTime(String? timeString) {
+    if (timeString == null || timeString.isEmpty) {
+      return DateFormat('HH:mm').format(DateTime.now());
+    }
+
+    try {
+      final dateTime = DateTime.parse(timeString);
+      return DateFormat('HH:mm').format(dateTime);
+    } catch (e) {
+      debugPrint('❌ 時間格式化失敗: $e');
+      return DateFormat('HH:mm').format(DateTime.now());
+    }
+  }
+
+  /// 從資料庫載入聊天訊息
+  Future<void> _loadChatMessages() async {
+    if (_isLoadingMessages) return;
+
+    try {
+      setState(() {
+        _isLoadingMessages = true;
+      });
+
+      final roomId = widget.data['room']['id']?.toString() ??
+          widget.data['room']['roomId']?.toString();
+
+      if (roomId == null || roomId.isEmpty) {
+        debugPrint('❌ 無法取得 roomId');
+        return;
+      }
+
+      debugPrint('🔍 載入聊天訊息，roomId: $roomId');
+
+      final result = await ChatService().getMessages(roomId: roomId);
+      final messages = result['messages'] as List<dynamic>? ?? [];
+
+      if (mounted) {
+        setState(() {
+          _chatMessages =
+              messages.map((msg) => Map<String, dynamic>.from(msg)).toList();
+          _isLoadingMessages = false;
+        });
+      }
+
+      debugPrint('✅ 成功載入 ${_chatMessages.length} 條訊息');
+    } catch (e) {
+      debugPrint('❌ 載入聊天訊息失敗: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingMessages = false;
+        });
+      }
     }
   }
 
@@ -140,28 +256,77 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
-  void _sendMessage() {
+  /// 發送訊息到聊天室（保存到資料庫）
+  Future<void> _sendMessage() async {
     final text = _controller.text.trim();
-    if (text.isNotEmpty && mounted) {
-      final now = DateTime.now();
-      final formattedTime =
-          "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-      setState(() {
-        _messages.add({'text': text, 'time': formattedTime});
-      });
+    if (text.isEmpty || !mounted) return;
+
+    try {
+      final roomId = widget.data['room']['id']?.toString() ??
+          widget.data['room']['roomId']?.toString();
+      final taskId = widget.data['task']['id']?.toString();
+
+      if (roomId == null || roomId.isEmpty) {
+        debugPrint('❌ 無法取得 roomId，無法發送訊息');
+        return;
+      }
+
+      debugPrint('🔍 發送訊息到聊天室: $roomId, 內容: $text');
+
+      // 先清空輸入框，提供即時回饋
       _controller.clear();
       _focusNode.requestFocus();
+
+      // 發送訊息到後端（HTTP API）
+      final result = await ChatService().sendMessage(
+        roomId: roomId,
+        message: text,
+        taskId: taskId,
+      );
+
+      debugPrint('✅ 訊息發送成功: ${result['message_id']}');
+
+      // 透過 Socket.IO 廣播即時訊息（可選，後端 API 也會觸發）
+      if (_socketService.isConnected && _currentRoomId != null) {
+        _socketService.sendMessage(
+          roomId: _currentRoomId!,
+          text: text,
+          messageId: result['message_id']?.toString(),
+        );
+      }
+
+      // 重新載入訊息列表
+      await _loadChatMessages();
+    } catch (e) {
+      debugPrint('❌ 發送訊息失敗: $e');
+
+      // 發送失敗時，顯示錯誤訊息
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('發送訊息失敗: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   @override
   void dispose() {
+    // 離開聊天室
+    if (_currentRoomId != null) {
+      _socketService.leaveRoom(_currentRoomId!);
+    }
+
+    // 清理計時器
     if (widget.data['task']['status'] ==
             TaskStatus.statusString['pending_confirmation_tasker'] ||
         widget.data['task']['status'] ==
             TaskStatus.statusString['pending_confirmation']) {
       countdownTicker.dispose();
     }
+
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -422,12 +587,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final questionReply = widget.data['room']['questionReply'] ?? '';
     final room = widget.data['room'];
     final applier = widget.data['room'];
-    print(applier);
-    final List<dynamic> sentMessages = room['sentMessages'] ?? [];
 
-    int totalItemCount = (questionReply.isNotEmpty ? 1 : 0) +
-        sentMessages.length +
-        _messages.length;
+    // 使用從資料庫載入的訊息列表
+    int totalItemCount =
+        (questionReply.isNotEmpty ? 1 : 0) + _chatMessages.length;
+
+    debugPrint(
+        '🔍 總訊息數量: $totalItemCount (questionReply: ${questionReply.isNotEmpty ? 1 : 0}, chatMessages: ${_chatMessages.length})');
 
     Widget buildQuestionReplyBubble(String text) {
       return Padding(
@@ -492,7 +658,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       );
     }
 
-    Widget buildOpponentBubble(String text, int? opponentUserId) {
+    Widget buildOpponentBubble(String text, int? opponentUserId,
+        {String? senderName, String? messageTime}) {
       // 根據對方身份獲取對應的用戶資訊
       Map<String, dynamic> opponentInfo = {};
 
@@ -556,7 +723,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        joinTime,
+                        messageTime != null
+                            ? _formatMessageTime(messageTime)
+                            : joinTime,
                         style:
                             const TextStyle(fontSize: 10, color: Colors.grey),
                       ),
@@ -738,36 +907,32 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
               int adjustedIndex = index - (questionReply.isNotEmpty ? 1 : 0);
 
-              if (adjustedIndex < sentMessages.length) {
-                final messageData = sentMessages[adjustedIndex];
-                final isString = messageData is String;
-                final messageText = isString
-                    ? messageData
-                    : (messageData['message'] ?? '').toString();
+              // 使用從資料庫載入的訊息列表
+              if (adjustedIndex < _chatMessages.length) {
+                final messageData = _chatMessages[adjustedIndex];
+                final messageText = messageData['message']?.toString() ?? '';
+                final messageFromUserId = messageData['from_user_id'];
+                final messageTime = messageData['created_at']?.toString() ?? '';
+                final senderName =
+                    messageData['sender_name']?.toString() ?? 'Unknown';
 
                 // 判斷這條訊息是否來自當前用戶
-                final messageFromUserId =
-                    room['user_id'] ?? room['participant_id'];
                 final isMyMessage = _currentUserId != null &&
                     messageFromUserId == _currentUserId;
 
                 debugPrint(
-                    '🔍 訊息判斷: messageFromUserId=$messageFromUserId, currentUserId=$_currentUserId, isMyMessage=$isMyMessage');
+                    '🔍 訊息判斷: messageFromUserId=$messageFromUserId, currentUserId=$_currentUserId, isMyMessage=$isMyMessage, text=$messageText');
 
                 // 根據是否為我方訊息決定氣泡樣式
                 if (isMyMessage) {
                   return buildMyMessageBubble({
                     'text': messageText,
-                    'time': joinTime,
+                    'time': _formatMessageTime(messageTime),
                   });
                 } else {
-                  return buildOpponentBubble(messageText, messageFromUserId);
+                  return buildOpponentBubble(messageText, messageFromUserId,
+                      senderName: senderName, messageTime: messageTime);
                 }
-              }
-
-              int myMessageIndex = adjustedIndex - sentMessages.length;
-              if (myMessageIndex < _messages.length) {
-                return buildMyMessageBubble(_messages[myMessageIndex]);
               }
 
               return const SizedBox.shrink();

@@ -4,6 +4,7 @@ import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:here4help/services/theme_config_manager.dart';
+import 'package:here4help/chat/services/chat_service.dart';
 
 /// 任務投遞應徵履歷表單頁面
 class TaskApplyPage extends StatefulWidget {
@@ -269,20 +270,30 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
 
                             // 取得任務資料，用於組合聊天室 payload
                             final task = taskService.getTaskById(taskId) ?? {};
-                            final posterId =
-                                (task['creator_id'] ?? '').toString();
-                            final applicantId = currentUser.id.toString();
-                            // deterministic room id（雙方裝置可計算一致）
-                            final roomId =
-                                'task_${taskId}_pair_${posterId}_$applicantId';
+                            final posterId = task['creator_id'] ?? 0;
+                            final applicantId = currentUser.id;
+
+                            // 使用 ChatService 創建實際的聊天室
+                            final chatService = ChatService();
+                            final roomResult = await chatService.ensureRoom(
+                              taskId: taskId,
+                              creatorId: posterId,
+                              participantId: applicantId,
+                            );
+                            final roomData = roomResult['room'];
+                            final roomId = roomData['id'].toString();
 
                             if (mounted) {
-                              // 直接跳聊天室測試 Socket（會在 ChatDetailPage 內 join_room 並清零未讀）
+                              // 使用真實的聊天室ID跳轉到聊天詳情頁面
                               context.go('/chat/detail', extra: {
                                 'task': task,
                                 'room': {
-                                  'roomId': roomId,
+                                  'id': roomData['id'], // 使用資料庫生成的真實 room_id
+                                  'roomId': roomId, // 保持字串版本以兼容現有代碼
                                   'taskId': taskId,
+                                  'task_id': taskId,
+                                  'creator_id': posterId,
+                                  'participant_id': applicantId,
                                   'questionReply': intro,
                                   'sentMessages': <dynamic>[],
                                   // 添加當前用戶（應徵者）的資訊

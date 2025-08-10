@@ -852,7 +852,7 @@ CREATE TABLE user_themes (
 
 ## 🐛 Bug 修復記錄
 
-### 2025/1/11 - 聊天列表載入修復
+### 2025/8/11 - 聊天列表載入修復
 
 #### 問題
 - `/chat` 頁面應徵者卡片在 hot restart 和 web 刷新時消失
@@ -895,5 +895,5 @@ CREATE TABLE user_themes (
 
 ---
 
-*最後更新: 2025/1/11 - 聊天列表載入修復 by AI Assistant*
+*最後更新: 2025/8/11 - 聊天列表載入修復 by AI Assistant*
 *維護者: Here4Help 開發團隊* 
