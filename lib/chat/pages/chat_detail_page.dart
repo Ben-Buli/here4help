@@ -4,6 +4,11 @@ import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/chat/services/global_chat_room.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:here4help/constants/task_status.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:here4help/config/app_config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:here4help/utils/image_helper.dart';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, required this.data});
@@ -17,6 +22,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     with TickerProviderStateMixin {
   // 統一應徵者訊息的背景色
   final Color applierBubbleColor = Colors.grey.shade100;
+
+  // 當前登入用戶 ID
+  int? _currentUserId;
 
   Map<String, dynamic> _getProgressData(String status) {
     return TaskStatus.getProgressData(status);
@@ -40,6 +48,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   @override
   void initState() {
     super.initState();
+    _loadCurrentUserId(); // 載入當前用戶 ID
+
     final now = DateTime.now();
     joinTime =
         "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
@@ -64,6 +74,36 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       countdownTicker = Ticker(_onTick)..start();
     } else {
       remainingTime = const Duration();
+    }
+  }
+
+  /// 載入當前登入用戶 ID
+  Future<void> _loadCurrentUserId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id');
+      if (mounted) {
+        setState(() {
+          _currentUserId = userId;
+        });
+      }
+      debugPrint('🔍 當前登入用戶 ID: $_currentUserId');
+    } catch (e) {
+      debugPrint('❌ 無法載入當前用戶 ID: $e');
+    }
+  }
+
+  /// 獲取當前用戶資訊
+  Future<Map<String, dynamic>?> _getCurrentUserInfo() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return {
+        'name': prefs.getString('user_name') ?? 'Me',
+        'avatar_url': prefs.getString('user_avatarUrl') ?? '',
+      };
+    } catch (e) {
+      debugPrint('❌ 無法獲取當前用戶資訊: $e');
+      return null;
     }
   }
 
@@ -127,6 +167,256 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     super.dispose();
   }
 
+  /// 獲取應徵者的應徵資料
+  Future<Map<String, dynamic>?> _getApplicationData(
+      String taskId, int applicantId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.applicationsListByTaskUrl}?task_id=$taskId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success']) {
+          final applications = data['data']['applications'] as List;
+          // 找到指定應徵者的應徵資料
+          final application = applications.firstWhere(
+            (app) => app['user_id'] == applicantId,
+            orElse: () => null,
+          );
+          return application;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching application data: $e');
+    }
+    return null;
+  }
+
+  /// 顯示應徵者真實應徵資料的對話框
+  void _showApplierResumeDialog(BuildContext context) async {
+    // 顯示載入對話框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final taskId = widget.data['task']['id']?.toString() ?? '';
+      final applicantId = widget.data['room']['user_id'] ??
+          widget.data['room']['participant_id'] ??
+          0;
+
+      final applicationData = await _getApplicationData(taskId, applicantId);
+
+      // 關閉載入對話框
+      Navigator.of(context).pop();
+
+      if (applicationData != null) {
+        // 解析 answers_json
+        Map<String, dynamic> answers = {};
+        try {
+          if (applicationData['answers_json'] != null) {
+            answers = jsonDecode(applicationData['answers_json']);
+          }
+        } catch (e) {
+          debugPrint('Error parsing answers_json: $e');
+        }
+
+        // 顯示真實的應徵資料
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Center(child: Text('應徵者履歷')),
+            actions: [
+              Center(
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('關閉'),
+                ),
+              ),
+            ],
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 24.0,
+              vertical: 24.0,
+            ),
+            contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 0),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 應徵者基本資訊
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundImage:
+                              applicationData['applier_avatar'] != null
+                                  ? (applicationData['applier_avatar']
+                                          .startsWith('http')
+                                      ? NetworkImage(
+                                          applicationData['applier_avatar'])
+                                      : AssetImage(
+                                              applicationData['applier_avatar'])
+                                          as ImageProvider)
+                                  : null,
+                          child: applicationData['applier_avatar'] == null
+                              ? Text(
+                                  (applicationData['applier_name'] ?? 'U')[0]
+                                      .toUpperCase(),
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 20),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                applicationData['applier_name'] ?? 'Anonymous',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '應徵時間: ${applicationData['created_at'] ?? 'Unknown'}',
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // 自我推薦
+                    if (answers['introduction']?.isNotEmpty == true) ...[
+                      const Text(
+                        '自我推薦',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: Text(answers['introduction'] ?? ''),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Cover Letter
+                    if (applicationData['cover_letter']?.isNotEmpty ==
+                        true) ...[
+                      const Text(
+                        'Cover Letter',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: Text(applicationData['cover_letter'] ?? ''),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // 其他問題回答
+                    ...['q1', 'q2', 'q3']
+                        .where((key) => answers[key]?.isNotEmpty == true)
+                        .map((key) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '問題 ${key.toUpperCase()}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey[300]!),
+                            ),
+                            child: Text(answers[key] ?? ''),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      } else {
+        // 顯示錯誤訊息
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('錯誤'),
+            content: const Text('無法載入應徵資料'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('確定'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      // 關閉載入對話框
+      Navigator.of(context).pop();
+
+      // 顯示錯誤訊息
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('錯誤'),
+          content: Text('載入應徵資料時發生錯誤: $e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('確定'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final questionReply = widget.data['room']['questionReply'] ?? '';
@@ -177,160 +467,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                               Align(
                                 alignment: Alignment.centerRight,
                                 child: TextButton(
-                                  onPressed: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Center(
-                                            child: Text('Resume Preview')),
-                                        actions: [
-                                          Center(
-                                            child: TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(context),
-                                              child: const Text('CLOSE'),
-                                            ),
-                                          ),
-                                        ],
-                                        insetPadding:
-                                            const EdgeInsets.symmetric(
-                                                horizontal: 24.0,
-                                                vertical: 24.0),
-                                        contentPadding:
-                                            const EdgeInsets.fromLTRB(
-                                                24.0, 20.0, 24.0, 0),
-                                        content: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.center,
-                                              children: [
-                                                CircleAvatar(
-                                                  radius: 30,
-                                                  backgroundImage: room['user']
-                                                              ?['avatar_url'] !=
-                                                          null
-                                                      ? (room['user']![
-                                                                  'avatar_url']
-                                                              .startsWith(
-                                                                  'http')
-                                                          ? NetworkImage(
-                                                              room['user']![
-                                                                  'avatar_url'])
-                                                          : AssetImage(room[
-                                                                      'user']![
-                                                                  'avatar_url'])
-                                                              as ImageProvider)
-                                                      : null,
-                                                  child: room['user']
-                                                              ?['avatar_url'] ==
-                                                          null
-                                                      ? Text(
-                                                          (room['user']?[
-                                                                      'name'] ??
-                                                                  applier[
-                                                                      'name'] ??
-                                                                  'U')[0]
-                                                              .toUpperCase(),
-                                                          style:
-                                                              const TextStyle(
-                                                                  color: Colors
-                                                                      .white,
-                                                                  fontSize: 20),
-                                                        )
-                                                      : null,
-                                                ),
-                                                const SizedBox(width: 16),
-                                                Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      applier['name'] ??
-                                                          'Applier',
-                                                      style: const TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 16,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Row(
-                                                      children: [
-                                                        const Icon(Icons.star,
-                                                            color: Colors.amber,
-                                                            size: 16),
-                                                        const SizedBox(
-                                                            width: 4),
-                                                        Text(
-                                                            '${applier['rating'] ?? 4.2}'),
-                                                        Text(
-                                                            ' (${applier['cooment'] ?? '16 comments'})'),
-                                                      ],
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 12),
-                                            const Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: Text(
-                                                  'Self-recommendation (optional)',
-                                                  style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold)),
-                                            ),
-                                            TextField(
-                                              controller: TextEditingController(
-                                                  text: room['user']
-                                                                  ?['selfIntro']
-                                                              ?.isNotEmpty ==
-                                                          true
-                                                      ? room['user']![
-                                                          'selfIntro']
-                                                      : 'I am reliable, experienced, and proficient in communication. I have handled similar tasks before and am confident in my ability to deliver quality work.'),
-                                              readOnly: true,
-                                              maxLines: 4,
-                                              decoration: const InputDecoration(
-                                                hintText:
-                                                    'Tell us about yourself',
-                                                border: OutlineInputBorder(),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 12),
-                                            const Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: Text(
-                                                  'Can you speak English?',
-                                                  style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold)),
-                                            ),
-                                            TextField(
-                                              controller: TextEditingController(
-                                                  text: room['user']?[
-                                                                  'languageReply']
-                                                              ?.isNotEmpty ==
-                                                          true
-                                                      ? room['user']![
-                                                          'languageReply']
-                                                      : 'Yes, I can speak English fluently.'),
-                                              readOnly: true,
-                                              maxLines: 2,
-                                              decoration: const InputDecoration(
-                                                hintText: 'Write your answer',
-                                                border: OutlineInputBorder(),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
+                                  onPressed: () =>
+                                      _showApplierResumeDialog(context),
                                   child: const Text('View Resume'),
                                 ),
                               ),
@@ -354,7 +492,31 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       );
     }
 
-    Widget buildApplierBubble(String text) {
+    Widget buildOpponentBubble(String text, int? opponentUserId) {
+      // 根據對方身份獲取對應的用戶資訊
+      Map<String, dynamic> opponentInfo = {};
+
+      // 檢查是否為任務發布者
+      final taskCreatorId = widget.data['task']['creator_id'];
+      if (opponentUserId == taskCreatorId) {
+        // 對方是任務發布者
+        opponentInfo = {
+          'name': widget.data['task']['creator_name'] ??
+              room['chat_partner']?['name'] ??
+              'Task Creator',
+          'avatar_url': widget.data['task']['creator_avatar'] ??
+              room['chat_partner']?['avatar_url'] ??
+              '',
+        };
+      } else {
+        // 對方是應徵者，從 room 中獲取
+        opponentInfo = {
+          'name':
+              room['user']?['name'] ?? room['participant_name'] ?? 'Applicant',
+          'avatar_url': room['user']?['avatar_url'] ?? '',
+        };
+      }
+
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3.0),
         child: Column(
@@ -365,19 +527,16 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundImage: room['user']?['avatar_url'] != null
-                      ? (room['user']!['avatar_url'].startsWith('http')
-                          ? NetworkImage(room['user']!['avatar_url'])
-                          : AssetImage(room['user']!['avatar_url'])
-                              as ImageProvider)
-                      : null,
-                  child: room['user']?['avatar_url'] == null
-                      ? Text(
-                          (room['user']?['name'] ?? applier['name'] ?? 'U')[0]
-                              .toUpperCase(),
-                          style: const TextStyle(color: Colors.white),
-                        )
-                      : null,
+                  backgroundImage:
+                      ImageHelper.getAvatarImage(opponentInfo['avatar_url']),
+                  child:
+                      ImageHelper.getAvatarImage(opponentInfo['avatar_url']) ==
+                              null
+                          ? Text(
+                              (opponentInfo['name'] ?? 'U')[0].toUpperCase(),
+                              style: const TextStyle(color: Colors.white),
+                            )
+                          : null,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -411,25 +570,29 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       );
     }
 
-    Widget buildMyMessageBubble(Map<String, String> message) {
+    Widget buildMyMessageBubble(Map<String, String> message,
+        {bool showAvatar = false}) {
       final text = message['text'] ?? '';
       final time =
           message['time'] ?? DateFormat('HH:mm').format(DateTime.now());
+
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3.0), // 上下間距
+        padding: const EdgeInsets.symmetric(vertical: 3.0),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
+            // 時間顯示在左側
             Text(
               time,
               style: const TextStyle(fontSize: 10, color: Colors.grey),
             ),
             const SizedBox(width: 4),
+            // 訊息氣泡
             Flexible(
               child: Container(
                 padding: const EdgeInsets.all(12),
-                constraints: const BoxConstraints(maxWidth: 400),
+                constraints: const BoxConstraints(maxWidth: 300),
                 decoration: BoxDecoration(
                   color: const Color.fromARGB(255, 235, 241, 249), // 我的訊息背景色
                   borderRadius: BorderRadius.circular(12),
@@ -437,6 +600,29 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                 child: Text(text),
               ),
             ),
+            // 可選的我方頭像（用於對稱設計）
+            if (showAvatar) ...[
+              const SizedBox(width: 8),
+              FutureBuilder<Map<String, dynamic>?>(
+                future: _getCurrentUserInfo(),
+                builder: (context, snapshot) {
+                  final userInfo = snapshot.data ?? {};
+                  return CircleAvatar(
+                    radius: 16,
+                    backgroundImage:
+                        ImageHelper.getAvatarImage(userInfo['avatar_url']) ??
+                            ImageHelper.getDefaultAvatar(),
+                    child: ImageHelper.getAvatarImage(userInfo['avatar_url']) ==
+                            null
+                        ? Text(
+                            (userInfo['name'] ?? 'Me')[0].toUpperCase(),
+                            style: const TextStyle(color: Colors.white),
+                          )
+                        : null,
+                  );
+                },
+              ),
+            ],
           ],
         ),
       );
@@ -558,7 +744,25 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                 final messageText = isString
                     ? messageData
                     : (messageData['message'] ?? '').toString();
-                return buildApplierBubble(messageText);
+
+                // 判斷這條訊息是否來自當前用戶
+                final messageFromUserId =
+                    room['user_id'] ?? room['participant_id'];
+                final isMyMessage = _currentUserId != null &&
+                    messageFromUserId == _currentUserId;
+
+                debugPrint(
+                    '🔍 訊息判斷: messageFromUserId=$messageFromUserId, currentUserId=$_currentUserId, isMyMessage=$isMyMessage');
+
+                // 根據是否為我方訊息決定氣泡樣式
+                if (isMyMessage) {
+                  return buildMyMessageBubble({
+                    'text': messageText,
+                    'time': joinTime,
+                  });
+                } else {
+                  return buildOpponentBubble(messageText, messageFromUserId);
+                }
               }
 
               int myMessageIndex = adjustedIndex - sentMessages.length;

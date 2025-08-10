@@ -285,6 +285,21 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                                   'taskId': taskId,
                                   'questionReply': intro,
                                   'sentMessages': <dynamic>[],
+                                  // 添加當前用戶（應徵者）的資訊
+                                  'user_id': currentUser.id,
+                                  'participant_id': currentUser.id,
+                                  'user': {
+                                    'id': currentUser.id,
+                                    'name': currentUser.name,
+                                    'avatar_url': currentUser.avatar_url,
+                                  },
+                                  // 聊天夥伴（任務發布者）資訊
+                                  'chat_partner': {
+                                    'id': task['creator_id'],
+                                    'name':
+                                        task['creator_name'] ?? 'Task Creator',
+                                    'avatar_url': task['creator_avatar'] ?? '',
+                                  },
                                 },
                               });
                             }

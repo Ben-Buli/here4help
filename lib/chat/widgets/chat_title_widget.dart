@@ -128,13 +128,36 @@ class _ChatTitleWidgetState extends State<ChatTitleWidget> {
     debugPrint('🔍 userRole: $userRole');
     debugPrint('🔍 chatPartnerInfo: $chatPartnerInfo');
 
-    // 優先從 chatPartnerInfo 取得聊天對象名稱，如果沒有則從 room 取得
-    final partnerName = chatPartnerInfo['name'] as String? ??
-        room['name'] as String? ??
-        room['participant_name'] as String? ??
-        'Chat Partner';
-    final rating = (room['rating'] as num?)?.toDouble();
-    final reviewsCount = room['reviewsCount'] as int?;
+    // 判斷當前用戶角色並確定聊天夥伴
+    String partnerName = 'Chat Partner';
+    Map<String, dynamic> effectiveChatPartnerInfo = {};
+
+    // 優先從 room 的 chat_partner 取得聊天對象資訊
+    if (room['chat_partner'] != null) {
+      final chatPartner = room['chat_partner'] as Map<String, dynamic>;
+      partnerName = chatPartner['name'] as String? ?? 'Task Creator';
+      effectiveChatPartnerInfo = chatPartner;
+      debugPrint('🔍 使用 room.chat_partner: $partnerName');
+    }
+    // 次要選項：從 chatPartnerInfo 取得
+    else if (chatPartnerInfo.isNotEmpty) {
+      partnerName = chatPartnerInfo['name'] as String? ?? 'Chat Partner';
+      effectiveChatPartnerInfo = chatPartnerInfo;
+      debugPrint('🔍 使用 chatPartnerInfo: $partnerName');
+    }
+    // 最後選項：從 room 的其他欄位取得
+    else {
+      partnerName = room['name'] as String? ??
+          room['participant_name'] as String? ??
+          task['creator_name'] as String? ??
+          'Chat Partner';
+      debugPrint('🔍 使用 room 其他欄位: $partnerName');
+    }
+
+    final rating = (effectiveChatPartnerInfo['rating'] as num?)?.toDouble() ??
+        (room['rating'] as num?)?.toDouble();
+    final reviewsCount = effectiveChatPartnerInfo['reviewsCount'] as int? ??
+        room['reviewsCount'] as int?;
 
     debugPrint('🔍 最終 partnerName: $partnerName');
     debugPrint('🔍 task title: ${task['title']}');
@@ -143,7 +166,7 @@ class _ChatTitleWidgetState extends State<ChatTitleWidget> {
       task: task,
       chatPartnerName: partnerName,
       userRole: userRole,
-      chatPartnerInfo: chatPartnerInfo,
+      chatPartnerInfo: effectiveChatPartnerInfo,
       rating: rating,
       reviewsCount: reviewsCount,
     );
