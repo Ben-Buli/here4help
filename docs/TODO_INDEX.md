@@ -1,42 +1,48 @@
 # Here4Help TODO - 快速索引
 
 ## 📊 專案狀態
-- **完成度**: 29.2% (19/65 任務)
+- **完成度**: 32.3% (21/65 任務)
 - **目標**: 7天內完成 100%
-- **當前版本**: v3.2.9
+- **當前版本**: v3.2.10
 - **下個版本**: v3.3.0 (聊天室功能)
 
+## 🎯 最新進展 (2025/1/11)
+### ✅ 完成項目
+- **聊天列表載入修復**: 修正 `/chat` 頁面應徵者卡片在 hot restart 和 web 刷新時消失的問題
+- **載入狀態優化**: 實現 `_isInitialLoadComplete` 標記來追蹤真正的載入完成狀態
+- **UI 體驗改善**: 添加載入進度顯示和重試功能
+- **數據持久化**: FutureBuilder 邏輯優化確保數據載入完成後正確顯示 UI
+
 ## 🚀 今日任務 (Day 2 - 8/9)
-- **20**: 聊天室列表頁面優化（收尾）
-  - 未讀數聚合與顯示（含 Navbar badge）
-  - Posted/My Works 改用真實資料（applications 與 acceptor_id）
-  - 任務資訊 Bottom Sheet 最終版（行為與按鈕位置調整）
-- **21**: 聊天室詳情頁面（HTTP 先行 + Socket 規劃）  
-  - 建立 `chat/rooms/open_or_get.php`、`chat/messages/send.php`
-  - /chat/detail 顯示 system message（application_resume）
-  - 完成讀取歷史訊息與送出訊息（HTTP 版）
-- **26**: 未讀訊息通知系統（MVP）
-  - 後端提供未讀快照 API（依任務狀態過濾）
-  - 前端整合全域未讀數與清除機制
-- **27（部分）**: 資料庫遷移執行
-  - 執行 `creator_id` 回填與 `creator_name` 刪除
-  - 前端移除殘留 `creator_name` 寫入，全面使用 JOIN 的 `creator_name`
-  - 確認 `status_id/status_code` 一致性，修正殘留 `status` 字串引用
+- **21 (Socket 核心)**
+  - 建立 Node.js Socket.IO Gateway（auth/rooms/events）
+  - 事件：auth/join_room/leave_room/send_message/read_room/typing
+  - 推送：unread_total、unread_room
+- **26（未讀 MVP）**
+  - 後端 `unread_snapshot.php`（冷啟/重連一次性）
+  - 前端 Navbar 徽章 + 進房清零
+- **20（列表與面板收斂）**
+  - Posted/My Works 用真實 API（`applications/list_by_user.php` + `acceptor_id` 規則）
+  - 任務資訊 Bottom Sheet 定稿
+- **27（部分）**
+  - `acceptor_id` 型態與 FK 已處理；清理殘留程式的舊欄位依賴
 
 ## 📋 任務分類
 
-### ✅ 已完成 (19個)
+### ✅ 已完成 (21個)
 - 1-10: 核心功能完善
 - 15-18: 基礎功能修復
 - 19: 任務狀態設計文件
+- 20a: 聊天列表載入修復 (2025/1/11)
+- 20b: FutureBuilder 優化 (2025/1/11)
 
 ### 🔄 進行中 (0個)
 - 無
 
-### 📋 待執行 (46個)
+### 📋 待執行 (44個)
 
-#### 🗓️ Day 1 - 聊天室功能 (3個)
-- 20: 聊天室列表優化（進度延後至 8/9 收尾）
+#### 🗓️ Day 1 - 聊天室功能 (1個)
+- ~~20: 聊天室列表優化~~ ✅ 已完成 (2025/1/11)
 - 21: Socket.IO 整合（8/9 先做 HTTP 版，Socket 列入規劃）
 - 26: 未讀通知系統（8/9 納入 MVP 實作）
 

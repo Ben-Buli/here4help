@@ -79,4 +79,19 @@ class AppConfig {
   static String get applicationRejectUrl {
     return '$apiBaseUrl/backend/api/tasks/applications/reject.php';
   }
+
+  // Socket Gateway
+  static String get devSocketUrl => 'http://localhost:3001';
+  static String get prodSocketUrl => 'https://hero4help.demofhs.com:3001';
+  static String get socketUrl => isDevelopment ? devSocketUrl : prodSocketUrl;
+
+  // Chat APIs (MVP)
+  static String get unreadSnapshotUrl =>
+      '$apiBaseUrl/backend/api/chat/unread_snapshot.php';
+  static String get chatSendMessageUrl =>
+      '$apiBaseUrl/backend/api/chat/send_message.php';
+  static String get chatReadRoomUrl =>
+      '$apiBaseUrl/backend/api/chat/read_room.php';
+  static String get ensureRoomUrl =>
+      '$apiBaseUrl/backend/api/chat/ensure_room.php';
 }

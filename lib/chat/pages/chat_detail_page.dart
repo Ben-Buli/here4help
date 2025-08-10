@@ -530,243 +530,135 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
     // --- END ALERT BAR SWITCH-CASE ---
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text(widget.data['task']['title'] ?? 'Task Info'),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Task Description',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text(widget.data['task']['description'] ??
-                            'No description'),
-                        const SizedBox(height: 8),
-                        const Text('Reward Point:',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text(widget.data['task']['reward_point'] != null
-                            ? 'NT\$${widget.data['task']['reward_point']}'
-                            : widget.data['task']['salary'] != null
-                                ? 'NT\$${widget.data['task']['salary']}'
-                                : 'N/A'),
-                        const SizedBox(height: 8),
-                        const Text('Request Language:',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text(
-                            widget.data['task']['language_requirement'] ?? '—'),
-                        const SizedBox(height: 8),
-                        const Text('Location:',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text(widget.data['task']['location'] ?? '—'),
-                        const SizedBox(height: 8),
-                        const Text('Task Date:',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text(widget.data['task']['task_date'] ?? '—'),
-                        const SizedBox(height: 8),
-                        // --- Application Question section ---
-                        const Text('Application Question:',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text(
-                            widget.data['task']['application_question'] ?? '—'),
-                        const SizedBox(height: 8),
-                        // --- End Application Question section ---
-                        const Text('Posted by:',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text('UserName: ${widget.data['room']['name'] ?? '—'}'),
-                        Row(
-                          children: [
-                            const Icon(Icons.star,
-                                color: Color.fromARGB(255, 255, 187, 0),
-                                size: 16),
-                            const SizedBox(width: 4),
-                            Text('${widget.data['room']['rating'] ?? 0.0}'),
-                            Text(
-                                ' (${widget.data['room']['reviewsCount'] ?? 0} reviews)'),
-                          ],
-                        )
-                      ],
-                    ),
-                    actions: [
-                      Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(
-                              height: 10,
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('CLOSE'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              child: Text(
-                widget.data['task']['title'] ?? 'Chat',
-                style: const TextStyle(
-                  fontSize: 20,
-                  color: Colors.blue,
-                ),
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              widget.data['room']['name'] ?? 'Applier',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1.0),
-          child: Container(
-            color: Colors.grey,
-            height: 1.0,
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          // alertBar 置於 AppBar 下方
-          if (alertContent != null)
-            Container(
-              color: Colors.grey[100],
-              width: double.infinity,
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: alertContent,
-            ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: totalItemCount,
-              itemBuilder: (context, index) {
-                if (questionReply.isNotEmpty && index == 0) {
-                  return buildQuestionReplyBubble(questionReply);
-                }
-
-                int adjustedIndex = index - (questionReply.isNotEmpty ? 1 : 0);
-
-                if (adjustedIndex < sentMessages.length) {
-                  final messageData = sentMessages[adjustedIndex];
-                  final isString = messageData is String;
-                  final messageText = isString
-                      ? messageData
-                      : (messageData['message'] ?? '').toString();
-                  return buildApplierBubble(messageText);
-                }
-
-                int myMessageIndex = adjustedIndex - sentMessages.length;
-                if (myMessageIndex < _messages.length) {
-                  return buildMyMessageBubble(_messages[myMessageIndex]);
-                }
-
-                return const SizedBox.shrink();
-              },
-            ),
-          ),
-          // 保持原本的 status banner 在底部
+    return Column(
+      children: [
+        // alertBar 置於 AppBar 下方
+        if (alertContent != null)
           Container(
-            color:
-                _getStatusBackgroundColor(widget.data['task']['status'] ?? ''),
+            color: Colors.grey[100],
             width: double.infinity,
             alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Text(
-              (() {
-                final status = widget.data['task']['status'] ?? '';
-                final progressData = _getProgressData(status);
-                final progress = progressData['progress'];
-                if (progress != null) {
-                  final percent = (progress * 100).round();
-                  return '$status ($percent%)';
-                } else {
-                  return status;
-                }
-              })(),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: _getStatusChipColor(widget.data['task']['status'] ?? ''),
-              ),
-              textAlign: TextAlign.center,
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: alertContent,
           ),
-          const Divider(
-            height: 1,
-            thickness: 2,
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: _buildActionButtonsByStatus()
-                .map((e) => Expanded(child: e))
-                .toList(),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.only(top: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      enabled: !isInputDisabled,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (value) {
-                        if (!isInputDisabled) _sendMessage();
-                      },
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: totalItemCount,
+            itemBuilder: (context, index) {
+              if (questionReply.isNotEmpty && index == 0) {
+                return buildQuestionReplyBubble(questionReply);
+              }
 
-                      /// 鍵盤收起時取消焦點
-                      onEditingComplete: () {
-                        FocusScope.of(context).unfocus();
-                      },
-                      onTapOutside: (_) {
-                        FocusScope.of(context).unfocus();
-                      },
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                        hintText: isInputDisabled
-                            ? (widget.data['task']['status'] == 'Completed'
-                                ? 'This task is completed'
-                                : 'This task was rejected')
-                            : 'Type a message',
-                        hintStyle: TextStyle(
-                          color: isInputDisabled ? Colors.grey : Colors.black54,
-                        ),
+              int adjustedIndex = index - (questionReply.isNotEmpty ? 1 : 0);
+
+              if (adjustedIndex < sentMessages.length) {
+                final messageData = sentMessages[adjustedIndex];
+                final isString = messageData is String;
+                final messageText = isString
+                    ? messageData
+                    : (messageData['message'] ?? '').toString();
+                return buildApplierBubble(messageText);
+              }
+
+              int myMessageIndex = adjustedIndex - sentMessages.length;
+              if (myMessageIndex < _messages.length) {
+                return buildMyMessageBubble(_messages[myMessageIndex]);
+              }
+
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+        // 保持原本的 status banner 在底部
+        Container(
+          color: _getStatusBackgroundColor(widget.data['task']['status'] ?? ''),
+          width: double.infinity,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text(
+            (() {
+              final status = widget.data['task']['status'] ?? '';
+              final progressData = _getProgressData(status);
+              final progress = progressData['progress'];
+              if (progress != null) {
+                final percent = (progress * 100).round();
+                return '$status ($percent%)';
+              } else {
+                return status;
+              }
+            })(),
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: _getStatusChipColor(widget.data['task']['status'] ?? ''),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+        const Divider(
+          height: 1,
+          thickness: 2,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: _buildActionButtonsByStatus()
+              .map((e) => Expanded(child: e))
+              .toList(),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    enabled: !isInputDisabled,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (value) {
+                      if (!isInputDisabled) _sendMessage();
+                    },
+
+                    /// 鍵盤收起時取消焦點
+                    onEditingComplete: () {
+                      FocusScope.of(context).unfocus();
+                    },
+                    onTapOutside: (_) {
+                      FocusScope.of(context).unfocus();
+                    },
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      hintText: isInputDisabled
+                          ? (widget.data['task']['status'] == 'Completed'
+                              ? 'This task is completed'
+                              : 'This task was rejected')
+                          : 'Type a message',
+                      hintStyle: TextStyle(
+                        color: isInputDisabled ? Colors.grey : Colors.black54,
                       ),
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: Icon(
-                    Icons.send,
-                    color: isInputDisabled ? Colors.grey : Colors.blue,
-                  ),
-                  onPressed: isInputDisabled ? null : _sendMessage,
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.send,
+                  color: isInputDisabled ? Colors.grey : Colors.blue,
                 ),
-              ],
-            ),
+                onPressed: isInputDisabled ? null : _sendMessage,
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

@@ -267,26 +267,26 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                               q1: q1.isEmpty ? null : q1,
                             );
 
+                            // 取得任務資料，用於組合聊天室 payload
+                            final task = taskService.getTaskById(taskId) ?? {};
+                            final posterId =
+                                (task['creator_id'] ?? '').toString();
+                            final applicantId = currentUser.id.toString();
+                            // deterministic room id（雙方裝置可計算一致）
+                            final roomId =
+                                'task_${taskId}_pair_${posterId}_$applicantId';
+
                             if (mounted) {
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  content: const Text(
-                                    'You have successfully applied.\nPlease wait patiently for the task poster’s response',
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  actionsAlignment: MainAxisAlignment.center,
-                                  actions: [
-                                    ElevatedButton(
-                                      onPressed: () {
-                                        Navigator.of(context).pop();
-                                        context.go('/chat');
-                                      },
-                                      child: const Text('Go to Chat'),
-                                    ),
-                                  ],
-                                ),
-                              );
+                              // 直接跳聊天室測試 Socket（會在 ChatDetailPage 內 join_room 並清零未讀）
+                              context.go('/chat/detail', extra: {
+                                'task': task,
+                                'room': {
+                                  'roomId': roomId,
+                                  'taskId': taskId,
+                                  'questionReply': intro,
+                                  'sentMessages': <dynamic>[],
+                                },
+                              });
                             }
                           } catch (e) {
                             ScaffoldMessenger.of(context).showSnackBar(

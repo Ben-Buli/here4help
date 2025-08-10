@@ -2,7 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:here4help/services/notification_service.dart';
+import 'dart:async';
 import 'package:here4help/services/theme_config_manager.dart';
+import 'package:here4help/services/data_preload_service.dart';
+import 'package:here4help/chat/services/chat_session_manager.dart';
 import 'dart:ui';
 
 class AppScaffold extends StatefulWidget {
@@ -10,6 +14,7 @@ class AppScaffold extends StatefulWidget {
     super.key,
     required this.child,
     this.title,
+    this.titleWidget,
     this.showAppBar = true,
     this.centerTitle = true,
     this.showBottomNav = true,
@@ -19,6 +24,7 @@ class AppScaffold extends StatefulWidget {
 
   final Widget child;
   final String? title;
+  final Widget? titleWidget;
   final bool showAppBar;
   final bool centerTitle;
   final bool showBottomNav;
@@ -42,18 +48,38 @@ class _AppScaffoldState extends State<AppScaffold> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final currentPath = GoRouterState.of(context).uri.toString();
 
-    if (currentPath.isNotEmpty) {
-      // 檢查是否已經有相同的路徑
-      if (_routeHistory.isEmpty || _routeHistory.last != currentPath) {
-        _routeHistory.add(currentPath);
+    // 檢查 Widget 是否仍然被掛載且可以安全存取 context
+    if (!mounted) return;
+
+    try {
+      final raw = GoRouterState.of(context).uri.toString();
+      final currentPath = _normalizeRoute(raw);
+
+      if (currentPath.isNotEmpty) {
+        if (_routeHistory.isEmpty || _routeHistory.last != currentPath) {
+          _routeHistory.add(currentPath);
+        }
       }
+    } catch (e) {
+      // 如果無法存取 GoRouterState，忽略這次更新
+      // 這可能發生在 Widget 樹重建期間
+      debugPrint('Failed to access GoRouterState: $e');
     }
   }
 
-  void _handleBack() {
+  void _handleBack() async {
     try {
+      // 檢查是否在聊天室中，如果是，使用會話管理器的返回路徑
+      if (await ChatSessionManager.isInChatRoom()) {
+        final returnPath = await ChatSessionManager.getReturnPath();
+        debugPrint('🔙 從聊天室返回到: $returnPath');
+        await ChatSessionManager.clearCurrentChatSession(); // 清除會話
+        context.go(returnPath);
+        return;
+      }
+
+      // 原有的返回邏輯
       if (_routeHistory.length > 1) {
         // 找到最近的可返回路徑
         String? targetPath;
@@ -81,7 +107,23 @@ class _AppScaffoldState extends State<AppScaffold> {
       }
     } catch (e) {
       // 備用方案
+      debugPrint('❌ 返回操作失敗: $e');
       Navigator.of(context).maybePop();
+    }
+  }
+
+  // 將完整 URI 正規化為純路徑（忽略 query 參數，支援 hash 路由）
+  String _normalizeRoute(String uriString) {
+    try {
+      final uri = Uri.parse(uriString);
+      if (uri.fragment.isNotEmpty) {
+        final frag = Uri.parse(
+            uri.fragment.startsWith('/') ? uri.fragment : '/${uri.fragment}');
+        return frag.path; // 例如 #/chat/detail?roomId=.. -> /chat/detail
+      }
+      return uri.path; // 例如 /chat/detail?roomId=.. -> /chat/detail
+    } catch (_) {
+      return uriString; // 解析失敗則原樣返回
     }
   }
 
@@ -159,14 +201,22 @@ class _AppScaffoldState extends State<AppScaffold> {
                       onPressed: _handleBack,
                     )
                   : null,
-              title: Text(
-                widget.title ?? '',
-                style: TextStyle(
-                  color: themeManager.appBarTextColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 20,
-                ),
-              ),
+              title: () {
+                debugPrint('🔍 [AppScaffold] 構建 AppBar title');
+                debugPrint(
+                    '🔍 [AppScaffold] widget.titleWidget: ${widget.titleWidget?.runtimeType}');
+                debugPrint('🔍 [AppScaffold] widget.title: ${widget.title}');
+
+                return widget.titleWidget ??
+                    Text(
+                      widget.title ?? '',
+                      style: TextStyle(
+                        color: themeManager.appBarTextColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 20,
+                      ),
+                    );
+              }(),
               actions: [
                 ...?widget.actions,
               ],
@@ -202,18 +252,27 @@ class _AppScaffoldState extends State<AppScaffold> {
             selectedItemColor: themeManager.navigationBarSelectedColor,
             unselectedItemColor: themeManager.navigationBarUnselectedColor,
             elevation: 0,
-            onTap: (index) {
+            onTap: (index) async {
+              // 預載入目標頁面的數據
+              final preloadService = DataPreloadService();
+
               switch (index) {
                 case 0:
                   context.go('/task/create');
                   break;
                 case 1:
+                  // 預載入任務數據
+                  preloadService.preloadForRoute('/task');
                   context.go('/task');
                   break;
                 case 2:
+                  // 預載入首頁數據
+                  preloadService.preloadForRoute('/home');
                   context.go('/home');
                   break;
                 case 3:
+                  // 預載入聊天數據
+                  preloadService.preloadForRoute('/chat');
                   context.go('/chat');
                   break;
                 case 4:
@@ -221,24 +280,24 @@ class _AppScaffoldState extends State<AppScaffold> {
                   break;
               }
             },
-            items: const [
-              BottomNavigationBarItem(
+            items: [
+              const BottomNavigationBarItem(
                 icon: Icon(Icons.add_box_outlined),
                 label: '',
               ),
-              BottomNavigationBarItem(
+              const BottomNavigationBarItem(
                 icon: Icon(Icons.search),
                 label: '',
               ),
-              BottomNavigationBarItem(
+              const BottomNavigationBarItem(
                 icon: Icon(Icons.home),
                 label: '',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.message),
+                icon: _ChatBadgeIcon(),
                 label: '',
               ),
-              BottomNavigationBarItem(
+              const BottomNavigationBarItem(
                 icon: Icon(Icons.person),
                 label: '',
               ),
@@ -281,5 +340,58 @@ class _AppScaffoldState extends State<AppScaffold> {
     }
 
     return false;
+  }
+}
+
+class _ChatBadgeIcon extends StatefulWidget {
+  @override
+  State<_ChatBadgeIcon> createState() => _ChatBadgeIconState();
+}
+
+class _ChatBadgeIconState extends State<_ChatBadgeIcon> {
+  int _total = 0;
+  StreamSubscription<int>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    final center = NotificationCenter();
+    _sub = center.totalUnreadStream.listen((v) {
+      if (!mounted) return;
+      setState(() => _total = v);
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        const Icon(Icons.message),
+        if (_total > 0)
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text(
+                _total > 99 ? '99+' : '$_total',
+                style: const TextStyle(color: Colors.white, fontSize: 10),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }

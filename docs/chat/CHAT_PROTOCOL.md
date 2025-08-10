@@ -1,3 +1,74 @@
+# Chat Protocol（聊天室通訊協議）
+
+目的：統一聊天室前後端協議，避免各頁/模組各自為政。此文件為綱要，並拆分導向協議至 `CHAT_NAVIGATION_SPEC.md`。
+
+## 1. 資料模型（核心）
+- roomKey（唯一鍵）
+  - roomId: string
+  - taskId: string
+  - creatorId: string
+  - participantId: string
+- participants
+  - creator { id, name, avatar }
+  - participant { id, name, avatar }
+- roomLite
+  - rating?: number
+  - reviewsCount?: number
+  - lastMessage?: string
+  - lastMessageAt?: ISOString
+  - unreadCount?: number
+- message
+  - id, roomId, senderId, text | mediaUrl, createdAt, status(read/sent)
+
+資料表對應（建議）：
+- chat_rooms(room_id, task_id, creator_id, participant_id, created_at, updated_at)
+- chat_messages(id, room_id, sender_id, text, media_url, created_at, read_at)
+- chat_participants(room_id, user_id, role[creator|participant])
+
+## 2. 導航/載入流程（摘要）
+詳見 `CHAT_NAVIGATION_SPEC.md`。
+
+1) 列表頁 onTap → 傳送 payload（含 roomKey, userRole, chatPartner, taskLite, roomLite）
+2) 詳情頁初始化：
+   - 以 roomKey 呼叫 ChatService.getRoom(roomKey) 取得完整 room 與 participants
+   - 若 payload 有 taskLite/roomLite，先渲染骨架，再補全
+3) 角色視角：`currentUser.id == creatorId ? creator : participant`
+
+## 3. Socket 事件（Socket.IO）
+- connect/auth
+  - client → server: `auth` { token }
+  - server → client: `auth_ok` | `auth_error`
+- room lifecycle
+  - join_room { roomKey }
+  - leave_room { roomKey }
+- messaging
+  - send_message { roomKey, tempId, text|media }
+  - message_new { message }
+  - message_ack { tempId, messageId }
+- read/typing
+  - read_room { roomKey, upToMessageId }
+  - room_read { roomKey, unreadCount }
+  - typing { roomKey, isTyping }
+  - typing_echo { roomKey, userId, isTyping }
+
+HTTP 備援端點（輪詢/首屏）：
+- GET /chat/rooms/open_or_get?taskId&creatorId&participantId → room 詳情
+- GET /chat/messages/list?roomId&cursor → 首屏/分頁訊息
+- POST /chat/messages/send
+- POST /chat/rooms/read
+
+## 4. 未讀聚合規則
+- 進入 room → 本人的未讀清零（server 計算，client 收到 room_read）
+- 列表徽章：sum(room.unreadCount)；房內 badge 不顯示
+
+## 5. 錯誤/重試
+- socket 斷線 → 指數回退重連；離線期間改用 HTTP 備援
+- send_message 失敗 → 暫存為 local pending，重連後重送
+
+## 6. 相容性與漸進式整合
+- 列表頁仍可傳舊 payload（只有 room/task），詳情頁以 roomKey 補全。
+- 建議兩個分頁 onTap 盡快統一至 `CHAT_NAVIGATION_SPEC.md`。
+
 # Here4Help 聊天協議與未讀聚合規範（CHAT_PROTOCOL）
 
 版本：1.0.0  

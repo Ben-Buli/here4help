@@ -546,7 +546,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                           Provider.of<UserService>(context, listen: false)
                                   .currentUser
                                   ?.id
-                                  ?.toString() ??
+                                  .toString() ??
                               '',
                       // 初始狀態以 status_code 傳遞
                       'status_code': 'open',

@@ -2,7 +2,7 @@
 
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
-import 'package:here4help/constants/app_colors.dart';
+// import 'package:here4help/constants/app_colors.dart';
 import 'package:intl/intl.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
@@ -30,8 +30,81 @@ class _TaskListPageState extends State<TaskListPage> {
   bool sortDesc = true; // 新增排序方向
   bool showMyTasksOnly = false; // 是否顯示我的任務
   bool showAppliedOnly = false; // 是否只顯示已應徵
-  final TextEditingController _languageSearchCtrl = TextEditingController();
+  // final TextEditingController _languageSearchCtrl = TextEditingController();
   List<Map<String, dynamic>> _languages = [];
+
+  void _showLanguageSearchDialog() {
+    final theme = Theme.of(context).colorScheme;
+    final languages = [
+      'All',
+      ..._languages
+          .map((e) => (e['name'] ?? '').toString())
+          .where((e) => e.isNotEmpty)
+    ];
+    final TextEditingController queryCtrl = TextEditingController();
+    List<String> filtered = List<String>.from(languages);
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: theme.surface,
+            contentPadding: const EdgeInsets.all(12),
+            content: SizedBox(
+              width: 380,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: queryCtrl,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      hintText: '輸入語言關鍵字',
+                    ),
+                    onChanged: (q) {
+                      final qq = q.toLowerCase();
+                      setState(() {
+                        filtered = languages
+                            .where((e) => e.toLowerCase().contains(qq))
+                            .toList();
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 360),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: filtered.length,
+                      itemBuilder: (_, i) {
+                        final lang = filtered[i];
+                        return ListTile(
+                          title: Text(lang),
+                          onTap: () {
+                            setState(() {
+                              selectedLanguage = lang == 'All' ? null : lang;
+                            });
+                            Navigator.of(dialogContext).pop();
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('關閉'),
+              ),
+            ],
+          );
+        });
+      },
+    );
+  }
 
   // 根據目前選擇的語言，取得可用的地點
   List<String> getAvailableLocations() {
@@ -598,7 +671,7 @@ class _TaskListPageState extends State<TaskListPage> {
     final currentUserId = Provider.of<UserService>(context, listen: false)
         .currentUser
         ?.id
-        ?.toString();
+        .toString();
     final myAppliedIds = TaskService()
         .myApplications
         .map((e) => (e['task_id'] ?? e['id']).toString())
@@ -929,7 +1002,7 @@ class _TaskListPageState extends State<TaskListPage> {
                           Provider.of<UserService>(context, listen: false)
                               .currentUser
                               ?.id
-                              ?.toString();
+                              .toString();
                       final isOwner = (task['creator_id']?.toString() ?? '') ==
                           (currentUserId ?? '');
                       final userNameBase =
@@ -1064,7 +1137,7 @@ class _TaskListPageState extends State<TaskListPage> {
                               const SizedBox(height: 10),
                               Row(
                                 children: [
-                                  Icon(Icons.local_fire_department,
+                                  const Icon(Icons.local_fire_department,
                                       color: Colors.red, size: 16),
                                   const SizedBox(width: 4),
                                   Flexible(
@@ -1088,7 +1161,8 @@ class _TaskListPageState extends State<TaskListPage> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  ThemeAwareIcon(icon: Icons.bookmark_border),
+                                  const ThemeAwareIcon(
+                                      icon: Icons.bookmark_border),
                                 ],
                               ),
                             ],

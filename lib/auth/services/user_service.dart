@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:here4help/auth/models/user_model.dart';
 import 'auth_service.dart';
+import 'package:here4help/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UserService extends ChangeNotifier {
@@ -160,6 +161,11 @@ class UserService extends ChangeNotifier {
       // 清除 AuthService 中的 token
       await AuthService.logout();
 
+      // 重置未讀中心為 0
+      final placeholder = NotificationServicePlaceholder();
+      await placeholder.init(userId: 'placeholder');
+      await NotificationCenter().use(placeholder);
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Log out success')),
@@ -179,6 +185,19 @@ class UserService extends ChangeNotifier {
 
     // 保存到 SharedPreferences 作為備用
     await _saveUserToPreferences(user);
+
+    // 初始化未讀中心（Socket + 冷啟快照）
+    try {
+      final svc = SocketNotificationService();
+      await svc.init(userId: user.id.toString());
+      await NotificationCenter().use(svc);
+      await svc.refreshSnapshot();
+    } catch (e) {
+      // 降級為 0 佔位
+      final placeholder = NotificationServicePlaceholder();
+      await placeholder.init(userId: 'placeholder');
+      await NotificationCenter().use(placeholder);
+    }
 
     notifyListeners();
   }

@@ -107,8 +107,33 @@ final GoRouter appRouter = GoRouter(
           actions = pageConfig['actions'] ?? AppScaffoldDefaults.defaultActions;
         }
 
+        // 若頁面提供自訂 titleWidgetBuilder，使用它來創建 titleWidget
+        Widget? titleWidget;
+        if (pageConfig['titleWidgetBuilder'] != null) {
+          debugPrint('🔍 [app_router] 找到 titleWidgetBuilder，準備調用');
+          debugPrint('🔍 [app_router] state.extra: ${state.extra}');
+          final builderFn = pageConfig['titleWidgetBuilder'] as Widget Function(
+              BuildContext, dynamic);
+          titleWidget = builderFn(context, state.extra);
+          debugPrint(
+              '🔍 [app_router] titleWidget 創建完成: ${titleWidget.runtimeType}');
+        } else if (pageConfig['appBarBuilder'] != null) {
+          // 保持對舊式 appBarBuilder 的支援
+          final builderFn = pageConfig['appBarBuilder'] as PreferredSizeWidget
+              Function(BuildContext, dynamic);
+          final customAppBar = builderFn(context, state.extra);
+          if (customAppBar is AppBar) {
+            titleWidget = (customAppBar as AppBar).title;
+          }
+        }
+
+        debugPrint('🔍 [app_router] 準備創建 AppScaffold');
+        debugPrint('🔍 [app_router] title: ${pageConfig['title']}');
+        debugPrint('🔍 [app_router] titleWidget: ${titleWidget.runtimeType}');
+
         return AppScaffold(
           title: pageConfig['title'] ?? AppScaffoldDefaults.defaultTitle,
+          titleWidget: titleWidget, // 只傳遞 title 組件
           showAppBar:
               pageConfig['showAppBar'] ?? AppScaffoldDefaults.defaultShowAppBar,
           showBottomNav: pageConfig['showBottomNav'] ??

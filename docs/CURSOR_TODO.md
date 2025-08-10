@@ -471,7 +471,7 @@
    - 未讀統計：不計算已取消任務的未讀訊息
 ```
 
-### 21. [ ] 聊天室詳情頁面（HTTP 先行 + Socket 規劃）
+### 21. [ ] 聊天室詳情頁面（Socket 核心 + HTTP 備援）
 **目標**: 實現一對一聊天室的即時通訊功能
 **檔案**: 
 - `lib/chat/pages/chat_detail_page.dart`
@@ -480,10 +480,9 @@
 **狀態**: 待執行
 **版本**: v3.3.0
 **操作**:
-- [ ] 建立 `chat/rooms/open_or_get.php`、`chat/messages/send.php`
-- [ ] /chat/detail 顯示 `system` 訊息（`application_resume`）
-- [ ] 歷史訊息載入 + 送出訊息（HTTP 版）
-- [ ] 規劃 Socket.IO 事件與資料格式（文檔）
+- [ ] Realtime Gateway（Node.js/Socket.IO）：auth/join_room/leave_room/send_message/read_room/typing
+- [ ] /chat/detail 串接 socket：收/送訊息、顯示 system(application_resume)
+- [ ] HTTP 備援：`chat/rooms/open_or_get.php`、`chat/messages/list.php`（冷啟/重連）
 
 ### 22. [ ] 用戶權限系統實現
 **目標**: 實現用戶權限分級和驗證系統
@@ -562,7 +561,7 @@
 - [ ] 添加任務篩選和搜尋
 - [ ] 實現分頁載入功能
 
-### 26. [ ] 未讀訊息通知系統（MVP）
+### 26. [ ] 未讀訊息通知系統（Socket 主推 + HTTP 快照）
 **目標**: 實現全局未讀訊息通知和統計
 **檔案**: 
 - `lib/services/notification_service.dart` (新增)
@@ -571,9 +570,9 @@
 **狀態**: 待執行
 **版本**: v3.3.0
 **操作**:
-- [ ] 後端：提供未讀快照 API（依任務狀態過濾）
-- [ ] 前端：整合全域未讀數與清除機制
-- [ ] 在 bottom navbar 顯示未讀徽章
+- [ ] 伺服器推播：`unread_total`、`unread_room`
+- [ ] 冷啟快照 API：`chat/unread_snapshot.php`
+- [ ] 前端：Navbar 徽章、進入聊天室清零
 
 ### 27. [ ] 資料庫結構優化（8/9 部分執行）
 **目標**: 優化資料庫結構以支援新功能

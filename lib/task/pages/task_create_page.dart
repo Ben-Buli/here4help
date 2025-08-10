@@ -300,7 +300,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     'Loading...',
                     style: TextStyle(
                       fontSize: 16,
@@ -350,7 +350,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
               children: [
                 Text(
                   userName,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -366,7 +366,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
               ],
             ),
           ),
-          Icon(Icons.check_circle, color: Colors.green),
+          const Icon(Icons.check_circle, color: Colors.green),
         ],
       ),
     );

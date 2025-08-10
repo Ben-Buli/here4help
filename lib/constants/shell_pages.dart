@@ -25,7 +25,8 @@ import 'package:here4help/auth/pages/student_id_page.dart';
 
 // ==================== chat 模組 ====================
 import 'package:here4help/chat/pages/chat_list_page.dart';
-import 'package:here4help/chat/pages/chat_detail_page.dart';
+import 'package:here4help/chat/widgets/chat_detail_wrapper.dart';
+import 'package:here4help/chat/widgets/chat_title_widget.dart';
 
 // ==================== explore 模組 ====================
 
@@ -83,14 +84,31 @@ final List<Map<String, dynamic>> shellPages = [
     'showBackArrow': true
   },
   {
+    'path': '/chat/my-works',
+    'child': const ChatListPage(initialTab: 1), // My Works 分頁
+    'title': 'My Works',
+    'showBottomNav': true,
+    'showBackArrow': true
+  },
+  {
+    'path': '/chat/posted-tasks',
+    'child': const ChatListPage(initialTab: 0), // Posted Tasks 分頁
+    'title': 'Posted Tasks',
+    'showBottomNav': true,
+    'showBackArrow': true
+  },
+  {
     'path': '/chat/detail',
     'builder': (context, data) {
-      return ChatDetailPage(data: data as Map<String, dynamic>);
+      return ChatDetailWrapper(data: data as Map<String, dynamic>?);
     },
-    // 設定寫在ChatDetailPage中
-    'showAppBar': false,
+    'title': '', // 設定空字串，讓 appBarBuilder 的標題優先顯示
+    'showAppBar': true,
     'showBottomNav': false,
-    'showBackArrow': true
+    'showBackArrow': true,
+    'titleWidgetBuilder': (context, data) {
+      return ChatTitleWidget(data: data as Map<String, dynamic>?);
+    },
   },
   {
     'path': '/account',

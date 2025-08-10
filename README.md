@@ -20,7 +20,8 @@ here4help/
 ├── backend/               # PHP 後端 API
 │   ├── api/              # API 端點
 │   ├── config/           # 配置檔案
-│   └── utils/            # 工具類別
+│   ├── utils/            # 工具類別
+│   └── socket/           # Node.js Socket.IO Gateway (MVP)
 ├── admin/                # 後台管理系統 (開發中)
 ├── android/              # Android 平台配置
 ├── ios/                  # iOS 平台配置
@@ -117,6 +118,15 @@ here4help/
 - 使用 MAMP/XAMPP 進行本地開發
 - 確保資料庫連線設定正確
 - 測試檔案上傳功能
+
+### Socket.IO Gateway (MVP)
+
+- 位置：`backend/socket/server.js`
+- 啟動方式：
+  ```bash
+  node backend/socket/server.js
+  ```
+  預設位址：`http://localhost:3001`
 
 ## 🤝 貢獻指南
 

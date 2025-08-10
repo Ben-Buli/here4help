@@ -1,33 +1,30 @@
 // home_page.dart
 import 'dart:async';
 import 'dart:ui';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import 'package:here4help/chat/models/chat_room_model.dart';
+// import 'package:here4help/chat/models/chat_room_model.dart';
+import 'package:here4help/chat/services/chat_service.dart';
 import 'package:intl/intl.dart';
-import 'package:here4help/chat/services/chat_storage_service.dart';
-import 'package:here4help/chat/services/chat_session_manager.dart';
 import 'package:here4help/constants/task_status.dart';
 import 'package:here4help/services/notification_service.dart';
-import 'package:here4help/services/data_preload_service.dart';
+// import 'package:here4help/config/app_config.dart';
+import 'package:here4help/auth/services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
 
 class ChatListPage extends StatefulWidget {
-  const ChatListPage({super.key, this.initialTab = 0});
-
-  final int initialTab; // 初始分頁：0 = Posted Tasks, 1 = My Works
+  const ChatListPage({super.key});
 
   @override
   State<ChatListPage> createState() => _ChatListPageState();
 }
 
 class _ChatListPageState extends State<ChatListPage>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
-  // 移除 _taskFuture，不再使用 FutureBuilder
+    with TickerProviderStateMixin {
+  late Future<void> _taskFuture;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String searchQuery = '';
@@ -40,8 +37,7 @@ class _ChatListPageState extends State<ChatListPage>
   late TabController _tabController;
 
   // 未讀通知占位（任務 26 會替換成實作）
-  final NotificationService _notificationService =
-      NotificationServicePlaceholder();
+  NotificationService _notificationService = NotificationServicePlaceholder();
   Map<String, int> _unreadByTask = const {};
   Map<String, int> _unreadByRoom = const {};
   int _totalUnread = 0;
@@ -52,91 +48,21 @@ class _ChatListPageState extends State<ChatListPage>
   // Posted Tasks 應徵者資料快取
   final Map<String, List<Map<String, dynamic>>> _applicationsByTask = {};
 
-  // 簡化的載入狀態
-  bool _isLoading = true;
-  String? _errorMessage;
-
-  /// 使用預載入服務初始化數據
-  Future<void> _initializeWithPreload() async {
-    if (!mounted) return;
-
-    final preloadService = DataPreloadService();
-
-    try {
-      // 檢查數據是否已經預載入
-      if (preloadService.isDataLoaded('chat_data')) {
-        debugPrint('🚀 聊天數據已預載入，直接載入應徵者資料...');
-
-        // 只需要載入應徵者數據
-        await _loadApplicationsForPostedTasks();
-
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _errorMessage = null;
-          });
-        }
-        debugPrint('⚡ 快速載入完成！');
-      } else {
-        debugPrint('🔄 數據未預載入，執行完整載入...');
-        await _loadChatData();
-      }
-    } catch (e) {
-      debugPrint('❌ 聊天數據初始化失敗: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = e.toString();
-        });
-      }
-    }
-  }
-
-  /// 同步載入所有聊天相關數據
-  Future<void> _loadChatData() async {
-    if (!mounted) return;
-
-    try {
-      debugPrint('🔄 開始同步載入聊天數據...');
-
-      // 同步載入任務和狀態
-      await Future.wait([
-        TaskService().loadTasks(),
-        TaskService().loadStatuses(),
-      ]);
-      debugPrint('✅ 任務列表載入完成');
-
-      // 載入應徵者數據
-      await _loadApplicationsForPostedTasks();
-      debugPrint('✅ 應徵者資料載入完成');
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = null;
-        });
-      }
-      debugPrint('🎉 聊天數據載入完成！');
-    } catch (e) {
-      debugPrint('❌ 聊天數據載入失敗: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = e.toString();
-        });
-      }
-    }
-  }
+  // 聊天服務
+  final ChatService _chatService = ChatService();
+  List<Map<String, dynamic>> _chatRooms = [];
+  bool _isLoadingRooms = false;
 
   @override
   void initState() {
     super.initState();
-
-    // 使用預載入服務，如果數據已預載入則立即可用
-    _initializeWithPreload();
-
-    _tabController =
-        TabController(length: 2, vsync: this, initialIndex: widget.initialTab);
+    _taskFuture = Future.wait([
+      TaskService().loadTasks(),
+      TaskService().loadStatuses(),
+      _loadApplicationsForPostedTasks(),
+      _loadChatRooms(),
+    ]);
+    _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
         setState(() {
@@ -151,26 +77,121 @@ class _ChatListPageState extends State<ChatListPage>
       }
     });
 
-    // 初始化未讀占位並訂閱
-    _notificationService.init(userId: 'placeholder');
-    _totalSub = _notificationService.observeTotalUnread().listen((v) {
+    // 初始化未讀服務：登入後切換為 Socket 實作
+    _initUnreadService();
+    final center = NotificationCenter();
+    _totalSub = center.totalUnreadStream.listen((v) {
       if (!mounted) return;
       setState(() => _totalUnread = v);
     });
-    _taskSub = _notificationService.observeUnreadByTask().listen((m) {
+    _taskSub = center.byTaskStream.listen((m) {
       if (!mounted) return;
       setState(() => _unreadByTask = m);
     });
-    _roomSub = _notificationService.observeUnreadByRoom().listen((m) {
+    _roomSub = center.byRoomStream.listen((m) {
       if (!mounted) return;
       setState(() => _unreadByRoom = m);
     });
-
-    // 添加應用生命週期監聽
-    WidgetsBinding.instance.addObserver(this);
   }
 
-  // 整理 My Works 清單：把 tasks 與 myApplications 合併，並標記 client 狀態
+  int _countUnreadForTab(bool forMyWorks) {
+    // 將 byRoom 的未讀統計映射到任務/房屬性
+    // 資料模型中房 id 存在 applierChatItem['id'] 或 room['roomId']，此處用 _unreadByRoom 的 key 為 roomId
+    // 我們粗略地依「是否屬於我的作品」來分流：
+    // - Posted: 我是 creator（在 _composeMyWorks 外的列表）
+    // - My Works: 我是 acceptor 或有應徵紀錄（_composeMyWorks 製作的列表）
+    // 這裡用當前 UI 的已分流資料來源來估算，避免重查 API
+    try {
+      final service = TaskService();
+      final userId =
+          Provider.of<UserService>(context, listen: false).currentUser?.id;
+      if (userId == null) return 0;
+      isMyWorkTask(Map<String, dynamic> t) {
+        final acceptorIsMe =
+            (t['acceptor_id']?.toString() ?? '') == userId.toString();
+        final appliedByMe = t['applied_by_me'] == true;
+        return acceptorIsMe || appliedByMe;
+      }
+
+      final tasksAll = List<Map<String, dynamic>>.from(service.tasks);
+      final myWorks = tasksAll
+          .where(isMyWorkTask)
+          .map((t) => (t['id'] ?? '').toString())
+          .toSet();
+      int sum = 0;
+      _unreadByRoom.forEach((roomId, cnt) {
+        // 從 roomId 解析 taskId（若符合我們的命名規格）
+        // pattern: task_{taskId}_pair_
+        String? taskId;
+        final m = RegExp(r'^task_(.+?)_pair_').firstMatch(roomId);
+        if (m != null) taskId = m.group(1);
+        if (taskId == null || taskId.isEmpty) return;
+        final inMyWorks = myWorks.contains(taskId);
+        if (forMyWorks == inMyWorks) {
+          sum += cnt;
+        }
+      });
+      return sum;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  String? _computeRoomIdForApplier(
+      Map<String, dynamic> task, Map<String, dynamic> applier) {
+    final taskId = (task['id'] ?? '').toString();
+    final creatorId = (task['creator_id'] ?? '').toString();
+    final applierId = (applier['user_id'] ?? '').toString();
+    if (taskId.isEmpty || creatorId.isEmpty || applierId.isEmpty) return null;
+    return 'task_${taskId}_pair_${creatorId}_$applierId';
+  }
+
+  Future<void> _initUnreadService() async {
+    try {
+      final token = await AuthService.getToken();
+      final user = Provider.of<UserService>(context, listen: false).currentUser;
+      if (token != null && user != null) {
+        _notificationService = SocketNotificationService();
+        await _notificationService.init(userId: user.id.toString());
+        await NotificationCenter().use(_notificationService);
+        await _notificationService.refreshSnapshot();
+      } else {
+        await _notificationService.init(userId: 'placeholder');
+        await NotificationCenter().use(_notificationService);
+      }
+    } catch (_) {
+      await _notificationService.init(userId: 'placeholder');
+      await NotificationCenter().use(_notificationService);
+    }
+  }
+
+  /// 載入聊天房間列表
+  Future<void> _loadChatRooms() async {
+    if (_isLoadingRooms) return;
+
+    setState(() {
+      _isLoadingRooms = true;
+    });
+
+    try {
+      final result = await _chatService.getChatRooms();
+      if (mounted) {
+        setState(() {
+          _chatRooms = List<Map<String, dynamic>>.from(result['rooms'] ?? []);
+          _isLoadingRooms = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingRooms = false;
+        });
+      }
+      print('載入聊天房間失敗: $e');
+    }
+  }
+
+  // 整理 My Works 清單：我作為應徵者申請的任務
   List<Map<String, dynamic>> _composeMyWorks(
       TaskService service, int? currentUserId) {
     final allTasks = List<Map<String, dynamic>>.from(service.tasks);
@@ -195,12 +216,23 @@ class _ChatListPageState extends State<ChatListPage>
       }
     }
 
-    // My Works 準則：被指派給我 或 我應徵過
+    // My Works 準則：我應徵過的任務（作為應徵者）
     return allTasks.where((t) {
-      final acceptorIsMe = (t['acceptor_id']?.toString() ?? '') ==
-          (currentUserId?.toString() ?? '');
       final appliedByMe = t['applied_by_me'] == true;
-      return acceptorIsMe || appliedByMe;
+      return appliedByMe;
+    }).toList();
+  }
+
+  // 整理 Posted Tasks 清單：我作為發布者發布的任務
+  List<Map<String, dynamic>> _composePostedTasks(
+      TaskService service, int? currentUserId) {
+    final allTasks = List<Map<String, dynamic>>.from(service.tasks);
+
+    // Posted Tasks 準則：我創建的任務（作為發布者）
+    return allTasks.where((t) {
+      final creatorIsMe = (t['creator_id']?.toString() ?? '') ==
+          (currentUserId?.toString() ?? '');
+      return creatorIsMe;
     }).toList();
   }
 
@@ -213,25 +245,7 @@ class _ChatListPageState extends State<ChatListPage>
     _taskSub?.cancel();
     _roomSub?.cancel();
     _notificationService.dispose();
-    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-
-    // 當應用恢復前台時，重新載入數據
-    if (state == AppLifecycleState.resumed) {
-      debugPrint('📱 應用恢復前台，重新載入聊天數據');
-      if (mounted) {
-        setState(() {
-          _isLoading = true;
-          _errorMessage = null;
-        });
-        _loadChatData();
-      }
-    }
   }
 
   String _displayStatus(Map<String, dynamic> task) {
@@ -880,6 +894,48 @@ class _ChatListPageState extends State<ChatListPage>
                     ],
                   ),
                   const SizedBox(height: 8),
+                  // 檢查是否為 Posted Tasks 且沒有應徵者
+                  if (_tabController.index == 0 &&
+                      _displayStatus(task) == 'Open' &&
+                      visibleapplierChatItems.isEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .secondary
+                            .withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .secondary
+                              .withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: Theme.of(context).colorScheme.secondary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'No applications received yet',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.secondary,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   ...visibleapplierChatItems.map(
                     (applierChatItem) => Slidable(
                       key: ValueKey(applierChatItem['id']),
@@ -981,62 +1037,27 @@ class _ChatListPageState extends State<ChatListPage>
                                       style: const TextStyle(fontSize: 12)),
                                 ],
                               ),
-                              onTap: () async {
-                                final userRole =
-                                    'creator'; // Posted Tasks 中，當前使用者是任務發布者
-                                final chatPartnerInfo = {
-                                  'id': applierChatItem['user_id'] ??
-                                      applierChatItem['participant_id'],
-                                  'name': applierChatItem['name'] ??
-                                      applierChatItem['participant_name'] ??
-                                      '任務應徵者',
-                                  'avatar': applierChatItem['avatar'] ??
-                                      applierChatItem['participant_avatar'] ??
-                                      'assets/images/avatar/avatar-1.png',
-                                  'role': 'participant',
-                                };
-                                final roomId =
-                                    applierChatItem['id']?.toString() ??
-                                        'unknown';
-                                // 保存持久化數據並設置當前會話（Posted Tasks）
-                                await ChatStorageService.savechatRoomData(
-                                  roomId: roomId,
-                                  room: applierChatItem,
-                                  task: task,
-                                  userRole: userRole,
-                                  chatPartnerInfo: chatPartnerInfo,
-                                );
-                                await ChatSessionManager.setCurrentChatSession(
-                                  roomId: roomId,
-                                  room: applierChatItem,
-                                  task: task,
-                                  userRole: userRole,
-                                  chatPartnerInfo: chatPartnerInfo,
-                                  sourceTab: 'posted-tasks', // 記錄來源分頁
-                                );
-                                final chatUrl =
-                                    ChatStorageService.generateChatUrl(
-                                  roomId: roomId,
-                                  taskId: task['id']?.toString(),
-                                );
+                              onTap: () {
                                 final data = {
-                                  'room': applierChatItem,
+                                  'room': {
+                                    ...applierChatItem,
+                                    'roomId': _computeRoomIdForApplier(
+                                            task, applierChatItem) ??
+                                        applierChatItem['id'],
+                                    'taskId': task['id'],
+                                  },
                                   'task': task,
-                                  'userRole': userRole,
-                                  'chatPartnerInfo': chatPartnerInfo,
                                 };
-
-                                debugPrint('🔍 [Posted Tasks] 準備導航到聊天室');
-                                debugPrint(
-                                    '🔍 [Posted Tasks] chatUrl: $chatUrl');
-                                debugPrint(
-                                    '🔍 [Posted Tasks] extra data: $data');
-
-                                context.go(chatUrl, extra: data);
+                                context.push('/chat/detail', extra: data);
                               },
                             ),
                           ),
-                          if (((_unreadByRoom[applierChatItem['id']] ?? 0)) > 0)
+                          if (() {
+                            final roomId = _computeRoomIdForApplier(
+                                    task, applierChatItem) ??
+                                applierChatItem['id'];
+                            return (_unreadByRoom[roomId] ?? 0) > 0;
+                          }())
                             Positioned(
                               top: -2,
                               right: -2,
@@ -1052,7 +1073,7 @@ class _ChatListPageState extends State<ChatListPage>
                                 ),
                                 alignment: Alignment.center,
                                 child: Text(
-                                  '${_unreadByRoom[applierChatItem['id']] ?? 0}',
+                                  '${_unreadByRoom[_computeRoomIdForApplier(task, applierChatItem) ?? applierChatItem['id']] ?? 0}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
@@ -1126,28 +1147,6 @@ class _ChatListPageState extends State<ChatListPage>
     );
   }
 
-  /// My Works 分頁的緊湊倒數計時器
-  Widget _buildCompactCountdownTimer(Map<String, dynamic> task) {
-    return _CompactCountdownTimerWidget(
-      task: task,
-      onCountdownComplete: () {
-        setState(() {
-          // Convert database status to display status for comparison
-          final displayStatus =
-              TaskStatus.statusString[task['status']] ?? task['status'];
-
-          if (displayStatus ==
-              TaskStatus.statusString['pending_confirmation']) {
-            task['status'] = 'completed'; // Use database status
-          } else if (displayStatus ==
-              TaskStatus.statusString['pending_confirmation_tasker']) {
-            task['status'] = 'completed_tasker'; // Use database status
-          }
-        });
-      },
-    );
-  }
-
   String _getProgressLabel(String status) {
     // Convert database status to display status if needed
     final displayStatus = TaskStatus.statusString[status] ?? status;
@@ -1164,9 +1163,15 @@ class _ChatListPageState extends State<ChatListPage>
     return '$displayStatus ($percentage%)';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final taskService = TaskService();
+  /// 計算對比色，確保文字在背景上清晰可見
+  Color _getContrastColor(Color backgroundColor) {
+    // 計算亮度
+    final luminance = backgroundColor.computeLuminance();
+    // 如果背景較亮，使用深色文字；如果背景較暗，使用淺色文字
+    return luminance > 0.5 ? Colors.black87 : Colors.white;
+  }
+
+  Widget _buildPostedTasksChatList() {
     final statusOrder = {
       'Open': 0,
       'In Progress': 1,
@@ -1175,204 +1180,477 @@ class _ChatListPageState extends State<ChatListPage>
       'Completed': 4,
     };
 
-    // 如果正在載入，顯示 loading
-    if (_isLoading) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text(
-              'Loading chat data...',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
+    return FutureBuilder(
+      future: _taskFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        } else {
+          final taskService = TaskService();
+          final tasks = taskService.tasks;
+          tasks.sort((a, b) {
+            // Convert database status to display status for sorting
+            final displayStatusA =
+                (a['status_display'] ?? a['status']) as String? ?? '';
+            final displayStatusB =
+                (b['status_display'] ?? b['status']) as String? ?? '';
+
+            final statusA = statusOrder[displayStatusA] ?? 99;
+            final statusB = statusOrder[displayStatusB] ?? 99;
+            if (statusA != statusB) {
+              return statusA.compareTo(statusB);
+            }
+            return (DateTime.parse(b['task_date']))
+                .compareTo(DateTime.parse(a['task_date']));
+          });
+
+          final filteredTasksForDropdown = tasks;
+          final locationOptions = filteredTasksForDropdown
+              .map((e) => (e['location'] ?? '').toString())
+              .where((e) => e.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+          // 從後端 `task_statuses` 取狀態顯示名稱
+          final service = TaskService();
+          final statusOptions = service.statuses
+              .map((e) => (e['display_name'] ?? '').toString())
+              .where((e) => e.isNotEmpty)
+              .toList();
+
+          return DefaultTabController(
+            length: 2,
+            initialIndex: taskerFilterEnabled ? 1 : 0,
+            child: Column(
+              children: [
+                TabBar(
+                  controller: _tabController,
+                  tabs: [
+                    Tab(
+                      child: _TabWithBadge(
+                        label: 'Posted Tasks',
+                        count: _countUnreadForTab(false),
+                      ),
+                    ),
+                    Tab(
+                      child: _TabWithBadge(
+                        label: 'My Works',
+                        count: _countUnreadForTab(true),
+                      ),
+                    ),
+                  ],
+                ),
+                // Removed or reduced vertical space above TabBar
+                // const SizedBox(height: 8                ),
+                // 只在 Posted Tasks 分頁顯示搜尋和篩選
+                if (_tabController.index == 0) ...[
+                  Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Row(
+                      children: [
+                        // Search bar
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            focusNode: _searchFocusNode,
+                            onChanged: (value) {
+                              setState(() {
+                                searchQuery = value.toLowerCase();
+                              });
+                            },
+                            onEditingComplete: () {
+                              FocusScope.of(context).unfocus();
+                            },
+                            decoration: InputDecoration(
+                              hintText: 'Search...',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear),
+                                      onPressed: () {
+                                        setState(() {
+                                          _searchController.clear();
+                                          searchQuery = '';
+                                        });
+                                      },
+                                    )
+                                  : null,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            value: selectedLocation,
+                            hint: const Text('Location'),
+                            underline: Container(height: 1, color: Colors.grey),
+                            items: locationOptions.map((loc) {
+                              return DropdownMenuItem(
+                                  value: loc, child: Text(loc));
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                selectedLocation = value;
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Hashtag dropdown commented
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButton<String>(
+                            isExpanded: true,
+                            value: selectedStatus,
+                            hint: const Text('Status'),
+                            underline: Container(height: 1, color: Colors.grey),
+                            items: statusOptions
+                                .map((status) => DropdownMenuItem(
+                                      value: status,
+                                      child: Text(status),
+                                    ))
+                                .toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                selectedStatus = value;
+                              });
+                            },
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.refresh, color: Colors.blue),
+                          tooltip: 'Reset Filters',
+                          onPressed: () {
+                            setState(() {
+                              _searchController.clear();
+                              searchQuery = '';
+                              selectedLocation = null;
+                              selectedHashtag = null;
+                              selectedStatus = null;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildTaskList(false), // Posted Tasks
+                      _buildMyWorksChatList(), // My Works - 聊天室列表
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      );
+          );
+        }
+      },
+    );
+  }
+
+  Widget _buildMyWorksChatList() {
+    final taskService = TaskService();
+    final currentUserId = context.read<UserService>().currentUser?.id;
+    if (currentUserId != null) {
+      // 確保載入我的應徵
+      taskService.loadMyApplications(currentUserId);
     }
 
-    // 如果有錯誤，顯示錯誤
-    if (_errorMessage != null) {
+    final tasks = _composeMyWorks(taskService, currentUserId);
+
+    if (tasks.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error, size: 48, color: Colors.red),
+            Icon(
+              Icons.chat_bubble_outline,
+              size: 64,
+              color: Colors.grey[400],
+            ),
             const SizedBox(height: 16),
-            const Text('Error loading data'),
+            Text(
+              '尚無聊天室',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text(_errorMessage!, style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _isLoading = true;
-                  _errorMessage = null;
-                });
-                _loadChatData();
-              },
-              child: const Text('Retry'),
+            Text(
+              '應徵任務後即可開始聊天',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
             ),
           ],
         ),
       );
     }
 
-    // 載入完成後的正常 UI
-    final tasks = taskService.tasks;
-    tasks.sort((a, b) {
-      // Convert database status to display status for sorting
-      final displayStatusA =
-          (a['status_display'] ?? a['status']) as String? ?? '';
-      final displayStatusB =
-          (b['status_display'] ?? b['status']) as String? ?? '';
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: tasks.length,
+      itemBuilder: (context, index) {
+        final task = tasks[index];
+        final taskId = task['id'].toString();
+        final creatorId = task['creator_id']?.toString() ?? '';
+        final currentUserId =
+            context.read<UserService>().currentUser?.id.toString() ?? '';
 
-      final statusA = statusOrder[displayStatusA] ?? 99;
-      final statusB = statusOrder[displayStatusB] ?? 99;
-      if (statusA != statusB) {
-        return statusA.compareTo(statusB);
-      }
-      return (DateTime.parse(b['task_date']))
-          .compareTo(DateTime.parse(a['task_date']));
-    });
+        // 計算聊天室 ID
+        final roomId = 'task_${taskId}_pair_${creatorId}_$currentUserId';
 
-    final filteredTasksForDropdown = tasks;
-    final locationOptions = filteredTasksForDropdown
-        .map((e) => (e['location'] ?? '').toString())
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    // 從後端 `task_statuses` 取狀態顯示名稱
-    final service = TaskService();
-    final statusOptions = service.statuses
-        .map((e) => (e['display_name'] ?? '').toString())
-        .where((e) => e.isNotEmpty)
-        .toList();
+        return _buildMyWorksChatRoomItem(task, roomId);
+      },
+    );
+  }
 
-    return DefaultTabController(
-      length: 2,
-      initialIndex: taskerFilterEnabled ? 1 : 0,
-      child: Column(
-        children: [
-          TabBar(
-            controller: _tabController,
-            tabs: const [
-              Tab(text: 'Posted Tasks'),
-              Tab(text: 'My Works'),
-            ],
-          ),
-          // Removed or reduced vertical space above TabBar
-          // const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              children: [
-                // Search bar
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    focusNode: _searchFocusNode,
-                    onChanged: (value) {
-                      setState(() {
-                        searchQuery = value.toLowerCase();
-                      });
-                    },
-                    onEditingComplete: () {
-                      FocusScope.of(context).unfocus();
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Search...',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                setState(() {
-                                  _searchController.clear();
-                                  searchQuery = '';
-                                });
-                              },
-                            )
-                          : null,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+  Widget _buildMyWorksChatRoomItem(Map<String, dynamic> task, String roomId) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final displayStatus = _displayStatus(task);
+    final progressData = _getProgressData(displayStatus);
+    final progress = progressData['progress'] ?? 0.0;
+    final baseColor = progressData['color'] ?? Colors.grey[600]!;
+
+    // 計算未讀訊息數量
+    final unreadCount = _unreadByRoom[roomId] ?? 0;
+
+    // 計算進度條顏色（水壺裝水效果）
+    final progressColor = Color.lerp(
+      baseColor.withOpacity(0.1), // 0% 時的淺色
+      baseColor, // 100% 時的深色
+      progress,
+    )!;
+
+    // 計算文字顏色（對比色）
+    final textColor = _getContrastColor(progressColor);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 1,
+      child: InkWell(
+        onTap: () {
+          // 直接導航到聊天室
+          context.push('/chat/detail', extra: {
+            'room': {
+              'roomId': roomId,
+              'taskId': task['id'],
+              'creatorId': task['creator_id'],
+              'participantId': context.read<UserService>().currentUser?.id,
+            },
+            'task': task,
+            'otherUser': {
+              'id': task['creator_id'],
+              'name': task['creator_name'] ?? '任務發布者',
+              'avatar':
+                  task['creator_avatar'] ?? 'assets/images/avatar/avatar-1.png',
+            },
+          });
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // 左側：中空圓餅圖進度指示器
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: CustomPaint(
+                  painter: PieChartPainter(
+                    progress: progress,
+                    baseColor: baseColor,
+                    strokeWidth: 4,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${(progress * 100).toInt()}%',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: baseColor,
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: selectedLocation,
-                    hint: const Text('Location'),
-                    underline: Container(height: 1, color: Colors.grey),
-                    items: locationOptions.map((loc) {
-                      return DropdownMenuItem(value: loc, child: Text(loc));
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedLocation = value;
-                      });
-                    },
+              ),
+              const SizedBox(width: 12),
+
+              // 中間：任務資訊
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 任務標題
+                    Text(
+                      task['title'] ?? '未命名任務',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+
+                    // 任務狀態和獎勵
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: baseColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            displayStatus,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: baseColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.attach_money,
+                            size: 14, color: Colors.grey[600]),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${task['reward_point'] ?? task['salary'] ?? 0}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+
+                    // 四個任務資訊欄位：位置、日期、發布者、語言要求
+                    Row(
+                      children: [
+                        Icon(Icons.location_on,
+                            size: 12, color: Colors.grey[500]),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            task['location'] ?? '未知地點',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[500],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.calendar_today,
+                            size: 12, color: Colors.grey[500]),
+                        const SizedBox(width: 2),
+                        Text(
+                          DateFormat('MM/dd').format(
+                            DateTime.parse(
+                                task['task_date'] ?? DateTime.now().toString()),
+                          ),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+
+                    // 發布者和語言要求
+                    Row(
+                      children: [
+                        Icon(Icons.person_outline,
+                            size: 12, color: Colors.grey[500]),
+                        const SizedBox(width: 2),
+                        Expanded(
+                          child: Text(
+                            task['creator_name'] ?? '未知發布者',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[500],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.language, size: 12, color: Colors.grey[500]),
+                        const SizedBox(width: 2),
+                        Text(
+                          task['language_requirement'] ?? '不限',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // 倒數計時（如果是 Pending Confirmation 狀態）
+                    if (_isCountdownStatus(displayStatus)) ...[
+                      const SizedBox(height: 4),
+                      _buildCountdownTimer(task),
+                    ],
+                  ],
+                ),
+              ),
+
+              // 右側：未讀徽章和箭頭
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (unreadCount > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        unreadCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 4),
+                  Icon(
+                    Icons.chevron_right,
+                    color: Colors.grey[400],
+                    size: 20,
                   ),
-                ),
-                const SizedBox(width: 8),
-                // Hashtag dropdown commented
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: selectedStatus,
-                    hint: const Text('Status'),
-                    underline: Container(height: 1, color: Colors.grey),
-                    items: statusOptions
-                        .map((status) => DropdownMenuItem(
-                              value: status,
-                              child: Text(status),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedStatus = value;
-                      });
-                    },
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.blue),
-                  tooltip: 'Reset Filters',
-                  onPressed: () {
-                    setState(() {
-                      _searchController.clear();
-                      searchQuery = '';
-                      selectedLocation = null;
-                      selectedHashtag = null;
-                      selectedStatus = null;
-                    });
-                  },
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildTaskList(false), // My Post
-                _buildTaskList(true), // My Task
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1393,7 +1671,7 @@ class _ChatListPageState extends State<ChatListPage>
     };
     final tasks = taskerEnabled
         ? _composeMyWorks(taskService, currentUserId)
-        : taskService.tasks;
+        : _composePostedTasks(taskService, currentUserId);
     tasks.sort((a, b) {
       // Convert database status to display status for sorting
       final displayStatusA =
@@ -1427,12 +1705,8 @@ class _ChatListPageState extends State<ChatListPage>
       final displayStatus = status;
       final matchStatus =
           selectedStatus == null || selectedStatus == displayStatus;
-      // My Works：接受者是我，或我有應徵紀錄
-      final isMyWork = taskerEnabled
-          ? ((task['acceptor_id']?.toString() == currentUserId?.toString()) ||
-              (task['applied_by_me'] == true))
-          : (task['creator_id']?.toString() != currentUserId?.toString());
-      final matchTasker = taskerEnabled ? isMyWork : !isMyWork;
+      // 篩選邏輯已經在 _composeMyWorks 和 _composePostedTasks 中處理
+      const matchTasker = true;
       return matchQuery && matchLocation && matchStatus && matchTasker;
     }).toList();
     return SlidableAutoCloseBehavior(
@@ -1440,36 +1714,42 @@ class _ChatListPageState extends State<ChatListPage>
         padding: const EdgeInsets.all(12),
         children: filteredTasks.map((task) {
           final taskId = task['id'].toString();
-
-          // 判斷是否為 Posted Tasks 模式
           final isPostedTasksTab = _tabController.index == 0;
           final userService = context.read<UserService>();
           final currentUserId = userService.currentUser?.id;
-          final isMyTask = currentUserId != null &&
-              (task['creator_id'] == currentUserId ||
-                  task['creator_id']?.toString() == currentUserId.toString());
 
           List<Map<String, dynamic>> applierChatItems;
 
-          if (isPostedTasksTab && isMyTask) {
-            // Posted Tasks: 使用真實應徵者資料
+          if (isPostedTasksTab) {
+            // Posted Tasks: 任務發布者視角 - 顯示應徵者
             final applications = _applicationsByTask[taskId] ?? [];
             applierChatItems =
                 _convertApplicationsToApplierChatItems(applications);
           } else {
-            // My Works 或非我的任務: 使用 demo 資料（暫時）
-            applierChatItems = chatRoomModel
-                .where((applierChatItem) =>
-                    applierChatItem['taskId'] == task['id'])
-                .toList();
+            // My Works: 任務應徵者視角 - 顯示自己的應徵者卡片
+            final isMyApplication = task['applied_by_me'] == true;
+            if (isMyApplication) {
+              // 為自己創建一個應徵者卡片
+              applierChatItems = [
+                {
+                  'id': 'my_application_$taskId',
+                  'taskId': taskId,
+                  'name': userService.currentUser?.name ?? 'Me',
+                  'rating': 4.0,
+                  'reviewsCount': 0,
+                  'questionReply': 'My application for this task',
+                  'sentMessages': ['I applied for this task'],
+                  'user_id': currentUserId,
+                  'application_status': 'applied',
+                  'isMyApplication': true,
+                }
+              ];
+            } else {
+              applierChatItems = [];
+            }
           }
 
-          // My Works 分頁使用特殊的聊天室列表設計
-          if (taskerEnabled) {
-            return _buildMyWorksChatRoomItem(task, applierChatItems);
-          } else {
-            return _taskCardWithapplierChatItems(task, applierChatItems);
-          }
+          return _taskCardWithapplierChatItems(task, applierChatItems);
         }).toList(),
       ),
     );
@@ -1482,37 +1762,20 @@ class _ChatListPageState extends State<ChatListPage>
     if (currentUserId == null) return;
 
     final taskService = TaskService();
-
-    // 確保任務已經載入
-    if (taskService.tasks.isEmpty) {
-      debugPrint('Tasks not loaded yet, waiting...');
-      await taskService.loadTasks();
-    }
-
     final myPostedTasks = taskService.tasks.where((task) {
       final creatorId = task['creator_id'];
       return creatorId == currentUserId ||
           creatorId?.toString() == currentUserId.toString();
     }).toList();
 
-    debugPrint(
-        'Found ${myPostedTasks.length} posted tasks for user $currentUserId');
-
     for (final task in myPostedTasks) {
       try {
         final applications =
             await taskService.loadApplicationsByTask(task['id'].toString());
         _applicationsByTask[task['id'].toString()] = applications;
-        debugPrint(
-            'Loaded ${applications.length} applications for task ${task['id']}');
       } catch (e) {
         debugPrint('Failed to load applications for task ${task['id']}: $e');
       }
-    }
-
-    // 觸發 UI 更新
-    if (mounted) {
-      setState(() {});
     }
   }
 
@@ -1711,6 +1974,49 @@ class _ChatListPageState extends State<ChatListPage>
         'isHidden': false,
       };
     }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _buildMyWorksChatList(),
+          _buildPostedTasksChatList(),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabWithBadge extends StatelessWidget {
+  final String label;
+  final int count;
+  const _TabWithBadge({required this.label, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(label),
+        if (count > 0) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.redAccent,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              count > 99 ? '99+' : '$count',
+              style: const TextStyle(color: Colors.white, fontSize: 11),
+            ),
+          ),
+        ]
+      ],
+    );
   }
 }
 
@@ -1983,444 +2289,50 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
 
     return actions;
   }
-
-  /// My Works 分頁的聊天室列表項目
-  Widget _buildMyWorksChatRoomItem(
-      Map<String, dynamic> task, List<Map<String, dynamic>> applierChatItems) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final displayStatus = _displayStatus(task);
-    final progressData = _getProgressData(displayStatus);
-    final progress = progressData['progress'] ?? 0.0;
-    final baseColor = progressData['color'] ?? Colors.grey[600]!;
-
-    // 計算未讀訊息數量
-    final unreadCount = applierChatItems.isNotEmpty
-        ? (_unreadByRoom[applierChatItems.first['id']] ?? 0)
-        : 0;
-
-    // 生成房間ID
-    final roomId = applierChatItems.isNotEmpty
-        ? applierChatItems.first['id']
-        : 'task_${task['id']}_pair_${task['creator_id']}_${context.read<UserService>().currentUser?.id}';
-
-    // 確定當前用戶在聊天室中的角色
-    final currentUserId = context.read<UserService>().currentUser?.id;
-    final isCreator =
-        task['creator_id']?.toString() == currentUserId?.toString();
-    final userRole = isCreator ? 'creator' : 'participant';
-
-    // 獲取聊天對象信息
-    final room = applierChatItems.isNotEmpty ? applierChatItems.first : null;
-    final chatPartnerInfo = _getChatPartnerInfo(task, userRole, room);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 1,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          InkWell(
-            onTap: () async {
-              if (applierChatItems.isNotEmpty) {
-                final room = applierChatItems.first;
-                final roomId = room['id']?.toString() ?? 'unknown';
-                // 儲存持久化資料並設置當前會話（My Works）
-                await ChatStorageService.savechatRoomData(
-                  roomId: roomId,
-                  room: room,
-                  task: task,
-                  userRole: userRole,
-                  chatPartnerInfo: chatPartnerInfo,
-                );
-                await ChatSessionManager.setCurrentChatSession(
-                  roomId: roomId,
-                  room: room,
-                  task: task,
-                  userRole: userRole,
-                  chatPartnerInfo: chatPartnerInfo,
-                  sourceTab: 'my-works', // 記錄來源分頁
-                );
-                // 使用帶參數 URL，避免 appBarBuilder 拿不到 extra
-                final chatUrl = ChatStorageService.generateChatUrl(
-                  roomId: roomId,
-                  taskId: task['id']?.toString(),
-                );
-                final extraData = {
-                  'room': room,
-                  'task': task,
-                  'userRole': userRole,
-                  'chatPartnerInfo': chatPartnerInfo,
-                };
-
-                debugPrint('🔍 [My Works] 準備導航到聊天室');
-                debugPrint('🔍 [My Works] chatUrl: $chatUrl');
-                debugPrint('🔍 [My Works] extra data: $extraData');
-
-                context.go(chatUrl, extra: extraData);
-              }
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  // 左側：中空圓餅圖進度指示器
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: CustomPaint(
-                      painter: PieChartPainter(
-                        progress: progress,
-                        baseColor: baseColor,
-                        strokeWidth: 4,
-                      ),
-                      child: Center(
-                        child: Text(
-                          '${(progress * 100).toInt()}%',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: baseColor,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-
-                  // 中間：任務資訊
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 任務標題
-                        Text(
-                          task['title'] ?? '未命名任務',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-
-                        // 任務狀態和獎勵
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: baseColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                displayStatus,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: baseColor,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(Icons.attach_money,
-                                size: 14, color: Colors.grey[600]),
-                            const SizedBox(width: 2),
-                            Text(
-                              '${task['reward_point'] ?? task['salary'] ?? 0}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-
-                        // 四個任務資訊欄位：位置、日期、語言要求（移除發布者）
-                        Row(
-                          children: [
-                            Icon(Icons.location_on,
-                                size: 12, color: Colors.grey[500]),
-                            const SizedBox(width: 2),
-                            Expanded(
-                              child: Text(
-                                task['location'] ?? '未知地點',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey[500],
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Icon(Icons.calendar_today,
-                                size: 12, color: Colors.grey[500]),
-                            const SizedBox(width: 2),
-                            Text(
-                              DateFormat('MM/dd').format(
-                                DateTime.parse(task['task_date'] ??
-                                    DateTime.now().toString()),
-                              ),
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-
-                        // 語言要求
-                        Row(
-                          children: [
-                            Icon(Icons.language,
-                                size: 12, color: Colors.grey[500]),
-                            const SizedBox(width: 2),
-                            Text(
-                              task['language_requirement'] ?? '不限',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // 右側：未讀徽章和箭頭
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (unreadCount > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            unreadCount.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 4),
-                      Icon(
-                        Icons.chevron_right,
-                        color: Colors.grey[400],
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // 倒數計時懸浮在右上角
-          if (_isCountdownStatus(displayStatus))
-            Positioned(
-              top: -8,
-              right: -8,
-              child: _buildCompactCountdownTimer(task),
-            ),
-        ],
-      ),
-    );
-  }
-
-  /// 獲取聊天對象信息
-  Map<String, dynamic> _getChatPartnerInfo(
-      Map<String, dynamic> task, String userRole,
-      [Map<String, dynamic>? room]) {
-    final currentUserId = context.read<UserService>().currentUser?.id;
-
-    if (userRole == 'creator') {
-      // 當前用戶是創建者，聊天對象是參與者
-      // 優先從 room 獲取參與者信息
-      if (room != null && room.isNotEmpty) {
-        return {
-          'id': room['user_id'] ?? room['participant_id'],
-          'name': room['name'] ?? room['participant_name'] ?? '任務應徵者',
-          'avatar': room['avatar'] ??
-              room['participant_avatar'] ??
-              'assets/images/avatar/avatar-1.png',
-          'role': 'participant',
-        };
-      }
-      // 後備方案：從 task 獲取
-      return {
-        'id': task['acceptor_id'] ?? task['participant_id'],
-        'name': task['acceptor_name'] ?? task['participant_name'] ?? '任務應徵者',
-        'avatar': task['acceptor_avatar'] ??
-            task['participant_avatar'] ??
-            'assets/images/avatar/avatar-1.png',
-        'role': 'participant',
-      };
-    } else {
-      // 當前用戶是參與者，聊天對象是創建者
-      return {
-        'id': task['creator_id'],
-        'name': task['creator_name'] ?? '任務發布者',
-        'avatar': task['creator_avatar'] ?? 'assets/images/avatar/avatar-1.png',
-        'role': 'creator',
-      };
-    }
-  }
 }
 
-/// 緊湊倒數計時器 Widget（用於 My Works 分頁）
-class _CompactCountdownTimerWidget extends StatefulWidget {
-  final Map<String, dynamic> task;
-  final VoidCallback onCountdownComplete;
-  const _CompactCountdownTimerWidget(
-      {required this.task, required this.onCountdownComplete});
-
-  @override
-  State<_CompactCountdownTimerWidget> createState() =>
-      _CompactCountdownTimerWidgetState();
-}
-
-class _CompactCountdownTimerWidgetState
-    extends State<_CompactCountdownTimerWidget> {
-  late Duration _remaining;
-  late DateTime _endTime;
-  late DateTime _startTime;
-  bool _completed = false;
-  late Ticker _ticker;
-
-  @override
-  void initState() {
-    super.initState();
-    _startTime = DateTime.now();
-    _endTime = _startTime.add(const Duration(days: 7));
-    _remaining = _endTime.difference(DateTime.now());
-    _ticker = Ticker(_onTick)..start();
-  }
-
-  void _onTick(Duration elapsed) {
-    final now = DateTime.now();
-    final remain = _endTime.difference(now);
-    if (remain <= Duration.zero && !_completed) {
-      _completed = true;
-      widget.onCountdownComplete();
-      _ticker.stop();
-      setState(() {
-        _remaining = Duration.zero;
-      });
-    } else if (!_completed) {
-      setState(() {
-        _remaining = remain > Duration.zero ? remain : Duration.zero;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _ticker.dispose();
-    super.dispose();
-  }
-
-  String _formatCompactDuration(Duration d) {
-    int totalSeconds = d.inSeconds;
-    int days = totalSeconds ~/ (24 * 3600);
-    int hours = (totalSeconds % (24 * 3600)) ~/ 3600;
-    int minutes = (totalSeconds % 3600) ~/ 60;
-    int seconds = totalSeconds % 60;
-    return '${days}d ${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.purple[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.purple[200]!, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.timer, color: Colors.purple[600], size: 12),
-          const SizedBox(width: 4),
-          Text(
-            _remaining > Duration.zero
-                ? _formatCompactDuration(_remaining)
-                : '00d 00:00:00',
-            style: TextStyle(
-              color: Colors.purple[600],
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'monospace',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 中空圓餅圖繪製器
+/// 中空圓餅圖畫家
 class PieChartPainter extends CustomPainter {
   final double progress;
   final Color baseColor;
   final double strokeWidth;
 
-  PieChartPainter({
+  const PieChartPainter({
     required this.progress,
     required this.baseColor,
-    this.strokeWidth = 4,
+    this.strokeWidth = 4.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - strokeWidth) / 2;
+    final radius = (size.width / 2) - (strokeWidth / 2);
 
-    // 繪製背景圓圈（淺色）
+    // 背景圓
     final backgroundPaint = Paint()
-      ..color = baseColor.withOpacity(0.1)
+      ..color = baseColor.withOpacity(0.2)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth;
 
     canvas.drawCircle(center, radius, backgroundPaint);
 
-    // 繪製進度圓弧
-    if (progress > 0) {
-      final progressPaint = Paint()
-        ..color = baseColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round;
+    // 進度圓弧
+    final progressPaint = Paint()
+      ..color = baseColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
 
-      final sweepAngle = 2 * pi * progress;
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        -pi / 2, // 從頂部開始
-        sweepAngle,
-        false,
-        progressPaint,
-      );
-    }
+    const startAngle = -3.14159 / 2; // 從12點鐘方向開始
+    final sweepAngle = 2 * 3.14159 * progress; // 進度角度
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      sweepAngle,
+      false,
+      progressPaint,
+    );
   }
 
   @override
