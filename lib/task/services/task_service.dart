@@ -164,6 +164,10 @@ class TaskService extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
+      debugPrint('🔍 TaskService createTask 開始');
+      debugPrint('🔍 API URL: ${AppConfig.taskCreateUrl}');
+      debugPrint('🔍 發送數據: ${jsonEncode(taskData)}');
+
       final response = await http
           .post(
             Uri.parse(AppConfig.taskCreateUrl),
@@ -174,23 +178,29 @@ class TaskService extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 30));
 
+      debugPrint('🔍 HTTP 回應狀態碼: ${response.statusCode}');
+      debugPrint('🔍 HTTP 回應內容: ${response.body}');
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
         if (data['success']) {
+          debugPrint('✅ 任務創建成功');
           // 重新載入任務列表
           await loadTasks();
           return true;
         } else {
           _error = data['message'] ?? 'Failed to create task';
+          debugPrint('❌ 任務創建失敗: $_error');
           return false;
         }
       } else {
         _error = 'HTTP ${response.statusCode}: Failed to create task';
+        debugPrint('❌ HTTP 錯誤: $_error');
         return false;
       }
     } catch (e) {
       _error = 'Network error: $e';
-      debugPrint('TaskService createTask error: $e');
+      debugPrint('❌ TaskService createTask 錯誤: $e');
       return false;
     } finally {
       _isLoading = false;

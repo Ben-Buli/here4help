@@ -158,13 +158,31 @@ class UserService extends ChangeNotifier {
       await prefs.remove('user_primaryLang');
       await prefs.remove('user_permission');
 
+      // 清除其他可能的用戶相關緩存
+      await prefs.remove('user_phone');
+      await prefs.remove('user_status');
+      await prefs.remove('user_provider');
+      await prefs.remove('user_created_at');
+      await prefs.remove('user_updated_at');
+      await prefs.remove('user_referral_code');
+      await prefs.remove('user_google_id');
+
       // 清除 AuthService 中的 token
       await AuthService.logout();
+
+      // 清除 Flutter 圖片緩存
+      if (context.mounted) {
+        PaintingBinding.instance.imageCache.clear();
+        PaintingBinding.instance.imageCache.clearLiveImages();
+        debugPrint('✅ 已清除 Flutter 圖片緩存');
+      }
 
       // 重置未讀中心為 0
       final placeholder = NotificationServicePlaceholder();
       await placeholder.init(userId: 'placeholder');
       await NotificationCenter().use(placeholder);
+
+      debugPrint('✅ 用戶登出完成，所有緩存已清除');
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -180,6 +198,11 @@ class UserService extends ChangeNotifier {
   Future<void> setUser(UserModel user) async {
     debugPrint('🔍 setUser called with ${user.id}');
     debugPrint('🔍 setUser avatar_url: ${user.avatar_url}');
+
+    // 清除舊的圖片緩存（避免顯示前一個用戶的頭像）
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+    debugPrint('✅ 已清除圖片緩存以避免顯示舊用戶頭像');
 
     _currentUser = user;
 

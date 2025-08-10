@@ -23,7 +23,7 @@ if (!$input) {
 }
 
 // 驗證必填欄位
-$requiredFields = ['title', 'description', 'reward_point', 'location', 'task_date', 'language_requirement'];
+$requiredFields = ['title', 'description', 'reward_point', 'location', 'task_date', 'language_requirement', 'creator_id'];
 $errors = [];
 
 foreach ($requiredFields as $field) {
@@ -31,6 +31,14 @@ foreach ($requiredFields as $field) {
         $errors[] = "Field '$field' is required";
     }
 }
+
+// 特別檢查 creator_id 是否為有效的整數
+if (isset($input['creator_id']) && !is_numeric($input['creator_id'])) {
+    $errors[] = "Field 'creator_id' must be a valid number";
+}
+
+// 記錄接收到的數據以便調試
+error_log("Task creation request data: " . json_encode($input));
 
 if (!empty($errors)) {
     Response::validationError($errors);
@@ -121,7 +129,14 @@ try {
     if (!empty($input['application_questions']) && is_array($input['application_questions'])) {
         foreach ($input['application_questions'] as $index => $question) {
             if (!empty($question)) {
-                $questionId = sprintf('q%d-%s', $index + 1, $taskId);
+                // 生成獨立的 UUID 作為問題 ID
+                $questionId = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+                    mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+                    mt_rand(0, 0xffff),
+                    mt_rand(0, 0x0fff) | 0x4000,
+                    mt_rand(0, 0x3fff) | 0x8000,
+                    mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+                );
                 $questionSql = "INSERT INTO application_questions (id, task_id, application_question, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())";
                 $db->query($questionSql, [$questionId, $taskId, $question]);
             }
@@ -150,6 +165,11 @@ try {
     Response::success($task, 'Task created successfully', 201);
     
 } catch (Exception $e) {
+    // 記錄詳細錯誤信息
+    error_log("Task creation failed: " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
+    error_log("Input data: " . json_encode($input));
+    
     Response::serverError('Failed to create task: ' . $e->getMessage());
 }
 ?> 

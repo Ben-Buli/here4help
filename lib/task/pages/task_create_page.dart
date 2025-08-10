@@ -277,6 +277,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
     // Debug: 打印用戶資訊
     debugPrint(
         '🔍 PersonalInfoSection - User: ${user?.name}, Avatar: ${user?.avatar_url}');
+    debugPrint('🔍 PersonalInfoSection - 當前時間: ${DateTime.now()}');
 
     // 如果正在載入用戶資料，顯示載入狀態
     if (userService.isLoading) {
@@ -333,8 +334,9 @@ class _PostFormPageState extends State<TaskCreatePage> {
       ),
       child: Row(
         children: [
-          // 用戶頭貼
+          // 用戶頭貼 - 使用 key 強制刷新
           CircleAvatar(
+            key: ValueKey('avatar_${user?.id}_${user?.avatar_url}'),
             radius: 24,
             backgroundColor: Colors.grey[300],
             backgroundImage: ImageHelper.getAvatarImage(avatarUrl) ??
@@ -1784,13 +1786,22 @@ class _PostFormPageState extends State<TaskCreatePage> {
 
           // 使用 SharedPreferences 儲存資料
           try {
+            debugPrint('🔍 正在保存任務資料到 SharedPreferences...');
+            debugPrint('🔍 要保存的資料: ${jsonEncode(data)}');
+
             final prefs = await SharedPreferences.getInstance();
             await prefs.setString('taskData', jsonEncode(data));
+
+            // 驗證資料是否正確保存
+            final savedData = prefs.getString('taskData');
+            debugPrint('🔍 驗證已保存的資料: $savedData');
+
+            debugPrint('✅ 任務資料保存成功，準備導航到預覽頁面');
 
             // 導航到預覽頁面
             if (mounted) {
               try {
-                context.push('/task/create/preview');
+                context.go('/task/create/preview');
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(

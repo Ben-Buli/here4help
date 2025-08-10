@@ -125,6 +125,13 @@ final List<Map<String, dynamic>> shellPages = [
     'showBackArrow': true
   },
   {
+    'path': '/task/create/preview',
+    'child': const TaskPreviewPage(),
+    'title': 'Task Preview',
+    'showBottomNav': false,
+    'showBackArrow': true
+  },
+  {
     'path': '/task',
     'child': const TaskListPage(),
     'title': 'Task',

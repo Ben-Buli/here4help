@@ -28,83 +28,10 @@ class _TaskListPageState extends State<TaskListPage> {
   String? selectedStatus; // 新增狀態篩選
   String sortBy = 'updated_at'; // 新增排序選項
   bool sortDesc = true; // 新增排序方向
-  bool showMyTasksOnly = false; // 是否顯示我的任務
-  bool showAppliedOnly = false; // 是否只顯示已應徵
+  bool showMyTasksOnly = false; // 是否只顯示我的任務
+  bool showAppliedOnly = false; // 是否只顯示已應徵任務
   // final TextEditingController _languageSearchCtrl = TextEditingController();
   List<Map<String, dynamic>> _languages = [];
-
-  void _showLanguageSearchDialog() {
-    final theme = Theme.of(context).colorScheme;
-    final languages = [
-      'All',
-      ..._languages
-          .map((e) => (e['name'] ?? '').toString())
-          .where((e) => e.isNotEmpty)
-    ];
-    final TextEditingController queryCtrl = TextEditingController();
-    List<String> filtered = List<String>.from(languages);
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(builder: (context, setState) {
-          return AlertDialog(
-            backgroundColor: theme.surface,
-            contentPadding: const EdgeInsets.all(12),
-            content: SizedBox(
-              width: 380,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: queryCtrl,
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      hintText: '輸入語言關鍵字',
-                    ),
-                    onChanged: (q) {
-                      final qq = q.toLowerCase();
-                      setState(() {
-                        filtered = languages
-                            .where((e) => e.toLowerCase().contains(qq))
-                            .toList();
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 360),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: filtered.length,
-                      itemBuilder: (_, i) {
-                        final lang = filtered[i];
-                        return ListTile(
-                          title: Text(lang),
-                          onTap: () {
-                            setState(() {
-                              selectedLanguage = lang == 'All' ? null : lang;
-                            });
-                            Navigator.of(dialogContext).pop();
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('關閉'),
-              ),
-            ],
-          );
-        });
-      },
-    );
-  }
 
   // 根據目前選擇的語言，取得可用的地點
   List<String> getAvailableLocations() {
@@ -161,35 +88,50 @@ class _TaskListPageState extends State<TaskListPage> {
       if (statusA == 'open' && statusB != 'open') return -1;
       if (statusA != 'open' && statusB == 'open') return 1;
 
-      // 然後按更新時間排序
-      final updatedAtA = a['updated_at'] ?? a['created_at'] ?? '';
-      final updatedAtB = b['updated_at'] ?? b['created_at'] ?? '';
-
-      if (updatedAtA.isNotEmpty && updatedAtB.isNotEmpty) {
-        DateTime? dateA;
-        DateTime? dateB;
-
-        // 嘗試解析日期
-        try {
-          dateA = DateTime.tryParse(updatedAtA);
-        } catch (e) {
-          dateA = null;
-        }
-
-        try {
-          dateB = DateTime.tryParse(updatedAtB);
-        } catch (e) {
-          dateB = null;
-        }
-
-        // 如果解析失敗，使用當前時間
-        dateA ??= DateTime.now();
-        dateB ??= DateTime.now();
+      // 然後按選擇的排序欄位排序
+      if (sortBy == 'reward_point') {
+        // 按獎勵點數排序
+        final rewardA =
+            double.tryParse((a['reward_point'] ?? '0').toString()) ?? 0.0;
+        final rewardB =
+            double.tryParse((b['reward_point'] ?? '0').toString()) ?? 0.0;
 
         if (sortDesc) {
-          return dateB.compareTo(dateA); // 降序
+          return rewardB.compareTo(rewardA); // 高到低
         } else {
-          return dateA.compareTo(dateB); // 升序
+          return rewardA.compareTo(rewardB); // 低到高
+        }
+      } else {
+        // 按更新時間排序（預設）
+        final updatedAtA = a['updated_at'] ?? a['created_at'] ?? '';
+        final updatedAtB = b['updated_at'] ?? b['created_at'] ?? '';
+
+        if (updatedAtA.isNotEmpty && updatedAtB.isNotEmpty) {
+          DateTime? dateA;
+          DateTime? dateB;
+
+          // 嘗試解析日期
+          try {
+            dateA = DateTime.tryParse(updatedAtA);
+          } catch (e) {
+            dateA = null;
+          }
+
+          try {
+            dateB = DateTime.tryParse(updatedAtB);
+          } catch (e) {
+            dateB = null;
+          }
+
+          // 如果解析失敗，使用當前時間
+          dateA ??= DateTime.now();
+          dateB ??= DateTime.now();
+
+          if (sortDesc) {
+            return dateB.compareTo(dateA); // 降序
+          } else {
+            return dateA.compareTo(dateB); // 升序
+          }
         }
       }
 
@@ -544,116 +486,193 @@ class _TaskListPageState extends State<TaskListPage> {
 
   /// 彈出篩選選單對話框
   void _showFilterDialog() {
+    // 創建臨時變數來存儲 dialog 內的狀態
+    bool tempShowMyTasksOnly = showMyTasksOnly;
+    bool tempShowAppliedOnly = showAppliedOnly;
+    String tempSortBy = sortBy;
+    bool tempSortDesc = sortDesc;
+
     showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return Consumer<ThemeConfigManager>(
-          builder: (context, themeManager, child) {
-            final theme = themeManager.effectiveTheme;
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
-              backgroundColor: theme.surface,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: 420,
-                  maxHeight: MediaQuery.of(context).size.height * 0.7,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              '篩選選項',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                color: theme.onSurface,
+        context: context,
+        builder: (BuildContext dialogContext) {
+          return Consumer<ThemeConfigManager>(
+            builder: (context, themeManager, child) {
+              final theme = themeManager.effectiveTheme;
+              return StatefulBuilder(
+                builder: (context, setDialogState) {
+                  return Dialog(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
+                    backgroundColor: theme.surface,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: 420,
+                        maxHeight: MediaQuery.of(context).size.height * 0.7,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Filter Options',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      color: theme.onSurface,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () {
+                                      setDialogState(() {
+                                        tempShowMyTasksOnly = false;
+                                        tempShowAppliedOnly =
+                                            false; // 預設都不勾選，顯示全部任務
+                                        tempSortBy = 'updated_at';
+                                        tempSortDesc = true;
+                                      });
+                                      // 不立即更新主頁面，關閉對話框
+                                      Navigator.pop(dialogContext);
+                                    },
+                                    icon: Icon(Icons.clear,
+                                        color: theme.onSurface),
+                                    tooltip: 'Clear and Close',
+                                  ),
+                                ],
                               ),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                setState(() {
-                                  showMyTasksOnly = false;
-                                  showAppliedOnly = false;
-                                  sortDesc = true;
-                                });
-                                Navigator.pop(dialogContext);
-                              },
-                              icon: Icon(Icons.clear, color: theme.onSurface),
-                              tooltip: '清除並關閉',
-                            ),
-                          ],
+                              const SizedBox(height: 12),
+                              Text('Task Type Filter',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.onSurface)),
+                              const SizedBox(height: 4),
+                              CheckboxListTile(
+                                value: tempShowAppliedOnly,
+                                onChanged: (v) {
+                                  setDialogState(() {
+                                    tempShowAppliedOnly = v ?? false;
+                                  });
+                                },
+                                title: Text('Show Applied Tasks',
+                                    style: TextStyle(color: theme.onSurface)),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 0),
+                                dense: true,
+                              ),
+                              CheckboxListTile(
+                                value: tempShowMyTasksOnly,
+                                onChanged: (v) {
+                                  setDialogState(() {
+                                    tempShowMyTasksOnly = v ?? false;
+                                  });
+                                },
+                                title: Text('Show My Tasks',
+                                    style: TextStyle(color: theme.onSurface)),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 0),
+                                dense: true,
+                              ),
+                              const SizedBox(height: 8),
+                              Text('Sort By',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.onSurface)),
+                              const SizedBox(height: 8),
+                              RadioListTile<String>(
+                                value: 'updated_at',
+                                groupValue: tempSortBy,
+                                onChanged: (v) {
+                                  setDialogState(
+                                      () => tempSortBy = v ?? 'updated_at');
+                                  // 不立即更新主頁面
+                                },
+                                title: const Text('Update Date'),
+                              ),
+                              RadioListTile<String>(
+                                value: 'reward_point',
+                                groupValue: tempSortBy,
+                                onChanged: (v) {
+                                  setDialogState(
+                                      () => tempSortBy = v ?? 'updated_at');
+                                  // 不立即更新主頁面
+                                },
+                                title: const Text('Reward Points'),
+                              ),
+                              const SizedBox(height: 8),
+                              Text('Sort Direction',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.onSurface)),
+                              const SizedBox(height: 8),
+                              RadioListTile<bool>(
+                                value: true,
+                                groupValue: tempSortDesc,
+                                onChanged: (v) {
+                                  setDialogState(
+                                      () => tempSortDesc = v ?? true);
+                                  // 不立即更新主頁面
+                                },
+                                title: const Text('Descending'),
+                              ),
+                              RadioListTile<bool>(
+                                value: false,
+                                groupValue: tempSortDesc,
+                                onChanged: (v) {
+                                  setDialogState(
+                                      () => tempSortDesc = v ?? false);
+                                  // 不立即更新主頁面
+                                },
+                                title: const Text('Ascending'),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  TextButton(
+                                    onPressed: () {
+                                      setDialogState(() {
+                                        tempShowMyTasksOnly = false;
+                                        tempShowAppliedOnly =
+                                            false; // 預設都不勾選，顯示全部任務
+                                        tempSortBy = 'updated_at';
+                                        tempSortDesc = true;
+                                      });
+                                      // Reset 不立即應用，只重置臨時值
+                                    },
+                                    child: const Text('Reset'),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      // Apply 按鈕：將臨時值應用到實際變數
+                                      setState(() {
+                                        showMyTasksOnly = tempShowMyTasksOnly;
+                                        showAppliedOnly = tempShowAppliedOnly;
+                                        sortBy = tempSortBy;
+                                        sortDesc = tempSortDesc;
+                                      });
+                                      Navigator.pop(dialogContext);
+                                    },
+                                    child: const Text('Apply'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 12),
-                        SwitchListTile(
-                          title: Text('是否顯示我的任務',
-                              style: TextStyle(color: theme.onSurface)),
-                          value: showMyTasksOnly,
-                          onChanged: (v) => setState(() => showMyTasksOnly = v),
-                        ),
-                        SwitchListTile(
-                          title: Text('顯示已應徵任務',
-                              style: TextStyle(color: theme.onSurface)),
-                          value: showAppliedOnly,
-                          onChanged: (v) => setState(() => showAppliedOnly = v),
-                        ),
-                        const SizedBox(height: 8),
-                        Text('按照更新日期排序',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: theme.onSurface)),
-                        RadioListTile<bool>(
-                          value: true,
-                          groupValue: sortDesc,
-                          onChanged: (v) =>
-                              setState(() => sortDesc = v ?? true),
-                          title: const Text('Z-A (新到舊)'),
-                        ),
-                        RadioListTile<bool>(
-                          value: false,
-                          groupValue: sortDesc,
-                          onChanged: (v) =>
-                              setState(() => sortDesc = v ?? false),
-                          title: const Text('A-Z (舊到新)'),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  showMyTasksOnly = false;
-                                  showAppliedOnly = false;
-                                  sortDesc = true;
-                                });
-                                Navigator.pop(dialogContext);
-                              },
-                              child: const Text('重設'),
-                            ),
-                            const SizedBox(width: 12),
-                            ElevatedButton(
-                              onPressed: () => Navigator.pop(dialogContext),
-                              child: const Text('套用'),
-                            ),
-                          ],
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
+                  );
+                },
+              );
+            },
+          );
+        });
   }
 
   @override
@@ -700,8 +719,10 @@ class _TaskListPageState extends State<TaskListPage> {
       final matchStatus = selectedStatus == null ||
           selectedStatus == 'All' ||
           status == selectedStatus!.toLowerCase();
-      final matchMine = !showMyTasksOnly || isMine;
-      final matchApplied = !showAppliedOnly || applied;
+      // 新的篩選邏輯：都不勾選時顯示全部任務
+      final matchMine = showMyTasksOnly ? isMine : true; // 勾選時只顯示我的，不勾選時顯示全部
+      final matchApplied =
+          showAppliedOnly ? applied : true; // 勾選時只顯示已應徵，不勾選時顯示全部
 
       return matchQuery &&
           matchLocation &&
@@ -865,11 +886,6 @@ class _TaskListPageState extends State<TaskListPage> {
                           },
                         ),
                       ),
-                      IconButton(
-                        onPressed: _showLanguageSearchDialog,
-                        icon: const Icon(Icons.search),
-                        tooltip: '搜尋語言',
-                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: DropdownButtonFormField<String>(
@@ -927,54 +943,6 @@ class _TaskListPageState extends State<TaskListPage> {
                           });
                         },
                         icon: const Icon(Icons.refresh),
-                      ),
-                    ],
-                  ),
-                ),
-                // 第二排：toggle 與排序
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Row(children: [
-                          Switch(
-                            value: showMyTasksOnly,
-                            onChanged: (v) =>
-                                setState(() => showMyTasksOnly = v),
-                          ),
-                          Text('顯示我的任務',
-                              style: TextStyle(color: theme.onSurface)),
-                        ]),
-                      ),
-                      Expanded(
-                        child: Row(children: [
-                          Switch(
-                            value: showAppliedOnly,
-                            onChanged: (v) =>
-                                setState(() => showAppliedOnly = v),
-                          ),
-                          Text('只顯示已應徵',
-                              style: TextStyle(color: theme.onSurface)),
-                        ]),
-                      ),
-                      Expanded(
-                        child: Row(children: [
-                          Radio<bool>(
-                            value: true,
-                            groupValue: sortDesc,
-                            onChanged: (v) =>
-                                setState(() => sortDesc = v ?? true),
-                          ),
-                          const Text('更新日期 Z-A'),
-                          Radio<bool>(
-                            value: false,
-                            groupValue: sortDesc,
-                            onChanged: (v) =>
-                                setState(() => sortDesc = v ?? false),
-                          ),
-                          const Text('更新日期 A-Z'),
-                        ]),
                       ),
                     ],
                   ),

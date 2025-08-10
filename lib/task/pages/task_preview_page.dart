@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:here4help/task/services/task_service.dart';
-import 'package:here4help/constants/app_colors.dart';
+
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:provider/provider.dart';
@@ -28,16 +28,29 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
 
   Future<void> _loadTaskData() async {
     try {
+      debugPrint('🔍 開始載入任務資料...');
       final prefs = await SharedPreferences.getInstance();
       final taskDataString = prefs.getString('taskData');
 
+      debugPrint('🔍 SharedPreferences 中的 taskData: $taskDataString');
+
       if (taskDataString != null) {
         final data = jsonDecode(taskDataString) as Map<String, dynamic>;
+        debugPrint('✅ 任務資料解析成功:');
+        debugPrint('   title: ${data['title']}');
+        debugPrint('   description: ${data['description']}');
+        debugPrint(
+            '   reward_point: ${data['reward_point'] ?? data['salary']}');
+        debugPrint('   location: ${data['location']}');
+        debugPrint('   task_date: ${data['task_date']}');
+        debugPrint('   language_requirement: ${data['language_requirement']}');
+
         setState(() {
           taskData = data;
           isLoading = false;
         });
       } else {
+        debugPrint('❌ SharedPreferences 中沒有找到 taskData');
         setState(() {
           isLoading = false;
         });
@@ -50,6 +63,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
         }
       }
     } catch (e) {
+      debugPrint('❌ 載入任務資料失敗: $e');
       setState(() {
         isLoading = false;
       });
@@ -88,8 +102,16 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
     taskData!['acceptor_confirmed'] = '0';
     taskData!['cancel_reason'] = '';
     taskData!['fail_reason'] = '';
-    // creator_name 僅用於預覽顯示，送 API 將以 creator_id 為準
-    taskData!['creator_name'] = taskData!['creator_name'] ?? 'Anonymous';
+    // 從 UserService 獲取當前用戶信息
+    final userService = Provider.of<UserService>(context, listen: false);
+    final currentUser = userService.currentUser;
+
+    // creator_name 從當前用戶獲取，送 API 將以 creator_id 為準
+    final creatorName = currentUser?.name ?? 'Anonymous';
+    final creatorAvatarUrl = currentUser?.avatar_url ?? '';
+
+    taskData!['creator_name'] = creatorName;
+    taskData!['avatar_url'] = creatorAvatarUrl;
     taskData!['description'] =
         taskData!['description'] ?? 'No description provided';
     taskData!['updated_at'] = DateTime.now().toIso8601String();
@@ -102,8 +124,6 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
         taskData!['salary']?.toString() ??
         'N/A';
     final date = taskData!['task_date']?.toString() ?? 'N/A';
-    final creatorName = taskData!['creator_name']?.toString() ?? 'N/A';
-    final creatorAvatarUrl = taskData!['avatar_url']?.toString();
 
     final languageRequirement =
         taskData!['language_requirement']?.toString() ?? 'N/A';
@@ -528,6 +548,15 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                   final taskService = TaskService();
 
                   try {
+                    // 獲取當前用戶
+                    final currentUser =
+                        Provider.of<UserService>(context, listen: false)
+                            .currentUser;
+
+                    if (currentUser == null) {
+                      throw Exception('用戶未登入');
+                    }
+
                     // 準備發送到後端的數據，只包含資料庫需要的欄位
                     final Map<String, dynamic> taskDataForApi = {
                       'title': taskData!['title'] ?? '',
@@ -542,15 +571,26 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                           taskData!['language_requirement'] ?? '',
                       // 僅送必要欄位；建立者用 creator_id（由登入用戶）
                       // 預覽中的 creator_name 僅作顯示
-                      'creator_id':
-                          Provider.of<UserService>(context, listen: false)
-                                  .currentUser
-                                  ?.id
-                                  .toString() ??
-                              '',
+                      'creator_id': currentUser.id, // 確保是 int 類型
                       // 初始狀態以 status_code 傳遞
                       'status_code': 'open',
                     };
+
+                    // Debug: 打印發送的數據
+                    debugPrint('🔍 準備發送的任務數據:');
+                    debugPrint('   title: ${taskDataForApi['title']}');
+                    debugPrint(
+                        '   description: ${taskDataForApi['description']}');
+                    debugPrint(
+                        '   reward_point: ${taskDataForApi['reward_point']}');
+                    debugPrint('   location: ${taskDataForApi['location']}');
+                    debugPrint('   task_date: ${taskDataForApi['task_date']}');
+                    debugPrint(
+                        '   language_requirement: ${taskDataForApi['language_requirement']}');
+                    debugPrint(
+                        '   creator_id: ${taskDataForApi['creator_id']} (${taskDataForApi['creator_id'].runtimeType})');
+                    debugPrint(
+                        '   status_code: ${taskDataForApi['status_code']}');
 
                     // 如果有申請問題，添加到數據中
                     if (taskData!['application_question'] != null &&
@@ -562,6 +602,8 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                           .split(' | ');
                       taskDataForApi['application_questions'] =
                           questions.where((q) => q.trim().isNotEmpty).toList();
+                      debugPrint(
+                          '   application_questions: ${taskDataForApi['application_questions']}');
                     }
 
                     // 創建任務
