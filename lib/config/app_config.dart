@@ -94,4 +94,23 @@ class AppConfig {
       '$apiBaseUrl/backend/api/chat/read_room.php';
   static String get ensureRoomUrl =>
       '$apiBaseUrl/backend/api/chat/ensure_room.php';
+  static String get chatUploadAttachmentUrl =>
+      '$apiBaseUrl/backend/api/chat/upload_attachment.php';
+
+  // Chat - Reports & Blocks
+  static String get chatReportUrl => '$apiBaseUrl/backend/api/chat/report.php';
+  static String get chatBlockUserUrl =>
+      '$apiBaseUrl/backend/api/chat/block_user.php';
+
+  // Tasks - Completion & Reviews & Payment
+  static String get taskConfirmCompletionUrl =>
+      '$apiBaseUrl/backend/api/tasks/confirm_completion.php';
+  static String get taskDisagreeCompletionUrl =>
+      '$apiBaseUrl/backend/api/tasks/disagree_completion.php';
+  static String get taskPayAndReviewUrl =>
+      '$apiBaseUrl/backend/api/tasks/pay_and_review.php';
+  static String get taskReviewsSubmitUrl =>
+      '$apiBaseUrl/backend/api/tasks/reviews_submit.php';
+  static String get taskReviewsGetUrl =>
+      '$apiBaseUrl/backend/api/tasks/reviews_get.php';
 }

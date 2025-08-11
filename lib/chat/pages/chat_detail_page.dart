@@ -5,6 +5,7 @@ import 'package:here4help/chat/services/global_chat_room.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:here4help/constants/task_status.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:here4help/config/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -43,13 +44,60 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   // 角色與動作列控制
   String _userRole = 'participant';
   bool _showActionBar = true;
+  // 狀態 Bar 動畫控制
+  late AnimationController _statusBarController;
+  late Animation<Offset> _statusBarSlide;
+  bool _showStatusBar = true;
+  Timer? _statusBarTimer;
 
   // Socket.IO 服務
   final SocketService _socketService = SocketService();
   String? _currentRoomId;
 
-  Map<String, dynamic> _getProgressData(String status) {
-    return TaskStatus.getProgressData(status);
+  // 進度資料暫不使用，保留映射函式如需擴充再啟用
+
+  String _taskStatusDisplay() {
+    final task = widget.data['task'] as Map<String, dynamic>? ?? {};
+    final dynamic explicitDisplay =
+        task['status_display'] ?? task['status_name'];
+    if (explicitDisplay != null && '$explicitDisplay'.isNotEmpty) {
+      return '$explicitDisplay';
+    }
+    final dynamic code = task['status_code'] ?? task['status'];
+    if (code != null) {
+      final codeStr = '$code';
+      // 若已是顯示文字，直接回傳；若是代碼，用映射轉為顯示文字
+      final mapped = TaskStatus.statusString[codeStr];
+      if (mapped != null) return mapped;
+      // 嘗試從顯示文字反推代碼（以值比對）
+      final entry = TaskStatus.statusString.entries.firstWhere(
+          (e) => e.value == codeStr,
+          orElse: () => const MapEntry('', ''));
+      if (entry.key.isNotEmpty) return entry.value;
+      return codeStr;
+    }
+    return '';
+  }
+
+  // _taskStatusCode() 暫不使用（資料以顯示文字流程處理）
+
+  int? _getOpponentUserId() {
+    try {
+      final room = widget.data['room'] as Map<String, dynamic>?;
+      if (room == null) return null;
+      final creatorId = room['creator_id'] ?? room['creatorId'];
+      final participantId = room['participant_id'] ?? room['participantId'];
+      if (_currentUserId == null) return null;
+      if (creatorId == _currentUserId) {
+        return participantId is int
+            ? participantId
+            : int.tryParse('$participantId');
+      } else {
+        return creatorId is int ? creatorId : int.tryParse('$creatorId');
+      }
+    } catch (_) {
+      return null;
+    }
   }
 
   void _scrollToBottom({bool delayed = false}) {
@@ -88,6 +136,17 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     super.initState();
     _loadCurrentUserId();
     _initializeChat(); // 載入當前用戶 ID
+
+    // 初始化狀態 Bar 動畫：顯示 3 秒後往下滑動消失
+    _statusBarController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _statusBarSlide = Tween<Offset>(begin: Offset.zero, end: const Offset(0, 1))
+        .animate(CurvedAnimation(
+            parent: _statusBarController, curve: Curves.linear));
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _startStatusBarAutoDismiss());
 
     // 監聽列表滾動，更新是否在底部
     _listController.addListener(() {
@@ -133,6 +192,22 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
+  void _startStatusBarAutoDismiss() {
+    if (!mounted) return;
+    setState(() => _showStatusBar = true);
+    _statusBarTimer?.cancel();
+    _statusBarTimer = Timer(const Duration(seconds: 3), () async {
+      if (!mounted) return;
+      try {
+        await _statusBarController.forward();
+      } finally {
+        if (!mounted) return;
+        setState(() => _showStatusBar = false);
+        _statusBarController.reset();
+      }
+    });
+  }
+
   /// 載入當前登入用戶 ID
   Future<void> _loadCurrentUserId() async {
     try {
@@ -154,21 +229,32 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
+  // 已有下方 dispose，避免重覆定義（保留於 520 行段落）
+
   void _toggleActionBar() {
     setState(() {
       _showActionBar = !_showActionBar;
     });
   }
 
-  /// 選擇圖片並以占位訊息發送（後端上傳端點待接）
+  /// 選擇圖片並上傳，成功後發送一則圖片訊息（簡化：以 [Photo] 檔名 + URL）
   Future<void> _pickAndSendPhoto() async {
     try {
       final picker = ImagePicker();
       final XFile? file = await picker.pickImage(source: ImageSource.gallery);
       if (file == null) return;
+      if (_currentRoomId == null) throw Exception('room 未初始化');
+
+      final upload = await ChatService().uploadAttachment(
+        roomId: _currentRoomId!,
+        filePath: file.path,
+      );
+      final url = upload['url'] ?? upload['path'] ?? '';
       final fileName = file.name;
-      // 先以占位訊息送出
-      _controller.text = '[Photo] $fileName';
+      final text = url is String && url.isNotEmpty
+          ? '[Photo] $fileName\n$url'
+          : '[Photo] $fileName';
+      _controller.text = text;
       await _sendMessage();
     } catch (e) {
       if (!mounted) return;
@@ -418,7 +504,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('發送訊息失敗: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -442,6 +528,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
     _controller.dispose();
     _focusNode.dispose();
+    _statusBarTimer?.cancel();
+    _statusBarController.dispose();
     super.dispose();
   }
 
@@ -739,11 +827,21 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               children: [
                 CircleAvatar(
                   radius: 16,
-                  child: Text(
-                    (room['user']?['name'] ?? applier['name'] ?? 'U')[0]
-                        .toUpperCase(),
-                    style: const TextStyle(color: Colors.white),
-                  ),
+                  backgroundImage: (room['user']?['avatar_url'] ??
+                              applier['avatar_url']) !=
+                          null
+                      ? NetworkImage(
+                          room['user']?['avatar_url'] ?? applier['avatar_url'])
+                      : null,
+                  child: ((room['user']?['avatar_url'] ??
+                              applier['avatar_url']) ==
+                          null)
+                      ? Text(
+                          (room['user']?['name'] ?? applier['name'] ?? 'U')[0]
+                              .toUpperCase(),
+                          style: const TextStyle(color: Colors.white),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -755,8 +853,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                           padding: const EdgeInsets.all(12),
                           constraints: const BoxConstraints(maxWidth: 300),
                           decoration: BoxDecoration(
-                            color: applierBubbleColor,
-                            borderRadius: BorderRadius.circular(12),
+                            color: Theme.of(context).colorScheme.secondary,
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -851,12 +949,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                           padding: const EdgeInsets.all(12),
                           constraints: const BoxConstraints(maxWidth: 300),
                           decoration: BoxDecoration(
-                            color: applierBubbleColor,
+                            color: Theme.of(context).colorScheme.secondary,
                             borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(0),
-                              topRight: Radius.circular(12),
-                              bottomLeft: Radius.circular(12),
-                              bottomRight: Radius.circular(12),
+                              topLeft: Radius.circular(4),
+                              topRight: Radius.circular(16),
+                              bottomLeft: Radius.circular(16),
+                              bottomRight: Radius.circular(16),
                             ),
                           ),
                           child: Text(text),
@@ -901,8 +999,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     padding: const EdgeInsets.all(12),
                     constraints: const BoxConstraints(maxWidth: 300),
                     decoration: BoxDecoration(
-                      color: const Color.fromARGB(255, 235, 241, 249),
-                      borderRadius: BorderRadius.circular(12),
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(4),
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(16),
+                      ),
                     ),
                     child: Text(text),
                   ),
@@ -1060,6 +1163,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         Expanded(
           child: Stack(
             children: [
+              // 取消覆蓋背景色，讓底層全局背景可見
               ListView.builder(
                 controller: _listController,
                 padding: const EdgeInsets.all(16),
@@ -1157,109 +1261,186 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             ],
           ),
         ),
-        // 保持原本的 status banner 在底部
-        Container(
-          color: _getStatusBackgroundColor(widget.data['task']['status'] ?? ''),
-          width: double.infinity,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Text(
-            (() {
-              final status = widget.data['task']['status'] ?? '';
-              final progressData = _getProgressData(status);
-              final progress = progressData['progress'];
-              if (progress != null) {
-                final percent = (progress * 100).round();
-                return '$status ($percent%)';
-              } else {
-                return status;
-              }
-            })(),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: _getStatusChipColor(widget.data['task']['status'] ?? ''),
+        // 將 status bar 以覆蓋方式顯示 3 秒，再滑動消失
+        if (_showStatusBar)
+          SlideTransition(
+            position: _statusBarSlide,
+            child: Container(
+              color: TaskStatus.themedColors(
+                          Theme.of(context).colorScheme)[_taskStatusDisplay()]
+                      ?.bg ??
+                  _getStatusBackgroundColor(_taskStatusDisplay()),
+              width: double.infinity,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                _taskStatusDisplay(),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: TaskStatus.themedColors(Theme.of(context).colorScheme)[
+                              _taskStatusDisplay()]
+                          ?.fg ??
+                      _getStatusChipColor(_taskStatusDisplay()),
+                ),
+                textAlign: TextAlign.center,
+              ),
             ),
-            textAlign: TextAlign.center,
           ),
-        ),
         const Divider(
           height: 1,
           thickness: 2,
         ),
-        const SizedBox(height: 12),
         if (_showActionBar)
-          Row(
-            children: _buildActionButtonsByStatus()
-                .map((e) => Expanded(child: e))
-                .toList(),
+          Container(
+            color: Theme.of(context).appBarTheme.backgroundColor,
+            // 將分隔線下方的間距改為 Action Bar 的內距（paddingTop）
+            padding: const EdgeInsets.only(top: 12, bottom: 10),
+            child: Row(
+              children: _buildActionButtonsByStatus()
+                  .map((e) => Expanded(
+                        child: IconTheme(
+                          data: IconThemeData(
+                            color:
+                                Theme.of(context).appBarTheme.foregroundColor ??
+                                    Colors.white,
+                          ),
+                          child: DefaultTextStyle(
+                            style: TextStyle(
+                              color: Theme.of(context)
+                                      .appBarTheme
+                                      .foregroundColor ??
+                                  Colors.white,
+                            ),
+                            child: e,
+                          ),
+                        ),
+                      ))
+                  .toList(),
+            ),
           ),
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(24),
+        // ActionBar + Input 區塊採用與 AppBar 相同的背景/前景配色，並提供 hover/pressed/focus 覆蓋色
+        Builder(builder: (context) {
+          final theme = Theme.of(context);
+          final bg =
+              theme.appBarTheme.backgroundColor ?? theme.colorScheme.primary;
+          final fg =
+              theme.appBarTheme.foregroundColor ?? theme.colorScheme.onPrimary;
+          return Theme(
+            data: theme.copyWith(
+              iconButtonTheme: IconButtonThemeData(
+                style: ButtonStyle(
+                  foregroundColor: MaterialStateProperty.resolveWith((states) {
+                    if (states.contains(MaterialState.disabled))
+                      return fg.withOpacity(0.5);
+                    return fg;
+                  }),
+                  overlayColor: MaterialStateProperty.resolveWith((states) {
+                    if (states.contains(MaterialState.pressed))
+                      return fg.withOpacity(0.12);
+                    if (states.contains(MaterialState.hovered))
+                      return fg.withOpacity(0.08);
+                    if (states.contains(MaterialState.focused))
+                      return fg.withOpacity(0.10);
+                    return null;
+                  }),
+                ),
+              ),
+              inputDecorationTheme: theme.inputDecorationTheme.copyWith(
+                filled: true,
+                fillColor: bg.withOpacity(0.08),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide(color: fg.withOpacity(0.24)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide(color: fg, width: 1.5),
+                ),
+                hintStyle: TextStyle(color: fg.withOpacity(0.6)),
+              ),
+              textSelectionTheme: TextSelectionThemeData(
+                cursorColor: fg,
+                selectionColor: fg.withOpacity(0.25),
+                selectionHandleColor: fg,
+              ),
+            ),
+            child: Container(
+              color: bg,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // plus 與 photo 置於最左側，位於輸入框之前
+                  IconTheme(
+                    data: IconThemeData(color: fg),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: _showActionBar ? 'Less' : 'More',
+                          icon: Icon(
+                            _showActionBar
+                                ? Icons.remove_circle_outline
+                                : Icons.add_circle_outline,
+                          ),
+                          onPressed: isInputDisabled ? null : _toggleActionBar,
+                        ),
+                        IconButton(
+                          tooltip: 'Photo',
+                          icon: const Icon(Icons.photo_outlined),
+                          onPressed: isInputDisabled ? null : _pickAndSendPhoto,
+                        ),
+                      ],
+                    ),
                   ),
-                  child: TextField(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    enabled: !isInputDisabled,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (value) {
-                      if (!isInputDisabled) _sendMessage();
-                    },
-
-                    /// 鍵盤收起時取消焦點
-                    onEditingComplete: () {
-                      FocusScope.of(context).unfocus();
-                    },
-                    onTapOutside: (_) {
-                      FocusScope.of(context).unfocus();
-                    },
-                    decoration: InputDecoration(
-                      border: InputBorder.none,
-                      hintText: isInputDisabled
-                          ? (widget.data['task']['status'] == 'Completed'
-                              ? 'This task is completed'
-                              : 'This task was rejected')
-                          : 'Type a message',
-                      hintStyle: TextStyle(
-                        color: isInputDisabled ? Colors.grey : Colors.black54,
+                  Expanded(
+                    child: Container(
+                      // 固定高度以與 IconButton (預設 48) 視覺中心對齊
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: bg.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: TextField(
+                        controller: _controller,
+                        focusNode: _focusNode,
+                        enabled: !isInputDisabled,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (value) {
+                          if (!isInputDisabled) _sendMessage();
+                        },
+                        onEditingComplete: () {
+                          FocusScope.of(context).unfocus();
+                        },
+                        onTapOutside: (_) {
+                          FocusScope.of(context).unfocus();
+                        },
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          // 調整內邊距：左側加 8，並垂直置中
+                          contentPadding:
+                              EdgeInsets.only(left: 8, top: 12, bottom: 12),
+                          hintText: 'Type a message',
+                        ),
+                        style: TextStyle(color: fg),
+                        cursorColor: fg,
                       ),
                     ),
                   ),
-                ),
+                  IconTheme(
+                    data: IconThemeData(color: fg),
+                    child: IconButton(
+                      icon: const Icon(Icons.send),
+                      onPressed: isInputDisabled ? null : _sendMessage,
+                    ),
+                  ),
+                ],
               ),
-              // 左側 plus 按鈕：切換 ActionBar 顯示
-              IconButton(
-                tooltip: 'More',
-                icon: const Icon(Icons.add_circle_outline),
-                color: isInputDisabled ? Colors.grey : Colors.black87,
-                onPressed: isInputDisabled ? null : _toggleActionBar,
-              ),
-              // 左側 photo 按鈕：上傳圖片（暫以上傳檔名訊息）
-              IconButton(
-                tooltip: 'Photo',
-                icon: const Icon(Icons.photo_outlined),
-                color: isInputDisabled ? Colors.grey : Colors.black87,
-                onPressed: isInputDisabled ? null : _pickAndSendPhoto,
-              ),
-              IconButton(
-                icon: Icon(
-                  Icons.send,
-                  color: isInputDisabled ? Colors.grey : Colors.blue,
-                ),
-                onPressed: isInputDisabled ? null : _sendMessage,
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        }),
       ],
     );
   }
@@ -1271,8 +1452,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.black),
+          // 使用 IconTheme 繼承的顏色，避免硬編黑色
+          Icon(icon),
           const SizedBox(height: 4),
+          // 使用 DefaultTextStyle 繼承主題前景色
           Text(label),
         ],
       ),
@@ -1287,19 +1470,30 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final isCreator = _userRole == 'creator';
 
     // 模組化定義：通用動作
-    Map<String, dynamic> actionDefs(String label, IconData icon, VoidCallback onTap) =>
+    Map<String, dynamic> actionDefs(
+            String label, IconData icon, VoidCallback onTap) =>
         {'label': label, 'icon': icon, 'onTap': onTap};
 
     // 工具：開啟二次確認對話
-    Future<void> confirmDialog({required String title, required String content, required VoidCallback onConfirm}) async {
+    Future<void> confirmDialog(
+        {required String title,
+        required String content,
+        required VoidCallback onConfirm}) async {
       await showDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(title),
           content: Text(content),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
-            ElevatedButton(onPressed: () { Navigator.of(context).pop(); onConfirm(); }, child: const Text('Confirm')),
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel')),
+            ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  onConfirm();
+                },
+                child: const Text('Confirm')),
           ],
         ),
       );
@@ -1314,7 +1508,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           actions.add(actionDefs('Accept', Icons.check, () async {
             await confirmDialog(
               title: 'Double Check',
-              content: 'Are you sure you want to assign this applicant to this task?',
+              content:
+                  'Are you sure you want to assign this applicant to this task?',
               onConfirm: () async {
                 await TaskService().updateTaskStatus(
                   widget.data['task']['id'].toString(),
@@ -1328,7 +1523,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                 );
                 if (mounted) setState(() {});
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Task accepted. Now in progress.')),
+                  const SnackBar(
+                      content: Text('Task accepted. Now in progress.')),
                 );
               },
             );
@@ -1336,20 +1532,62 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           actions.add(actionDefs('Block', Icons.block, () async {
             await confirmDialog(
               title: 'Block User',
-              content: 'Block this user from applying your tasks in the future?',
-              onConfirm: () {}, // TODO: 實作封鎖 API
+              content:
+                  'Block this user from applying your tasks in the future?',
+              onConfirm: () async {
+                final opponentId = _getOpponentUserId();
+                if (opponentId == null) return;
+                try {
+                  await ChatService()
+                      .blockUser(targetUserId: opponentId, block: true);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('User blocked.')));
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Block failed: $e')));
+                  }
+                }
+              },
             );
           }));
         } else {
-          actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+          actions.add(actionDefs('Report', Icons.article, () {
+            _openReportSheet();
+          }));
         }
         break;
       case 'In Progress':
         if (isCreator) {
-          actions.add(actionDefs('Pay', Icons.payment, () { _openPayAndReview(); }));
-          actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+          actions.add(actionDefs('Pay', Icons.payment, () {
+            _openPayAndReview();
+          }));
+          actions.add(actionDefs('Report', Icons.article, () {
+            _openReportSheet();
+          }));
           actions.add(actionDefs('Block', Icons.block, () async {
-            await confirmDialog(title: 'Block User', content: 'Block this user?', onConfirm: () {});
+            await confirmDialog(
+                title: 'Block User',
+                content: 'Block this user?',
+                onConfirm: () async {
+                  final opponentId = _getOpponentUserId();
+                  if (opponentId == null) return;
+                  try {
+                    await ChatService()
+                        .blockUser(targetUserId: opponentId, block: true);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('User blocked.')));
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Block failed: $e')));
+                    }
+                  }
+                });
           }));
         } else {
           actions.add(actionDefs('Completed', Icons.check_circle, () {
@@ -1357,18 +1595,22 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               title: 'Double Check',
               content: 'Are you sure you have completed this task?',
               onConfirm: () async {
-                widget.data['task']['pendingStart'] = DateTime.now().toIso8601String();
+                widget.data['task']['pendingStart'] =
+                    DateTime.now().toIso8601String();
                 await TaskService().updateTaskStatus(
                   widget.data['task']['id'].toString(),
                   TaskStatus.statusString['pending_confirmation_tasker']!,
                   statusCode: 'pending_confirmation',
                 );
                 if (mounted) setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Waiting for poster confirmation.')));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Waiting for poster confirmation.')));
               },
             );
           }));
-          actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+          actions.add(actionDefs('Report', Icons.article, () {
+            _openReportSheet();
+          }));
         }
         break;
       case 'Pending Confirmation':
@@ -1376,50 +1618,152 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           actions.add(actionDefs('Confirm', Icons.check, () async {
             await confirmDialog(
               title: 'Double Check',
-              content: 'Confirm this task and transfer reward points to the Tasker?',
+              content:
+                  'Confirm this task and transfer reward points to the Tasker?',
               onConfirm: () async {
-                await TaskService().updateTaskStatus(
-                  widget.data['task']['id'].toString(),
-                  TaskStatus.statusString['completed']!,
-                  statusCode: 'completed',
-                );
-                if (mounted) setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Task confirmed and paid.')));
+                try {
+                  await TaskService().confirmCompletion(
+                      taskId: widget.data['task']['id'].toString());
+                  if (mounted) setState(() {});
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('Task confirmed and paid.')));
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Confirm failed: $e')));
+                  }
+                }
               },
             );
           }));
           actions.add(actionDefs('Disagree', Icons.close, () async {
-            await confirmDialog(title: 'Disagree', content: 'Disagree this task is completed?', onConfirm: () { /* TODO: 紀錄拒絕（上限兩次）*/ });
+            await confirmDialog(
+              title: 'Disagree',
+              content: 'Disagree this task is completed?',
+              onConfirm: () async {
+                try {
+                  await TaskService().disagreeCompletion(
+                      taskId: widget.data['task']['id'].toString());
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Disagree submitted.')));
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Disagree failed: $e')));
+                  }
+                }
+              },
+            );
           }));
-          actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+          actions.add(actionDefs('Report', Icons.article, () {
+            _openReportSheet();
+          }));
         } else {
-          actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+          actions.add(actionDefs('Report', Icons.article, () {
+            _openReportSheet();
+          }));
         }
         break;
       case 'Dispute':
-        actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+        actions.add(actionDefs('Report', Icons.article, () {
+          _openReportSheet();
+        }));
         break;
       case 'Completed':
         if (isCreator) {
-          actions.add(actionDefs('Paid', Icons.attach_money, () { _showPaidInfo(); }));
-          actions.add(actionDefs('Reviews', Icons.reviews, () { _openReviewDialog(readOnlyIfExists: true); }));
+          actions.add(actionDefs('Paid', Icons.attach_money, () {
+            _showPaidInfo();
+          }));
+          actions.add(actionDefs('Reviews', Icons.reviews, () {
+            _openReviewDialog(readOnlyIfExists: true);
+          }));
           actions.add(actionDefs('Block', Icons.block, () async {
-            await confirmDialog(title: 'Block User', content: 'Block this user?', onConfirm: () {});
+            await confirmDialog(
+                title: 'Block User',
+                content: 'Block this user?',
+                onConfirm: () async {
+                  final opponentId = _getOpponentUserId();
+                  if (opponentId == null) return;
+                  try {
+                    await ChatService()
+                        .blockUser(targetUserId: opponentId, block: true);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('User blocked.')));
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Block failed: $e')));
+                    }
+                  }
+                });
           }));
         } else {
-          actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
-          actions.add(actionDefs('Block', Icons.block, () async { await confirmDialog(title: 'Block User', content: 'Block this user?', onConfirm: () {}); }));
+          actions.add(actionDefs('Report', Icons.article, () {
+            _openReportSheet();
+          }));
+          actions.add(actionDefs('Block', Icons.block, () async {
+            await confirmDialog(
+                title: 'Block User',
+                content: 'Block this user?',
+                onConfirm: () async {
+                  final opponentId = _getOpponentUserId();
+                  if (opponentId == null) return;
+                  try {
+                    await ChatService()
+                        .blockUser(targetUserId: opponentId, block: true);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('User blocked.')));
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Block failed: $e')));
+                    }
+                  }
+                });
+          }));
         }
         break;
       default:
         // 其他（Rejected/Closed/Canceled）
-        actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
-        actions.add(actionDefs('Block', Icons.block, () async { await confirmDialog(title: 'Block User', content: 'Block this user?', onConfirm: () {}); }));
+        actions.add(actionDefs('Report', Icons.article, () {
+          _openReportSheet();
+        }));
+        actions.add(actionDefs('Block', Icons.block, () async {
+          await confirmDialog(
+              title: 'Block User',
+              content: 'Block this user?',
+              onConfirm: () async {
+                final opponentId = _getOpponentUserId();
+                if (opponentId == null) return;
+                try {
+                  await ChatService()
+                      .blockUser(targetUserId: opponentId, block: true);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('User blocked.')));
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Block failed: $e')));
+                  }
+                }
+              });
+        }));
         break;
     }
 
     return actions
-        .map((a) => _actionButton(a['icon'] as IconData, a['label'] as String, a['onTap'] as VoidCallback))
+        .map((a) => _actionButton(a['icon'] as IconData, a['label'] as String,
+            a['onTap'] as VoidCallback))
         .toList();
   }
 
@@ -1429,8 +1773,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       context: context,
       isScrollControlled: true,
       builder: (context) {
+        final descriptionCtrl = TextEditingController();
+        String? selectedReason;
         return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
           child: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -1438,19 +1785,74 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Report', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('Report',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
                   const Text('Reason'),
-                  // TODO: radio 選項（含 Request Dispute）
+                  const SizedBox(height: 6),
+                  StatefulBuilder(builder: (context, setState) {
+                    Widget reasonTile(String value, String label) {
+                      return RadioListTile<String>(
+                        title: Text(label),
+                        value: value,
+                        groupValue: selectedReason,
+                        onChanged: (v) => setState(() => selectedReason = v),
+                      );
+                    }
+
+                    return Column(
+                      children: [
+                        reasonTile('abuse', 'Abusive behavior'),
+                        reasonTile('spam', 'Spam or scam'),
+                        reasonTile('harassment', 'Harassment'),
+                        reasonTile('dispute', 'Request Dispute'),
+                      ],
+                    );
+                  }),
                   const SizedBox(height: 8),
                   const Text('Description (min 10 chars)'),
-                  const TextField(maxLines: 4),
+                  TextField(maxLines: 4, controller: descriptionCtrl),
                   const SizedBox(height: 8),
-                  ElevatedButton.icon(onPressed: () {}, icon: const Icon(Icons.photo), label: const Text('Upload evidence')),
+                  ElevatedButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.photo),
+                      label: const Text('Upload evidence (coming soon)')),
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Submit')),
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final roomId = _currentRoomId;
+                        if (roomId == null ||
+                            selectedReason == null ||
+                            (descriptionCtrl.text.trim().length < 10)) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                              content: Text(
+                                  'Please select a reason and enter at least 10 characters description.')));
+                          return;
+                        }
+                        try {
+                          await ChatService().reportChat(
+                            roomId: roomId,
+                            reason: selectedReason!,
+                            description: descriptionCtrl.text.trim(),
+                          );
+                          if (mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Report submitted.')));
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Report failed: $e')));
+                          }
+                        }
+                      },
+                      child: const Text('Submit'),
+                    ),
                   )
                 ],
               ),
@@ -1472,12 +1874,16 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         return StatefulBuilder(builder: (context, setState) {
           Widget buildStars(int value, ValueChanged<int> onChanged) {
             return Row(
-              children: List.generate(5, (i) => IconButton(
-                icon: Icon(i < value ? Icons.star : Icons.star_border, color: Colors.amber),
-                onPressed: () => onChanged(i + 1),
-              )),
+              children: List.generate(
+                  5,
+                  (i) => IconButton(
+                        icon: Icon(i < value ? Icons.star : Icons.star_border,
+                            color: Colors.amber),
+                        onPressed: () => onChanged(i + 1),
+                      )),
             );
           }
+
           return AlertDialog(
             title: const Text('Review & Pay'),
             content: SingleChildScrollView(
@@ -1492,23 +1898,59 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                   buildStars(experience, (v) => setState(() => experience = v)),
                   const SizedBox(height: 8),
                   const Text('Comment (<= 100 chars)'),
-                  TextField(controller: commentCtrl, maxLength: 100, maxLines: 3),
+                  TextField(
+                      controller: commentCtrl, maxLength: 100, maxLines: 3),
                   const Divider(height: 24),
                   const Text('Payment Code (6 digits) — Enter twice'),
-                  TextField(controller: code1, keyboardType: TextInputType.number, maxLength: 6),
-                  TextField(controller: code2, keyboardType: TextInputType.number, maxLength: 6),
+                  TextField(
+                      controller: code1,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6),
+                  TextField(
+                      controller: code2,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6),
                 ],
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-              ElevatedButton(onPressed: () {
-                if (code1.text.length == 6 && code1.text == code2.text) {
-                  // TODO: 轉點 / 寫入評論 / 更新狀態 completed
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Task completed and paid.')));
-                }
-              }, child: const Text('Pay')),
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () async {
+                  if (!(code1.text.length == 6 && code1.text == code2.text)) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content:
+                            Text('Please enter two identical 6-digit codes.')));
+                    return;
+                  }
+                  try {
+                    await TaskService().payAndReview(
+                      taskId: widget.data['task']['id'].toString(),
+                      ratingService: service,
+                      ratingAttitude: attitude,
+                      ratingExperience: experience,
+                      comment: commentCtrl.text.trim().isEmpty
+                          ? null
+                          : commentCtrl.text.trim(),
+                      paymentCode1: code1.text,
+                      paymentCode2: code2.text,
+                    );
+                    if (mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('Task completed and paid.')));
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Pay failed: $e')));
+                    }
+                  }
+                },
+                child: const Text('Pay'),
+              ),
             ],
           );
         });
@@ -1523,164 +1965,93 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         title: const Text('Paid Info'),
         content: const Text('Show paid timestamp and transfer details here.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close')),
         ],
       ),
     );
   }
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Double Check'),
-                      content: const Text(
-                          'Are you sure you want to accept this applier for this task?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            TaskService().updateTaskStatus(
-                              widget.data['task']['id'].toString(),
-                              TaskStatus.statusString['in_progress']!,
-                              statusCode: 'in_progress',
-                            );
-                            GlobalChatRoom().removeRoomsByTaskIdExcept(
-                              widget.data['task']['id'].toString(),
-                              widget.data['room']['roomId'].toString(),
-                            );
-                            setState(() {});
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content:
-                                      Text('Task accepted. Now in progress.')),
-                            );
-                          },
-                          child: const Text('Confirm'),
-                        ),
-                      ],
-                    ),
-                  );
-                } else if (action['label'] == 'Confirm') {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Double Check'),
-                      content: const Text(
-                          'Are you sure you want to confirm this task?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            TaskService taskService = TaskService();
-                            taskService.updateTaskStatus(
-                              widget.data['room']['taskId'].toString(),
-                              TaskStatus.statusString['completed']!,
-                              statusCode: 'completed',
-                            );
-                            setState(() {});
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text(
-                                      'Task confirmed! Reward point paid to the creator.')),
-                            );
-                          },
-                          child: const Text('Confirm'),
-                        ),
-                      ],
-                    ),
-                  );
-                } else if (action['label'] == 'Pay') {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Double Check'),
-                      content: const Text(
-                          'Are you sure you want to complete this task with payment?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            TaskService().updateTaskStatus(
-                              widget.data['task']['id'].toString(),
-                              TaskStatus.statusString['completed']!,
-                              statusCode: 'completed',
-                            );
-                            setState(() {});
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text(
-                                      'Task marked as completed with payment.')),
-                            );
-                          },
-                          child: const Text('Confirm'),
-                        ),
-                      ],
-                    ),
-                  );
-                } else if (action['label'] == 'Completed') {
-                  // In Progress (Tasker) 的 Completed 按鈕功能
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Double Check'),
-                      content: const Text(
-                          'Are you sure you have completed this task?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Cancel'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            // 在切換到 pending_confirmation_tasker 狀態時，加入 pendingStart 記錄
-                            widget.data['task']['pendingStart'] =
-                                DateTime.now().toIso8601String();
-                            TaskService().updateTaskStatus(
-                              widget.data['task']['id'].toString(),
-                              TaskStatus
-                                  .statusString['pending_confirmation_tasker']!,
-                              statusCode: 'pending_confirmation',
-                            );
-                            // 重新初始化倒數
-                            setState(() {
-                              taskPendingStart = DateTime.parse(
-                                  widget.data['task']['pendingStart']);
-                              taskPendingEnd = taskPendingStart
-                                  .add(const Duration(seconds: 5));
-                              remainingTime =
-                                  taskPendingEnd.difference(DateTime.now());
-                              countdownCompleted = false;
-                              countdownTicker = Ticker(_onTick)..start();
-                            });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content:
-                                      Text('Waiting for poster confirmation.')),
-                            );
-                          },
-                          child: const Text('Confirm'),
-                        ),
-                      ],
-                    ),
-                  );
-                } else {
-                  // TODO: Define other button behaviors here
-                }
-              },
-            ))
-        .toList();
+
+  void _openReviewDialog({bool readOnlyIfExists = false}) {
+    // 簡易評論視窗骨架（之後串接後端/查已有評論改為唯讀）
+    int service = 0, attitude = 0, experience = 0;
+    final commentCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          Widget buildStars(int value, ValueChanged<int> onChanged) {
+            return Row(
+              children: List.generate(
+                5,
+                (i) => IconButton(
+                  icon: Icon(i < value ? Icons.star : Icons.star_border,
+                      color: Colors.amber),
+                  onPressed: readOnlyIfExists ? null : () => onChanged(i + 1),
+                ),
+              ),
+            );
+          }
+
+          return AlertDialog(
+            title: const Text('Reviews'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Service'),
+                  buildStars(service, (v) => setState(() => service = v)),
+                  const Text('Attitude'),
+                  buildStars(attitude, (v) => setState(() => attitude = v)),
+                  const Text('Experience'),
+                  buildStars(experience, (v) => setState(() => experience = v)),
+                  const SizedBox(height: 8),
+                  const Text('Comment (<= 100 chars)'),
+                  TextField(
+                      controller: commentCtrl,
+                      maxLength: 100,
+                      maxLines: 3,
+                      enabled: !readOnlyIfExists),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close')),
+              if (!readOnlyIfExists)
+                ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      await TaskService().submitReview(
+                        taskId: widget.data['task']['id'].toString(),
+                        ratingService: service,
+                        ratingAttitude: attitude,
+                        ratingExperience: experience,
+                        comment: commentCtrl.text.trim().isEmpty
+                            ? null
+                            : commentCtrl.text.trim(),
+                      );
+                      if (mounted) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Review submitted.')));
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('Submit review failed: $e')));
+                      }
+                    }
+                  },
+                  child: const Text('Submit'),
+                ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Color _getStatusChipColor(String status) {

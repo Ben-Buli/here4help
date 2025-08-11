@@ -48,10 +48,58 @@ try {
     Response::validationError(['room_id' => 'required', 'message' => 'required']);
   }
 
-  // Ensure room exists - 檢查房間是否存在，如果不存在則跳過（房間應該由 ensure_room.php 創建）
-  $existingRoom = $db->fetch("SELECT id FROM chat_rooms WHERE id = ?", [$room_id]);
+  // Ensure room exists & fetch related task
+  $existingRoom = $db->fetch("SELECT id, task_id FROM chat_rooms WHERE id = ?", [$room_id]);
   if (!$existingRoom) {
     Response::error('Chat room not found', 404);
+  }
+
+  // Block messaging for completed/closed/canceled/rejected tasks（相容多種欄位）
+  if (!empty($existingRoom['task_id'])) {
+    try {
+      $task = $db->fetch("SELECT * FROM tasks WHERE id = ?", [$existingRoom['task_id']]);
+      if ($task) {
+        $statusCandidates = [];
+        foreach (['status', 'status_code', 'status_display'] as $k) {
+          if (isset($task[$k]) && $task[$k] !== '') $statusCandidates[] = strtolower((string)$task[$k]);
+        }
+        if (isset($task['status_id']) && $task['status_id'] !== null) {
+          $statusCandidates[] = 'id:'.(string)$task['status_id'];
+        }
+        $st = implode(' ', $statusCandidates);
+        if (
+          strpos($st, 'complete') !== false ||
+          strpos($st, 'close') !== false ||
+          strpos($st, 'cancel') !== false ||
+          strpos($st, 'reject') !== false
+        ) {
+          Response::error('Messaging disabled for this task status', 403);
+        }
+      }
+    } catch (Exception $e) {
+      // 若任務欄位不同步，不阻斷發送（放行）
+    }
+  }
+
+  // 封鎖檢查：若雙方有任一方封鎖對方，禁止發送（若表不存在則自動建立）
+  $opponentIdRow = $db->fetch("SELECT CASE WHEN creator_id = ? THEN participant_id ELSE creator_id END AS opponent_id FROM chat_rooms WHERE id = ?", [$user_id, $room_id]);
+  if ($opponentIdRow && isset($opponentIdRow['opponent_id'])) {
+    $oppId = (int)$opponentIdRow['opponent_id'];
+    // 確保 user_blocks 表存在
+    try {
+      $db->query("CREATE TABLE IF NOT EXISTS user_blocks (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT UNSIGNED NOT NULL,
+        target_user_id BIGINT UNSIGNED NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_user_target (user_id, target_user_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    } catch (Exception $e) {}
+
+    $blocked = $db->fetch("SELECT 1 FROM user_blocks WHERE (user_id = ? AND target_user_id = ?) OR (user_id = ? AND target_user_id = ?) LIMIT 1", [$user_id, $oppId, $oppId, $user_id]);
+    if ($blocked) {
+      Response::error('Messaging blocked between users', 403);
+    }
   }
 
   // Insert message（相容舊欄位 content）

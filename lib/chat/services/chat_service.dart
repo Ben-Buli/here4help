@@ -144,6 +144,33 @@ class ChatService {
     }
   }
 
+  /// 上傳聊天附件（回傳檔名與 URL），限制檔案大小與副檔名由後端處理
+  Future<Map<String, dynamic>> uploadAttachment({
+    required String roomId,
+    required String filePath,
+  }) async {
+    final token = await AuthService.getToken();
+    if (token == null) {
+      throw Exception('未登入');
+    }
+    final uri = Uri.parse(AppConfig.chatUploadAttachmentUrl);
+    final request = http.MultipartRequest('POST', uri)
+      ..headers.addAll({'Authorization': 'Bearer $token'})
+      ..fields['room_id'] = roomId
+      ..files.add(await http.MultipartFile.fromPath('file', filePath));
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return Map<String, dynamic>.from(data['data'] ?? {});
+      }
+      throw Exception(data['message'] ?? '上傳失敗');
+    } else {
+      throw Exception('HTTP ${response.statusCode}: 上傳失敗');
+    }
+  }
+
   /// 確保聊天房間存在
   Future<Map<String, dynamic>> ensureRoom({
     required String taskId,
@@ -299,5 +326,85 @@ class ChatService {
       };
     }
     return null;
+  }
+
+  /// 檢舉聊天（含證據上傳占位，實際檔案上傳改為後續 API）
+  Future<Map<String, dynamic>> reportChat({
+    required String roomId,
+    required String reason,
+    String? description,
+    List<String>? evidenceTempNames,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('未登入');
+      }
+
+      final uri = Uri.parse(AppConfig.chatReportUrl);
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'room_id': roomId,
+          'reason': reason,
+          if (description != null) 'description': description,
+          if (evidenceTempNames != null) 'evidence': evidenceTempNames,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return Map<String, dynamic>.from(data['data'] ?? {});
+        }
+        throw Exception(data['message'] ?? '檢舉失敗');
+      } else {
+        throw Exception('HTTP ${response.statusCode}: 檢舉失敗');
+      }
+    } catch (e) {
+      throw Exception('檢舉失敗: $e');
+    }
+  }
+
+  /// 封鎖/解除封鎖使用者
+  Future<Map<String, dynamic>> blockUser({
+    required int targetUserId,
+    required bool block,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('未登入');
+      }
+
+      final uri = Uri.parse(AppConfig.chatBlockUserUrl);
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'target_user_id': targetUserId,
+          'block': block ? 1 : 0,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return Map<String, dynamic>.from(data['data'] ?? {});
+        }
+        throw Exception(data['message'] ?? '封鎖操作失敗');
+      } else {
+        throw Exception('HTTP ${response.statusCode}: 封鎖操作失敗');
+      }
+    } catch (e) {
+      throw Exception('封鎖操作失敗: $e');
+    }
   }
 }

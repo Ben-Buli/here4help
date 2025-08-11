@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 // 統一任務狀態映射常量
 class TaskStatus {
   // 狀態名稱映射
@@ -33,6 +35,28 @@ class TaskStatus {
     'dispute': 3,
     'completed': 4,
   };
+
+  // 根據主題色系生成對應的狀態配色
+  // 回傳各顯示狀態對應的前景/背景色與進度權重
+  static Map<String, ({double intensity, Color fg, Color bg})> themedColors(
+      ColorScheme scheme) {
+    Color muted(Color base, [double opacity = 0.12]) =>
+        base.withOpacity(opacity);
+    final Color primary = scheme.primary;
+    final Color secondary = scheme.secondary;
+    final Color warning = scheme.tertiary; // 近似警告/等待
+    final Color neutral = scheme.surfaceVariant;
+
+    return {
+      'Open': (intensity: 0.0, fg: primary, bg: muted(primary)),
+      'In Progress': (intensity: 0.25, fg: secondary, bg: muted(secondary)),
+      'Pending Confirmation': (intensity: 0.5, fg: warning, bg: muted(warning)),
+      'Completed': (intensity: 1.0, fg: scheme.onSurface, bg: muted(neutral)),
+      'Dispute': (intensity: 0.75, fg: scheme.error, bg: muted(scheme.error)),
+      'Applying': (intensity: 0.0, fg: primary, bg: muted(primary)),
+      'Rejected': (intensity: 0.0, fg: scheme.onSurface, bg: muted(neutral)),
+    };
+  }
 
   // 獲取顯示狀態
   static String getDisplayStatus(String status) {

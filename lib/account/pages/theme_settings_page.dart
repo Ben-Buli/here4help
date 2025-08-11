@@ -185,6 +185,13 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
                           color: representativeTheme.backgroundGradient == null
                               ? representativeTheme.primary
                               : null,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -292,11 +299,16 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
                   Container(
                     height: 56,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: themeManager.appBarGradient,
-                      ),
+                      gradient: themeManager.appBarGradient.isNotEmpty
+                          ? LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: themeManager.appBarGradient,
+                            )
+                          : null,
+                      color: themeManager.appBarGradient.isNotEmpty
+                          ? null
+                          : themeManager.navigationBarBackground,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -603,7 +615,7 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
       case AppThemeMode.light:
         return 'Light Mode';
       case AppThemeMode.dark:
-        return 'Dark Mode';
+        return 'Dark Mode (Beta)';
       case AppThemeMode.system:
         return 'System Default';
     }
@@ -621,6 +633,11 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     // Business 主題使用不透明背景
     if (currentTheme.name.contains('business')) {
       return Colors.white; // 純白色，不透明
+    }
+
+    // Blue Grey 主題：下拉選單改為純色（使用 surface 對應的實色）
+    if (currentTheme.name.contains('glassmorphism_blue_grey')) {
+      return const Color(0xFFFFFFFF); // 純白更清晰
     }
 
     // 其他主題使用半透明背景

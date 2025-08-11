@@ -42,6 +42,10 @@ class ThemeScheme {
   final Color warningBackground; // 警告背景色
   final Color errorBackground; // 錯誤背景色
 
+  // 新增 AppBar 標題與次標題顏色（可選）。若未提供，將在 ThemeConfigManager 中自動推導
+  final Color? appBarTitleColor;
+  final Color? appBarSubtitleColor;
+
   const ThemeScheme({
     required this.name,
     required this.displayName,
@@ -78,6 +82,8 @@ class ThemeScheme {
     this.successBackground = const Color(0xFFD1FAE5), // 淺綠色
     this.warningBackground = const Color(0xFFFEF3C7), // 淺橙色
     this.errorBackground = const Color(0xFFFEE2E2), // 淺紅色
+    this.appBarTitleColor,
+    this.appBarSubtitleColor,
   });
 
   /// 主要風格 - 毛玻璃紫色系 (Main Style)
@@ -525,12 +531,14 @@ class ThemeScheme {
     gradientEnd: Alignment(1.0, 1.0), // 45度漸層 - 右下角
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
+    appBarTitleColor: Colors.white,
+    appBarSubtitleColor: Colors.white,
   );
 
   /// 簡約靜物主題 - 基於簡約靜物色卡
   static const ThemeScheme minimalistStill = ThemeScheme(
     name: 'minimalist_still',
-    displayName: 'Minimalist Still',
+    displayName: 'Old Street',
     primary: Color(0xFF5A6B7A), // 深藍灰色
     secondary: Color(0xFF6B7A8A), // 中藍灰色
     accent: Color(0xFF87CEEB), // 天空藍
@@ -548,6 +556,8 @@ class ThemeScheme {
     outlineVariant: Color(0xFF5A6B7A), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
+    appBarTitleColor: Colors.white,
+    appBarSubtitleColor: Colors.white,
   );
 
   /// 毛玻璃模糊主題 - 支援背景模糊效果
@@ -573,6 +583,411 @@ class ThemeScheme {
     surfaceBlur: 5.0, // 表面模糊 5px
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
+  );
+
+  /// Taiwan - Taipei（取自：Timeless Gray / Vibrant Pink / Revitalizing Green）
+  /// 不使用漸層，採用溫潤米白背景與高可讀性前景
+  static const ThemeScheme taipei = ThemeScheme(
+    name: 'taipei_2019_pantone',
+    displayName: 'Taipei',
+    primary: Color(0xFF9FB65A), // Revitalizing Green 作為主要互動色
+    secondary: Color(0xFFE58FB0), // Vibrant Pink 作為次要強調
+    accent: Color(0xFFB6C77A), // 綠色的較亮版本
+    background: Color(0xFFF7F5F2), // 溫潤米白背景
+    surface: Color(0xFFFAF8F5), // 卡片/面板
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFFFFFFFF),
+    onBackground: Color(0xFF3B3B3B), // Timeless Gray 系列深灰
+    onSurface: Color(0xFF3B3B3B),
+    error: Color(0xFFB00020),
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF2E7D32),
+    warning: Color(0xFF9C6F19),
+    shadow: Color(0x1A000000),
+    outlineVariant: Color(0xFFCEC8C0),
+    backArrowColor: Color(0xFF3B3B3B),
+    backArrowColorInactive: Color(0x803B3B3B),
+    cardBackground: Color(0xFFFAF8F5),
+    cardBorder: Color(0xFFE6E0D7),
+    inputBackground: Color(0xFFFAF8F5),
+    inputBorder: Color(0xFFDCD4CA),
+    hintText: Color(0xFF7A746C),
+    disabledText: Color(0xFF9D968D),
+    divider: Color(0xFFEFEAE3),
+    overlay: Color(0x33000000),
+    successBackground: Color(0xFFDDE7D8),
+    warningBackground: Color(0xFFF3E8D5),
+    errorBackground: Color(0xFFF4DADA),
+    appBarTitleColor: Colors.white,
+    appBarSubtitleColor: Colors.white,
+  );
+
+  /// Taiwan - Taipei 101：夜晚藍天 + 冷白燈飾 + 建築深藍灰
+  static const ThemeScheme taipei101 = ThemeScheme(
+    name: 'taipei_101',
+    displayName: 'Taipei 101',
+    primary: Color(0xFF4DA3FF), // 亮藍（街區冷白燈偏藍）
+    secondary: Color(0xFF40C4FF), // 天色偏亮藍
+    accent: Color(0xFF82B1FF),
+    background: Color(0xFFEFF5FF), // 微藍的冷白背景
+    surface: Color(0xFFF7FAFF),
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFF0D1B2A),
+    onBackground: Color(0xFF273043), // 建築與夜色的深藍灰
+    onSurface: Color(0xFF273043),
+    error: Color(0xFFB00020),
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF2E7D32),
+    warning: Color(0xFF9C6F19),
+    shadow: Color(0x1A000000),
+    outlineVariant: Color(0xFFBFD4F2),
+    backArrowColor: Color(0xFF273043),
+    backArrowColorInactive: Color(0x80273043),
+    cardBackground: Color(0xFFF7FAFF),
+    cardBorder: Color(0xFFD6E6FF),
+    inputBackground: Color(0xFFF7FAFF),
+    inputBorder: Color(0xFFC9DBF4),
+    hintText: Color(0xFF6B7A90),
+    disabledText: Color(0xFF90A4B8),
+    divider: Color(0xFFE3EEFF),
+    overlay: Color(0x33000000),
+    successBackground: Color(0xFFD7F0E0),
+    warningBackground: Color(0xFFF3EBD6),
+    errorBackground: Color(0xFFF6DADA),
+    appBarTitleColor: Colors.white,
+    appBarSubtitleColor: Colors.white,
+  );
+
+  /// LGBTQ+ - 彩虹驕傲六色主題（Red/Orange/Yellow/Green/Blue/Violet）
+  static const ThemeScheme rainbowPride = ThemeScheme(
+    name: 'rainbow_pride',
+    displayName: 'Rainbow Pride',
+    primary: Color(0xFF004DFF), // Blue 作為主要互動色（穩定、可讀）
+    secondary: Color(0xFF750787), // Violet 作為次要色
+    accent: Color(0xFFFFED00), // Yellow 作為點綴
+    background: Color(0xFFFAFAFA),
+    surface: Color(0xFFFFFFFF),
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFFFFFFFF),
+    onBackground: Color(0xFF1F2937),
+    onSurface: Color(0xFF1F2937),
+    error: Color(0xFFE40303), // Red（依旗幟紅）
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF008026), // Green
+    warning: Color(0xFFFF8C00), // Orange
+    shadow: Color(0x1A000000),
+    outlineVariant: Color(0xFFE5E7EB),
+    backArrowColor: Color(0xFF1F2937),
+    backArrowColorInactive: Color(0x801F2937),
+    cardBackground: Color(0xFFFFFFFF),
+    cardBorder: Color(0xFFE5E7EB),
+    inputBackground: Color(0xFFFFFFFF),
+    inputBorder: Color(0xFFD1D5DB),
+    hintText: Color(0xFF6B7280),
+    disabledText: Color(0xFF9CA3AF),
+    divider: Color(0xFFF3F4F6),
+    overlay: Color(0x33000000),
+    successBackground: Color(0xFFE6F4EA),
+    warningBackground: Color(0xFFFFF4E5),
+    errorBackground: Color(0xFFFDE8E8),
+    // 45° 背景漸層（降低飽和度的一階柔和版）
+    backgroundGradient: [
+      Color(0xFFE65C5C), // softer + darker red
+      Color(0xFFF2A64F), // softer + darker orange
+      Color(0xFFF2E86A), // softer + darker yellow
+      Color(0xFF52AE6B), // softer + darker green
+      Color(0xFF4A79EA), // softer + darker blue
+      Color(0xFFA262AD), // softer + darker violet
+    ],
+    gradientBegin: Alignment(-1.0, -1.0),
+    gradientEnd: Alignment(1.0, 1.0),
+  );
+
+  /// LGBTQ+ - Trans（Light Blue / White / Pink 漸層）
+  static const ThemeScheme trans = ThemeScheme(
+    name: 'trans',
+    displayName: 'Trans',
+    primary: Color(0xFF55CDFC), // Light Blue
+    secondary: Color(0xFFF7A8B8), // Pink
+    accent: Color(0xFFFFFFFF), // White（作為點綴）
+    background: Color(0xFFFDFDFE),
+    surface: Color(0xFFFFFFFF),
+    onPrimary: Color(0xFF0F172A),
+    onSecondary: Color(0xFF0F172A),
+    onBackground: Color(0xFF111827),
+    onSurface: Color(0xFF111827),
+    error: Color(0xFFB00020),
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF16A34A),
+    warning: Color(0xFFF59E0B),
+    shadow: Color(0x1A000000),
+    outlineVariant: Color(0xFFE5E7EB),
+    backArrowColor: Color(0xFF111827),
+    backArrowColorInactive: Color(0x80111827),
+    cardBackground: Color(0xFFFFFFFF),
+    cardBorder: Color(0xFFE5E7EB),
+    inputBackground: Color(0xFFFFFFFF),
+    inputBorder: Color(0xFFD1D5DB),
+    hintText: Color(0xFF6B7280),
+    disabledText: Color(0xFF9CA3AF),
+    divider: Color(0xFFF3F4F6),
+    overlay: Color(0x33000000),
+    successBackground: Color(0xFFE7F7ED),
+    warningBackground: Color(0xFFFFF4E5),
+    errorBackground: Color(0xFFFDE8E8),
+    backgroundGradient: [
+      Color(0xFF9ED5F0), // darker light blue
+      Color(0xFFFFFFFF), // white
+      Color(0xFFE8B5C2), // darker pink
+    ],
+    gradientBegin: Alignment(-1.0, -1.0),
+    gradientEnd: Alignment(1.0, 1.0),
+  );
+
+  /// LGBTQ+ - Lesbian（以旗幟橘/粉/洋紅為基礎，UI 取高對比組合）
+  static const ThemeScheme lesbianTheme = ThemeScheme(
+    name: 'lesbian_theme',
+    displayName: 'Lesbian',
+    // 經典旗幟色系：深洋紅/粉紫/橘，採 UI 高對比
+    primary: Color(0xFFA30262), // 深洋紅
+    secondary: Color(0xFFD362A4), // 粉紫
+    accent: Color(0xFFFF9A56), // 橘
+    background: Color(0xFFFEF7F9),
+    surface: Color(0xFFFFFFFF),
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFF1F2937),
+    onBackground: Color(0xFF1F2937),
+    onSurface: Color(0xFF1F2937),
+    error: Color(0xFFB00020),
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF16A34A),
+    warning: Color(0xFFF59E0B),
+    shadow: Color(0x1A000000),
+    outlineVariant: Color(0xFFF1D2E5),
+    backArrowColor: Color(0xFF1F2937),
+    backArrowColorInactive: Color(0x801F2937),
+    cardBackground: Color(0xFFFFFFFF),
+    cardBorder: Color(0xFFE5E7EB),
+    inputBackground: Color(0xFFFFFFFF),
+    inputBorder: Color(0xFFD1D5DB),
+    hintText: Color(0xFF6B7280),
+    disabledText: Color(0xFF9CA3AF),
+    divider: Color(0xFFF3F4F6),
+    overlay: Color(0x33000000),
+    successBackground: Color(0xFFE6F4EA),
+    warningBackground: Color(0xFFFFF4E5),
+    errorBackground: Color(0xFFFDE8E8),
+    backgroundGradient: [
+      Color(0xFFC05890), // darker magenta
+      Color(0xFFD496B6), // darker pink purple
+      Color(0xFFF2B67F), // darker orange
+    ],
+    gradientBegin: Alignment(-1.0, -1.0),
+    gradientEnd: Alignment(1.0, 1.0),
+  );
+
+  /// LGBTQ+ - Non-binary（黃/白/紫/黑，UI 取紫為 primary、黃為 secondary）
+  static const ThemeScheme nonBinaryTheme = ThemeScheme(
+    name: 'non_binary_theme',
+    displayName: 'Non-binary',
+    primary: Color(0xFF9B59D0), // 紫
+    secondary: Color(0xFFFFF433), // 黃
+    accent: Color(0xFF111111), // 黑
+    background: Color(0xFFFBFBFD),
+    surface: Color(0xFFFFFFFF),
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFF111827),
+    onBackground: Color(0xFF111827),
+    onSurface: Color(0xFF111827),
+    error: Color(0xFFB00020),
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF16A34A),
+    warning: Color(0xFFF59E0B),
+    shadow: Color(0x1A000000),
+    outlineVariant: Color(0xFFE5E7EB),
+    backArrowColor: Color(0xFF111827),
+    backArrowColorInactive: Color(0x80111827),
+    cardBackground: Color(0xFFFFFFFF),
+    cardBorder: Color(0xFFE5E7EB),
+    inputBackground: Color(0xFFFFFFFF),
+    inputBorder: Color(0xFFD1D5DB),
+    hintText: Color(0xFF6B7280),
+    disabledText: Color(0xFF9CA3AF),
+    divider: Color(0xFFF3F4F6),
+    overlay: Color(0x33000000),
+    successBackground: Color(0xFFE7F7ED),
+    warningBackground: Color(0xFFFFF4E5),
+    errorBackground: Color(0xFFFDE8E8),
+    backgroundGradient: [
+      Color(0xFFF0EA94), // darker yellow
+      Color(0xFFFFFFFF), // white
+      Color(0xFFB487D3), // darker purple
+      Color(0xFF4A4A4A), // darker gray-black
+    ],
+    gradientBegin: Alignment(-1.0, -1.0),
+    gradientEnd: Alignment(1.0, 1.0),
+  );
+
+  /// LGBTQ+ - Bear Gay（棕/橙/黃/棕褐/白/灰/黑，UI 取溫暖棕橙）
+  static const ThemeScheme bearGayFlat = ThemeScheme(
+    name: 'bear_gay_flat',
+    displayName: 'Bears',
+    primary: Color(0xFFE0812C), // 橙
+    secondary: Color(0xFF5C3A21), // 深棕
+    accent: Color(0xFFF3C55A), // 黃
+    background: Color(0xFFFAF5EF), // 淺棕褐背景
+    surface: Color(0xFFFEFCFA),
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFFFFFFFF),
+    onBackground: Color(0xFF2D2520),
+    onSurface: Color(0xFF2D2520),
+    error: Color(0xFFB00020),
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF2E7D32),
+    warning: Color(0xFF9C6F19),
+    shadow: Color(0x1A000000),
+    outlineVariant: Color(0xFFE6D8C8),
+    backArrowColor: Color(0xFF2D2520),
+    backArrowColorInactive: Color(0x802D2520),
+    cardBackground: Color(0xFFFEFCFA),
+    cardBorder: Color(0xFFEADCCB),
+    inputBackground: Color(0xFFFEFCFA),
+    inputBorder: Color(0xFFE1D3C2),
+    hintText: Color(0xFF7A6E63),
+    disabledText: Color(0xFFA39588),
+    divider: Color(0xFFF0E5D8),
+    overlay: Color(0x33000000),
+    successBackground: Color(0xFFE7F2E5),
+    warningBackground: Color(0xFFF7ECD9),
+    errorBackground: Color(0xFFF6DEDE),
+    backgroundGradient: [
+      Color(0xFF8B6D55), // darker brown
+      Color(0xFFE5A561), // darker soft orange
+      Color(0xFFEAD18F), // darker soft yellow
+      Color(0xFFFFFFFF), // white stripe
+      Color(0xFFB5B5B5), // darker gray stripe
+      Color(0xFF4D4D4D), // darker gray-black
+    ],
+    gradientBegin: Alignment(-1.0, -1.0),
+    gradientEnd: Alignment(1.0, 1.0),
+  );
+
+  /// LGBTQ+ - Pride S-Curve（S 曲線彩虹背景，UI 元素採藍主色以維持可讀性）
+  static const ThemeScheme prideSCurve = ThemeScheme(
+    name: 'pride_s_curve',
+    displayName: 'Pride S-Curve',
+    primary: Color(0xFF4A79EA), // 較穩定的藍色作為互動主色
+    secondary: Color(0xFFA262AD), // 紫作為次色
+    accent: Color(0xFFF2A64F), // 橙作為點綴
+    background: Color(0xFFFAFAFA),
+    surface: Color(0xFFFFFFFF),
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFFFFFFFF),
+    onBackground: Color(0xFF1F2937),
+    onSurface: Color(0xFF1F2937),
+    error: Color(0xFFE65C5C),
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF52AE6B),
+    warning: Color(0xFFF2A64F),
+    shadow: Color(0x1A000000),
+    outlineVariant: Color(0xFFE5E7EB),
+    backArrowColor: Color(0xFF1F2937),
+    backArrowColorInactive: Color(0x801F2937),
+    // 使用 S 曲線繪製，不設 linear 背景漸層
+    appBarTitleColor: Colors.white,
+    appBarSubtitleColor: Colors.white,
+  );
+
+  /// Ocean - Sunset Beach（夕陽粉橘 + 藍紫）
+  static const ThemeScheme sunsetBeach = ThemeScheme(
+    name: 'sunset_beach',
+    displayName: 'Sunset Beach',
+    primary: Color(0xFFFF8A65),
+    secondary: Color(0xFF7E57C2),
+    accent: Color(0xFFFFB3C1),
+    background: Color(0xFFFFF7F2),
+    surface: Color(0xFFFFFFFF),
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFFFFFFFF),
+    onBackground: Color(0xFF2C3E50),
+    onSurface: Color(0xFF2C3E50),
+    error: Color(0xFFE65C5C),
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF2E7D32),
+    warning: Color(0xFFF2A64F),
+    shadow: Color(0x1A000000),
+    outlineVariant: Color(0xFFE6D7CC),
+    backArrowColor: Color(0xFF2C3E50),
+    backArrowColorInactive: Color(0x802C3E50),
+    backgroundGradient: [
+      Color(0xFFFFB08A),
+      Color(0xFFFFC4D2),
+      Color(0xFF9E84FF),
+    ],
+    gradientBegin: Alignment(-1.0, -1.0),
+    gradientEnd: Alignment(1.0, 1.0),
+  );
+
+  /// Ocean - Clownfish（小丑魚：橘/白/黑條紋）
+  static const ThemeScheme clownfish = ThemeScheme(
+    name: 'clownfish',
+    displayName: 'Clownfish',
+    primary: Color(0xFFFF7F2A),
+    secondary: Color(0xFFFFFFFF),
+    accent: Color(0xFF111111),
+    background: Color(0xFFFFFBF6),
+    surface: Color(0xFFFFFFFF),
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFF111111),
+    onBackground: Color(0xFF1F2937),
+    onSurface: Color(0xFF1F2937),
+    error: Color(0xFFB00020),
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF2E7D32),
+    warning: Color(0xFFF59E0B),
+    shadow: Color(0x1A000000),
+    outlineVariant: Color(0xFFEDE3D7),
+    backArrowColor: Color(0xFF1F2937),
+    backArrowColorInactive: Color(0x801F2937),
+    backgroundGradient: [
+      Color(0xFFFF8C3A),
+      Color(0xFFFFFFFF),
+      Color(0xFF333333),
+      Color(0xFFFFFFFF),
+      Color(0xFFFF8C3A),
+    ],
+    gradientBegin: Alignment(-1.0, -1.0),
+    gradientEnd: Alignment(1.0, 1.0),
+  );
+
+  /// Ocean - Patrick Star（粉紅 + 青綠 + 紫色點綴）
+  static const ThemeScheme patrickStar = ThemeScheme(
+    name: 'patrick_star',
+    displayName: 'Patrick Star',
+    primary: Color(0xFFF78DA7),
+    secondary: Color(0xFF8ED081),
+    accent: Color(0xFF9460D6),
+    background: Color(0xFFFFF3F6),
+    surface: Color(0xFFFFFFFF),
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFF0F172A),
+    onBackground: Color(0xFF1F2937),
+    onSurface: Color(0xFF1F2937),
+    error: Color(0xFFB00020),
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF2E7D32),
+    warning: Color(0xFFF59E0B),
+    shadow: Color(0x1A000000),
+    outlineVariant: Color(0xFFEAD5E0),
+    backArrowColor: Color(0xFF1F2937),
+    backArrowColorInactive: Color(0x801F2937),
+    backgroundGradient: [
+      Color(0xFFF9A9BC),
+      Color(0xFFBEE8B6),
+      Color(0xFFB695E6),
+    ],
+    gradientBegin: Alignment(-1.0, -1.0),
+    gradientEnd: Alignment(1.0, 1.0),
   );
 
   /// 毛玻璃藍灰色主題 - Blue Grey 色系
@@ -618,6 +1033,17 @@ class ThemeScheme {
     minimalistStill,
     glassmorphismBlur,
     glassmorphismBlueGrey,
+    taipei,
+    taipei101,
+    rainbowPride,
+    trans,
+    lesbianTheme,
+    nonBinaryTheme,
+    bearGayFlat,
+    prideSCurve,
+    sunsetBeach,
+    clownfish,
+    patrickStar,
   ];
 
   /// 根據名稱獲取主題
@@ -630,8 +1056,7 @@ class ThemeScheme {
 
   /// 轉換為 Material ThemeData
   ThemeData toThemeData() {
-    // 為 Meta 商業風格添加特殊配置
-
+    // 為特定主題（如 taipei_101）提供可選的裝飾背景（此處以無漸層為原則，背景圖樣可由 AppScaffold 另行覆蓋）
     return ThemeData(
       scaffoldBackgroundColor: background,
       splashColor: accent,
@@ -643,7 +1068,7 @@ class ThemeScheme {
         shadowColor: shadow,
         centerTitle: true,
         titleTextStyle: TextStyle(
-          color: onPrimary,
+          color: appBarTitleColor ?? onPrimary,
           fontSize: 20,
           fontWeight: FontWeight.w600,
         ),

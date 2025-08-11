@@ -66,6 +66,185 @@ class TaskService extends ChangeNotifier {
     }
   }
 
+  /// 取得任務分頁（回傳 items 與 hasMore）
+  Future<({List<Map<String, dynamic>> tasks, bool hasMore})> fetchTasksPage({
+    required int limit,
+    required int offset,
+    Map<String, String>? filters,
+  }) async {
+    try {
+      final query = <String, String>{
+        'limit': '$limit',
+        'offset': '$offset',
+      };
+      if (filters != null) {
+        query.addAll(filters);
+      }
+      final uri =
+          Uri.parse(AppConfig.taskListUrl).replace(queryParameters: query);
+      final resp = await http.get(uri, headers: {
+        'Content-Type': 'application/json'
+      }).timeout(const Duration(seconds: 30));
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        if (data['success'] == true) {
+          final payload = data['data'] ?? {};
+          final itemsRaw = payload['tasks'] ?? [];
+          final List<Map<String, dynamic>> items = (itemsRaw is List)
+              ? itemsRaw.map((e) => Map<String, dynamic>.from(e)).toList()
+              : [];
+          final hasMore = (payload['pagination']?['has_more'] ?? false) == true;
+          return (tasks: items, hasMore: hasMore);
+        }
+      }
+      return (tasks: <Map<String, dynamic>>[], hasMore: false);
+    } catch (e) {
+      debugPrint('fetchTasksPage error: $e');
+      return (tasks: <Map<String, dynamic>>[], hasMore: false);
+    }
+  }
+
+  /// Poster 確認完成（自動轉點與異動紀錄由後端處理）
+  Future<Map<String, dynamic>> confirmCompletion({
+    required String taskId,
+  }) async {
+    final resp = await http
+        .post(
+          Uri.parse(AppConfig.taskConfirmCompletionUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'task_id': taskId}),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (resp.statusCode == 200) {
+      final data = jsonDecode(resp.body);
+      if (data['success'] == true) {
+        return Map<String, dynamic>.from(data['data'] ?? {});
+      }
+      throw Exception(data['message'] ?? 'Confirm failed');
+    } else {
+      throw Exception('HTTP ${resp.statusCode}: Confirm failed');
+    }
+  }
+
+  /// Poster 不同意完成（統計拒絕次數由後端處理）
+  Future<Map<String, dynamic>> disagreeCompletion({
+    required String taskId,
+    String? reason,
+  }) async {
+    final body = {'task_id': taskId, if (reason != null) 'reason': reason};
+    final resp = await http
+        .post(
+          Uri.parse(AppConfig.taskDisagreeCompletionUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (resp.statusCode == 200) {
+      final data = jsonDecode(resp.body);
+      if (data['success'] == true) {
+        return Map<String, dynamic>.from(data['data'] ?? {});
+      }
+      throw Exception(data['message'] ?? 'Disagree failed');
+    } else {
+      throw Exception('HTTP ${resp.statusCode}: Disagree failed');
+    }
+  }
+
+  /// 支付並評價（輸入兩次支付碼 + 三項評分 + 評論）
+  Future<Map<String, dynamic>> payAndReview({
+    required String taskId,
+    required int ratingService,
+    required int ratingAttitude,
+    required int ratingExperience,
+    String? comment,
+    required String paymentCode1,
+    required String paymentCode2,
+  }) async {
+    final body = {
+      'task_id': taskId,
+      'ratings': {
+        'service': ratingService,
+        'attitude': ratingAttitude,
+        'experience': ratingExperience,
+      },
+      if (comment != null) 'comment': comment,
+      'payment_code_1': paymentCode1,
+      'payment_code_2': paymentCode2,
+    };
+    final resp = await http
+        .post(
+          Uri.parse(AppConfig.taskPayAndReviewUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (resp.statusCode == 200) {
+      final data = jsonDecode(resp.body);
+      if (data['success'] == true) {
+        return Map<String, dynamic>.from(data['data'] ?? {});
+      }
+      throw Exception(data['message'] ?? 'Pay & Review failed');
+    } else {
+      throw Exception('HTTP ${resp.statusCode}: Pay & Review failed');
+    }
+  }
+
+  /// 送出或更新評論
+  Future<Map<String, dynamic>> submitReview({
+    required String taskId,
+    required int ratingService,
+    required int ratingAttitude,
+    required int ratingExperience,
+    String? comment,
+  }) async {
+    final body = {
+      'task_id': taskId,
+      'ratings': {
+        'service': ratingService,
+        'attitude': ratingAttitude,
+        'experience': ratingExperience,
+      },
+      if (comment != null) 'comment': comment,
+    };
+    final resp = await http
+        .post(
+          Uri.parse(AppConfig.taskReviewsSubmitUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (resp.statusCode == 200) {
+      final data = jsonDecode(resp.body);
+      if (data['success'] == true) {
+        return Map<String, dynamic>.from(data['data'] ?? {});
+      }
+      throw Exception(data['message'] ?? 'Submit review failed');
+    } else {
+      throw Exception('HTTP ${resp.statusCode}: Submit review failed');
+    }
+  }
+
+  /// 取得評論（若有則前端切換唯讀）
+  Future<Map<String, dynamic>?> getReview({
+    required String taskId,
+  }) async {
+    final uri = Uri.parse('${AppConfig.taskReviewsGetUrl}?task_id=$taskId');
+    final resp = await http.get(uri, headers: {
+      'Content-Type': 'application/json'
+    }).timeout(const Duration(seconds: 30));
+    if (resp.statusCode == 200) {
+      final data = jsonDecode(resp.body);
+      if (data['success'] == true) {
+        return data['data'] == null
+            ? null
+            : Map<String, dynamic>.from(data['data']);
+      }
+      return null;
+    } else {
+      return null;
+    }
+  }
+
   /// 取得任務狀態清單（從後端）
   Future<void> loadStatuses({bool force = false}) async {
     if (_statuses.isNotEmpty && !force) return;

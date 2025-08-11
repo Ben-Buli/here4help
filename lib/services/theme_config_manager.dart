@@ -291,14 +291,25 @@ class ThemeConfigManager extends ChangeNotifier {
         baseName.contains('beach') ||
         baseName.contains('sandy')) {
       return 'Ocean';
+    } else if (baseName.contains('milk_tea') ||
+        baseName.contains('minimalist') ||
+        baseName == 'taipei_2019_pantone' ||
+        baseName == 'taipei_101') {
+      // 將 Milk Tea 與 Minimalist 歸類到 Taiwan 分類
+      return 'Taiwan';
     } else if (baseName.contains('business') ||
         baseName.contains('meta') ||
-        baseName.contains('minimalist') ||
-        baseName.contains('milk_tea')) {
-      return 'Business';
-    } else if (baseName.contains('glassmorphism') ||
+        baseName.contains('glassmorphism') ||
         baseName.contains('main_style')) {
-      return 'Glassmorphism';
+      // 將 Glass、Blue Grey、Main 也併入 Business 分類
+      return 'Business';
+    } else if (baseName.contains('rainbow_pride') ||
+        baseName.contains('trans') ||
+        baseName.contains('lesbian_theme') ||
+        baseName.contains('non_binary_theme') ||
+        baseName.contains('bear_gay_flat') ||
+        baseName.contains('pride_s_curve')) {
+      return 'LGBTQ+';
     } else {
       return 'Other';
     }
@@ -508,6 +519,7 @@ class ThemeConfigManager extends ChangeNotifier {
   /// 這個方法確保 AppBar 文字在不同主題下都有良好的可讀性。
   Color get appBarTextColor {
     final theme = effectiveTheme;
+    if (theme.appBarTitleColor != null) return theme.appBarTitleColor!;
     final style = _getThemeStyle(theme);
     switch (style) {
       case 'ocean':
@@ -547,6 +559,13 @@ class ThemeConfigManager extends ChangeNotifier {
         }
         return theme.primary; // 標準主題使用主要色
     }
+  }
+
+  /// AppBar 次標題顏色（若未定義則以標題色 80% 不透明度推導）
+  Color get appBarSubtitleColor {
+    final theme = effectiveTheme;
+    if (theme.appBarSubtitleColor != null) return theme.appBarSubtitleColor!;
+    return appBarTextColor.withOpacity(0.8);
   }
 
   /// 獲取 AppBar 背景漸層
@@ -608,6 +627,15 @@ class ThemeConfigManager extends ChangeNotifier {
             const Color(0xFF26C6DA).withValues(alpha: 0.8), // 淺碧綠色
           ];
         }
+        // LGBTQ+ 分類：AppBar 與 BottomNav 一致（交由 AppScaffold 用 navigationBarBackground 顏色渲染）
+        // 這裡回傳空陣列代表不使用漸層
+        if (theme.name.contains('rainbow_pride') ||
+            theme.name.contains('trans') ||
+            theme.name.contains('lesbian_theme') ||
+            theme.name.contains('non_binary_theme') ||
+            theme.name.contains('bear_gay_flat')) {
+          return [];
+        }
         return [
           theme.primary.withValues(alpha: 0.8),
           theme.secondary.withValues(alpha: 0.6),
@@ -646,6 +674,14 @@ class ThemeConfigManager extends ChangeNotifier {
       case 'business':
         return Colors.white.withValues(alpha: 0.3); // Business 主題使用半透明白色
       default:
+        // LGBTQ+ 類主題：白色液態玻璃
+        if (theme.name.contains('rainbow_pride') ||
+            theme.name.contains('trans') ||
+            theme.name.contains('lesbian_theme') ||
+            theme.name.contains('non_binary_theme') ||
+            theme.name.contains('bear_gay_flat')) {
+          return Colors.white.withValues(alpha: 0.3);
+        }
         // Beach 主題使用碧綠色半透明背景
         if (theme.name == 'beach_sunset' || theme.name == 'beach_sunset_dark') {
           return const Color(0xFF00BCD4).withValues(alpha: 0.3); // 碧綠色半透明

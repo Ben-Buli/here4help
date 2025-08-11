@@ -15,6 +15,11 @@ import 'package:here4help/constants/task_status.dart';
 import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/services/data_preload_service.dart';
 import 'package:provider/provider.dart';
+import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:here4help/config/app_config.dart';
 import 'package:here4help/auth/services/user_service.dart';
 
 class ChatListPage extends StatefulWidget {
@@ -39,13 +44,17 @@ class _ChatListPageState extends State<ChatListPage>
   // Tasker 篩選狀態
   bool taskerFilterEnabled = false;
   late TabController _tabController;
+  static const int _pageSize = 10;
+  final PagingController<int, Map<String, dynamic>> _pagingController =
+      PagingController(firstPageKey: 0);
+  final PagingController<int, Map<String, dynamic>> _myWorksPagingController =
+      PagingController(firstPageKey: 0);
 
   // 未讀通知占位（任務 26 會替換成實作）
   final NotificationService _notificationService =
       NotificationServicePlaceholder();
   Map<String, int> _unreadByTask = const {};
   Map<String, int> _unreadByRoom = const {};
-  int _totalUnread = 0;
   StreamSubscription<int>? _totalSub;
   StreamSubscription<Map<String, int>>? _taskSub;
   StreamSubscription<Map<String, int>>? _roomSub;
@@ -56,6 +65,10 @@ class _ChatListPageState extends State<ChatListPage>
   // 簡化的載入狀態
   bool _isLoading = true;
   String? _errorMessage;
+  bool get _hasActiveFilters =>
+      (selectedLocation != null && selectedLocation!.isNotEmpty) ||
+      (selectedStatus != null && selectedStatus!.isNotEmpty) ||
+      (searchQuery.isNotEmpty);
 
   /// 使用預載入服務初始化數據
   Future<void> _initializeWithPreload() async {
@@ -90,6 +103,176 @@ class _ChatListPageState extends State<ChatListPage>
           _errorMessage = e.toString();
         });
       }
+    }
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _searchController.clear();
+      searchQuery = '';
+      selectedLocation = null;
+      selectedHashtag = null;
+      selectedStatus = null;
+    });
+    // 重新載入分頁
+    _pagingController.refresh();
+  }
+
+  void _openFilterOptions({
+    required List<String> locationOptions,
+    required List<String> statusOptions,
+  }) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) {
+        String tempLocation = selectedLocation ?? '';
+        String tempStatus = selectedStatus ?? '';
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+            left: 16,
+            right: 16,
+            top: 12,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Filter options', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: tempLocation.isEmpty ? null : tempLocation,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Location'),
+                hint: const Text('Any'),
+                items: locationOptions
+                    .map(
+                        (loc) => DropdownMenuItem(value: loc, child: Text(loc)))
+                    .toList(),
+                onChanged: (val) => tempLocation = val ?? '',
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: tempStatus.isEmpty ? null : tempStatus,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Status'),
+                hint: const Text('Any'),
+                items: statusOptions
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                onChanged: (val) => tempStatus = val ?? '',
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        _resetFilters();
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Reset'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          selectedLocation =
+                              tempLocation.isEmpty ? null : tempLocation;
+                          selectedStatus =
+                              tempStatus.isEmpty ? null : tempStatus;
+                        });
+                        Navigator.of(ctx).pop();
+                        _pagingController.refresh();
+                      },
+                      icon: const Icon(Icons.check),
+                      label: const Text('Apply'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _seedIfNeeded() async {
+    try {
+      // 僅開發模式才進行種子資料；避免 dead code 警告
+      final bool isDev = true; // 可切換為 AppConfig.isDevelopment
+      if (!isDev) {
+        return;
+      }
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('has_seeded_chat') == true) return;
+      await http.post(
+        Uri.parse(
+            '${AppConfig.apiBaseUrl}/backend/api/tasks/generate-sample-data.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'count': _pageSize}),
+      );
+      await prefs.setBool('has_seeded_chat', true);
+    } catch (_) {
+      // 忽略種子錯誤以免影響正式流程
+    }
+  }
+
+  Future<void> _fetchPage(int offset) async {
+    await _seedIfNeeded();
+    final service = TaskService();
+    final result =
+        await service.fetchTasksPage(limit: _pageSize, offset: offset);
+    if (!mounted) return;
+    if (result.hasMore) {
+      _pagingController.appendPage(result.tasks, offset + result.tasks.length);
+    } else {
+      _pagingController.appendLastPage(result.tasks);
+    }
+  }
+
+  Future<void> _fetchMyWorksPage(int offset) async {
+    final taskService = TaskService();
+    final currentUserId = context.read<UserService>().currentUser?.id;
+    if (currentUserId != null) {
+      await taskService.loadMyApplications(currentUserId);
+    }
+    final all = _composeMyWorks(taskService, currentUserId);
+    final filtered = all.where((task) {
+      final title = (task['title'] ?? '').toString().toLowerCase();
+      final location = (task['location'] ?? '').toString();
+      final description = (task['description'] ?? '').toString().toLowerCase();
+      final status = _displayStatus(task);
+      final query = searchQuery.toLowerCase();
+      final matchQuery = query.isEmpty ||
+          title.contains(query) ||
+          location.toLowerCase().contains(query) ||
+          description.contains(query);
+      final matchLocation =
+          selectedLocation == null || selectedLocation == location;
+      final matchStatus = selectedStatus == null || selectedStatus == status;
+      return matchQuery && matchLocation && matchStatus;
+    }).toList();
+
+    final start = offset;
+    final end = (offset + _pageSize) > filtered.length
+        ? filtered.length
+        : (offset + _pageSize);
+    final slice = filtered.sublist(start, end);
+    final hasMore = end < filtered.length;
+    if (!mounted) return;
+    if (hasMore) {
+      _myWorksPagingController.appendPage(slice, end);
+    } else {
+      _myWorksPagingController.appendLastPage(slice);
     }
   }
 
@@ -136,6 +319,14 @@ class _ChatListPageState extends State<ChatListPage>
     // 使用預載入服務，如果數據已預載入則立即可用
     _initializeWithPreload();
 
+    // 設定分頁監聽
+    _pagingController.addPageRequestListener((offset) {
+      _fetchPage(offset);
+    });
+    _myWorksPagingController.addPageRequestListener((offset) {
+      _fetchMyWorksPage(offset);
+    });
+
     _tabController =
         TabController(length: 2, vsync: this, initialIndex: widget.initialTab);
     _tabController.addListener(() {
@@ -149,6 +340,9 @@ class _ChatListPageState extends State<ChatListPage>
           selectedHashtag = null;
           selectedStatus = null;
         });
+        // 切換分頁時同步刷新各自分頁控制器
+        _pagingController.refresh();
+        _myWorksPagingController.refresh();
       }
     });
 
@@ -156,7 +350,7 @@ class _ChatListPageState extends State<ChatListPage>
     _notificationService.init(userId: 'placeholder');
     _totalSub = _notificationService.observeTotalUnread().listen((v) {
       if (!mounted) return;
-      setState(() => _totalUnread = v);
+      // 目前未顯示總未讀，僅維持訂閱以後續擴充；不存入狀態避免未使用警告
     });
     _taskSub = _notificationService.observeUnreadByTask().listen((m) {
       if (!mounted) return;
@@ -207,6 +401,8 @@ class _ChatListPageState extends State<ChatListPage>
 
   @override
   void dispose() {
+    _pagingController.dispose();
+    _myWorksPagingController.dispose();
     _tabController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -590,7 +786,7 @@ class _ChatListPageState extends State<ChatListPage>
     );
   }
 
-  /// Returns the text color for status chip.
+  // Deprecated: 目前未使用，若需狀態徽章樣式可再啟用
   Color _getStatusChipColor(String status, String type) {
     // Convert database status to display status if needed
     final displayStatus = TaskStatus.getDisplayStatus(status);
@@ -616,6 +812,7 @@ class _ChatListPageState extends State<ChatListPage>
     }
   }
 
+  // Deprecated: 目前未使用
   Color _getStatusChipBorderColor(String status) {
     // Convert database status to display status if needed
     final displayStatus = TaskStatus.getDisplayStatus(status);
@@ -681,12 +878,12 @@ class _ChatListPageState extends State<ChatListPage>
     }
   }
 
-  /// 修改卡片內容，添加進度條（點擊卡片顯示懸浮視窗）
+  // Deprecated: 目前未使用（保留作為未來進度條樣式的範本）
   Widget _taskCardWithProgressBar(Map<String, dynamic> task) {
     final String displayStatus = _displayStatus(task);
     final progressData = _getProgressData(displayStatus);
     final progress = progressData['progress'];
-    final color = progressData['color'];
+    final color = progressData['color']; // ignore: unused_local_variable
 
     return InkWell(
       onTap: () => _showTaskInfoDialog(task),
@@ -1306,12 +1503,18 @@ class _ChatListPageState extends State<ChatListPage>
       initialIndex: taskerFilterEnabled ? 1 : 0,
       child: Column(
         children: [
-          TabBar(
-            controller: _tabController,
-            tabs: const [
-              Tab(text: 'Posted Tasks'),
-              Tab(text: 'My Works'),
-            ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+            child: TabBar(
+              controller: _tabController,
+              isScrollable: false,
+              labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+              indicatorPadding: EdgeInsets.zero,
+              tabs: const [
+                Tab(text: 'Posted Tasks'),
+                Tab(text: 'My Works'),
+              ],
+            ),
           ),
           // Removed or reduced vertical space above TabBar
           // const SizedBox(height: 8),
@@ -1319,7 +1522,7 @@ class _ChatListPageState extends State<ChatListPage>
             padding: const EdgeInsets.all(12.0),
             child: Row(
               children: [
-                // Search bar
+                // Search bar + inline actions
                 Expanded(
                   child: TextField(
                     controller: _searchController,
@@ -1335,8 +1538,11 @@ class _ChatListPageState extends State<ChatListPage>
                     decoration: InputDecoration(
                       hintText: 'Search...',
                       prefixIcon: const Icon(Icons.search),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_searchController.text.isNotEmpty)
+                            IconButton(
                               icon: const Icon(Icons.clear),
                               onPressed: () {
                                 setState(() {
@@ -1344,8 +1550,29 @@ class _ChatListPageState extends State<ChatListPage>
                                   searchQuery = '';
                                 });
                               },
-                            )
-                          : null,
+                              tooltip: 'Clear',
+                            ),
+                          IconButton(
+                            icon: Icon(Icons.filter_list,
+                                color: _hasActiveFilters
+                                    ? Theme.of(context).colorScheme.primary
+                                    : IconTheme.of(context).color),
+                            tooltip: 'Filter options',
+                            onPressed: () {
+                              _openFilterOptions(
+                                locationOptions: locationOptions,
+                                statusOptions: statusOptions,
+                              );
+                            },
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.refresh,
+                                color: Theme.of(context).colorScheme.primary),
+                            tooltip: 'Reset',
+                            onPressed: _resetFilters,
+                          ),
+                        ],
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -1355,70 +1582,12 @@ class _ChatListPageState extends State<ChatListPage>
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: selectedLocation,
-                    hint: const Text('Location'),
-                    underline: Container(height: 1, color: Colors.grey),
-                    items: locationOptions.map((loc) {
-                      return DropdownMenuItem(value: loc, child: Text(loc));
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedLocation = value;
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Hashtag dropdown commented
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: selectedStatus,
-                    hint: const Text('Status'),
-                    underline: Container(height: 1, color: Colors.grey),
-                    items: statusOptions
-                        .map((status) => DropdownMenuItem(
-                              value: status,
-                              child: Text(status),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedStatus = value;
-                      });
-                    },
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.blue),
-                  tooltip: 'Reset Filters',
-                  onPressed: () {
-                    setState(() {
-                      _searchController.clear();
-                      searchQuery = '';
-                      selectedLocation = null;
-                      selectedHashtag = null;
-                      selectedStatus = null;
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildTaskList(false), // My Post
-                _buildTaskList(true), // My Task
+                _buildPostedTasksPaged(),
+                _buildMyWorksPaged(),
               ],
             ),
           ),
@@ -1429,7 +1598,11 @@ class _ChatListPageState extends State<ChatListPage>
 
   Widget _buildTaskList(bool taskerEnabled) {
     final taskService = TaskService();
-    final currentUserId = context.read<UserService>().currentUser?.id;
+    // currentUserId 僅在下方分支條件中使用
+    final currentUserId = context
+        .read<UserService>()
+        .currentUser
+        ?.id; // ignore: unused_local_variable
     if (taskerEnabled && currentUserId != null) {
       // 確保載入我的應徵
       taskService.loadMyApplications(currentUserId);
@@ -1462,9 +1635,9 @@ class _ChatListPageState extends State<ChatListPage>
     final filteredTasks = tasks.where((task) {
       final title = (task['title'] ?? '').toString().toLowerCase();
       final location = (task['location'] ?? '').toString();
-      final hashtags = (task['hashtags'] as List<dynamic>? ?? [])
-          .map((h) => h.toString())
-          .toList();
+      // final hashtags = (task['hashtags'] as List<dynamic>? ?? [])
+      //     .map((h) => h.toString())
+      //     .toList();
       final status = _displayStatus(task);
       final description = (task['description'] ?? '').toString().toLowerCase();
       final query = searchQuery.toLowerCase();
@@ -1521,6 +1694,71 @@ class _ChatListPageState extends State<ChatListPage>
             return _taskCardWithapplierChatItems(task, applierChatItems);
           }
         }).toList(),
+      ),
+    );
+  }
+
+  // Posted Tasks 分頁 + 保留原卡 UI
+  Widget _buildPostedTasksPaged() {
+    return RefreshIndicator(
+      onRefresh: () async => _pagingController.refresh(),
+      child: PagedListView<int, Map<String, dynamic>>(
+        padding: const EdgeInsets.all(12),
+        pagingController: _pagingController,
+        builderDelegate: PagedChildBuilderDelegate<Map<String, dynamic>>(
+          itemBuilder: (context, task, index) {
+            // 依據原本 Posted Tasks 卡片邏輯構建
+            final taskId = task['id'].toString();
+            final userService = context.read<UserService>();
+            final currentUserId = userService.currentUser?.id;
+            final isMyTask = currentUserId != null &&
+                (task['creator_id'] == currentUserId ||
+                    task['creator_id']?.toString() == currentUserId.toString());
+
+            List<Map<String, dynamic>> applierChatItems;
+            if (isMyTask) {
+              final applications = _applicationsByTask[taskId] ?? [];
+              applierChatItems =
+                  _convertApplicationsToApplierChatItems(applications);
+            } else {
+              applierChatItems = chatRoomModel
+                  .where((applierChatItem) =>
+                      applierChatItem['taskId'] == task['id'])
+                  .toList();
+            }
+            return _taskCardWithapplierChatItems(task, applierChatItems);
+          },
+          firstPageProgressIndicatorBuilder: (context) =>
+              const Center(child: CircularProgressIndicator()),
+          newPageProgressIndicatorBuilder: (context) =>
+              const Center(child: CircularProgressIndicator()),
+          noItemsFoundIndicatorBuilder: (context) =>
+              const Center(child: Text('No tasks found')),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMyWorksPaged() {
+    return RefreshIndicator(
+      onRefresh: () async => _myWorksPagingController.refresh(),
+      child: PagedListView<int, Map<String, dynamic>>(
+        padding: const EdgeInsets.all(12),
+        pagingController: _myWorksPagingController,
+        builderDelegate: PagedChildBuilderDelegate<Map<String, dynamic>>(
+          itemBuilder: (context, task, index) {
+            final applierChatItems = chatRoomModel
+                .where((room) => room['taskId'] == task['id'])
+                .toList();
+            return _buildMyWorksChatRoomItem(task, applierChatItems);
+          },
+          firstPageProgressIndicatorBuilder: (context) =>
+              const Center(child: CircularProgressIndicator()),
+          newPageProgressIndicatorBuilder: (context) =>
+              const Center(child: CircularProgressIndicator()),
+          noItemsFoundIndicatorBuilder: (context) =>
+              const Center(child: Text('No tasks found')),
+        ),
       ),
     );
   }
@@ -2048,10 +2286,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
         ? (_unreadByRoom[applierChatItems.first['id']] ?? 0)
         : 0;
 
-    // 生成房間ID
-    final roomId = applierChatItems.isNotEmpty
-        ? applierChatItems.first['id']
-        : 'task_${task['id']}_pair_${task['creator_id']}_${context.read<UserService>().currentUser?.id}';
+    // 房間 ID 在下方使用時以就地變數處理
 
     // 確定當前用戶在聊天室中的角色
     final currentUserId = context.read<UserService>().currentUser?.id;

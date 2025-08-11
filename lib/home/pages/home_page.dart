@@ -97,14 +97,17 @@ class HomePage extends StatelessWidget {
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 18)),
                     const SizedBox(height: 12),
-                    const Row(
+                    Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _AchievementBox(label: 'Total Coins', value: '1200'),
-                        _AchievementBox(label: 'Task Completed', value: '20'),
-                        _AchievementBox(
+                        const _AchievementBox(
+                            label: 'Total Coins', value: '1200'),
+                        const _AchievementBox(
+                            label: 'Task Completed', value: '20'),
+                        const _AchievementBox(
                             label: 'Five-Star Ratings', value: '10'),
-                        _AchievementBox(label: 'Avg Rating', value: '4.5'),
+                        const _AchievementBox(
+                            label: 'Avg Rating', value: '4.5'),
                       ],
                     ),
 
@@ -233,9 +236,17 @@ class _AchievementBox extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          themeManager.currentTheme.primary,
-                          themeManager.currentTheme.secondary,
-                          themeManager.currentTheme.accent,
+                          // 若為 lesbian theme，使用粉藍-白-粉紅漸層
+                          if (themeManager.currentTheme.name
+                              .startsWith('lesbian_theme')) ...[
+                            const Color(0xFF89CFF0),
+                            const Color(0xFFFFFFFF),
+                            const Color(0xFFF8A1C4),
+                          ] else ...[
+                            themeManager.currentTheme.primary,
+                            themeManager.currentTheme.secondary,
+                            themeManager.currentTheme.accent,
+                          ]
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,

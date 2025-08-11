@@ -25,6 +25,19 @@ try {
     $limit = (int)($_GET['limit'] ?? 20);
     $offset = (int)($_GET['offset'] ?? 0);
     
+    // 嘗試從 Authorization 取出目前使用者（用於封鎖過濾）
+    $currentUserId = null;
+    $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+    if (!empty($auth_header) && preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
+        try {
+            $decoded = base64_decode($m[1]);
+            $payload = json_decode($decoded, true);
+            if ($payload && isset($payload['user_id'])) {
+                $currentUserId = (int)$payload['user_id'];
+            }
+        } catch (Exception $e) {}
+    }
+
     // 建立查詢條件
     $whereConditions = [];
     $params = [];
@@ -71,8 +84,17 @@ try {
             LEFT JOIN task_statuses s ON t.status_id = s.id
             LEFT JOIN users u ON t.creator_id = u.id
             $whereClause
+            " . ($currentUserId ? " AND NOT EXISTS (
+              SELECT 1 FROM user_blocks b 
+              WHERE (b.user_id = ? AND b.target_user_id = u.id) 
+                 OR (b.user_id = u.id AND b.target_user_id = ?)
+            )" : "") . "
             ORDER BY t.created_at DESC 
             LIMIT ? OFFSET ?";
+    if ($currentUserId) {
+        $params[] = $currentUserId;
+        $params[] = $currentUserId;
+    }
     $params[] = $limit;
     $params[] = $offset;
     
@@ -95,8 +117,17 @@ try {
     // 獲取總數
     $countSql = "SELECT COUNT(*) as total FROM tasks t 
                  LEFT JOIN task_statuses s ON t.status_id = s.id
-                 $whereClause";
-    $totalResult = $db->fetch($countSql, array_slice($params, 0, -2));
+                 LEFT JOIN users u ON t.creator_id = u.id
+                 $whereClause" . ($currentUserId ? " AND NOT EXISTS (
+                    SELECT 1 FROM user_blocks b 
+                    WHERE (b.user_id = ? AND b.target_user_id = u.id) 
+                       OR (b.user_id = u.id AND b.target_user_id = ?)
+                 )" : "");
+    $countParams = $params;
+    // 去除 LIMIT/OFFSET 兩個參數
+    array_pop($countParams);
+    array_pop($countParams);
+    $totalResult = $db->fetch($countSql, $countParams);
     $total = $totalResult['total'];
     
     Response::success([
