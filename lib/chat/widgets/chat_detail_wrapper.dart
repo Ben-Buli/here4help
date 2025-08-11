@@ -49,10 +49,36 @@ class _ChatDetailWrapperState extends State<ChatDetailWrapper> {
 
             final roomId = ChatStorageService.extractRoomIdFromUrl(location);
             debugPrint('🔍 提取的 roomId: $roomId');
+            // 同時擷取 taskId（供最小資料構造使用）
+            String? urlTaskId;
+            try {
+              final frag = Uri.parse(location).fragment;
+              final fragUri = Uri.parse(frag.startsWith('/') ? frag : '/$frag');
+              urlTaskId = fragUri.queryParameters['taskId'];
+            } catch (_) {}
 
             if (roomId != null) {
+              // 若為舊格式（如 app_5），嘗試用 taskId 在會話或本地查找真實 BIGINT room_id
+              String effectiveRoomId = roomId;
+              if (roomId.startsWith('app_')) {
+                debugPrint('🔁 偵測到舊格式 roomId: $roomId，嘗試回退');
+                final fragUri = Uri.parse(location).fragment;
+                final parsedFrag =
+                    Uri.parse(fragUri.startsWith('/') ? fragUri : '/$fragUri');
+                final taskId = parsedFrag.queryParameters['taskId'];
+                debugPrint('🔍 從 URL 取得 taskId: $taskId');
+                // 嘗試從會話獲取真實 id
+                final session =
+                    await ChatSessionManager.getCurrentChatSession();
+                final sessionRoomId = session?['room']?['id']?.toString();
+                if (sessionRoomId != null && sessionRoomId.isNotEmpty) {
+                  effectiveRoomId = sessionRoomId;
+                  debugPrint('✅ 使用會話中的真實 room_id: $effectiveRoomId');
+                }
+              }
+
               final storedData =
-                  await ChatStorageService.getChatRoomData(roomId);
+                  await ChatStorageService.getChatRoomData(effectiveRoomId);
               debugPrint('🔍 從本地儲存獲取的數據: $storedData');
               if (storedData != null) {
                 chatData = storedData;
@@ -60,11 +86,32 @@ class _ChatDetailWrapperState extends State<ChatDetailWrapper> {
 
                 // 將本地數據設置為當前會話
                 await ChatSessionManager.setCurrentChatSession(
-                  roomId: roomId,
+                  roomId: effectiveRoomId,
                   room: storedData['room'] ?? {},
                   task: storedData['task'] ?? {},
                   userRole: storedData['userRole'] ?? '',
                   chatPartnerInfo: storedData['chatPartnerInfo'] ?? {},
+                );
+              } else {
+                // 本地沒有資料，構造最小資料集（支援直接貼連結進入）
+                debugPrint('ℹ️ 本地無資料，使用 URL 構造最小聊天室資料');
+                chatData = {
+                  'room': {
+                    'id': effectiveRoomId,
+                    'roomId': effectiveRoomId,
+                    if (urlTaskId != null) 'taskId': urlTaskId,
+                    if (urlTaskId != null) 'task_id': urlTaskId,
+                  },
+                  'task': {
+                    if (urlTaskId != null) 'id': urlTaskId,
+                  },
+                };
+                await ChatSessionManager.setCurrentChatSession(
+                  roomId: effectiveRoomId,
+                  room: chatData['room'] as Map<String, dynamic>,
+                  task: chatData['task'] as Map<String, dynamic>,
+                  userRole: '',
+                  chatPartnerInfo: const {},
                 );
               }
             } else {

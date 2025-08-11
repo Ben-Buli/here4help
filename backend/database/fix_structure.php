@@ -1,4 +1,41 @@
 <?php
+// 一次性資料修復：將 task_applications.answers_json 中的 introduction 搬到 cover_letter（僅在 cover_letter 為空時）
+// 使用方式：php backend/database/fix_structure.php
+
+require_once __DIR__ . '/../config/database.php';
+
+try {
+    $db = Database::getInstance();
+
+    $rows = $db->fetchAll("SELECT id, cover_letter, answers_json FROM task_applications");
+    $updated = 0;
+
+    foreach ($rows as $row) {
+        $id = (int)$row['id'];
+        $cover = $row['cover_letter'];
+        $answers = $row['answers_json'];
+
+        if (!empty($cover)) continue; // 只修補 cover 為空的資料
+        if (empty($answers)) continue;
+
+        $decoded = json_decode($answers, true);
+        if (!is_array($decoded)) continue;
+
+        $intro = isset($decoded['introduction']) ? trim((string)$decoded['introduction']) : '';
+        if ($intro === '') continue;
+
+        // 將 introduction 搬到 cover_letter
+        $db->query("UPDATE task_applications SET cover_letter = ? WHERE id = ?", [$intro, $id]);
+        $updated++;
+    }
+
+    echo "Fixed rows: {$updated}\n";
+} catch (Exception $e) {
+    echo 'Error: ' . $e->getMessage() . "\n";
+}
+
+?>
+<?php
 /**
  * 資料庫結構修復腳本
  * 自動修復常見的資料庫結構問題

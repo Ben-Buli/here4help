@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/utils/image_helper.dart';
 import 'package:here4help/chat/services/chat_service.dart';
 import 'package:here4help/chat/services/socket_service.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, required this.data});
@@ -31,6 +32,17 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   // 聊天訊息列表（從資料庫載入）
   List<Map<String, dynamic>> _chatMessages = [];
   bool _isLoadingMessages = false;
+  int? resultOpponentLastReadId;
+  // 新增：滾動控制與新訊息提示
+  final ScrollController _listController = ScrollController();
+  bool _isAtBottom = true;
+  bool _showNewMsgBanner = false;
+  int _unseenCount = 0;
+  // 本地暫存「傳送中」訊息
+  List<Map<String, dynamic>> _pendingMessages = [];
+  // 角色與動作列控制
+  String _userRole = 'participant';
+  bool _showActionBar = true;
 
   // Socket.IO 服務
   final SocketService _socketService = SocketService();
@@ -38,6 +50,23 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   Map<String, dynamic> _getProgressData(String status) {
     return TaskStatus.getProgressData(status);
+  }
+
+  void _scrollToBottom({bool delayed = false}) {
+    void run() {
+      if (!_listController.hasClients) return;
+      _listController.animateTo(
+        _listController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+
+    if (delayed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => run());
+    } else {
+      run();
+    }
   }
 
   final TextEditingController _controller = TextEditingController();
@@ -59,6 +88,23 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     super.initState();
     _loadCurrentUserId();
     _initializeChat(); // 載入當前用戶 ID
+
+    // 監聽列表滾動，更新是否在底部
+    _listController.addListener(() {
+      if (!_listController.hasClients) return;
+      final maxScroll = _listController.position.maxScrollExtent;
+      final offset = _listController.offset;
+      final atBottom = (maxScroll - offset) <= 24.0; // 容忍 24px
+      if (_isAtBottom != atBottom) {
+        setState(() {
+          _isAtBottom = atBottom;
+          if (_isAtBottom) {
+            _showNewMsgBanner = false;
+            _unseenCount = 0;
+          }
+        });
+      }
+    });
 
     final now = DateTime.now();
     joinTime =
@@ -95,11 +141,40 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       if (mounted) {
         setState(() {
           _currentUserId = userId;
+          // 根據當前用戶決定角色
+          final creatorId = widget.data['task']['creator_id'];
+          if (creatorId != null && userId != null) {
+            _userRole = (creatorId == userId) ? 'creator' : 'participant';
+          }
         });
       }
       debugPrint('🔍 當前登入用戶 ID: $_currentUserId');
     } catch (e) {
       debugPrint('❌ 無法載入當前用戶 ID: $e');
+    }
+  }
+
+  void _toggleActionBar() {
+    setState(() {
+      _showActionBar = !_showActionBar;
+    });
+  }
+
+  /// 選擇圖片並以占位訊息發送（後端上傳端點待接）
+  Future<void> _pickAndSendPhoto() async {
+    try {
+      final picker = ImagePicker();
+      final XFile? file = await picker.pickImage(source: ImageSource.gallery);
+      if (file == null) return;
+      final fileName = file.name;
+      // 先以占位訊息送出
+      _controller.text = '[Photo] $fileName';
+      await _sendMessage();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('選取圖片失敗: $e')),
+      );
     }
   }
 
@@ -141,8 +216,18 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
     // 檢查是否為當前聊天室的訊息
     final roomId = messageData['roomId']?.toString();
+    final fromUserId = messageData['fromUserId'];
     if (roomId == _currentRoomId) {
-      // 重新載入訊息列表以獲取最新訊息
+      // 不是自己發的且不在底部時，顯示新訊息提示
+      final isFromMe = _currentUserId != null &&
+          (fromUserId == _currentUserId ||
+              '${fromUserId}' == '${_currentUserId}');
+      if (!isFromMe && !_isAtBottom) {
+        setState(() {
+          _unseenCount += 1;
+          _showNewMsgBanner = true;
+        });
+      }
       _loadChatMessages();
     }
   }
@@ -189,6 +274,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
       final result = await ChatService().getMessages(roomId: roomId);
       final messages = result['messages'] as List<dynamic>? ?? [];
+      // 讀取對方最後已讀訊息 ID 供渲染使用
+      resultOpponentLastReadId =
+          (result['opponent_last_read_message_id'] is int)
+              ? result['opponent_last_read_message_id']
+              : int.tryParse('${result['opponent_last_read_message_id']}') ?? 0;
 
       if (mounted) {
         setState(() {
@@ -196,6 +286,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               messages.map((msg) => Map<String, dynamic>.from(msg)).toList();
           _isLoadingMessages = false;
         });
+        // 在底部則保持自動滾到底
+        if (_isAtBottom) {
+          _scrollToBottom(delayed: true);
+        }
       }
 
       debugPrint('✅ 成功載入 ${_chatMessages.length} 條訊息');
@@ -273,9 +367,15 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
       debugPrint('🔍 發送訊息到聊天室: $roomId, 內容: $text');
 
-      // 先清空輸入框，提供即時回饋
+      // 先清空輸入框，提供即時回饋；並加入暫存訊息（顯示傳送中）
       _controller.clear();
       _focusNode.requestFocus();
+      setState(() {
+        _pendingMessages.add({
+          'message': text,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      });
 
       // 發送訊息到後端（HTTP API）
       final result = await ChatService().sendMessage(
@@ -295,8 +395,21 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         );
       }
 
-      // 重新載入訊息列表
+      // 重新載入訊息列表並移除暫存
       await _loadChatMessages();
+      if (mounted) {
+        setState(() {
+          if (_pendingMessages.isNotEmpty) _pendingMessages.removeAt(0);
+        });
+      }
+      // 我方發送後直接滾到底部並隱藏新訊息提示
+      if (mounted) {
+        setState(() {
+          _showNewMsgBanner = false;
+          _unseenCount = 0;
+        });
+        _scrollToBottom(delayed: true);
+      }
     } catch (e) {
       debugPrint('❌ 發送訊息失敗: $e');
 
@@ -361,224 +474,243 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   /// 顯示應徵者真實應徵資料的對話框
   void _showApplierResumeDialog(BuildContext context) async {
-    // 顯示載入對話框
+    // 顯示載入對話框（使用 rootNavigator，並確保關閉動作安全）
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
+      useRootNavigator: true,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
     );
+
+    bool loaderClosed = false;
+    void closeLoaderSafely() {
+      if (loaderClosed || !mounted) return;
+      loaderClosed = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final nav = Navigator.of(context, rootNavigator: true);
+        if (nav.canPop()) {
+          nav.pop();
+        }
+      });
+    }
 
     try {
       final taskId = widget.data['task']['id']?.toString() ?? '';
-      final applicantId = widget.data['room']['user_id'] ??
-          widget.data['room']['participant_id'] ??
+      // 嘗試從多個來源推斷 applicantId（優先 room.participant_id）
+      final dynamic rawApplicantId = widget.data['room']['participant_id'] ??
+          widget.data['room']['user_id'] ??
+          widget.data['chatPartnerInfo']?['id'] ??
           0;
+      final int applicantId = (rawApplicantId is int)
+          ? rawApplicantId
+          : int.tryParse(rawApplicantId.toString()) ?? 0;
 
       final applicationData = await _getApplicationData(taskId, applicantId);
-
-      // 關閉載入對話框
-      Navigator.of(context).pop();
+      // 關閉載入對話框（安全）
+      closeLoaderSafely();
 
       if (applicationData != null) {
-        // 解析 answers_json
+        // 安全解析 answers_json（可能為字串或已是物件），鍵為「問題原文」
         Map<String, dynamic> answers = {};
+        final dynamic raw = applicationData['answers_json'];
         try {
-          if (applicationData['answers_json'] != null) {
-            answers = jsonDecode(applicationData['answers_json']);
+          if (raw != null) {
+            if (raw is String && raw.isNotEmpty) {
+              answers = jsonDecode(raw);
+            } else if (raw is Map<String, dynamic>) {
+              answers = raw;
+            }
           }
         } catch (e) {
           debugPrint('Error parsing answers_json: $e');
         }
 
-        // 顯示真實的應徵資料
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Center(child: Text('應徵者履歷')),
-            actions: [
-              Center(
-                child: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('關閉'),
+        // 顯示真實的應徵資料（避免與上一個對話框同幀衝突）
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          showDialog(
+            context: context,
+            useRootNavigator: true,
+            builder: (context) => AlertDialog(
+              title: const Center(child: Text('Applicant Resume')),
+              actions: [
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close'),
+                  ),
                 ),
+              ],
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 24.0,
+                vertical: 24.0,
               ),
-            ],
-            insetPadding: const EdgeInsets.symmetric(
-              horizontal: 24.0,
-              vertical: 24.0,
-            ),
-            contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 0),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 應徵者基本資訊
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundImage:
-                              applicationData['applier_avatar'] != null
-                                  ? (applicationData['applier_avatar']
-                                          .startsWith('http')
-                                      ? NetworkImage(
-                                          applicationData['applier_avatar'])
-                                      : AssetImage(
-                                              applicationData['applier_avatar'])
-                                          as ImageProvider)
-                                  : null,
-                          child: applicationData['applier_avatar'] == null
-                              ? Text(
-                                  (applicationData['applier_name'] ?? 'U')[0]
-                                      .toUpperCase(),
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 20),
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                applicationData['applier_name'] ?? 'Anonymous',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '應徵時間: ${applicationData['created_at'] ?? 'Unknown'}',
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-
-                    // 自我推薦
-                    if (answers['introduction']?.isNotEmpty == true) ...[
-                      const Text(
-                        '自我推薦',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: Text(answers['introduction'] ?? ''),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // Cover Letter
-                    if (applicationData['cover_letter']?.isNotEmpty ==
-                        true) ...[
-                      const Text(
-                        'Cover Letter',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: Text(applicationData['cover_letter'] ?? ''),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // 其他問題回答
-                    ...['q1', 'q2', 'q3']
-                        .where((key) => answers[key]?.isNotEmpty == true)
-                        .map((key) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              contentPadding: const EdgeInsets.fromLTRB(24.0, 20.0, 24.0, 0),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 應徵者基本資訊
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Text(
-                            '問題 ${key.toUpperCase()}',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16),
+                          CircleAvatar(
+                            radius: 30,
+                            backgroundImage:
+                                applicationData['applier_avatar'] != null
+                                    ? (applicationData['applier_avatar']
+                                            .startsWith('http')
+                                        ? NetworkImage(
+                                            applicationData['applier_avatar'])
+                                        : AssetImage(applicationData[
+                                            'applier_avatar']) as ImageProvider)
+                                    : null,
+                            child: applicationData['applier_avatar'] == null
+                                ? Text(
+                                    (applicationData['applier_name'] ?? 'U')[0]
+                                        .toUpperCase(),
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 20),
+                                  )
+                                : null,
                           ),
-                          const SizedBox(height: 8),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[300]!),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  applicationData['applier_name'] ??
+                                      'Anonymous',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Application Time : ${applicationData['created_at'] ?? 'Unknown'}',
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
                             ),
-                            child: Text(answers[key] ?? ''),
                           ),
-                          const SizedBox(height: 16),
                         ],
-                      );
-                    }).toList(),
-                  ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Self-recommendation（以 cover_letter 為主）
+                      if ((applicationData['cover_letter'] ?? '')
+                          .toString()
+                          .trim()
+                          .isNotEmpty) ...[
+                        const Text(
+                          'Self‑recommendation',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: Text((applicationData['cover_letter'] ?? '')
+                              .toString()),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // 其他問題回答：逐一以「問題原文」作為標題
+                      ...answers.keys
+                          .where((key) =>
+                              (answers[key]?.toString().trim().isNotEmpty ??
+                                  false))
+                          .map((key) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              key.toString(),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              child: Text(answers[key]?.toString() ?? ''),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                        );
+                      }).toList(),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
+          );
+        });
       } else {
-        // 顯示錯誤訊息
+        // 找不到應徵資料時的友善提示（關閉 loader 後再顯示）
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          showDialog(
+            context: context,
+            useRootNavigator: true,
+            builder: (context) => AlertDialog(
+              title: const Text('No application data found'),
+              content: Text(
+                  'No application data found for task (ID: $taskId) and user (ID: $applicantId).'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        });
+      }
+    } catch (e) {
+      // 關閉載入對話框（安全）
+      closeLoaderSafely();
+
+      // 顯示錯誤訊息（避免與 loader 衝突）
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         showDialog(
           context: context,
+          useRootNavigator: true,
           builder: (context) => AlertDialog(
-            title: const Text('錯誤'),
-            content: const Text('無法載入應徵資料'),
+            title: const Text('Error'),
+            content: Text('Error loading application data: $e'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('確定'),
+                child: const Text('OK'),
               ),
             ],
           ),
         );
-      }
-    } catch (e) {
-      // 關閉載入對話框
-      Navigator.of(context).pop();
-
-      // 顯示錯誤訊息
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('錯誤'),
-          content: Text('載入應徵資料時發生錯誤: $e'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('確定'),
-            ),
-          ],
-        ),
-      );
+      });
     }
   }
 
@@ -589,11 +721,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final applier = widget.data['room'];
 
     // 使用從資料庫載入的訊息列表
-    int totalItemCount =
-        (questionReply.isNotEmpty ? 1 : 0) + _chatMessages.length;
+    int totalItemCount = (questionReply.isNotEmpty ? 1 : 0) +
+        _chatMessages.length +
+        (_pendingMessages.length);
 
     debugPrint(
-        '🔍 總訊息數量: $totalItemCount (questionReply: ${questionReply.isNotEmpty ? 1 : 0}, chatMessages: ${_chatMessages.length})');
+        '🔍 Total messages: $totalItemCount (questionReply: ${questionReply.isNotEmpty ? 1 : 0}, chatMessages: ${_chatMessages.length})');
 
     Widget buildQuestionReplyBubble(String text) {
       return Padding(
@@ -680,7 +813,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         opponentInfo = {
           'name':
               room['user']?['name'] ?? room['participant_name'] ?? 'Applicant',
-          'avatar_url': room['user']?['avatar_url'] ?? '',
+          'avatar_url': room['user']?['avatar_url'] ??
+              room['participant_avatar'] ??
+              room['avatar'] ??
+              '',
         };
       }
 
@@ -716,7 +852,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                           constraints: const BoxConstraints(maxWidth: 300),
                           decoration: BoxDecoration(
                             color: applierBubbleColor,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(0),
+                              topRight: Radius.circular(12),
+                              bottomLeft: Radius.circular(12),
+                              bottomRight: Radius.circular(12),
+                            ),
                           ),
                           child: Text(text),
                         ),
@@ -751,22 +892,42 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           mainAxisAlignment: MainAxisAlignment.end,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // 時間顯示在左側
-            Text(
-              time,
-              style: const TextStyle(fontSize: 10, color: Colors.grey),
-            ),
-            const SizedBox(width: 4),
-            // 訊息氣泡
+            // 訊息氣泡 + 已讀標記
             Flexible(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                constraints: const BoxConstraints(maxWidth: 300),
-                decoration: BoxDecoration(
-                  color: const Color.fromARGB(255, 235, 241, 249), // 我的訊息背景色
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(text),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    constraints: const BoxConstraints(maxWidth: 300),
+                    decoration: BoxDecoration(
+                      color: const Color.fromARGB(255, 235, 241, 249),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(text),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        time,
+                        style:
+                            const TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
+                      const SizedBox(width: 6),
+                      // 依賴 _opponentLastReadMessageId 與本訊息 id 比較（於列表組裝時傳入）
+                      if (message.containsKey('read'))
+                        Icon(
+                          Icons.done_all,
+                          size: 14,
+                          color: (message['read'] == 'true')
+                              ? Colors.blueAccent
+                              : Colors.grey,
+                        ),
+                    ],
+                  ),
+                ],
               ),
             ),
             // 可選的我方頭像（用於對稱設計）
@@ -897,46 +1058,103 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             child: alertContent,
           ),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: totalItemCount,
-            itemBuilder: (context, index) {
-              if (questionReply.isNotEmpty && index == 0) {
-                return buildQuestionReplyBubble(questionReply);
-              }
+          child: Stack(
+            children: [
+              ListView.builder(
+                controller: _listController,
+                padding: const EdgeInsets.all(16),
+                itemCount: totalItemCount,
+                itemBuilder: (context, index) {
+                  if (questionReply.isNotEmpty && index == 0) {
+                    return buildQuestionReplyBubble(questionReply);
+                  }
 
-              int adjustedIndex = index - (questionReply.isNotEmpty ? 1 : 0);
+                  int adjustedIndex =
+                      index - (questionReply.isNotEmpty ? 1 : 0);
 
-              // 使用從資料庫載入的訊息列表
-              if (adjustedIndex < _chatMessages.length) {
-                final messageData = _chatMessages[adjustedIndex];
-                final messageText = messageData['message']?.toString() ?? '';
-                final messageFromUserId = messageData['from_user_id'];
-                final messageTime = messageData['created_at']?.toString() ?? '';
-                final senderName =
-                    messageData['sender_name']?.toString() ?? 'Unknown';
+                  // 使用從資料庫載入的訊息列表
+                  if (adjustedIndex < _chatMessages.length) {
+                    final messageData = _chatMessages[adjustedIndex];
+                    final messageText =
+                        messageData['message']?.toString() ?? '';
+                    final messageFromUserId = messageData['from_user_id'];
+                    final messageTime =
+                        messageData['created_at']?.toString() ?? '';
+                    final senderName =
+                        messageData['sender_name']?.toString() ?? 'Unknown';
 
-                // 判斷這條訊息是否來自當前用戶
-                final isMyMessage = _currentUserId != null &&
-                    messageFromUserId == _currentUserId;
+                    // 判斷這條訊息是否來自當前用戶
+                    final isMyMessage = _currentUserId != null &&
+                        messageFromUserId == _currentUserId;
 
-                debugPrint(
-                    '🔍 訊息判斷: messageFromUserId=$messageFromUserId, currentUserId=$_currentUserId, isMyMessage=$isMyMessage, text=$messageText');
+                    debugPrint(
+                        '🔍 Message judgment: messageFromUserId=$messageFromUserId, currentUserId=$_currentUserId, isMyMessage=$isMyMessage, text=$messageText');
 
-                // 根據是否為我方訊息決定氣泡樣式
-                if (isMyMessage) {
-                  return buildMyMessageBubble({
-                    'text': messageText,
-                    'time': _formatMessageTime(messageTime),
-                  });
-                } else {
-                  return buildOpponentBubble(messageText, messageFromUserId,
-                      senderName: senderName, messageTime: messageTime);
-                }
-              }
+                    // 根據是否為我方訊息決定氣泡樣式
+                    if (isMyMessage) {
+                      // 根據對方最後已讀訊息 ID 決定狀態：read 或 sent
+                      final int msgId = (messageData['id'] is int)
+                          ? messageData['id']
+                          : int.tryParse('${messageData['id']}') ?? 0;
+                      final int opponentReadId =
+                          (resultOpponentLastReadId ?? 0);
+                      final String status =
+                          opponentReadId >= msgId ? 'read' : 'sent';
+                      return buildMyMessageBubble({
+                        'text': messageText,
+                        'time': _formatMessageTime(messageTime),
+                        'status': status,
+                      });
+                    } else {
+                      return buildOpponentBubble(messageText, messageFromUserId,
+                          senderName: senderName, messageTime: messageTime);
+                    }
+                  }
 
-              return const SizedBox.shrink();
-            },
+                  return const SizedBox.shrink();
+                },
+              ),
+              if (_showNewMsgBanner)
+                Positioned(
+                  bottom: 12,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _showNewMsgBanner = false;
+                          _unseenCount = 0;
+                        });
+                        _scrollToBottom();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.55),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.arrow_downward,
+                                color: Colors.white, size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              _unseenCount > 0
+                                  ? '有未讀訊息（$_unseenCount）— 點擊前往最新'
+                                  : '有未讀訊息 — 點擊前往最新',
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
         // 保持原本的 status banner 在底部
@@ -970,11 +1188,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           thickness: 2,
         ),
         const SizedBox(height: 12),
-        Row(
-          children: _buildActionButtonsByStatus()
-              .map((e) => Expanded(child: e))
-              .toList(),
-        ),
+        if (_showActionBar)
+          Row(
+            children: _buildActionButtonsByStatus()
+                .map((e) => Expanded(child: e))
+                .toList(),
+          ),
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: Row(
@@ -1017,6 +1236,20 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                   ),
                 ),
               ),
+              // 左側 plus 按鈕：切換 ActionBar 顯示
+              IconButton(
+                tooltip: 'More',
+                icon: const Icon(Icons.add_circle_outline),
+                color: isInputDisabled ? Colors.grey : Colors.black87,
+                onPressed: isInputDisabled ? null : _toggleActionBar,
+              ),
+              // 左側 photo 按鈕：上傳圖片（暫以上傳檔名訊息）
+              IconButton(
+                tooltip: 'Photo',
+                icon: const Icon(Icons.photo_outlined),
+                color: isInputDisabled ? Colors.grey : Colors.black87,
+                onPressed: isInputDisabled ? null : _pickAndSendPhoto,
+              ),
               IconButton(
                 icon: Icon(
                   Icons.send,
@@ -1051,57 +1284,250 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   List<Widget> _buildActionButtonsByStatus() {
     final status = (widget.data['task']['status'] ?? '').toString();
-    final Map<String, List<Map<String, dynamic>>> statusActions = {
-      TaskStatus.statusString['open']!: [
-        {'icon': Icons.check, 'label': 'Accept'},
-      ],
-      TaskStatus.statusString['in_progress']!: [
-        {'icon': Icons.payment, 'label': 'Pay'},
-        {'icon': Icons.volume_off, 'label': 'Silence'},
-        {'icon': Icons.article, 'label': 'Complaint'},
-        {'icon': Icons.block, 'label': 'Block'},
-      ],
-      TaskStatus.statusString['in_progress_tasker']!: [
-        {'icon': Icons.check_circle, 'label': 'Completed'},
-        {'icon': Icons.article, 'label': 'Complaint'},
-        {'icon': Icons.block, 'label': 'Block'},
-      ],
-      TaskStatus.statusString['applying_tasker']!: [
-        {'icon': Icons.article, 'label': 'Complaint'},
-        {'icon': Icons.block, 'label': 'Block'},
-      ],
-      TaskStatus.statusString['rejected_tasker']!: [
-        {'icon': Icons.article, 'label': 'Complaint'},
-      ],
-      TaskStatus.statusString['pending_confirmation']!: [
-        {'icon': Icons.check, 'label': 'Confirm'},
-        {'icon': Icons.article, 'label': 'Complaint'},
-      ],
-      TaskStatus.statusString['pending_confirmation_tasker']!: [
-        {'icon': Icons.article, 'label': 'Complaint'},
-      ],
-      TaskStatus.statusString['dispute']!: [
-        {'icon': Icons.article, 'label': 'Complaint'},
-      ],
-      TaskStatus.statusString['completed']!: [
-        {'icon': Icons.attach_money, 'label': 'Paid'},
-        {'icon': Icons.reviews, 'label': 'Reviews'},
-      ],
-      TaskStatus.statusString['completed_tasker']!: [
-        {'icon': Icons.reviews, 'label': 'Reviews'},
-        {'icon': Icons.article, 'label': 'Complaint'},
-      ],
-    };
+    final isCreator = _userRole == 'creator';
 
-    final actions = statusActions[status] ?? [];
+    // 模組化定義：通用動作
+    Map<String, dynamic> actionDefs(String label, IconData icon, VoidCallback onTap) =>
+        {'label': label, 'icon': icon, 'onTap': onTap};
+
+    // 工具：開啟二次確認對話
+    Future<void> confirmDialog({required String title, required String content, required VoidCallback onConfirm}) async {
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(title),
+          content: Text(content),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+            ElevatedButton(onPressed: () { Navigator.of(context).pop(); onConfirm(); }, child: const Text('Confirm')),
+          ],
+        ),
+      );
+    }
+
+    // 依狀態與角色組合動作
+    final List<Map<String, dynamic>> actions = [];
+
+    switch (status) {
+      case 'Open':
+        if (isCreator) {
+          actions.add(actionDefs('Accept', Icons.check, () async {
+            await confirmDialog(
+              title: 'Double Check',
+              content: 'Are you sure you want to assign this applicant to this task?',
+              onConfirm: () async {
+                await TaskService().updateTaskStatus(
+                  widget.data['task']['id'].toString(),
+                  TaskStatus.statusString['in_progress']!,
+                  statusCode: 'in_progress',
+                );
+                // 關閉其他申請聊天室（舊全域資料結構保留）
+                GlobalChatRoom().removeRoomsByTaskIdExcept(
+                  widget.data['task']['id'].toString(),
+                  widget.data['room']['roomId'].toString(),
+                );
+                if (mounted) setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Task accepted. Now in progress.')),
+                );
+              },
+            );
+          }));
+          actions.add(actionDefs('Block', Icons.block, () async {
+            await confirmDialog(
+              title: 'Block User',
+              content: 'Block this user from applying your tasks in the future?',
+              onConfirm: () {}, // TODO: 實作封鎖 API
+            );
+          }));
+        } else {
+          actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+        }
+        break;
+      case 'In Progress':
+        if (isCreator) {
+          actions.add(actionDefs('Pay', Icons.payment, () { _openPayAndReview(); }));
+          actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+          actions.add(actionDefs('Block', Icons.block, () async {
+            await confirmDialog(title: 'Block User', content: 'Block this user?', onConfirm: () {});
+          }));
+        } else {
+          actions.add(actionDefs('Completed', Icons.check_circle, () {
+            confirmDialog(
+              title: 'Double Check',
+              content: 'Are you sure you have completed this task?',
+              onConfirm: () async {
+                widget.data['task']['pendingStart'] = DateTime.now().toIso8601String();
+                await TaskService().updateTaskStatus(
+                  widget.data['task']['id'].toString(),
+                  TaskStatus.statusString['pending_confirmation_tasker']!,
+                  statusCode: 'pending_confirmation',
+                );
+                if (mounted) setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Waiting for poster confirmation.')));
+              },
+            );
+          }));
+          actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+        }
+        break;
+      case 'Pending Confirmation':
+        if (isCreator) {
+          actions.add(actionDefs('Confirm', Icons.check, () async {
+            await confirmDialog(
+              title: 'Double Check',
+              content: 'Confirm this task and transfer reward points to the Tasker?',
+              onConfirm: () async {
+                await TaskService().updateTaskStatus(
+                  widget.data['task']['id'].toString(),
+                  TaskStatus.statusString['completed']!,
+                  statusCode: 'completed',
+                );
+                if (mounted) setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Task confirmed and paid.')));
+              },
+            );
+          }));
+          actions.add(actionDefs('Disagree', Icons.close, () async {
+            await confirmDialog(title: 'Disagree', content: 'Disagree this task is completed?', onConfirm: () { /* TODO: 紀錄拒絕（上限兩次）*/ });
+          }));
+          actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+        } else {
+          actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+        }
+        break;
+      case 'Dispute':
+        actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+        break;
+      case 'Completed':
+        if (isCreator) {
+          actions.add(actionDefs('Paid', Icons.attach_money, () { _showPaidInfo(); }));
+          actions.add(actionDefs('Reviews', Icons.reviews, () { _openReviewDialog(readOnlyIfExists: true); }));
+          actions.add(actionDefs('Block', Icons.block, () async {
+            await confirmDialog(title: 'Block User', content: 'Block this user?', onConfirm: () {});
+          }));
+        } else {
+          actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+          actions.add(actionDefs('Block', Icons.block, () async { await confirmDialog(title: 'Block User', content: 'Block this user?', onConfirm: () {}); }));
+        }
+        break;
+      default:
+        // 其他（Rejected/Closed/Canceled）
+        actions.add(actionDefs('Report', Icons.article, () { _openReportSheet(); }));
+        actions.add(actionDefs('Block', Icons.block, () async { await confirmDialog(title: 'Block User', content: 'Block this user?', onConfirm: () {}); }));
+        break;
+    }
 
     return actions
-        .map((action) => _actionButton(
-              action['icon'],
-              action['label'],
-              () {
-                // Accept button logic with double confirm dialog
-                if (action['label'] == 'Accept') {
+        .map((a) => _actionButton(a['icon'] as IconData, a['label'] as String, a['onTap'] as VoidCallback))
+        .toList();
+  }
+
+  // ====== 以下為動作視窗（報告、支付+評論、已付款資訊）骨架 ======
+  void _openReportSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Report', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  const Text('Reason'),
+                  // TODO: radio 選項（含 Request Dispute）
+                  const SizedBox(height: 8),
+                  const Text('Description (min 10 chars)'),
+                  const TextField(maxLines: 4),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(onPressed: () {}, icon: const Icon(Icons.photo), label: const Text('Upload evidence')),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Submit')),
+                  )
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _openPayAndReview() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        int service = 0, attitude = 0, experience = 0;
+        final commentCtrl = TextEditingController();
+        final code1 = TextEditingController();
+        final code2 = TextEditingController();
+        return StatefulBuilder(builder: (context, setState) {
+          Widget buildStars(int value, ValueChanged<int> onChanged) {
+            return Row(
+              children: List.generate(5, (i) => IconButton(
+                icon: Icon(i < value ? Icons.star : Icons.star_border, color: Colors.amber),
+                onPressed: () => onChanged(i + 1),
+              )),
+            );
+          }
+          return AlertDialog(
+            title: const Text('Review & Pay'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Service'),
+                  buildStars(service, (v) => setState(() => service = v)),
+                  const Text('Attitude'),
+                  buildStars(attitude, (v) => setState(() => attitude = v)),
+                  const Text('Experience'),
+                  buildStars(experience, (v) => setState(() => experience = v)),
+                  const SizedBox(height: 8),
+                  const Text('Comment (<= 100 chars)'),
+                  TextField(controller: commentCtrl, maxLength: 100, maxLines: 3),
+                  const Divider(height: 24),
+                  const Text('Payment Code (6 digits) — Enter twice'),
+                  TextField(controller: code1, keyboardType: TextInputType.number, maxLength: 6),
+                  TextField(controller: code2, keyboardType: TextInputType.number, maxLength: 6),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ElevatedButton(onPressed: () {
+                if (code1.text.length == 6 && code1.text == code2.text) {
+                  // TODO: 轉點 / 寫入評論 / 更新狀態 completed
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Task completed and paid.')));
+                }
+              }, child: const Text('Pay')),
+            ],
+          );
+        });
+      },
+    );
+  }
+
+  void _showPaidInfo() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Paid Info'),
+        content: const Text('Show paid timestamp and transfer details here.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
                   showDialog(
                     context: context,
                     builder: (context) => AlertDialog(

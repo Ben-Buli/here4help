@@ -1,10 +1,10 @@
 # Here4Help TODO - 快速索引
 
 ## 📊 專案狀態
-- **完成度**: 36.9% (24/65 任務)
+- **完成度**: 43.1% (28/65 任務)
 - **目標**: 7天內完成 100%
-- **當前版本**: v3.3.0
-- **下個版本**: v3.3.1 (用戶權限系統)
+- **當前版本**: v3.3.1
+- **下個版本**: v3.3.2 (用戶權限系統 / 未讀 UI)
 
 ## 🎯 最新進展 (2025/8/11)
 ### ✅ 完成項目
@@ -12,9 +12,19 @@
 - **載入狀態優化**: 實現 `_isInitialLoadComplete` 標記來追蹤真正的載入完成狀態
 - **UI 體驗改善**: 添加載入進度顯示和重試功能
 - **數據持久化**: FutureBuilder 邏輯優化確保數據載入完成後正確顯示 UI
-- **聊天訊息持久化**: 完成 `/chat/detail` 頁面訊息保存到 `chat_messages` 資料表
-- **Socket.IO 整合**: 建立即時聊天基礎架構，支援即時訊息接收和發送
-- **聊天室創建優化**: 修復任務應徵後自動創建真實聊天室功能
+- **聊天訊息持久化**: 完成 `/chat/detail` 訊息保存到 `chat_messages`
+- **Socket.IO 整合**: 建立即時聊天基礎架構，支援即時訊息接收/發送
+- **聊天室創建優化**: 應徵後使用 `ensure_room` 建立 BIGINT `chat_rooms.id`
+- **自動首則訊息**: 應徵成功後前端自動以 `cover_letter`（附回答摘要）呼叫 `chat/send_message.php` 寫入 `chat_messages`，並嘗試透過 Socket 推播
+- **My Works 導航回退**: 若該任務下無現成房間，`My Works` 點擊會回退呼叫 `ensure_room` 以目前使用者作為 participant 建立/取得房間，之後持久化並導頁
+- **View Resume 強化**: 以 `cover_letter` 作為自我推薦，`answers_json` 以「問題原文」為鍵；支援字串/物件雙格式解析
+- **/task/apply 傳輸格式調整**: 前端改傳 `answers: {questionText: answer}`；後端 `apply.php` 僅存 q1..q3 相容回退
+- **資料庫同步/清理**:
+  - 將舊 `answers_json(q1/q2/q3/introduction)` 轉換為「問題原文」鍵
+  - `introduction → cover_letter`（僅 cover 為空時）
+  - 為開放中任務自動補 3 題自訂問題
+- **聊天室參與者一致化**: 批次將 `chat_rooms.participant_id` 對齊最新 `task_applications.user_id`
+- **假資料產生器**: 以新格式批量產生 `task_applications` 假資料
 
 ## 🚀 今日任務 (Day 2 - 8/9)
 - **21 (Socket 核心)**
@@ -42,8 +52,9 @@
 - 26a: 聊天訊息持久化 (2025/8/11) - 訊息保存到資料庫
 - 26b: 聊天室創建優化 (2025/8/11) - 任務應徵後自動創建聊天室
 
-### 🔄 進行中 (0個)
-- 無
+### 🔄 進行中 (2個)
+- 26（未讀 UI 整合）
+- 22（用戶權限系統）
 
 ### 📋 待執行 (41個)
 

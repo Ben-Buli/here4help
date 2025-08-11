@@ -10,6 +10,7 @@ import 'package:here4help/chat/models/chat_room_model.dart';
 import 'package:intl/intl.dart';
 import 'package:here4help/chat/services/chat_storage_service.dart';
 import 'package:here4help/chat/services/chat_session_manager.dart';
+import 'package:here4help/chat/services/chat_service.dart';
 import 'package:here4help/constants/task_status.dart';
 import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/services/data_preload_service.dart';
@@ -982,8 +983,44 @@ class _ChatListPageState extends State<ChatListPage>
                                 ],
                               ),
                               onTap: () async {
-                                final userRole =
-                                    'creator'; // Posted Tasks 中，當前使用者是任務發布者
+                                // 1) 計算基礎資訊
+                                final userRole = 'creator';
+                                final String taskId =
+                                    task['id']?.toString() ?? '';
+                                final int? posterId =
+                                    (task['creator_id'] is int)
+                                        ? task['creator_id']
+                                        : int.tryParse('${task['creator_id']}');
+                                final int? applicantId =
+                                    (applierChatItem['user_id'] is int)
+                                        ? applierChatItem['user_id']
+                                        : int.tryParse(
+                                            '${applierChatItem['user_id']}');
+
+                                if (taskId.isEmpty ||
+                                    posterId == null ||
+                                    applicantId == null) {
+                                  debugPrint(
+                                      '❌ 進入聊天室缺少必要參數: taskId/posterId/applicantId');
+                                  return;
+                                }
+
+                                // 2) 透過後端 ensure_room 取得資料庫的真實 BIGINT room_id
+                                final chatService = ChatService();
+                                final roomResult = await chatService.ensureRoom(
+                                  taskId: taskId,
+                                  creatorId: posterId,
+                                  participantId: applicantId,
+                                );
+                                final roomData = roomResult['room'] ?? {};
+                                final String realRoomId =
+                                    roomData['id']?.toString() ?? '';
+                                if (realRoomId.isEmpty) {
+                                  debugPrint('❌ 無法取得真實 room_id');
+                                  return;
+                                }
+
+                                // 3) 準備聊天夥伴資訊與 room payload（使用真實 room_id）
                                 final chatPartnerInfo = {
                                   'id': applierChatItem['user_id'] ??
                                       applierChatItem['participant_id'],
@@ -995,32 +1032,45 @@ class _ChatListPageState extends State<ChatListPage>
                                       'assets/images/avatar/avatar-1.png',
                                   'role': 'participant',
                                 };
-                                final roomId =
-                                    applierChatItem['id']?.toString() ??
-                                        'unknown';
-                                // 保存持久化數據並設置當前會話（Posted Tasks）
+
+                                final roomPayload = {
+                                  ...applierChatItem,
+                                  'id': roomData['id'],
+                                  'roomId': realRoomId,
+                                  'taskId': taskId,
+                                  'task_id': taskId,
+                                  'creator_id': posterId,
+                                  'participant_id': applicantId,
+                                  'participant_avatar':
+                                      applierChatItem['participant_avatar'] ??
+                                          applierChatItem['avatar'],
+                                };
+
+                                // 4) 保存持久化數據並設置當前會話（使用真實 room_id 作為 key）
                                 await ChatStorageService.savechatRoomData(
-                                  roomId: roomId,
-                                  room: applierChatItem,
+                                  roomId: realRoomId,
+                                  room: roomPayload,
                                   task: task,
                                   userRole: userRole,
                                   chatPartnerInfo: chatPartnerInfo,
                                 );
                                 await ChatSessionManager.setCurrentChatSession(
-                                  roomId: roomId,
-                                  room: applierChatItem,
+                                  roomId: realRoomId,
+                                  room: roomPayload,
                                   task: task,
                                   userRole: userRole,
                                   chatPartnerInfo: chatPartnerInfo,
-                                  sourceTab: 'posted-tasks', // 記錄來源分頁
+                                  sourceTab: 'posted-tasks',
                                 );
+
+                                // 5) 產生正確 URL 並導頁
                                 final chatUrl =
                                     ChatStorageService.generateChatUrl(
-                                  roomId: roomId,
-                                  taskId: task['id']?.toString(),
+                                  roomId: realRoomId,
+                                  taskId: taskId,
                                 );
                                 final data = {
-                                  'room': applierChatItem,
+                                  'room': roomPayload,
                                   'task': task,
                                   'userRole': userRole,
                                   'chatPartnerInfo': chatPartnerInfo,
@@ -2058,6 +2108,81 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                 debugPrint('🔍 [My Works] extra data: $extraData');
 
                 context.go(chatUrl, extra: extraData);
+              } else {
+                // 沒有現成房間資料：回退為 ensure_room 建立/取得真實 BIGINT room_id 後導頁
+                try {
+                  final userService = context.read<UserService>();
+                  final currentUserId = userService.currentUser?.id;
+                  final taskId = task['id']?.toString() ?? '';
+                  final creatorId = (task['creator_id'] is int)
+                      ? task['creator_id']
+                      : int.tryParse('${task['creator_id']}') ?? 0;
+                  final participantId = (currentUserId is int)
+                      ? currentUserId
+                      : int.tryParse('${currentUserId}') ?? 0;
+
+                  if (taskId.isEmpty || creatorId <= 0 || participantId <= 0) {
+                    debugPrint('❌ [My Works] ensure_room 參數不足');
+                    return;
+                  }
+
+                  final chatService = ChatService();
+                  final roomResult = await chatService.ensureRoom(
+                    taskId: taskId,
+                    creatorId: creatorId,
+                    participantId: participantId,
+                    type: 'application',
+                  );
+                  final roomData = roomResult['room'] ?? {};
+                  final String realRoomId = roomData['id']?.toString() ?? '';
+                  if (realRoomId.isEmpty) {
+                    debugPrint('❌ [My Works] ensure_room 未取得 room_id');
+                    return;
+                  }
+
+                  final fallbackRoomPayload = {
+                    'id': roomData['id'],
+                    'roomId': realRoomId,
+                    'taskId': taskId,
+                    'task_id': taskId,
+                    'creator_id': creatorId,
+                    'participant_id': participantId,
+                  };
+
+                  await ChatStorageService.savechatRoomData(
+                    roomId: realRoomId,
+                    room: fallbackRoomPayload,
+                    task: task,
+                    userRole: userRole,
+                    chatPartnerInfo: chatPartnerInfo,
+                  );
+                  await ChatSessionManager.setCurrentChatSession(
+                    roomId: realRoomId,
+                    room: fallbackRoomPayload,
+                    task: task,
+                    userRole: userRole,
+                    chatPartnerInfo: chatPartnerInfo,
+                    sourceTab: 'my-works',
+                  );
+
+                  final chatUrl = ChatStorageService.generateChatUrl(
+                    roomId: realRoomId,
+                    taskId: taskId,
+                  );
+
+                  final extraData = {
+                    'room': fallbackRoomPayload,
+                    'task': task,
+                    'userRole': userRole,
+                    'chatPartnerInfo': chatPartnerInfo,
+                  };
+
+                  debugPrint('🔁 [My Works] ensure_room 後導航到聊天室');
+                  debugPrint('🔁 [My Works] chatUrl: $chatUrl');
+                  context.go(chatUrl, extra: extraData);
+                } catch (e) {
+                  debugPrint('❌ [My Works] ensure_room 失敗: $e');
+                }
               }
             },
             borderRadius: BorderRadius.circular(12),

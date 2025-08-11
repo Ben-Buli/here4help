@@ -123,20 +123,14 @@ class TaskService extends ChangeNotifier {
     required String taskId,
     required int userId,
     String? coverLetter,
-    String? introduction,
-    String? q1,
-    String? q2,
-    String? q3,
+    Map<String, String>? answers,
   }) async {
     final body = <String, dynamic>{
       'task_id': taskId,
       'user_id': userId,
     };
     if (coverLetter != null) body['cover_letter'] = coverLetter;
-    if (introduction != null) body['introduction'] = introduction;
-    if (q1 != null) body['q1'] = q1;
-    if (q2 != null) body['q2'] = q2;
-    if (q3 != null) body['q3'] = q3;
+    if (answers != null && answers.isNotEmpty) body['answers'] = answers;
 
     final resp = await http
         .post(

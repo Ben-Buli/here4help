@@ -5,6 +5,7 @@ import 'package:here4help/task/services/task_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/chat/services/chat_service.dart';
+import 'package:here4help/chat/services/socket_service.dart';
 
 /// 任務投遞應徵履歷表單頁面
 class TaskApplyPage extends StatefulWidget {
@@ -75,13 +76,13 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                     children: [
                       CircleAvatar(
                         radius: 30,
-                        backgroundImage: currentUser.avatar_url != null
+                        backgroundImage: currentUser.avatar_url.isNotEmpty
                             ? (currentUser.avatar_url.startsWith('http')
                                 ? NetworkImage(currentUser.avatar_url)
                                 : AssetImage(currentUser.avatar_url)
                                     as ImageProvider)
                             : null,
-                        child: currentUser.avatar_url == null
+                        child: currentUser.avatar_url.isEmpty
                             ? const Icon(Icons.person, size: 40)
                             : null,
                       ),
@@ -259,13 +260,19 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                             final taskService = TaskService();
                             final intro = _selfIntroController.text.trim();
                             final q1 = _englishController.text.trim();
+                            // 組裝新格式 answers：以「問題原文」為鍵
+                            final Map<String, String> answers = {};
+                            if (applicationQuestion != null &&
+                                applicationQuestion.trim().isNotEmpty &&
+                                q1.isNotEmpty) {
+                              answers[applicationQuestion.trim()] = q1;
+                            }
 
                             await taskService.applyForTask(
                               taskId: taskId,
                               userId: currentUser.id,
                               coverLetter: intro,
-                              introduction: intro,
-                              q1: q1.isEmpty ? null : q1,
+                              answers: answers.isEmpty ? null : answers,
                             );
 
                             // 取得任務資料，用於組合聊天室 payload
@@ -283,6 +290,41 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                             final roomData = roomResult['room'];
                             final roomId = roomData['id'].toString();
 
+                            // 應徵成功後，主動發送第一則訊息（使用 cover_letter 與可用回答摘要）
+                            try {
+                              final String answersSummary = (answers.isNotEmpty)
+                                  ? answers.entries
+                                      .map((e) => '${e.key}: ${e.value}')
+                                      .join('\n')
+                                  : '';
+                              final String autoMessage = [
+                                if (intro.isNotEmpty) intro,
+                                if (answersSummary.isNotEmpty) answersSummary,
+                              ].join('\n\n');
+
+                              if (autoMessage.trim().isNotEmpty) {
+                                final sendRes = await chatService.sendMessage(
+                                  roomId: roomId,
+                                  message: autoMessage.trim(),
+                                  taskId: taskId,
+                                );
+
+                                // 透過 Socket.IO 同步推播（若可用）
+                                try {
+                                  final socket = SocketService();
+                                  await socket.connect();
+                                  socket.sendMessage(
+                                    roomId: roomId,
+                                    text: autoMessage.trim(),
+                                    messageId:
+                                        sendRes['message_id']?.toString(),
+                                  );
+                                } catch (_) {}
+                              }
+                            } catch (e) {
+                              // 自動訊息失敗不阻擋流程
+                            }
+
                             if (mounted) {
                               // 使用真實的聊天室ID跳轉到聊天詳情頁面
                               context.go('/chat/detail', extra: {
@@ -298,12 +340,13 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                                   'sentMessages': <dynamic>[],
                                   // 添加當前用戶（應徵者）的資訊
                                   'user_id': currentUser.id,
-                                  'participant_id': currentUser.id,
                                   'user': {
                                     'id': currentUser.id,
                                     'name': currentUser.name,
                                     'avatar_url': currentUser.avatar_url,
                                   },
+                                  // 參與者頭像後備（供對方視角顯示）
+                                  'participant_avatar': currentUser.avatar_url,
                                   // 聊天夥伴（任務發布者）資訊
                                   'chat_partner': {
                                     'id': task['creator_id'],

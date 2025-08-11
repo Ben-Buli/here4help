@@ -21,26 +21,41 @@ try {
     $coverLetter = isset($body['cover_letter']) ? trim($body['cover_letter']) : '';
 
     // 組合 answers_json
-    $answers = [
-        'q1' => isset($body['q1']) ? (string)$body['q1'] : null,
-        'q2' => isset($body['q2']) ? (string)$body['q2'] : null,
-        'q3' => isset($body['q3']) ? (string)$body['q3'] : null,
-        'introduction' => isset($body['introduction']) ? (string)$body['introduction'] : ''
-    ];
+    // 統一 answers_json：以「問題原文」作為鍵，答案為值
+    $answers = [];
 
-    // 若未提供 introduction，嘗試用 cover_letter 和 q1..q3 自動組合
-    if (empty($answers['introduction'])) {
-        $introParts = [];
-        if (!empty($coverLetter)) { $introParts[] = $coverLetter; }
-        foreach (['q1','q2','q3'] as $k) {
-            if (!empty($answers[$k])) { $introParts[] = $answers[$k]; }
+    // 新格式：接收 { answers: { 'Question text': 'answer', ... } }
+    if (isset($body['answers']) && is_array($body['answers'])) {
+        foreach ($body['answers'] as $q => $a) {
+            $qText = trim((string)$q);
+            $aText = trim((string)$a);
+            if ($qText !== '' && $aText !== '') {
+                $answers[$qText] = $aText;
+            }
         }
-        $answers['introduction'] = implode(' ', $introParts);
     }
 
-    // 清掉為 null 的鍵
+    // 舊格式相容：若未傳 answers，則檢查 q1..q3，並以通用鍵名代入
+    if (empty($answers)) {
+        $legacy = [
+            'q1' => isset($body['q1']) ? (string)$body['q1'] : null,
+            'q2' => isset($body['q2']) ? (string)$body['q2'] : null,
+            'q3' => isset($body['q3']) ? (string)$body['q3'] : null,
+        ];
+        foreach ($legacy as $k => $v) {
+            if ($v !== null && trim($v) !== '') {
+                $answers[strtoupper($k)] = trim($v);
+            }
+        }
+    }
+
+    // 不再於 answers_json 放 introduction，僅保留 cover_letter 作為自我推薦
+
+    // 最後保險：清掉空值答案
     foreach ($answers as $k => $v) {
-        if ($v === null) { unset($answers[$k]); }
+        if (!is_string($k) || trim($k) === '' || trim((string)$v) === '') {
+            unset($answers[$k]);
+        }
     }
 
     if ($taskId === '' || $userId <= 0) {

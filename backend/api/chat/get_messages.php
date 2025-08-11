@@ -109,11 +109,28 @@ try {
     WHERE cm.room_id = ? AND cm.id > COALESCE(cr.last_read_message_id, 0)
   ", [$user_id, $room_id]);
 
+  // 取得對方的最後已讀訊息 ID（用於前端顯示我的訊息是否被已讀）
+  $opponent_id = ($room['creator_id'] == $user_id) ? (int)$room['participant_id'] : (int)$room['creator_id'];
+  $opponent_read = $db->fetch(
+    "SELECT COALESCE(last_read_message_id, 0) AS last_read_message_id FROM chat_reads WHERE user_id = ? AND room_id = ?",
+    [$opponent_id, $room_id]
+  );
+  $opponent_last_read_id = isset($opponent_read['last_read_message_id']) ? (int)$opponent_read['last_read_message_id'] : 0;
+
+  // 也回傳自己最後已讀（可選）
+  $my_read = $db->fetch(
+    "SELECT COALESCE(last_read_message_id, 0) AS last_read_message_id FROM chat_reads WHERE user_id = ? AND room_id = ?",
+    [$user_id, $room_id]
+  );
+  $my_last_read_id = isset($my_read['last_read_message_id']) ? (int)$my_read['last_read_message_id'] : 0;
+
   Response::success([
     'messages' => $messages,
     'room_id' => $room_id,
     'unread_count' => (int)$unread_count['count'],
-    'has_more' => count($messages) >= $limit
+    'has_more' => count($messages) >= $limit,
+    'opponent_last_read_message_id' => $opponent_last_read_id,
+    'my_last_read_message_id' => $my_last_read_id
   ], 'Messages retrieved successfully');
 
 } catch (Exception $e) {

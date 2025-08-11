@@ -12,6 +12,7 @@ class SocketService {
   io.Socket? _socket;
   bool _isConnected = false;
   String? _currentUserId;
+  final Set<String> _pendingJoinRooms = <String>{};
 
   // 監聽器
   Function(Map<String, dynamic>)? onMessageReceived;
@@ -39,7 +40,7 @@ class SocketService {
       _currentUserId = userId.toString();
 
       // Socket.IO 連接配置
-      final socketUrl = '${AppConfig.apiBaseUrl.replaceAll('/api', '')}:3001';
+      final socketUrl = AppConfig.socketUrl;
 
       _socket = io.io(socketUrl, <String, dynamic>{
         'transports': ['websocket'],
@@ -53,6 +54,15 @@ class SocketService {
       _socket!.onConnect((_) {
         _isConnected = true;
         debugPrint('✅ Socket connected for user $_currentUserId');
+
+        // Auto-join any rooms that were queued before connection
+        if (_pendingJoinRooms.isNotEmpty) {
+          for (final roomId in _pendingJoinRooms) {
+            _socket!.emit('join_room', {'roomId': roomId});
+            debugPrint('🏠 Auto-joined queued room: $roomId');
+          }
+          _pendingJoinRooms.clear();
+        }
       });
 
       _socket!.onDisconnect((_) {
@@ -113,7 +123,9 @@ class SocketService {
   /// 加入聊天室
   void joinRoom(String roomId) {
     if (!_isConnected || _socket == null) {
-      debugPrint('❌ Socket not connected, cannot join room');
+      // Queue the room join until we connect
+      _pendingJoinRooms.add(roomId);
+      debugPrint('⏳ Socket not connected, queued join for room: $roomId');
       return;
     }
 

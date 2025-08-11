@@ -79,6 +79,11 @@ ChatDetailPage (訊息顯示和發送)
 └── ChatStorageService (本地持久化)
 ```
 
+#### 補充
+- ChatTitleWidget / ChatDetailWrapper：支援從 `extra`、Session、LocalStorage 還原；Web 刷新安全
+- 舊格式 roomId `app_*` → 自動回退為 BIGINT `chat_rooms.id`
+- View Resume：以 `cover_letter` 為自我推薦；`answers_json` 以「問題原文」為鍵動態呈現
+
 ### 後端 Node.js + PHP
 ```
 Socket.IO Server (即時通信, :3001)
