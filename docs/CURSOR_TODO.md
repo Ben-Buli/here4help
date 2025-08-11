@@ -471,18 +471,23 @@
    - 未讀統計：不計算已取消任務的未讀訊息
 ```
 
-### 21. [ ] 聊天室詳情頁面（Socket 核心 + HTTP 備援）
-**目標**: 實現一對一聊天室的即時通訊功能
+### 21. [✅] 聊天室詳情頁面（Socket 核心 + HTTP 備援 + Action Bar API Skeleton + 主題整合）
+**目標**: 實現一對一聊天室的即時通訊功能與 Action Bar 動作骨架
 **檔案**: 
 - `lib/chat/pages/chat_detail_page.dart`
 - `lib/chat/services/global_chat_room.dart`
-- `backend/api/chat/` (新增)
-**狀態**: 待執行
+- `lib/chat/services/chat_service.dart`
+- `backend/api/chat/`（send_message/read_room/ensure_room/unread_snapshot/report/block_user/upload_attachment）
+- `backend/api/tasks/`（confirm_completion/disagree_completion/pay_and_review/reviews_get/reviews_submit）
+**狀態**: ✅ 已完成（MVP 骨架）
 **版本**: v3.3.0
 **操作**:
-- [ ] Realtime Gateway（Node.js/Socket.IO）：auth/join_room/leave_room/send_message/read_room/typing
-- [ ] /chat/detail 串接 socket：收/送訊息、顯示 system(application_resume)
-- [ ] HTTP 備援：`chat/rooms/open_or_get.php`、`chat/messages/list.php`（冷啟/重連）
+- [x] Realtime Gateway（Socket.IO）：收/送訊息、read、未讀推播（前端已接基礎）
+- [x] /chat/detail 串接 socket：收/送訊息
+- [x] Action Bar 串接（依角色/狀態）Report/Pay/Reviews/Confirm/Disagree/Block
+- [x] 附件上傳（MVP）：上傳圖片並回傳 URL，訊息帶入 URL
+- [x] UI 主題整合：Action Bar/Icon/Button/Input 採用 AppBar 主題色，並以局部 Theme 覆寫 hover/pressed/focus 狀態色
+- [x] 後端保護：已完成/關閉/取消/拒絕 任務禁止發送；雙向封鎖禁止發送
 
 ### 22. [ ] 用戶權限系統實現
 **目標**: 實現用戶權限分級和驗證系統
@@ -561,7 +566,7 @@
 - [ ] 添加任務篩選和搜尋
 - [ ] 實現分頁載入功能
 
-### 26. [ ] 未讀訊息通知系統（Socket 主推 + HTTP 快照）
+### 26. [🔄] 未讀訊息通知系統（Socket 主推 + HTTP 快照）
 **目標**: 實現全局未讀訊息通知和統計
 **檔案**: 
 - `lib/services/notification_service.dart` (新增)
@@ -587,7 +592,7 @@
 - [ ] 前端移除殘留 `creator_name` 寫入，全面使用 JOIN 的 `creator_name`
 - [ ] 移除殘留 `task['status']` 字串引用，統一 `status_code/status_display`
 
-### 28. [ ] API 端點完善
+### 28. [🔄] API 端點完善
 **目標**: 完善後端 API 以支援新功能
 **檔案**: 
 - `backend/api/chat/` (新增)
@@ -596,11 +601,11 @@
 **狀態**: 待執行
 **版本**: v3.3.1
 **操作**:
-- [ ] 創建聊天室相關 API
-- [ ] 更新任務相關 API
+- [x] 聊天室相關 API（send_message/read_room/ensure_room/unread_snapshot/report/block_user/upload_attachment）
+- [x] 任務相關 API（confirm_completion/disagree_completion/pay_and_review/reviews_get/reviews_submit）
 - [ ] 完善用戶認證 API
-- [ ] 添加檔案上傳 API
-- [ ] 實現 WebSocket 支援
+- [x] 添加檔案上傳 API（chat attachments MVP）
+- [x] WebSocket 支援（基礎）
 - [ ] 添加 API 版本控制
 - [ ] 實現 API 文檔
 

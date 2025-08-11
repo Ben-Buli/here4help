@@ -162,11 +162,11 @@
   - /task：新篩選列（我的任務、已應徵、更新日期排序、重設 + 三下拉 All、語言來源 `languages`）（已完成）
 - 狀態: 部分完成（8/9 收斂：未讀、Posted/My Works 真實資料、資訊面板最終版）
 
-**21. [✅] 聊天室詳情頁面 Socket.IO 整合** - 已完成 (2025/8/11)
+**21. [✅] 聊天室詳情頁面 Socket.IO 整合 + Action Bar API Skeleton** - 已完成 (2025/8/11)
 - 檔案: `lib/chat/pages/chat_detail_page.dart`, `lib/chat/services/socket_service.dart`
-- 操作: 整合 Socket.IO, 即時訊息, 訊息狀態, 打字指示器
+- 操作: 整合 Socket.IO, 即時訊息, 訊息狀態, 打字指示器；Action Bar 串接 Report/Pay/Reviews/Confirm/Disagree/Block（MVP 骨架）；附件上傳（MVP）；主題化的 Action Bar/Input（hover/pressed/focus 狀態色）
 - 狀態: ✅ 已完成
-- 成果: 完成即時聊天基礎架構，支援即時訊息接收和發送
+- 成果: 完成即時聊天基礎架構，支援即時訊息接收與發送；完成 Action Bar API 骨架，前後端基礎串接
 
 **26. [🔄] 未讀訊息通知系統** - 部分完成 (2025/8/11)
 - 檔案: `lib/services/notification_service.dart`, `lib/chat/services/socket_service.dart`

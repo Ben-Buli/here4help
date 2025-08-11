@@ -17,6 +17,62 @@
 - **聊天室創建優化**: 應徵後使用 `ensure_room` 建立 BIGINT `chat_rooms.id`
 - **自動首則訊息**: 應徵成功後前端自動以 `cover_letter`（附回答摘要）呼叫 `chat/send_message.php` 寫入 `chat_messages`，並嘗試透過 Socket 推播
 - **My Works 導航回退**: 若該任務下無現成房間，`My Works` 點擊會回退呼叫 `ensure_room` 以目前使用者作為 participant 建立/取得房間，之後持久化並導頁
+
+## 🧭 Chat Detail Action Bar - 任務與進度
+
+### 目標
+- 模組化 Action Bar（可依 `creator/participant` 與任務狀態切換動作）
+- Minimal UI 骨架先就緒；DB/API 第二步串接
+
+### 已完成（前端骨架 / 第一步）
+- 模組化 Action Bar：集中映射、依角色/狀態產生按鈕
+- plus/photo 圖示：
+  - plus：切換 Action Bar 顯示/隱藏
+  - photo：先開啟檔案選擇器並以占位訊息送出（上傳 API 待接）
+- 對話框/表單骨架：
+  - Creator
+    - Open: Accept（雙重確認 → 切 `in_progress`，保留舊清理其他聊天室動作）/ Block（骨架）
+    - In Progress: Pay（含 Reviews 視窗：Service/Attitude/Experience 三個 5 顆星 + 100 字 comment；雙重支付碼輸入）/ Report（BottomSheet 表單骨架）
+    - Pending Confirmation: Confirm / Disagree / Report（皆為骨架）
+    - Dispute: Report（骨架）
+    - Completed: Paid（時間戳視窗骨架）/ Reviews（可唯讀或可填寫骨架）/ Block（骨架）
+  - Participant
+    - Open: Report（骨架）
+    - In Progress: Completed（雙重確認 → 切 `pending_confirmation_tasker`）/ Report（骨架）
+    - Pending Confirmation: Report（骨架）
+    - Completed/Rejected/Closed/Canceled: Report/Block（骨架）
+- 其他相關 UI（已完成）
+  - 已讀狀態：傳送中（時鐘）/ 已傳送（單勾）/ 已讀（雙勾）
+  - 未讀提示浮條：不在底部時顯示半透明提示，點擊滾到底部
+  - 對手頭像 fallback：`room.user.avatar_url → participant_avatar → avatar`
+
+### 已完成（第二步：DB/API 串接 - MVP Skeleton）
+- Report API：`backend/api/chat/report.php`（描述需≥10字）＋ 前端 `_openReportSheet()` 串接 ✅
+- Pay 流程（MVP）：`backend/api/tasks/pay_and_review.php`（雙重支付碼，狀態切 Completed）＋ 前端 `_openPayAndReview()` ✅
+- Reviews API：`backend/api/tasks/reviews_get.php` / `reviews_submit.php` ＋ 前端 `_openReviewDialog()` 先查詢再唯讀/預填 ✅
+- Confirm（MVP）：`backend/api/tasks/confirm_completion.php`（先切狀態，後續補點數異動）✅
+- Disagree（限制）：`backend/api/tasks/disagree_completion.php`（每任務最多 2 次）✅
+- Block API：`backend/api/chat/block_user.php` ＋ 前端 Action 串接 ✅
+  - 新增資料表：`user_blocks`（雙向封鎖）與端點相容自動建立 ✅
+- 後端保護：`backend/api/chat/send_message.php` 禁止 Completed/Closed/Canceled/Rejected 狀態發送 ✅
+- 附件上傳（MVP）：`backend/api/chat/upload_attachment.php` ＋ 前端 `ChatService.uploadAttachment()`、`_pickAndSendPhoto()` ✅
+
+### 已完成（UI/UX 行為與主題整合）
+- Action Bar 與輸入區域配色統一至 AppBar 主題（背景/前景/文字/icon）✅
+- IconButton 與 TextField 的 hover/pressed/focus 狀態色以局部 Theme 覆寫，符合主題色階 ✅
+- plus/photo icon 調整至輸入框左側，輸入列垂直置中、hint 左側 padding ✅
+- 狀態 Bar 進入頁面自動顯示 3 秒後下滑消失（覆蓋於 Action Bar 上方）✅
+- Divider 與 Action Bar 之間的空間改為 Action Bar 的 paddingTop，結構更一致 ✅
+
+### 待辦（第二步：DB/API 進一步完善）
+- Pay/Confirm：點數轉移、交易紀錄寫入、權限驗證與安全檢查
+- Report：圖片上傳（evidence）與管理端審核流
+- Block：黑名單策略（搜尋/投遞限制）→ `/tasks/list` 已過濾封鎖的任務發布者（不可見/不可應徵）；已應徵與既有聊天室保留 ✅
+- 上傳圖片 API（chat attachments），訊息內顯示圖片縮圖
+
+### 技術註記
+- 行為映射集中於 `lib/chat/pages/chat_detail_page.dart` 的 `_buildActionButtonsByStatus()` 與彈窗 helper（`_openReportSheet` / `_openPayAndReview` / `_openReviewDialog` / `_showPaidInfo`）
+- 後端串接完成後，將把骨架中的 TODO 逐一替換為 API 呼叫
 - **View Resume 強化**: 以 `cover_letter` 作為自我推薦，`answers_json` 以「問題原文」為鍵；支援字串/物件雙格式解析
 - **/task/apply 傳輸格式調整**: 前端改傳 `answers: {questionText: answer}`；後端 `apply.php` 僅存 q1..q3 相容回退
 - **資料庫同步/清理**:
