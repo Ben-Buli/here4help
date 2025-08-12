@@ -449,7 +449,19 @@ class _ChatListPageState extends State<ChatListPage>
                                 backgroundColor:
                                     _getAvatarColor(applierChatItem['name']),
                                 child: Text(
-                                  _getInitials(applierChatItem['name']),
+                                  _getInitials((applierChatItem['id'] ==
+                                                  'tasker_13' ||
+                                              applierChatItem['id'] ==
+                                                  'tasker_room_11' ||
+                                              applierChatItem['id'] ==
+                                                  'tasker_room_12') &&
+                                          (applierChatItem['status']
+                                                  ?.toString()
+                                                  .contains('Tasker') ??
+                                              false)
+                                      ? (applierChatItem['poster']?['name'] ??
+                                          '')
+                                      : (applierChatItem['name'] ?? '')),
                                   style: const TextStyle(color: Colors.white),
                                 ),
                               ),
@@ -457,7 +469,19 @@ class _ChatListPageState extends State<ChatListPage>
                                 children: [
                                   Flexible(
                                     child: Text(
-                                      applierChatItem['name'],
+                                      (applierChatItem['id'] == 'tasker_13' ||
+                                                  applierChatItem['id'] ==
+                                                      'tasker_room_11' ||
+                                                  applierChatItem['id'] ==
+                                                      'tasker_room_12') &&
+                                              (applierChatItem['status']
+                                                      ?.toString()
+                                                      .contains('Tasker') ??
+                                                  false)
+                                          ? (applierChatItem['poster']
+                                                  ?['name'] ??
+                                              '')
+                                          : (applierChatItem['name'] ?? ''),
                                       maxLines: null,
                                       softWrap: true,
                                       overflow: TextOverflow.visible,

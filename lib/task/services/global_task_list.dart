@@ -174,7 +174,7 @@ class GlobalTaskList extends ChangeNotifier {
     ),
     TaskModel(
       id: "j1j1j1j1-k2k2-l3l3-m4m4-n5n5n5n5n5n6",
-      creatorName: "Sophia",
+      creatorName: "Fang",
       acceptorId: null,
       title: "Apply for International Driver's License",
       description:

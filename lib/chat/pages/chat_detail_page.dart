@@ -162,216 +162,437 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final applier = widget.data['room'];
     print(applier);
     final List<dynamic> sentMessages = room['sentMessages'] ?? [];
+    final List<dynamic> myMessages = room['myMessages'] ?? [];
+
+    // 交錯合併：先顯示對方，再顯示我方，依序交錯
+    final List<Map<String, String>> interleaved = [];
+    final int maxLen = (sentMessages.length > myMessages.length)
+        ? sentMessages.length
+        : myMessages.length;
+    for (int i = 0; i < maxLen; i++) {
+      if (i < sentMessages.length) {
+        final messageData = sentMessages[i];
+        final isString = messageData is String;
+        final messageText =
+            isString ? messageData : (messageData['message'] ?? '').toString();
+        interleaved.add({'from': 'other', 'text': messageText});
+      }
+      if (i < myMessages.length) {
+        interleaved.add({'from': 'self', 'text': myMessages[i].toString()});
+      }
+    }
 
     int totalItemCount = (questionReply.isNotEmpty ? 1 : 0) +
-        sentMessages.length +
+        interleaved.length +
         _messages.length;
 
     Widget buildQuestionReplyBubble(String text) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  child: Text(
-                    (room['user']?['name'] ?? applier['name'] ?? 'U')[0]
-                        .toUpperCase(),
-                    style: const TextStyle(color: Colors.white),
+      // 判斷是否為 My Works（Tasker 視角）
+      final List<dynamic> tagList =
+          (widget.data['task']['hashtags'] as List<dynamic>?) ?? const [];
+      final bool byHashtag =
+          tagList.map((e) => e.toString().toLowerCase()).contains('tasker');
+      final String statusStr = (widget.data['task']['status'] ?? '').toString();
+      final bool byStatus = statusStr.contains('(Tasker)');
+      final bool isMyWorksView = byHashtag || byStatus;
+
+      // 決定要顯示誰的履歷資料
+      // 判斷是否為 My Works 視角
+      final bool isTaskerView =
+          room['status']?.toString().contains('Tasker') ?? false;
+
+      // 根據視角選擇資料來源
+      final bool isSpecialRoom = room['id'] == 'tasker_13' ||
+          room['id'] == 'tasker_room_11' ||
+          room['id'] == 'tasker_room_12';
+
+      final Map<String, dynamic> subject;
+      final String subjectName;
+
+      if (isSpecialRoom) {
+        // 特殊聊天室：根據 Tasker 視角決定顯示我方還是對方資訊
+        if (isTaskerView) {
+          subject =
+              (room['user'] as Map<String, dynamic>? ?? <String, dynamic>{});
+          subjectName = room['user']?['name'] ?? 'User';
+        } else {
+          subject =
+              (room['poster'] as Map<String, dynamic>? ?? <String, dynamic>{});
+          subjectName = room['poster']?['name'] ?? 'User';
+        }
+      } else {
+        // 一般聊天室：直接使用 room 的資訊
+        subject = room;
+        subjectName = room['name'] ?? 'User';
+      }
+      final String subjectRating = room['rating']?.toString() ?? '4.0';
+      final String subjectReviews = room['reviewsCount']?.toString() ?? '0';
+
+      // 自介/語言回答
+      final String subjectSelfIntro;
+      final String subjectLanguage;
+
+      if (isSpecialRoom) {
+        // 特殊聊天室：根據 Tasker 視角決定顯示我方還是對方資訊
+        if (isTaskerView) {
+          subjectSelfIntro =
+              (room['user']?['selfIntro'] ?? 'No self-introduction available.')
+                  .toString();
+          subjectLanguage = (room['user']?['languageReply'] ??
+                  'No language information available.')
+              .toString();
+        } else {
+          subjectSelfIntro = (room['poster']?['selfIntro'] ??
+                  'No self-introduction available.')
+              .toString();
+          subjectLanguage = (room['poster']?['languageReply'] ??
+                  'No language information available.')
+              .toString();
+        }
+      } else {
+        // 一般聊天室：直接使用 room 的資訊
+        subjectSelfIntro =
+            (room['selfIntro'] ?? 'No self-introduction available.').toString();
+        subjectLanguage =
+            (room['languageReply'] ?? 'No language information available.')
+                .toString();
+      }
+
+      if (isMyWorksView) {
+        // 我方視角（Tasker）：右側 + 我方履歷
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    joinTime,
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          constraints: const BoxConstraints(maxWidth: 300),
-                          decoration: BoxDecoration(
-                            color: applierBubbleColor,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(text),
-                              const SizedBox(height: 4),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(
-                                  onPressed: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: const Center(
-                                            child: Text('Resume Preview')),
-                                        actions: [
-                                          Center(
-                                            child: TextButton(
-                                              onPressed: () =>
-                                                  Navigator.pop(context),
-                                              child: const Text('CLOSE'),
-                                            ),
-                                          ),
-                                        ],
-                                        insetPadding:
-                                            const EdgeInsets.symmetric(
-                                                horizontal: 24.0,
-                                                vertical: 24.0),
-                                        contentPadding:
-                                            const EdgeInsets.fromLTRB(
-                                                24.0, 20.0, 24.0, 0),
-                                        content: Column(
-                                          mainAxisSize: MainAxisSize.min,
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      constraints: const BoxConstraints(maxWidth: 400),
+                      decoration: BoxDecoration(
+                        color: const Color.fromARGB(255, 235, 241, 249),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(text),
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Center(
+                                        child: Text('Resume Preview')),
+                                    actions: [
+                                      Center(
+                                        child: TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          child: const Text('CLOSE'),
+                                        ),
+                                      ),
+                                    ],
+                                    insetPadding: const EdgeInsets.symmetric(
+                                        horizontal: 24.0, vertical: 24.0),
+                                    contentPadding: const EdgeInsets.fromLTRB(
+                                        24.0, 20.0, 24.0, 0),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
                                           crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                              CrossAxisAlignment.center,
                                           children: [
-                                            Row(
+                                            CircleAvatar(
+                                              radius: 30,
+                                              child: Text(
+                                                subjectName
+                                                    .trim()
+                                                    .substring(0, 1)
+                                                    .toUpperCase(),
+                                                style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 20),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 16),
+                                            Column(
                                               crossAxisAlignment:
-                                                  CrossAxisAlignment.center,
+                                                  CrossAxisAlignment.start,
                                               children: [
-                                                CircleAvatar(
-                                                  radius: 30,
-                                                  backgroundImage: room['user']
-                                                              ?['avatar_url'] !=
-                                                          null
-                                                      ? NetworkImage(
-                                                          room['user']![
-                                                              'avatar_url'])
-                                                      : null,
-                                                  child: room['user']
-                                                              ?['avatar_url'] ==
-                                                          null
-                                                      ? Text(
-                                                          (room['user']?[
-                                                                      'name'] ??
-                                                                  applier[
-                                                                      'name'] ??
-                                                                  'U')[0]
-                                                              .toUpperCase(),
-                                                          style:
-                                                              const TextStyle(
-                                                                  color: Colors
-                                                                      .white,
-                                                                  fontSize: 20),
-                                                        )
-                                                      : null,
+                                                Text(
+                                                  subjectName,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                  ),
                                                 ),
-                                                const SizedBox(width: 16),
-                                                Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
+                                                const SizedBox(height: 2),
+                                                Row(
                                                   children: [
+                                                    const Icon(Icons.star,
+                                                        color: Colors.amber,
+                                                        size: 16),
+                                                    const SizedBox(width: 4),
+                                                    Text(subjectRating),
                                                     Text(
-                                                      applier['name'] ??
-                                                          'Applier',
-                                                      style: const TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 16,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Row(
-                                                      children: [
-                                                        const Icon(Icons.star,
-                                                            color: Colors.amber,
-                                                            size: 16),
-                                                        const SizedBox(
-                                                            width: 4),
-                                                        Text(
-                                                            '${applier['rating'] ?? 4.2}'),
-                                                        Text(
-                                                            ' (${applier['cooment'] ?? '16 comments'})'),
-                                                      ],
-                                                    ),
+                                                        ' ($subjectReviews reviews)'),
                                                   ],
                                                 ),
                                               ],
                                             ),
-                                            const SizedBox(height: 12),
-                                            const Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: Text(
-                                                  'Self-recommendation (optional)',
-                                                  style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold)),
-                                            ),
-                                            TextField(
-                                              controller: TextEditingController(
-                                                  text: room['user']
-                                                                  ?['selfIntro']
-                                                              ?.isNotEmpty ==
-                                                          true
-                                                      ? room['user']![
-                                                          'selfIntro']
-                                                      : 'I am reliable, experienced, and proficient in communication. I have handled similar tasks before and am confident in my ability to deliver quality work.'),
-                                              readOnly: true,
-                                              maxLines: 4,
-                                              decoration: const InputDecoration(
-                                                hintText:
-                                                    'Tell us about yourself',
-                                                border: OutlineInputBorder(),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 12),
-                                            const Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: Text(
-                                                  'Can you speak English?',
-                                                  style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold)),
-                                            ),
-                                            TextField(
-                                              controller: TextEditingController(
-                                                  text: room['user']?[
-                                                                  'languageReply']
-                                                              ?.isNotEmpty ==
-                                                          true
-                                                      ? room['user']![
-                                                          'languageReply']
-                                                      : 'Yes, I can speak English fluently.'),
-                                              readOnly: true,
-                                              maxLines: 2,
-                                              decoration: const InputDecoration(
-                                                hintText: 'Write your answer',
-                                                border: OutlineInputBorder(),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                              'Self-recommendation (optional)',
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
+                                        ),
+                                        TextField(
+                                          controller: TextEditingController(
+                                              text: subjectSelfIntro),
+                                          readOnly: true,
+                                          maxLines: 4,
+                                          decoration: const InputDecoration(
+                                            hintText: 'Tell us about yourself',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Text('Can you speak English?',
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold)),
+                                        ),
+                                        TextField(
+                                          controller: TextEditingController(
+                                              text: subjectLanguage),
+                                          readOnly: true,
+                                          maxLines: 2,
+                                          decoration: const InputDecoration(
+                                            hintText: 'Write your answer',
+                                            border: OutlineInputBorder(),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: const Text('View Resume'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      } else {
+        // 發布者視角（Posted Tasks）：左側 + 對方履歷
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    child: Text(
+                      subjectName.trim().substring(0, 1).toUpperCase(),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            constraints: const BoxConstraints(maxWidth: 300),
+                            decoration: BoxDecoration(
+                              color: applierBubbleColor,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(text),
+                                const SizedBox(height: 4),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Center(
+                                              child: Text('Resume Preview')),
+                                          actions: [
+                                            Center(
+                                              child: TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(context),
+                                                child: const Text('CLOSE'),
                                               ),
                                             ),
                                           ],
+                                          insetPadding:
+                                              const EdgeInsets.symmetric(
+                                                  horizontal: 24.0,
+                                                  vertical: 24.0),
+                                          contentPadding:
+                                              const EdgeInsets.fromLTRB(
+                                                  24.0, 20.0, 24.0, 0),
+                                          content: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.center,
+                                                children: [
+                                                  CircleAvatar(
+                                                    radius: 30,
+                                                    child: Text(
+                                                      subjectName
+                                                          .trim()
+                                                          .substring(0, 1)
+                                                          .toUpperCase(),
+                                                      style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 20),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 16),
+                                                  Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        subjectName,
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 16,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Row(
+                                                        children: [
+                                                          const Icon(Icons.star,
+                                                              color:
+                                                                  Colors.amber,
+                                                              size: 16),
+                                                          const SizedBox(
+                                                              width: 4),
+                                                          Text(subjectRating),
+                                                          Text(
+                                                              ' ($subjectReviews reviews)'),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 12),
+                                              const Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(
+                                                    'Self-recommendation (optional)',
+                                                    style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold)),
+                                              ),
+                                              TextField(
+                                                controller:
+                                                    TextEditingController(
+                                                        text: subjectSelfIntro),
+                                                readOnly: true,
+                                                maxLines: 4,
+                                                decoration:
+                                                    const InputDecoration(
+                                                  hintText:
+                                                      'Tell us about yourself',
+                                                  border: OutlineInputBorder(),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              const Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(
+                                                    'Can you speak English?',
+                                                    style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold)),
+                                              ),
+                                              TextField(
+                                                controller:
+                                                    TextEditingController(
+                                                        text: subjectLanguage),
+                                                readOnly: true,
+                                                maxLines: 2,
+                                                decoration:
+                                                    const InputDecoration(
+                                                  hintText: 'Write your answer',
+                                                  border: OutlineInputBorder(),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                  },
-                                  child: const Text('View Resume'),
+                                      );
+                                    },
+                                    child: const Text('View Resume'),
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        joinTime,
-                        style:
-                            const TextStyle(fontSize: 10, color: Colors.grey),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Text(
+                          joinTime,
+                          style:
+                              const TextStyle(fontSize: 10, color: Colors.grey),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
+                ],
+              ),
+            ],
+          ),
+        );
+      }
     }
 
     Widget buildApplierBubble(String text) {
@@ -385,16 +606,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundImage: room['user']?['avatar_url'] != null
-                      ? NetworkImage(room['user']!['avatar_url'])
-                      : null,
-                  child: room['user']?['avatar_url'] == null
-                      ? Text(
-                          (room['user']?['name'] ?? applier['name'] ?? 'U')[0]
-                              .toUpperCase(),
-                          style: const TextStyle(color: Colors.white),
-                        )
-                      : null,
+                  child: Text(
+                    (applier['name'] ?? 'J')[0].toUpperCase(),
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -671,18 +886,21 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
                 int adjustedIndex = index - (questionReply.isNotEmpty ? 1 : 0);
 
-                if (adjustedIndex < sentMessages.length) {
-                  final messageData = sentMessages[adjustedIndex];
-                  final isString = messageData is String;
-                  final messageText = isString
-                      ? messageData
-                      : (messageData['message'] ?? '').toString();
-                  return buildApplierBubble(messageText);
+                if (adjustedIndex < interleaved.length) {
+                  final item = interleaved[adjustedIndex];
+                  if (item['from'] == 'other') {
+                    return buildApplierBubble(item['text']!);
+                  } else {
+                    return buildMyMessageBubble({
+                      'text': item['text']!,
+                      'time': joinTime,
+                    });
+                  }
                 }
 
-                int myMessageIndex = adjustedIndex - sentMessages.length;
-                if (myMessageIndex < _messages.length) {
-                  return buildMyMessageBubble(_messages[myMessageIndex]);
+                int myMessageDynamicIndex = adjustedIndex - interleaved.length;
+                if (myMessageDynamicIndex < _messages.length) {
+                  return buildMyMessageBubble(_messages[myMessageDynamicIndex]);
                 }
 
                 return const SizedBox.shrink();
