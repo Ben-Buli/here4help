@@ -208,7 +208,7 @@ class _ChatListPageState extends State<ChatListPage>
   Future<void> _seedIfNeeded() async {
     try {
       // 僅開發模式才進行種子資料；避免 dead code 警告
-      final bool isDev = true; // 可切換為 AppConfig.isDevelopment
+      const bool isDev = true; // 可切換為 AppConfig.isDevelopment
       if (!isDev) {
         return;
       }
@@ -1181,7 +1181,7 @@ class _ChatListPageState extends State<ChatListPage>
                               ),
                               onTap: () async {
                                 // 1) 計算基礎資訊
-                                final userRole = 'creator';
+                                const userRole = 'creator';
                                 final String taskId =
                                     task['id']?.toString() ?? '';
                                 final int? posterId =
@@ -1193,6 +1193,17 @@ class _ChatListPageState extends State<ChatListPage>
                                         ? applierChatItem['user_id']
                                         : int.tryParse(
                                             '${applierChatItem['user_id']}');
+
+                                // Debug 資料值
+                                debugPrint(
+                                    '🔍 點擊應徵者卡片 - taskId: $taskId, posterId: $posterId, applicantId: $applicantId');
+                                debugPrint('🔍 task keys: ${task.keys}');
+                                debugPrint(
+                                    '🔍 applierChatItem keys: ${applierChatItem.keys}');
+                                debugPrint(
+                                    '🔍 task[creator_id]: ${task['creator_id']} (${task['creator_id'].runtimeType})');
+                                debugPrint(
+                                    '🔍 applierChatItem[user_id]: ${applierChatItem['user_id']} (${applierChatItem['user_id'].runtimeType})');
 
                                 if (taskId.isEmpty ||
                                     posterId == null ||
@@ -1218,15 +1229,23 @@ class _ChatListPageState extends State<ChatListPage>
                                 }
 
                                 // 3) 準備聊天夥伴資訊與 room payload（使用真實 room_id）
+                                final partnerName = applierChatItem['name'] ??
+                                    applierChatItem['participant_name'] ??
+                                    'Applicant';
+                                final partnerAvatar =
+                                    applierChatItem['avatar'] ??
+                                        applierChatItem['participant_avatar'];
                                 final chatPartnerInfo = {
                                   'id': applierChatItem['user_id'] ??
                                       applierChatItem['participant_id'],
-                                  'name': applierChatItem['name'] ??
-                                      applierChatItem['participant_name'] ??
-                                      '任務應徵者',
-                                  'avatar': applierChatItem['avatar'] ??
-                                      applierChatItem['participant_avatar'] ??
-                                      'assets/images/avatar/avatar-1.png',
+                                  'name': partnerName,
+                                  'avatar': (partnerAvatar != null &&
+                                          partnerAvatar
+                                              .toString()
+                                              .trim()
+                                              .isNotEmpty)
+                                      ? partnerAvatar
+                                      : null, // 使用 null 讓 UI 層顯示首字母頭像
                                   'role': 'participant',
                                 };
 
@@ -1982,15 +2001,23 @@ class _ChatListPageState extends State<ChatListPage>
   List<Map<String, dynamic>> _convertApplicationsToApplierChatItems(
       List<Map<String, dynamic>> applications) {
     return applications.map((app) {
+      debugPrint('🔍 轉換應徵者資料: ${app.keys}');
+      debugPrint(
+          '🔍 應徵者名稱: ${app['applier_name']}, 頭像: ${app['applier_avatar']}');
+
       return {
         'id': 'app_${app['application_id'] ?? app['user_id']}',
         'taskId': app['task_id'],
         'name': app['applier_name'] ?? 'Anonymous',
+        'avatar': app['applier_avatar'], // 對應後端的 u.avatar_url AS applier_avatar
+        'participant_avatar': app['applier_avatar'], // 備用字段
+        'participant_avatar_url': app['applier_avatar'], // 備用字段
         'rating': 4.0, // 預設評分，未來可從 API 取得
         'reviewsCount': 0, // 預設評論數，未來可從 API 取得
         'questionReply': app['cover_letter'] ?? '',
         'sentMessages': [app['cover_letter'] ?? 'Applied for this task'],
         'user_id': app['user_id'],
+        'participant_id': app['user_id'], // 備用字段
         'application_id': app['application_id'],
         'application_status': app['application_status'] ?? 'applied',
         'answers_json': app['answers_json'],
@@ -2354,7 +2381,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                       : int.tryParse('${task['creator_id']}') ?? 0;
                   final participantId = (currentUserId is int)
                       ? currentUserId
-                      : int.tryParse('${currentUserId}') ?? 0;
+                      : int.tryParse('$currentUserId') ?? 0;
 
                   if (taskId.isEmpty || creatorId <= 0 || participantId <= 0) {
                     debugPrint('❌ [My Works] ensure_room 參數不足');
@@ -2606,34 +2633,108 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
       [Map<String, dynamic>? room]) {
     final currentUserId = context.read<UserService>().currentUser?.id;
 
+    debugPrint(
+        '🔍 _getChatPartnerInfo - userRole: $userRole, currentUserId: $currentUserId');
+    debugPrint('🔍 _getChatPartnerInfo - task keys: ${task.keys}');
+    debugPrint('🔍 _getChatPartnerInfo - room keys: ${room?.keys}');
+
     if (userRole == 'creator') {
       // 當前用戶是創建者，聊天對象是參與者
-      // 優先從 room 獲取參與者信息
       if (room != null && room.isNotEmpty) {
+        final dynamic id = room['user_id'] ?? room['participant_id'];
+        final String name =
+            room['name'] ?? room['participant_name'] ?? 'Applicant';
+        // 不使用預設圖，改用首字母圓形頭像
+        String? avatar;
+        final List<dynamic> avatarCandidates = [
+          room['participant_avatar_url'], // 從 ensure_room 返回
+          room['participant_avatar'], // 從 ensure_room 返回
+          (room['other_user'] is Map)
+              ? (room['other_user'] as Map)['avatar']
+              : null, // 從 get_rooms 返回
+          room['avatar'], // 通用字段
+          task['participant_avatar_url'], // 任務數據
+          task['participant_avatar'], // 任務數據
+          task['acceptor_avatar_url'], // 接受者數據
+          task['acceptor_avatar'], // 接受者數據
+        ];
+        for (final c in avatarCandidates) {
+          if (c is String &&
+              c.trim().isNotEmpty &&
+              !c.contains('assets/images/avatar/')) {
+            avatar = c;
+            break;
+          }
+        }
+        // 若找不到頭像網址，則用首字母圓形頭像（avatar 設為 null，UI 層判斷後渲染字母圓形頭像）
+        debugPrint(
+            '🎯 [Creator視角] 參與者資訊 - id: $id, name: $name, avatar: $avatar');
         return {
-          'id': room['user_id'] ?? room['participant_id'],
-          'name': room['name'] ?? room['participant_name'] ?? '任務應徵者',
-          'avatar': room['avatar'] ??
-              room['participant_avatar'] ??
-              'assets/images/avatar/avatar-1.png',
+          'id': id,
+          'name': name,
+          'avatar':
+              (avatar != null && avatar.trim().isNotEmpty) ? avatar : null,
           'role': 'participant',
         };
       }
       // 後備方案：從 task 獲取
+      final String name =
+          task['acceptor_name'] ?? task['participant_name'] ?? 'Applicant';
+      String? avatar;
+      final List<dynamic> taskAvatarCandidates = [
+        task['acceptor_avatar'],
+        task['participant_avatar'],
+      ];
+      for (final c in taskAvatarCandidates) {
+        if (c is String &&
+            c.trim().isNotEmpty &&
+            !c.contains('assets/images/avatar/')) {
+          avatar = c;
+          break;
+        }
+      }
+      // 若找不到頭像網址，則用首字母圓形頭像（avatar 設為 null，UI 層判斷後渲染字母圓形頭像）
+      debugPrint('🎯 [Creator視角-後備] 參與者資訊 - name: $name, avatar: $avatar');
       return {
         'id': task['acceptor_id'] ?? task['participant_id'],
-        'name': task['acceptor_name'] ?? task['participant_name'] ?? '任務應徵者',
-        'avatar': task['acceptor_avatar'] ??
-            task['participant_avatar'] ??
-            'assets/images/avatar/avatar-1.png',
+        'name': name,
+        'avatar': (avatar != null && avatar.trim().isNotEmpty) ? avatar : null,
         'role': 'participant',
       };
     } else {
       // 當前用戶是參與者，聊天對象是創建者
+      final String name =
+          task['creator_name'] ?? room?['creator_name'] ?? 'Creator';
+      final List<dynamic> creatorAvatarCandidates = [
+        room?['creator_avatar_url'], // 從 ensure_room 返回
+        room?['creator_avatar'], // 從 ensure_room 返回
+        (room?['other_user'] is Map)
+            ? room?['other_user']?['avatar']
+            : null, // 從 get_rooms 返回
+        (room?['chat_partner'] is Map)
+            ? room?['chat_partner']?['avatar_url']
+            : null,
+        (room?['chat_partner'] is Map)
+            ? room?['chat_partner']?['avatar']
+            : null,
+        task['creator_avatar_url'], // 任務數據
+        task['creator_avatar'], // 任務數據
+      ];
+      String? avatar;
+      for (final c in creatorAvatarCandidates) {
+        if (c is String &&
+            c.trim().isNotEmpty &&
+            !c.contains('assets/images/avatar/')) {
+          avatar = c;
+          break;
+        }
+      }
+      // 若找不到頭像網址，則用首字母圓形頭像（avatar 設為 null，UI 層判斷後渲染字母圓形頭像）
+      debugPrint('🎯 [Participant視角] 創建者資訊 - name: $name, avatar: $avatar');
       return {
         'id': task['creator_id'],
-        'name': task['creator_name'] ?? '任務發布者',
-        'avatar': task['creator_avatar'] ?? 'assets/images/avatar/avatar-1.png',
+        'name': name,
+        'avatar': (avatar != null && avatar.trim().isNotEmpty) ? avatar : null,
         'role': 'creator',
       };
     }

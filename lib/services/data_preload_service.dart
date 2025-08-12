@@ -1,6 +1,5 @@
 // data_preload_service.dart
 import 'package:here4help/task/services/task_service.dart';
-import 'package:here4help/auth/services/user_service.dart';
 
 /// 數據預載入服務
 ///

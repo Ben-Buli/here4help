@@ -1,22 +1,29 @@
 # Here4Help TODO - 快速索引
 
 ## 📊 專案狀態
-- **完成度**: 43.1% (28/65 任務)
+- **完成度**: 46.2% (30/65 任務)
 - **目標**: 7天內完成 100%
-- **當前版本**: v3.3.1
-- **下個版本**: v3.3.2 (用戶權限系統 / 未讀 UI)
+- **當前版本**: v3.3.2
+- **下個版本**: v3.3.3 (聊天室數據修復完成 / 圖片預覽優化)
 
-## 🎯 最新進展 (2025/8/11)
-### ✅ 完成項目
+## 🎯 最新進展 (2025/8/12)
+### ✅ v3.3.2 完成項目
+- **聊天室數據完整性修復**: 修復 `ensure_room.php` API 中的 SQL 查詢，正確關聯用戶表並返回用戶資訊
+- **資料庫結構同步**: 根據實際資料庫結構修復欄位名稱不一致問題（`name` vs `username`）
+- **圖片預覽功能優化**: 
+  - 修復圖片預覽關閉後空白畫面問題
+  - 優化預覽按鈕位置（關閉按鈕左上角，下載按鈕右下角）
+  - 使用 `showDialog` 和 `PopScope` 替代 `PageRouteBuilder` 解決導航衝突
+- **聊天對手頭像修復**: 
+  - 修復 `chat_list_page.dart` 中硬編碼預設頭像問題
+  - 優化頭像獲取邏輯，過濾預設 assets 路徑，支援文字頭像
+- **應徵者卡片數據映射**: 
+  - 修復 `_convertApplicationsToApplierChatItems` 中的頭像數據映射
+  - 添加詳細 debug 日誌追蹤數據流
 - **聊天列表載入修復**: 修正 `/chat` 頁面應徵者卡片在 hot restart 和 web 刷新時消失的問題
 - **載入狀態優化**: 實現 `_isInitialLoadComplete` 標記來追蹤真正的載入完成狀態
-- **UI 體驗改善**: 添加載入進度顯示和重試功能
-- **數據持久化**: FutureBuilder 邏輯優化確保數據載入完成後正確顯示 UI
 - **聊天訊息持久化**: 完成 `/chat/detail` 訊息保存到 `chat_messages`
 - **Socket.IO 整合**: 建立即時聊天基礎架構，支援即時訊息接收/發送
-- **聊天室創建優化**: 應徵後使用 `ensure_room` 建立 BIGINT `chat_rooms.id`
-- **自動首則訊息**: 應徵成功後前端自動以 `cover_letter`（附回答摘要）呼叫 `chat/send_message.php` 寫入 `chat_messages`，並嘗試透過 Socket 推播
-- **My Works 導航回退**: 若該任務下無現成房間，`My Works` 點擊會回退呼叫 `ensure_room` 以目前使用者作為 participant 建立/取得房間，之後持久化並導頁
 
 ## 🧭 Chat Detail Action Bar - 任務與進度
 

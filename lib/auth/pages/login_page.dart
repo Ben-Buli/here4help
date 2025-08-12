@@ -8,6 +8,7 @@ import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/auth/models/user_model.dart';
 import 'package:here4help/auth/services/platform_auth_service.dart';
 import 'package:here4help/auth/services/auth_service.dart';
+import 'package:here4help/utils/image_helper.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -111,7 +112,7 @@ class _LoginPageState extends State<LoginPage> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('登入成功：$email')),
+        SnackBar(content: Text('Login Success: $email')),
       );
 
       print('🚀 準備跳轉到首頁...');
@@ -125,11 +126,11 @@ class _LoginPageState extends State<LoginPage> {
         isLoading = false;
       });
 
-      String errorMessage = '登入失敗';
+      String errorMessage = 'Login Failed';
       if (e.toString().contains('Invalid email or password')) {
-        errorMessage = '帳號或密碼錯誤';
+        errorMessage = 'Invalid email or password';
       } else if (e.toString().contains('No token available')) {
-        errorMessage = '認證失敗，請重新登入';
+        errorMessage = 'Authentication failed, please login again';
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -213,17 +214,18 @@ class _LoginPageState extends State<LoginPage> {
         ));
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google 登入成功：${userData['email']}')),
+          SnackBar(content: Text('Google Login Success: ${userData['email']}')),
         );
         context.go('/home');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Google 登入失敗，請重試')),
+          const SnackBar(
+              content: Text('Google Login Failed, Please Try Again')),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Google 登入錯誤：$e')),
+        SnackBar(content: Text('Google Login Error: $e')),
       );
     } finally {
       setState(() {
@@ -274,17 +276,19 @@ class _LoginPageState extends State<LoginPage> {
         ));
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Facebook 登入成功：${userData['email']}')),
+          SnackBar(
+              content: Text('Facebook Login Success: ${userData['email']}')),
         );
         context.go('/home');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Facebook 登入失敗，請重試')),
+          const SnackBar(
+              content: Text('Facebook Login Failed, Please Try Again')),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Facebook 登入錯誤：$e')),
+        SnackBar(content: Text('Facebook Login Error: $e')),
       );
     } finally {
       setState(() {
@@ -335,17 +339,17 @@ class _LoginPageState extends State<LoginPage> {
         ));
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Apple 登入成功：${userData['email']}')),
+          SnackBar(content: Text('Apple Login Success: ${userData['email']}')),
         );
         context.go('/home');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Apple 登入失敗，請重試')),
+          const SnackBar(content: Text('Apple Login Failed, Please Try Again')),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Apple 登入錯誤：$e')),
+        SnackBar(content: Text('Apple Login Error: $e')),
       );
     } finally {
       setState(() {
@@ -384,10 +388,24 @@ class _LoginPageState extends State<LoginPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // App 圖示置中顯示
+                        // 建議統一使用 ImageHelper 來處理圖片路徑，這樣無論圖片放在 assets 還是 cPanel 網址都能自動判斷
+                        // 只要傳入相對路徑或完整網址即可
+                        Image(
+                          image: ImageHelper.getAvatarImage(
+                                  'assets/icon/app_icon_bordered.png') ??
+                              const AssetImage(
+                                  'assets/icon/app_icon_bordered.png'),
+                          width: 60,
+                          height: 60,
+                          errorBuilder: (context, error, stackTrace) =>
+                              const Icon(Icons.image_not_supported, size: 56),
+                        ),
+                        const SizedBox(height: 12),
                         const Text(
-                          'Welcome Back',
+                          'Here4Help',
                           style: TextStyle(
-                            fontSize: 28,
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -427,18 +445,17 @@ class _LoginPageState extends State<LoginPage> {
                           onFieldSubmitted: (_) => _submitForm(),
                         ),
                         const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Checkbox(
-                              value: rememberMe,
-                              onChanged: (value) {
-                                setState(() {
-                                  rememberMe = value ?? false;
-                                });
-                              },
-                            ),
-                            const Text('Remember me'),
-                          ],
+                        CheckboxListTile(
+                          value: rememberMe,
+                          onChanged: (value) {
+                            setState(() {
+                              rememberMe = value ?? false;
+                            });
+                          },
+                          title: const Text('Remember me'),
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
                         ),
                         const SizedBox(height: 16),
                         SizedBox(

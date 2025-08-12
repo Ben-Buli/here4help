@@ -13,6 +13,11 @@ import 'package:here4help/utils/image_helper.dart';
 import 'package:here4help/chat/services/chat_service.dart';
 import 'package:here4help/chat/services/socket_service.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:photo_view/photo_view.dart';
+import 'package:here4help/utils/path_mapper.dart';
+import 'package:provider/provider.dart';
+import 'package:here4help/services/theme_config_manager.dart';
+import 'dart:ui';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, required this.data});
@@ -29,6 +34,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   // 當前登入用戶 ID
   int? _currentUserId;
+  //
 
   // 聊天訊息列表（從資料庫載入）
   List<Map<String, dynamic>> _chatMessages = [];
@@ -40,7 +46,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   bool _showNewMsgBanner = false;
   int _unseenCount = 0;
   // 本地暫存「傳送中」訊息
-  List<Map<String, dynamic>> _pendingMessages = [];
+  final List<Map<String, dynamic>> _pendingMessages = [];
   // 角色與動作列控制
   String _userRole = 'participant';
   bool _showActionBar = true;
@@ -53,6 +59,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   // Socket.IO 服務
   final SocketService _socketService = SocketService();
   String? _currentRoomId;
+
+  // 對方頭像與名稱（相對於當前使用者的聊天室對象）快取
+  String? _opponentAvatarUrlCached;
+  String _opponentNameCached = 'U';
 
   // 進度資料暫不使用，保留映射函式如需擴充再啟用
 
@@ -79,6 +89,118 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     return '';
   }
 
+  // 偵測訊息內的第一個圖片連結（支援純 URL 或 [Photo]\nURL 格式）
+  String? _extractFirstImageUrl(String text) {
+    final lines = text.split('\n');
+    for (final line in lines) {
+      final trimmed = line.trim();
+      // 允許相對路徑（後端回傳 backend/uploads/...）與完整 URL
+      final httpMatch = RegExp(r'(https?:\/\/[^\s]+\.(png|jpg|jpeg|gif))',
+              caseSensitive: false)
+          .firstMatch(trimmed);
+      if (httpMatch != null) return httpMatch.group(1);
+      final relMatch = RegExp(
+              r'^(?:\/)?(backend\/uploads\/[^\s]+\.(png|jpg|jpeg|gif))$',
+              caseSensitive: false)
+          .firstMatch(trimmed);
+      if (relMatch != null) {
+        final rel = relMatch.group(1)!;
+        // 映射為可訪問 URL
+        return PathMapper.mapDatabasePathToUrl(rel);
+      }
+    }
+    return null;
+  }
+
+  // 建立訊息內容：若包含圖片 URL 則顯示縮圖並可點擊預覽，否則顯示文字
+  Widget _buildMessageContent(String text) {
+    final imageUrl = _extractFirstImageUrl(text);
+    if (imageUrl == null) {
+      return Text(text);
+    }
+    // 隱藏 URL/相對路徑，只保留其他說明文字（例如 [Photo] 檔名）
+    final httpRe =
+        RegExp(r'https?:\/\/[^\s]+\.(png|jpg|jpeg|gif)', caseSensitive: false);
+    final relRe = RegExp(
+        r'^(?:\/)?backend\/uploads\/[^\s]+\.(png|jpg|jpeg|gif)$',
+        caseSensitive: false);
+    final photoTagRe = RegExp(r'^\s*\[photo\]', caseSensitive: false);
+    final fileNameOnlyRe =
+        RegExp(r'^[^\\/\s]+\.(png|jpe?g|gif)$', caseSensitive: false);
+    final caption = text
+        .split('\n')
+        .where((line) {
+          final t = line.trim();
+          if (t.isEmpty) return false;
+          if (httpRe.hasMatch(t)) return false;
+          if (relRe.hasMatch(t)) return false;
+          if (photoTagRe.hasMatch(t)) return false; // [Photo] 檔名行不顯示
+          if (fileNameOnlyRe.hasMatch(t)) return false; // 純檔名行不顯示
+          return true;
+        })
+        .join('\n')
+        .trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (caption.isNotEmpty) ...[
+          Text(caption),
+          const SizedBox(height: 6),
+        ],
+        GestureDetector(
+          onTap: () {
+            if (!mounted) return;
+            _showImagePreview(imageUrl);
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LayoutBuilder(builder: (context, constraints) {
+              final maxW = constraints.maxWidth;
+              return ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxW),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return Container(
+                      color: Colors.black12,
+                      height: maxW * 0.6,
+                      alignment: Alignment.center,
+                      child: const SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: Colors.black12,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: const Icon(Icons.broken_image),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _glassNavColor(BuildContext context) {
+    try {
+      final themeManager =
+          Provider.of<ThemeConfigManager>(context, listen: false);
+      return themeManager.navigationBarBackground;
+    } catch (_) {
+      final appBarBg = Theme.of(context).appBarTheme.backgroundColor;
+      return (appBarBg ?? Colors.white).withOpacity(0.3);
+    }
+  }
+
   // _taskStatusCode() 暫不使用（資料以顯示文字流程處理）
 
   int? _getOpponentUserId() {
@@ -88,13 +210,176 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       final creatorId = room['creator_id'] ?? room['creatorId'];
       final participantId = room['participant_id'] ?? room['participantId'];
       if (_currentUserId == null) return null;
-      if (creatorId == _currentUserId) {
-        return participantId is int
-            ? participantId
-            : int.tryParse('$participantId');
-      } else {
-        return creatorId is int ? creatorId : int.tryParse('$creatorId');
+      final int? creator =
+          (creatorId is int) ? creatorId : int.tryParse('$creatorId');
+      final int? participant = (participantId is int)
+          ? participantId
+          : int.tryParse('$participantId');
+      debugPrint(
+          '👥 resolve opponent: currentUserId=$_currentUserId, creator=$creator, participant=$participant');
+      if (creator == _currentUserId) return participant;
+      if (participant == _currentUserId) return creator;
+      return participant ?? creator;
+    } catch (e) {
+      debugPrint('❌ _getOpponentUserId error: $e');
+      return null;
+    }
+  }
+
+  /// 取得對方顯示名稱（依對方 userId 判斷應取哪一側欄位）
+  String _getOpponentDisplayName() {
+    try {
+      final room = widget.data['room'] as Map<String, dynamic>?;
+      final task = widget.data['task'] as Map<String, dynamic>?;
+      final partner = room?['chat_partner'] as Map<String, dynamic>?;
+      final participantObj = room?['participant'] as Map<String, dynamic>?;
+      if (room == null) return 'User';
+      final int? opponentId = _getOpponentUserId();
+      final int? participantId = (room['participant_id'] is int)
+          ? room['participant_id']
+          : int.tryParse('${room['participant_id']}');
+
+      String? firstNonEmpty(List<dynamic> list) {
+        for (final v in list) {
+          if (v is String && v.trim().isNotEmpty) return v.trim();
+        }
+        return null;
       }
+
+      String? name;
+      if (opponentId != null &&
+          participantId != null &&
+          opponentId == participantId) {
+        // 對方為 participant
+        name = firstNonEmpty([
+          room['participant_nickname'],
+          room['participant_name'],
+          participantObj?['nickname'],
+          participantObj?['name'],
+          task?['participant_name'],
+        ]);
+      } else {
+        // 對方為 creator
+        name = firstNonEmpty([
+          room['creator_nickname'],
+          room['creator_name'],
+          partner?['nickname'],
+          partner?['name'],
+          task?['creator_name'],
+        ]);
+      }
+      return (name == null || name.isEmpty) ? 'User' : name;
+    } catch (_) {
+      return 'User';
+    }
+  }
+
+  /// 嘗試從多個來源擷取對方評分（平均星等、評論數）
+  (double avg, int count) _getOpponentRating() {
+    double avg = 0;
+    int count = 0;
+    try {
+      Map<String, dynamic>? source;
+      final room = widget.data['room'] as Map<String, dynamic>?;
+      final partner = room?['chat_partner'] as Map<String, dynamic>?;
+      final userObj = room?['user'] as Map<String, dynamic>?;
+      final chatPartnerInfo =
+          widget.data['chatPartnerInfo'] as Map<String, dynamic>?;
+      source = partner ?? userObj ?? chatPartnerInfo;
+
+      double? tryNum(dynamic v) {
+        if (v is num) return v.toDouble();
+        return double.tryParse('$v');
+      }
+
+      int? tryInt(dynamic v) {
+        if (v is num) return v.toInt();
+        return int.tryParse('$v');
+      }
+
+      final candidatesAvg = [
+        source?['avg_rating'],
+        source?['average_rating'],
+        source?['rating'],
+        source?['stars'],
+      ];
+      for (final c in candidatesAvg) {
+        final v = tryNum(c);
+        if (v != null) {
+          avg = v;
+          break;
+        }
+      }
+
+      final candidatesCount = [
+        source?['review_count'],
+        source?['reviews_count'],
+        source?['comments_count'],
+        source?['comments'],
+      ];
+      for (final c in candidatesCount) {
+        final v = tryInt(c);
+        if (v != null) {
+          count = v;
+          break;
+        }
+      }
+    } catch (_) {}
+    return (avg, count);
+  }
+
+  // 移除未使用的 _getRoomCreatorId 以消除警告
+
+  // 移除未使用的 _getRoomParticipantId 以消除 linter 警告
+
+  // 移除未使用的 _amCreatorInThisRoom 以消除警告
+
+  /// 取得對方大頭貼 URL（依對方 userId 判斷應取哪一側欄位）
+  String? _getOpponentAvatarUrl() {
+    try {
+      final room = widget.data['room'] as Map<String, dynamic>?;
+      final task = widget.data['task'] as Map<String, dynamic>?;
+      final partner = room?['chat_partner'] as Map<String, dynamic>?;
+      final chatPartnerInfo =
+          widget.data['chatPartnerInfo'] as Map<String, dynamic>?;
+      if (room == null) return null;
+      final int? opponentId = _getOpponentUserId();
+      final int? participantId = (room['participant_id'] is int)
+          ? room['participant_id']
+          : int.tryParse('${room['participant_id']}');
+      List<dynamic> candidates;
+      if (opponentId != null &&
+          participantId != null &&
+          opponentId == participantId) {
+        // 對方為 participant
+        final participantObj = room['participant'] as Map<String, dynamic>?;
+        candidates = [
+          room['participant_avatar'],
+          room['participant_avatar_url'],
+          participantObj?['avatar_url'],
+          room['applier_avatar'],
+          chatPartnerInfo?['avatar_url'],
+          chatPartnerInfo?['avatar'],
+          task?['participant_avatar_url'],
+          task?['participant_avatar'],
+        ];
+      } else {
+        // 對方為 creator
+        candidates = [
+          room['creator_avatar'],
+          room['creator_avatar_url'],
+          partner?['avatar_url'],
+          partner?['avatar'],
+          chatPartnerInfo?['avatar_url'],
+          chatPartnerInfo?['avatar'],
+          task?['creator_avatar'],
+          task?['creator_avatar_url'],
+        ];
+      }
+      for (final c in candidates) {
+        if (c is String && c.trim().isNotEmpty) return c;
+      }
+      return null;
     } catch (_) {
       return null;
     }
@@ -147,6 +432,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             parent: _statusBarController, curve: Curves.linear));
     WidgetsBinding.instance
         .addPostFrameCallback((_) => _startStatusBarAutoDismiss());
+    // 首次進入後解析一次對方身份（若資料稍後才齊，全局回調也會再觸發一次）
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _resolveOpponentIdentity());
 
     // 監聽列表滾動，更新是否在底部
     _listController.addListener(() {
@@ -213,6 +501,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('user_id');
+      final currentAvatar = prefs.getString('user_avatarUrl') ?? '';
       if (mounted) {
         setState(() {
           _currentUserId = userId;
@@ -222,6 +511,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             _userRole = (creatorId == userId) ? 'creator' : 'participant';
           }
         });
+        debugPrint(
+            '🔍 current user avatar from prefs: ${currentAvatar.isNotEmpty ? currentAvatar : 'empty'}');
+        // 當取得 userId 後再解析一次對方身份，避免因為 _currentUserId 為 null 造成角色判斷錯誤
+        _resolveOpponentIdentity();
       }
       debugPrint('🔍 當前登入用戶 ID: $_currentUserId');
     } catch (e) {
@@ -245,10 +538,21 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       if (file == null) return;
       if (_currentRoomId == null) throw Exception('room 未初始化');
 
-      final upload = await ChatService().uploadAttachment(
-        roomId: _currentRoomId!,
-        filePath: file.path,
-      );
+      // Web 需使用 bytes 上傳；原生可用 path。這裡優先走 bytes，失敗再回退 path。
+      Map<String, dynamic> upload;
+      try {
+        final bytes = await file.readAsBytes();
+        upload = await ChatService().uploadAttachment(
+          roomId: _currentRoomId!,
+          bytes: bytes,
+          fileName: file.name,
+        );
+      } catch (_) {
+        upload = await ChatService().uploadAttachment(
+          roomId: _currentRoomId!,
+          filePath: file.path,
+        );
+      }
       final url = upload['url'] ?? upload['path'] ?? '';
       final fileName = file.name;
       final text = url is String && url.isNotEmpty
@@ -288,12 +592,35 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         _socketService.joinRoom(_currentRoomId!);
         // 標記為已讀
         _socketService.markRoomAsRead(_currentRoomId!);
+        // 每次建立/切換聊天室時，解析一次對方身份與頭像
+        _resolveOpponentIdentity();
       }
 
       debugPrint('✅ Socket setup completed for room: $_currentRoomId');
     } catch (e) {
       debugPrint('❌ Socket setup failed: $e');
     }
+  }
+
+  /// 解析聊天室中「對方」身份並快取頭像與名稱
+  void _resolveOpponentIdentity() {
+    try {
+      // 若尚未取得當前使用者 ID，暫不解析，避免誤判角色導致顯示自己的頭像
+      if (_currentUserId == null) {
+        debugPrint('⏸️ 略過解析對方身份，因 _currentUserId 為 null');
+        return;
+      }
+      final name = _getOpponentDisplayName().trim();
+      final url = _getOpponentAvatarUrl();
+      final oppId = _getOpponentUserId();
+      setState(() {
+        _opponentNameCached = name.isNotEmpty ? name : 'U';
+        _opponentAvatarUrlCached =
+            (url != null && url.trim().isNotEmpty) ? url : null;
+      });
+      debugPrint(
+          '🧩 Opponent resolved: id=${oppId ?? 'null'}, name=$_opponentNameCached, avatar=${_opponentAvatarUrlCached ?? 'null'}');
+    } catch (_) {}
   }
 
   /// 處理收到的即時訊息
@@ -306,8 +633,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     if (roomId == _currentRoomId) {
       // 不是自己發的且不在底部時，顯示新訊息提示
       final isFromMe = _currentUserId != null &&
-          (fromUserId == _currentUserId ||
-              '${fromUserId}' == '${_currentUserId}');
+          (fromUserId == _currentUserId || '$fromUserId' == '$_currentUserId');
       if (!isFromMe && !_isAtBottom) {
         setState(() {
           _unseenCount += 1;
@@ -320,7 +646,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   /// 處理未讀訊息更新
   void _onUnreadUpdate(Map<String, dynamic> unreadData) {
-    debugPrint('🔔 Unread update: $unreadData');
+    // debugPrint('🔔 Unread update: $unreadData');
     // 這裡可以更新 UI 中的未讀徽章
   }
 
@@ -805,8 +1131,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   @override
   Widget build(BuildContext context) {
     final questionReply = widget.data['room']['questionReply'] ?? '';
-    final room = widget.data['room'];
-    final applier = widget.data['room'];
+    // final applier = widget.data['room'];
 
     // 使用從資料庫載入的訊息列表
     int totalItemCount = (questionReply.isNotEmpty ? 1 : 0) +
@@ -817,6 +1142,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         '🔍 Total messages: $totalItemCount (questionReply: ${questionReply.isNotEmpty ? 1 : 0}, chatMessages: ${_chatMessages.length})');
 
     Widget buildQuestionReplyBubble(String text) {
+      final (avgRating, reviewsCount) = _getOpponentRating();
+
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3.0),
         child: Column(
@@ -827,19 +1154,19 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundImage: (room['user']?['avatar_url'] ??
-                              applier['avatar_url']) !=
-                          null
-                      ? NetworkImage(
-                          room['user']?['avatar_url'] ?? applier['avatar_url'])
+                  backgroundImage: _opponentAvatarUrlCached != null
+                      ? ImageHelper.getAvatarImage(_opponentAvatarUrlCached!)
                       : null,
-                  child: ((room['user']?['avatar_url'] ??
-                              applier['avatar_url']) ==
-                          null)
+                  backgroundColor:
+                      Theme.of(context).colorScheme.secondary.withOpacity(0.35),
+                  child: _opponentAvatarUrlCached == null
                       ? Text(
-                          (room['user']?['name'] ?? applier['name'] ?? 'U')[0]
-                              .toUpperCase(),
-                          style: const TextStyle(color: Colors.white),
+                          _opponentNameCached.isNotEmpty
+                              ? _opponentNameCached[0].toUpperCase()
+                              : 'U',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSecondary,
+                          ),
                         )
                       : null,
                 ),
@@ -851,22 +1178,76 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                       Flexible(
                         child: Container(
                           padding: const EdgeInsets.all(12),
-                          constraints: const BoxConstraints(maxWidth: 300),
+                          constraints: const BoxConstraints(maxWidth: 250),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.secondary,
+                            color:
+                                Theme.of(context).colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Text(text),
-                              const SizedBox(height: 4),
+                              // 1. 頭像置中
+                              CircleAvatar(
+                                radius: 28,
+                                backgroundImage:
+                                    _opponentAvatarUrlCached != null
+                                        ? ImageHelper.getAvatarImage(
+                                            _opponentAvatarUrlCached!)
+                                        : null,
+                                backgroundColor: Theme.of(context)
+                                    .colorScheme
+                                    .secondary
+                                    .withOpacity(0.35),
+                                child: _opponentAvatarUrlCached == null
+                                    ? Text(
+                                        _opponentNameCached.isNotEmpty
+                                            ? _opponentNameCached[0]
+                                                .toUpperCase()
+                                            : 'U',
+                                        style: TextStyle(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSecondary,
+                                            fontSize: 18),
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(height: 8),
+                              // 2. 名字（無 nickname 則全名）
+                              Text(
+                                _opponentNameCached,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 6),
+                              // 3. 五星評分與評論數
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.star,
+                                      color: Colors.amber, size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${avgRating > 0 ? avgRating.toStringAsFixed(1) : '0.0'}  (${reviewsCount > 0 ? '$reviewsCount comments' : '0 comments'})',
+                                    style: const TextStyle(
+                                        color: Colors.black54, fontSize: 12),
+                                  )
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              const Divider(height: 16),
+                              // 4. View Resume 按鈕置中
                               Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(
+                                alignment: Alignment.center,
+                                child: FilledButton.icon(
+                                  icon: const Icon(Icons.visibility),
+                                  label: const Text('View Resume'),
                                   onPressed: () =>
                                       _showApplierResumeDialog(context),
-                                  child: const Text('View Resume'),
                                 ),
                               ),
                             ],
@@ -876,8 +1257,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                       const SizedBox(width: 4),
                       Text(
                         joinTime,
-                        style:
-                            const TextStyle(fontSize: 10, color: Colors.grey),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
                       ),
                     ],
                   ),
@@ -891,32 +1274,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
     Widget buildOpponentBubble(String text, int? opponentUserId,
         {String? senderName, String? messageTime}) {
-      // 根據對方身份獲取對應的用戶資訊
-      Map<String, dynamic> opponentInfo = {};
-
-      // 檢查是否為任務發布者
-      final taskCreatorId = widget.data['task']['creator_id'];
-      if (opponentUserId == taskCreatorId) {
-        // 對方是任務發布者
-        opponentInfo = {
-          'name': widget.data['task']['creator_name'] ??
-              room['chat_partner']?['name'] ??
-              'Task Creator',
-          'avatar_url': widget.data['task']['creator_avatar'] ??
-              room['chat_partner']?['avatar_url'] ??
-              '',
-        };
-      } else {
-        // 對方是應徵者，從 room 中獲取
-        opponentInfo = {
-          'name':
-              room['user']?['name'] ?? room['participant_name'] ?? 'Applicant',
-          'avatar_url': room['user']?['avatar_url'] ??
-              room['participant_avatar'] ??
-              room['avatar'] ??
-              '',
-        };
-      }
+      // 先前的 opponentInfo 已不再使用，頭像/名稱以快取為準
 
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3.0),
@@ -928,16 +1286,20 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundImage:
-                      ImageHelper.getAvatarImage(opponentInfo['avatar_url']),
-                  child:
-                      ImageHelper.getAvatarImage(opponentInfo['avatar_url']) ==
-                              null
-                          ? Text(
-                              (opponentInfo['name'] ?? 'U')[0].toUpperCase(),
-                              style: const TextStyle(color: Colors.white),
-                            )
-                          : null,
+                  backgroundImage: _opponentAvatarUrlCached != null
+                      ? ImageHelper.getAvatarImage(_opponentAvatarUrlCached!)
+                      : null,
+                  backgroundColor:
+                      Theme.of(context).colorScheme.secondary.withOpacity(0.35),
+                  child: _opponentAvatarUrlCached == null
+                      ? Text(
+                          _opponentNameCached.isNotEmpty
+                              ? _opponentNameCached[0].toUpperCase()
+                              : 'U',
+                          style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSecondary),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -957,7 +1319,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                               bottomRight: Radius.circular(16),
                             ),
                           ),
-                          child: Text(text),
+                          child: DefaultTextStyle.merge(
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSecondary,
+                            ),
+                            child: _buildMessageContent(text),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -1007,7 +1374,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                         bottomRight: Radius.circular(16),
                       ),
                     ),
-                    child: Text(text),
+                    child: DefaultTextStyle.merge(
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                      child: _buildMessageContent(text),
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Row(
@@ -1015,19 +1387,24 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     children: [
                       Text(
                         time,
-                        style:
-                            const TextStyle(fontSize: 10, color: Colors.grey),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
                       const SizedBox(width: 6),
-                      // 依賴 _opponentLastReadMessageId 與本訊息 id 比較（於列表組裝時傳入）
-                      if (message.containsKey('read'))
-                        Icon(
-                          Icons.done_all,
+                      // 狀態圖示：read 顯示雙勾(藍)，sent 顯示單勾(灰)
+                      Builder(builder: (_) {
+                        final status = (message['status'] ?? '').toString();
+                        final bool isRead =
+                            status == 'read' || (message['read'] == 'true');
+                        final cs = Theme.of(context).colorScheme;
+                        return Icon(
+                          isRead ? Icons.done_all : Icons.done,
                           size: 14,
-                          color: (message['read'] == 'true')
-                              ? Colors.blueAccent
-                              : Colors.grey,
-                        ),
+                          color: isRead ? cs.primary : cs.secondary,
+                        );
+                      }),
                     ],
                   ),
                 ],
@@ -1191,8 +1568,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     final isMyMessage = _currentUserId != null &&
                         messageFromUserId == _currentUserId;
 
-                    debugPrint(
-                        '🔍 Message judgment: messageFromUserId=$messageFromUserId, currentUserId=$_currentUserId, isMyMessage=$isMyMessage, text=$messageText');
+                    // debugPrint(
+                    //     '🔍 Message judgment: messageFromUserId=$messageFromUserId, currentUserId=$_currentUserId, isMyMessage=$isMyMessage, text=$messageText');
 
                     // 根據是否為我方訊息決定氣泡樣式
                     if (isMyMessage) {
@@ -1292,31 +1669,39 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           thickness: 2,
         ),
         if (_showActionBar)
-          Container(
-            color: Theme.of(context).appBarTheme.backgroundColor,
-            // 將分隔線下方的間距改為 Action Bar 的內距（paddingTop）
-            padding: const EdgeInsets.only(top: 12, bottom: 10),
-            child: Row(
-              children: _buildActionButtonsByStatus()
-                  .map((e) => Expanded(
-                        child: IconTheme(
-                          data: IconThemeData(
-                            color:
-                                Theme.of(context).appBarTheme.foregroundColor ??
+          ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: _glassNavColor(context),
+                ),
+                // 將分隔線下方的間距改為 Action Bar 的內距（paddingTop）
+                padding: const EdgeInsets.only(top: 12, bottom: 10),
+                child: Row(
+                  children: _buildActionButtonsByStatus()
+                      .map((e) => Expanded(
+                            child: IconTheme(
+                              data: IconThemeData(
+                                color: Theme.of(context)
+                                        .appBarTheme
+                                        .foregroundColor ??
                                     Colors.white,
-                          ),
-                          child: DefaultTextStyle(
-                            style: TextStyle(
-                              color: Theme.of(context)
-                                      .appBarTheme
-                                      .foregroundColor ??
-                                  Colors.white,
+                              ),
+                              child: DefaultTextStyle(
+                                style: TextStyle(
+                                  color: Theme.of(context)
+                                          .appBarTheme
+                                          .foregroundColor ??
+                                      Colors.white,
+                                ),
+                                child: e,
+                              ),
                             ),
-                            child: e,
-                          ),
-                        ),
-                      ))
-                  .toList(),
+                          ))
+                      .toList(),
+                ),
+              ),
             ),
           ),
         // ActionBar + Input 區塊採用與 AppBar 相同的背景/前景配色，並提供 hover/pressed/focus 覆蓋色
@@ -1327,119 +1712,130 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           final fg =
               theme.appBarTheme.foregroundColor ?? theme.colorScheme.onPrimary;
           return Theme(
-            data: theme.copyWith(
-              iconButtonTheme: IconButtonThemeData(
-                style: ButtonStyle(
-                  foregroundColor: MaterialStateProperty.resolveWith((states) {
-                    if (states.contains(MaterialState.disabled))
-                      return fg.withOpacity(0.5);
-                    return fg;
-                  }),
-                  overlayColor: MaterialStateProperty.resolveWith((states) {
-                    if (states.contains(MaterialState.pressed))
-                      return fg.withOpacity(0.12);
-                    if (states.contains(MaterialState.hovered))
-                      return fg.withOpacity(0.08);
-                    if (states.contains(MaterialState.focused))
-                      return fg.withOpacity(0.10);
-                    return null;
-                  }),
+              data: theme.copyWith(
+                iconButtonTheme: IconButtonThemeData(
+                  style: ButtonStyle(
+                    foregroundColor: WidgetStateProperty.resolveWith((states) {
+                      if (states.contains(WidgetState.disabled)) {
+                        return fg.withOpacity(0.5);
+                      }
+                      return fg;
+                    }),
+                    overlayColor: WidgetStateProperty.resolveWith((states) {
+                      if (states.contains(WidgetState.pressed)) {
+                        return fg.withOpacity(0.12);
+                      }
+                      if (states.contains(WidgetState.hovered)) {
+                        return fg.withOpacity(0.08);
+                      }
+                      if (states.contains(WidgetState.focused)) {
+                        return fg.withOpacity(0.10);
+                      }
+                      return null;
+                    }),
+                  ),
+                ),
+                inputDecorationTheme: theme.inputDecorationTheme.copyWith(
+                  filled: true,
+                  fillColor: bg.withOpacity(0.08),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide(color: fg.withOpacity(0.24)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide(color: fg, width: 1.5),
+                  ),
+                  hintStyle: TextStyle(color: fg.withOpacity(0.6)),
+                ),
+                textSelectionTheme: TextSelectionThemeData(
+                  cursorColor: fg,
+                  selectionColor: fg.withOpacity(0.25),
+                  selectionHandleColor: fg,
                 ),
               ),
-              inputDecorationTheme: theme.inputDecorationTheme.copyWith(
-                filled: true,
-                fillColor: bg.withOpacity(0.08),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(color: fg.withOpacity(0.24)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide(color: fg, width: 1.5),
-                ),
-                hintStyle: TextStyle(color: fg.withOpacity(0.6)),
-              ),
-              textSelectionTheme: TextSelectionThemeData(
-                cursorColor: fg,
-                selectionColor: fg.withOpacity(0.25),
-                selectionHandleColor: fg,
-              ),
-            ),
-            child: Container(
-              color: bg,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // plus 與 photo 置於最左側，位於輸入框之前
-                  IconTheme(
-                    data: IconThemeData(color: fg),
+              child: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: Container(
+                    decoration: BoxDecoration(color: _glassNavColor(context)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        IconButton(
-                          tooltip: _showActionBar ? 'Less' : 'More',
-                          icon: Icon(
-                            _showActionBar
-                                ? Icons.remove_circle_outline
-                                : Icons.add_circle_outline,
+                        // plus 與 photo 置於最左側，位於輸入框之前
+                        IconTheme(
+                          data: IconThemeData(color: fg),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: _showActionBar ? 'Less' : 'More',
+                                icon: Icon(
+                                  _showActionBar
+                                      ? Icons.remove_circle_outline
+                                      : Icons.add_circle_outline,
+                                ),
+                                onPressed:
+                                    isInputDisabled ? null : _toggleActionBar,
+                              ),
+                              IconButton(
+                                tooltip: 'Photo',
+                                icon: const Icon(Icons.photo_outlined),
+                                onPressed:
+                                    isInputDisabled ? null : _pickAndSendPhoto,
+                              ),
+                            ],
                           ),
-                          onPressed: isInputDisabled ? null : _toggleActionBar,
                         ),
-                        IconButton(
-                          tooltip: 'Photo',
-                          icon: const Icon(Icons.photo_outlined),
-                          onPressed: isInputDisabled ? null : _pickAndSendPhoto,
+                        Expanded(
+                          child: Container(
+                            // 固定高度以與 IconButton (預設 48) 視覺中心對齊
+                            height: 48,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: bg.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            child: TextField(
+                              controller: _controller,
+                              focusNode: _focusNode,
+                              enabled: !isInputDisabled,
+                              textInputAction: TextInputAction.send,
+                              onSubmitted: (value) {
+                                if (!isInputDisabled) _sendMessage();
+                              },
+                              onEditingComplete: () {
+                                FocusScope.of(context).unfocus();
+                              },
+                              onTapOutside: (_) {
+                                FocusScope.of(context).unfocus();
+                              },
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                // 調整內邊距：左側加 8，並垂直置中
+                                contentPadding: EdgeInsets.only(
+                                    left: 8, top: 12, bottom: 12),
+                                hintText: 'Type a message',
+                              ),
+                              style: TextStyle(color: fg),
+                              cursorColor: fg,
+                            ),
+                          ),
+                        ),
+                        IconTheme(
+                          data: IconThemeData(color: fg),
+                          child: IconButton(
+                            icon: const Icon(Icons.send),
+                            onPressed: isInputDisabled ? null : _sendMessage,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  Expanded(
-                    child: Container(
-                      // 固定高度以與 IconButton (預設 48) 視覺中心對齊
-                      height: 48,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: bg.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: TextField(
-                        controller: _controller,
-                        focusNode: _focusNode,
-                        enabled: !isInputDisabled,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (value) {
-                          if (!isInputDisabled) _sendMessage();
-                        },
-                        onEditingComplete: () {
-                          FocusScope.of(context).unfocus();
-                        },
-                        onTapOutside: (_) {
-                          FocusScope.of(context).unfocus();
-                        },
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          // 調整內邊距：左側加 8，並垂直置中
-                          contentPadding:
-                              EdgeInsets.only(left: 8, top: 12, bottom: 12),
-                          hintText: 'Type a message',
-                        ),
-                        style: TextStyle(color: fg),
-                        cursorColor: fg,
-                      ),
-                    ),
-                  ),
-                  IconTheme(
-                    data: IconThemeData(color: fg),
-                    child: IconButton(
-                      icon: const Icon(Icons.send),
-                      onPressed: isInputDisabled ? null : _sendMessage,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
+                ),
+              ));
         }),
       ],
     );
@@ -2112,5 +2508,105 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       default:
         return Colors.grey[200]!;
     }
+  }
+
+  /// 顯示圖片預覽對話框
+  void _showImagePreview(String imageUrl) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.95),
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) {
+        return PopScope(
+          canPop: true,
+          onPopInvokedWithResult: (didPop, result) {
+            // 當用戶按返回鍵時，這裡會被調用
+            // didPop 為 true 表示已經執行了 pop，不需要額外處理
+          },
+          child: Dialog.fullscreen(
+            backgroundColor: Colors.transparent,
+            child: Stack(
+              children: [
+                // 點擊背景關閉
+                GestureDetector(
+                  onTap: () => Navigator.of(dialogContext).pop(),
+                  child: Container(
+                    color: Colors.transparent,
+                    width: double.infinity,
+                    height: double.infinity,
+                  ),
+                ),
+                // 圖片預覽內容
+                Center(
+                  child: GestureDetector(
+                    onTap: () {}, // 防止點擊圖片時關閉對話框
+                    child: PhotoView(
+                      imageProvider: NetworkImage(imageUrl),
+                      backgroundDecoration: const BoxDecoration(
+                        color: Colors.transparent,
+                      ),
+                      minScale: PhotoViewComputedScale.contained,
+                      maxScale: PhotoViewComputedScale.covered * 3.0,
+                      initialScale: PhotoViewComputedScale.contained,
+                      loadingBuilder: (context, event) => const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error, color: Colors.white, size: 64),
+                            SizedBox(height: 16),
+                            Text(
+                              '圖片載入失敗',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // 關閉按鈕 (左上角)
+                Positioned(
+                  top: MediaQuery.of(dialogContext).padding.top + 16,
+                  left: 16,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                    ),
+                  ),
+                ),
+                // 下載按鈕 (右下角)
+                Positioned(
+                  bottom: MediaQuery.of(dialogContext).padding.bottom + 16,
+                  right: 16,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.download, color: Colors.white),
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('下載功能開發中')),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }

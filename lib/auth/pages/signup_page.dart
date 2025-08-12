@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/constants/app_colors.dart';
 import 'package:here4help/task/services/language_service.dart';
+import 'package:pinput/pinput.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -522,89 +523,44 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 16),
 
-            // Payment Password
-            TextFormField(
+            // Payment Password (6 boxes)
+            const Text('Payment Password'),
+            const SizedBox(height: 8),
+            _buildPinputField(
               controller: paymentPasswordController,
-              decoration: InputDecoration(
-                labelText: 'Payment Password',
-                hintText: 'Enter 6-digit payment code',
-                border: const OutlineInputBorder(),
-                helperText: 'This will be used for payment verification',
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    showPaymentPassword
-                        ? Icons.visibility
-                        : Icons.visibility_off,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      showPaymentPassword = !showPaymentPassword;
-                    });
-                  },
-                ),
-              ),
-              obscureText: !showPaymentPassword,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-              ],
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter payment password';
-                }
-                if (value.length != 6) {
-                  return 'Payment password must be 6 digits';
-                }
+              helperText: 'This will be used for payment verification',
+              validator: (v) {
+                final t = (v ?? '').trim();
+                if (t.isEmpty) return 'Please enter payment password';
+                if (t.length != 6) return 'Payment password must be 6 digits';
+                if (!RegExp(r'^\d{6}$').hasMatch(t)) return 'Digits only';
                 return null;
               },
             ),
             const SizedBox(height: 16),
 
-            // Confirm Payment Password
-            TextFormField(
+            // Confirm Payment Password (6 boxes)
+            const Text('Confirm Payment Password'),
+            const SizedBox(height: 8),
+            _buildPinputField(
               controller: confirmPaymentPasswordController,
-              decoration: InputDecoration(
-                labelText: 'Confirm Payment Password',
-                hintText: 'Enter 6-digit payment code again',
-                border: const OutlineInputBorder(),
-                helperText: confirmPaymentPasswordController.text.isNotEmpty &&
-                        confirmPaymentPasswordController.text !=
-                            paymentPasswordController.text
-                    ? 'Payment passwords do not match'
-                    : null,
-                helperMaxLines: 1,
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    showConfirmPaymentPassword
-                        ? Icons.visibility
-                        : Icons.visibility_off,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      showConfirmPaymentPassword = !showConfirmPaymentPassword;
-                    });
-                  },
-                ),
-              ),
-              obscureText: !showConfirmPaymentPassword,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-              ],
-              onChanged: (value) {
-                setState(() {});
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please confirm payment password';
+              onChanged: (t) {
+                // 及時驗證與第一次是否一致（6 碼時才比對）
+                if (t.length == 6 && t != paymentPasswordController.text) {
+                  // 觸發一次重建以顯示 validator 的錯誤（若有包在 Form 中）
+                  if (mounted) setState(() {});
                 }
-                if (value != paymentPasswordController.text) {
+              },
+              validator: (v) {
+                final t = (v ?? '').trim();
+                if (t.isEmpty) return 'Please confirm payment password';
+                if (t.length != 6) return 'Must be 6 digits';
+                if (t != paymentPasswordController.text) {
                   return 'Payment passwords do not match';
                 }
                 return null;
               },
+              helperText: 'Must match the password above',
             ),
             const SizedBox(height: 32),
 
@@ -629,6 +585,10 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       ),
     );
   }
+
+  // 6 位數輸入元件（圓角方格/底線樣式）
+  // 使用六個單格 TextField，自動前進與退格回上一格
+  // 外部以 controller 讀取最終字串
 
   void _showLanguageSelector() {
     showDialog(
@@ -796,5 +756,69 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       );
       return false;
     }
+  }
+
+  /// 建立 6 位數字密碼輸入欄位（使用 Pinput）
+  Widget _buildPinputField({
+    required TextEditingController controller,
+    String? Function(String?)? validator,
+    void Function(String)? onChanged,
+    String? helperText,
+  }) {
+    final defaultPinTheme = PinTheme(
+      width: 45,
+      height: 50,
+      textStyle: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+      ),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade400),
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+
+    final focusedPinTheme = defaultPinTheme.copyWith(
+      decoration: defaultPinTheme.decoration!.copyWith(
+        border: Border.all(color: Theme.of(context).primaryColor, width: 2),
+      ),
+    );
+
+    final submittedPinTheme = defaultPinTheme.copyWith(
+      decoration: defaultPinTheme.decoration!.copyWith(
+        color: Colors.grey.shade100,
+        border: Border.all(color: Colors.grey.shade400),
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Pinput(
+          controller: controller,
+          length: 6,
+          defaultPinTheme: defaultPinTheme,
+          focusedPinTheme: focusedPinTheme,
+          submittedPinTheme: submittedPinTheme,
+          validator: validator,
+          onChanged: onChanged,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          obscureText: true,
+          autofocus: false,
+          pinputAutovalidateMode: PinputAutovalidateMode.onSubmit,
+        ),
+        if (helperText != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            helperText,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }

@@ -9,6 +9,7 @@ import 'package:here4help/services/data_preload_service.dart';
 import 'package:here4help/chat/services/chat_session_manager.dart';
 import 'dart:ui';
 import 'dart:math';
+import 'package:here4help/services/scroll_event_bus.dart';
 
 class AppScaffold extends StatefulWidget {
   const AppScaffold({
@@ -320,6 +321,21 @@ class _AppScaffoldState extends State<AppScaffold> {
             unselectedItemColor: themeManager.navigationBarUnselectedColor,
             elevation: 0,
             onTap: (index) async {
+              final current = _getCurrentIndex(context);
+              if (index == current) {
+                // 同頁：發送滾頂事件
+                final route = switch (index) {
+                  0 => '/task/create',
+                  1 => '/task',
+                  2 => '/home',
+                  3 => '/chat',
+                  4 => '/account',
+                  _ => '/home',
+                };
+                ScrollEventBus().emit(route);
+                return;
+              }
+
               // 預載入目標頁面的數據
               final preloadService = DataPreloadService();
 
@@ -328,17 +344,14 @@ class _AppScaffoldState extends State<AppScaffold> {
                   context.go('/task/create');
                   break;
                 case 1:
-                  // 預載入任務數據
                   preloadService.preloadForRoute('/task');
                   context.go('/task');
                   break;
                 case 2:
-                  // 預載入首頁數據
                   preloadService.preloadForRoute('/home');
                   context.go('/home');
                   break;
                 case 3:
-                  // 預載入聊天數據
                   preloadService.preloadForRoute('/chat');
                   context.go('/chat');
                   break;
@@ -350,23 +363,23 @@ class _AppScaffoldState extends State<AppScaffold> {
             items: [
               const BottomNavigationBarItem(
                 icon: Icon(Icons.add_box_outlined),
-                label: '',
+                label: 'Post',
               ),
               const BottomNavigationBarItem(
                 icon: Icon(Icons.search),
-                label: '',
+                label: 'Tasks',
               ),
               const BottomNavigationBarItem(
                 icon: Icon(Icons.home),
-                label: '',
+                label: 'Home',
               ),
               BottomNavigationBarItem(
                 icon: _ChatBadgeIcon(),
-                label: '',
+                label: 'Chat',
               ),
               const BottomNavigationBarItem(
                 icon: Icon(Icons.person),
-                label: '',
+                label: 'Account',
               ),
             ],
           ),

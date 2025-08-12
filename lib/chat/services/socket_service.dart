@@ -98,14 +98,14 @@ class SocketService {
 
     // 未讀數量更新
     _socket!.on('unread_total', (data) {
-      debugPrint('🔔 Unread total updated: $data');
+      // debugPrint('🔔 Unread total updated: $data');
       if (onUnreadUpdate != null) {
         onUnreadUpdate!(Map<String, dynamic>.from(data));
       }
     });
 
     _socket!.on('unread_by_room', (data) {
-      debugPrint('🔔 Unread by room updated: $data');
+      // debugPrint('🔔 Unread by room updated: $data');
       if (onUnreadUpdate != null) {
         onUnreadUpdate!(Map<String, dynamic>.from(data));
       }

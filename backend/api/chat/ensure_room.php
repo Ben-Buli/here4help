@@ -55,9 +55,16 @@ try {
     throw new Exception('Task not found');
   }
 
-  // 查找是否已有房間
+  // 查找是否已有房間，並同時查詢用戶資料
   $room = $db->fetch(
-    'SELECT id, task_id, creator_id, participant_id, type FROM chat_rooms WHERE task_id = ? AND creator_id = ? AND participant_id = ? AND type = ? LIMIT 1',
+    'SELECT cr.id, cr.task_id, cr.creator_id, cr.participant_id, cr.type,
+            creator.name as creator_name, creator.avatar_url as creator_avatar_url, creator.avatar_url as creator_avatar,
+            participant.name as participant_name, participant.avatar_url as participant_avatar_url, participant.avatar_url as participant_avatar
+     FROM chat_rooms cr
+     LEFT JOIN users creator ON cr.creator_id = creator.id
+     LEFT JOIN users participant ON cr.participant_id = participant.id
+     WHERE cr.task_id = ? AND cr.creator_id = ? AND cr.participant_id = ? AND cr.type = ? 
+     LIMIT 1',
     [$task_id, $creator_id, $participant_id, $type]
   );
 
@@ -69,17 +76,25 @@ try {
     );
     $newIdRow = $db->fetch('SELECT LAST_INSERT_ID() AS id');
     $roomId = (int)$newIdRow['id'];
-    $room = [
-      'id' => $roomId,
-      'task_id' => $task_id,
-      'creator_id' => $creator_id,
-      'participant_id' => $participant_id,
-      'type' => $type,
-    ];
+    
+    // 查詢新建房間的完整資料（包含用戶信息）
+    $room = $db->fetch(
+      'SELECT cr.id, cr.task_id, cr.creator_id, cr.participant_id, cr.type,
+              creator.name as creator_name, creator.avatar_url as creator_avatar_url, creator.avatar_url as creator_avatar,
+              participant.name as participant_name, participant.avatar_url as participant_avatar_url, participant.avatar_url as participant_avatar
+       FROM chat_rooms cr
+       LEFT JOIN users creator ON cr.creator_id = creator.id
+       LEFT JOIN users participant ON cr.participant_id = participant.id
+       WHERE cr.id = ?
+       LIMIT 1',
+      [$roomId]
+    );
   }
 
   Response::success(['room' => $room], 'Room ensured');
 } catch (Exception $e) {
+  error_log('ensure_room.php error: ' . $e->getMessage());
+  error_log('ensure_room.php trace: ' . $e->getTraceAsString());
   Response::error('Server error: ' . $e->getMessage(), 500);
 }
 ?>

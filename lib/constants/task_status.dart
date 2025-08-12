@@ -45,7 +45,7 @@ class TaskStatus {
     final Color primary = scheme.primary;
     final Color secondary = scheme.secondary;
     final Color warning = scheme.tertiary; // 近似警告/等待
-    final Color neutral = scheme.surfaceVariant;
+    final Color neutral = scheme.surfaceContainerHighest;
 
     return {
       'Open': (intensity: 0.0, fg: primary, bg: muted(primary)),

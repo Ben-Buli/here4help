@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/auth/services/auth_service.dart';
 
@@ -147,7 +148,9 @@ class ChatService {
   /// 上傳聊天附件（回傳檔名與 URL），限制檔案大小與副檔名由後端處理
   Future<Map<String, dynamic>> uploadAttachment({
     required String roomId,
-    required String filePath,
+    String? filePath,
+    List<int>? bytes,
+    String? fileName,
   }) async {
     final token = await AuthService.getToken();
     if (token == null) {
@@ -156,8 +159,23 @@ class ChatService {
     final uri = Uri.parse(AppConfig.chatUploadAttachmentUrl);
     final request = http.MultipartRequest('POST', uri)
       ..headers.addAll({'Authorization': 'Bearer $token'})
-      ..fields['room_id'] = roomId
-      ..files.add(await http.MultipartFile.fromPath('file', filePath));
+      ..fields['room_id'] = roomId;
+
+    if (bytes != null && (fileName != null && fileName.isNotEmpty)) {
+      final lower = fileName.toLowerCase();
+      MediaType? ct;
+      if (lower.endsWith('.png')) ct = MediaType('image', 'png');
+      if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+        ct = MediaType('image', 'jpeg');
+      }
+      if (lower.endsWith('.gif')) ct = MediaType('image', 'gif');
+      request.files.add(http.MultipartFile.fromBytes('file', bytes,
+          filename: fileName, contentType: ct));
+    } else if (filePath != null) {
+      request.files.add(await http.MultipartFile.fromPath('file', filePath));
+    } else {
+      throw Exception('缺少檔案資料');
+    }
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
     if (response.statusCode == 200) {

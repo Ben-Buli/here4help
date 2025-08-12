@@ -1,14 +1,43 @@
 // home_page.dart
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
+import 'package:here4help/services/scroll_event_bus.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/constants/app_colors.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/utils/image_helper.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final ScrollController _scrollController = ScrollController();
+  StreamSubscription<String>? _scrollSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollSub = ScrollEventBus().stream.listen((route) {
+      if (!mounted) return;
+      if (route == '/home' && _scrollController.hasClients) {
+        _scrollController.animateTo(0,
+            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollSub?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +53,7 @@ class HomePage extends StatelessWidget {
                 maxWidth: isWide ? 800 : double.infinity,
               ),
               child: SingleChildScrollView(
+                controller: _scrollController,
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start, // 水平方向靠左對齊
@@ -97,17 +127,14 @@ class HomePage extends StatelessWidget {
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 18)),
                     const SizedBox(height: 12),
-                    Row(
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        const _AchievementBox(
-                            label: 'Total Coins', value: '1200'),
-                        const _AchievementBox(
-                            label: 'Task Completed', value: '20'),
-                        const _AchievementBox(
+                        _AchievementBox(label: 'Total Coins', value: '1200'),
+                        _AchievementBox(label: 'Task Completed', value: '20'),
+                        _AchievementBox(
                             label: 'Five-Star Ratings', value: '10'),
-                        const _AchievementBox(
-                            label: 'Avg Rating', value: '4.5'),
+                        _AchievementBox(label: 'Avg Rating', value: '4.5'),
                       ],
                     ),
 

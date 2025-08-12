@@ -123,7 +123,7 @@ final GoRouter appRouter = GoRouter(
               Function(BuildContext, dynamic);
           final customAppBar = builderFn(context, state.extra);
           if (customAppBar is AppBar) {
-            titleWidget = (customAppBar as AppBar).title;
+            titleWidget = (customAppBar).title;
           }
         }
 

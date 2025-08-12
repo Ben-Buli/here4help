@@ -154,13 +154,13 @@ class SocketNotificationService implements NotificationService {
   factory SocketNotificationService() => _instance;
   SocketNotificationService._internal();
 
-  StreamController<int> _totalUnreadController =
+  final StreamController<int> _totalUnreadController =
       StreamController<int>.broadcast();
-  StreamController<Map<String, int>> _byTaskController =
+  final StreamController<Map<String, int>> _byTaskController =
       StreamController<Map<String, int>>.broadcast();
-  StreamController<Map<String, int>> _byRoomController =
+  final StreamController<Map<String, int>> _byRoomController =
       StreamController<Map<String, int>>.broadcast();
-  StreamController<ConnectionStatus> _statusController =
+  final StreamController<ConnectionStatus> _statusController =
       StreamController<ConnectionStatus>.broadcast();
 
   final Map<String, int> _unreadByTask = const {};
