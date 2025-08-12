@@ -289,7 +289,10 @@ class ThemeConfigManager extends ChangeNotifier {
       return 'Morandi';
     } else if (baseName.contains('ocean') ||
         baseName.contains('beach') ||
-        baseName.contains('sandy')) {
+        baseName.contains('sandy') ||
+        baseName == 'clownfish' ||
+        baseName == 'patrick_star' ||
+        baseName == 'sunset_beach') {
       return 'Ocean';
     } else if (baseName.contains('milk_tea') ||
         baseName.contains('minimalist') ||

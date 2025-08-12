@@ -203,10 +203,18 @@ class _AppScaffoldState extends State<AppScaffold> {
           );
         }
 
+        // 對特定主題（clownfish、patrick_star）強制水平 0deg 漸層
+        final bool forceHorizontal =
+            baseThemeName == 'clownfish' || baseThemeName == 'patrick_star';
+        final AlignmentGeometry? beginOverride =
+            forceHorizontal ? Alignment.centerLeft : null;
+        final AlignmentGeometry? endOverride =
+            forceHorizontal ? Alignment.centerRight : null;
+
         return themeManager.effectiveTheme.createGradientBlurredBackground(
           child: backgroundChild,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: beginOverride,
+          end: endOverride,
           blurRadius: 16.0,
         );
       },
@@ -617,7 +625,9 @@ class _BubbleTeaPatternPainter extends CustomPainter {
     cupPath.close();
     canvas.drawPath(cupPath, cupPaint);
 
-    // 珍珠
+    // 珍珠（限制在杯身範圍內，允許被杯邊裁切）
+    canvas.save();
+    canvas.clipPath(cupPath); // 限制繪製區域到杯身
     final pearlPaint = Paint()..color = pearlColor;
     for (int r = 0; r < 3; r++) {
       for (int c = 0; c < 3 + r; c++) {
@@ -626,6 +636,7 @@ class _BubbleTeaPatternPainter extends CustomPainter {
         canvas.drawCircle(Offset(px, py), width * 0.05, pearlPaint);
       }
     }
+    canvas.restore();
   }
 
   @override

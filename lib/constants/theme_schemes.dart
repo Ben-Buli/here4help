@@ -503,7 +503,7 @@ class ThemeScheme {
   /// Pantone 奶茶色主題 - 基於 Pantone 482C/481C/480C 色卡
   static const ThemeScheme milkTeaEarth = ThemeScheme(
     name: 'milk_tea_earth',
-    displayName: 'Pantone Milk Tea',
+    displayName: 'Bubble Milk Tea',
     primary: Color(0xFF8B6B5A), // Pantone 480C - 最深棕色
     secondary: Color(0xFFA67B5A), // Pantone 481C - 中等棕色
     accent: Color(0xFFC19B7A), // Pantone 482C - 最淺米色
@@ -589,7 +589,7 @@ class ThemeScheme {
   /// 不使用漸層，採用溫潤米白背景與高可讀性前景
   static const ThemeScheme taipei = ThemeScheme(
     name: 'taipei_2019_pantone',
-    displayName: 'Taipei',
+    displayName: 'Taipei 2019 Pantone',
     primary: Color(0xFF9FB65A), // Revitalizing Green 作為主要互動色
     secondary: Color(0xFFE58FB0), // Vibrant Pink 作為次要強調
     accent: Color(0xFFB6C77A), // 綠色的較亮版本
@@ -956,8 +956,11 @@ class ThemeScheme {
       Color(0xFFFFFFFF),
       Color(0xFFFF8C3A),
     ],
-    gradientBegin: Alignment(-1.0, -1.0),
-    gradientEnd: Alignment(1.0, 1.0),
+    // 0deg（沒有斜角），水平由左至右
+    gradientBegin: Alignment.centerLeft,
+    gradientEnd: Alignment.centerRight,
+    appBarTitleColor: Colors.white,
+    appBarSubtitleColor: Colors.white,
   );
 
   /// Ocean - Patrick Star（粉紅 + 青綠 + 紫色點綴）
@@ -986,8 +989,11 @@ class ThemeScheme {
       Color(0xFFBEE8B6),
       Color(0xFFB695E6),
     ],
-    gradientBegin: Alignment(-1.0, -1.0),
-    gradientEnd: Alignment(1.0, 1.0),
+    // 0deg（沒有斜角），水平由左至右
+    gradientBegin: Alignment.centerLeft,
+    gradientEnd: Alignment.centerRight,
+    appBarTitleColor: Colors.white,
+    appBarSubtitleColor: Colors.white,
   );
 
   /// 毛玻璃藍灰色主題 - Blue Grey 色系
