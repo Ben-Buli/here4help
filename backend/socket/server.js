@@ -30,13 +30,16 @@ let dbPool = null;
 
 async function initDatabase() {
   try {
+    // Load environment variables
+    require('dotenv').config({ path: '../../.env' });
+    
     dbPool = mysql.createPool({
-      host: 'localhost',
-      port: 8889,
-      user: 'root',
-      password: 'root',
-      database: 'hero4helpdemofhs_hero4help',
-      charset: 'utf8mb4',
+      host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT || 8889,
+      user: process.env.DB_USERNAME || 'root',
+      password: process.env.DB_PASSWORD || 'root',
+      database: process.env.DB_NAME || 'hero4helpdemofhs_hero4help',
+      charset: process.env.DB_CHARSET || 'utf8mb4',
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0
