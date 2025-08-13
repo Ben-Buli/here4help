@@ -26,6 +26,7 @@ class ChatService {
       final queryParams = <String, String>{
         'limit': limit.toString(),
         'offset': offset.toString(),
+        'token': token, // 添加 token 作為備用方案
       };
 
       if (taskId != null) {
@@ -205,10 +206,10 @@ class ChatService {
       final response = await http.post(
         Uri.parse('$_baseUrl/backend/api/chat/ensure_room.php'),
         headers: {
-          'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
         body: json.encode({
+          'token': token, // 改用 JSON body 傳遞 token
           'task_id': taskId,
           'creator_id': creatorId,
           'participant_id': participantId,

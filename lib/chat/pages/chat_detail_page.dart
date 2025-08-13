@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/chat/services/global_chat_room.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:here4help/constants/task_status.dart';
+import 'package:here4help/services/task_status_service.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
@@ -68,25 +68,29 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   String _taskStatusDisplay() {
     final task = widget.data['task'] as Map<String, dynamic>? ?? {};
+
+    // 優先使用後端返回的顯示名稱
     final dynamic explicitDisplay =
         task['status_display'] ?? task['status_name'];
     if (explicitDisplay != null && '$explicitDisplay'.isNotEmpty) {
       return '$explicitDisplay';
     }
-    final dynamic code = task['status_code'] ?? task['status'];
-    if (code != null) {
-      final codeStr = '$code';
-      // 若已是顯示文字，直接回傳；若是代碼，用映射轉為顯示文字
-      final mapped = TaskStatus.statusString[codeStr];
-      if (mapped != null) return mapped;
-      // 嘗試從顯示文字反推代碼（以值比對）
-      final entry = TaskStatus.statusString.entries.firstWhere(
-          (e) => e.value == codeStr,
-          orElse: () => const MapEntry('', ''));
-      if (entry.key.isNotEmpty) return entry.value;
-      return codeStr;
-    }
-    return '';
+
+    // 使用動態狀態服務解析
+    final statusService = context.read<TaskStatusService>();
+    final identifier =
+        task['status_id'] ?? task['status_code'] ?? task['status'];
+    return statusService.getDisplayName(identifier);
+  }
+
+  /// 獲取當前任務狀態的樣式
+  TaskStatusStyle _getStatusStyle() {
+    final task = widget.data['task'] as Map<String, dynamic>? ?? {};
+    final statusService = context.read<TaskStatusService>();
+    final colorScheme = Theme.of(context).colorScheme;
+    final identifier =
+        task['status_id'] ?? task['status_code'] ?? task['status'];
+    return statusService.getStatusStyle(identifier, colorScheme);
   }
 
   // 偵測訊息內的第一個圖片連結（支援純 URL 或 [Photo]\nURL 格式）
@@ -457,8 +461,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     joinTime =
         "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
     // 加強 pendingStart 處理，若不存在自動補上
-    if (widget.data['task']['status'] ==
-        TaskStatus.statusString['pending_confirmation_tasker']) {
+    final currentStatus = widget.data['task']['status']?.toString() ?? '';
+
+    if (currentStatus == 'pending_confirmation_tasker') {
       taskPendingStart =
           DateTime.tryParse(widget.data['task']['pendingStart'] ?? '') ??
               DateTime.now();
@@ -466,8 +471,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       taskPendingEnd = taskPendingStart.add(const Duration(seconds: 5));
       remainingTime = taskPendingEnd.difference(DateTime.now());
       countdownTicker = Ticker(_onTick)..start();
-    } else if (widget.data['task']['status'] ==
-        TaskStatus.statusString['pending_confirmation']) {
+    } else if (currentStatus == 'pending_confirmation') {
       taskPendingStart =
           DateTime.tryParse(widget.data['task']['pendingStart'] ?? '') ??
               DateTime.now();
@@ -737,12 +741,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       countdownTicker.stop();
       setState(() {
         remainingTime = Duration.zero;
-        widget.data['task']['status'] =
-            TaskStatus.statusString['completed_tasker'];
+        widget.data['task']['status'] = 'completed_tasker';
       });
       TaskService().updateTaskStatus(
         widget.data['task']['id'].toString(),
-        TaskStatus.statusString['completed_tasker']!,
+        'completed_tasker',
         statusCode: 'completed',
       );
       if (mounted) {
@@ -845,10 +848,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
 
     // 清理計時器
-    if (widget.data['task']['status'] ==
-            TaskStatus.statusString['pending_confirmation_tasker'] ||
-        widget.data['task']['status'] ==
-            TaskStatus.statusString['pending_confirmation']) {
+    final currentStatus = widget.data['task']['status']?.toString() ?? '';
+    if (currentStatus == 'pending_confirmation_tasker' ||
+        currentStatus == 'pending_confirmation') {
       countdownTicker.dispose();
     }
 
@@ -1438,12 +1440,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       );
     }
 
-    final isInputDisabled =
-        widget.data['task']['status'] == TaskStatus.statusString['completed'] ||
-            widget.data['task']['status'] ==
-                TaskStatus.statusString['rejected_tasker'] ||
-            widget.data['task']['status'] ==
-                TaskStatus.statusString['completed_tasker'];
+    final currentStatus = widget.data['task']['status']?.toString() ?? '';
+    final isInputDisabled = currentStatus == 'completed' ||
+        currentStatus == 'rejected_tasker' ||
+        currentStatus == 'completed_tasker';
     // --- ALERT BAR SWITCH-CASE 重構 ---
     // 預設 alert bar 不會顯示，只有在特定狀態下才顯示
     Widget? alertContent;
@@ -1643,10 +1643,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           SlideTransition(
             position: _statusBarSlide,
             child: Container(
-              color: TaskStatus.themedColors(
-                          Theme.of(context).colorScheme)[_taskStatusDisplay()]
-                      ?.bg ??
-                  _getStatusBackgroundColor(_taskStatusDisplay()),
+              color: _getStatusStyle().backgroundColor,
               width: double.infinity,
               alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1655,10 +1652,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
-                  color: TaskStatus.themedColors(Theme.of(context).colorScheme)[
-                              _taskStatusDisplay()]
-                          ?.fg ??
-                      _getStatusChipColor(_taskStatusDisplay()),
+                  color: _getStatusStyle().foregroundColor,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -1909,7 +1903,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               onConfirm: () async {
                 await TaskService().updateTaskStatus(
                   widget.data['task']['id'].toString(),
-                  TaskStatus.statusString['in_progress']!,
+                  'in_progress',
                   statusCode: 'in_progress',
                 );
                 // 關閉其他申請聊天室（舊全域資料結構保留）
@@ -1995,7 +1989,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     DateTime.now().toIso8601String();
                 await TaskService().updateTaskStatus(
                   widget.data['task']['id'].toString(),
-                  TaskStatus.statusString['pending_confirmation_tasker']!,
+                  'pending_confirmation_tasker',
                   statusCode: 'pending_confirmation',
                 );
                 if (mounted) setState(() {});
@@ -2451,63 +2445,17 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   }
 
   Color _getStatusChipColor(String status) {
-    // Convert database status to display status if needed
-    final displayStatus = TaskStatus.statusString[status] ?? status;
-
-    switch (displayStatus) {
-      case 'Open':
-        return Colors.blue[800]!;
-      case 'In Progress':
-        return Colors.orange[800]!;
-      case 'In Progress (Tasker)':
-        return Colors.orange[800]!;
-      case 'Applying (Tasker)':
-        return Colors.blue[800]!;
-      case 'Rejected (Tasker)':
-        return Colors.grey[800]!;
-      case 'Dispute':
-        return Colors.brown[800]!;
-      case 'Pending Confirmation':
-        return Colors.purple[800]!;
-      case 'Pending Confirmation (Tasker)':
-        return Colors.purple[800]!;
-      case 'Completed':
-        return Colors.grey[800]!;
-      case 'Completed (Tasker)':
-        return Colors.grey[800]!;
-      default:
-        return Colors.grey[800]!;
-    }
+    final statusService = context.read<TaskStatusService>();
+    final colorScheme = Theme.of(context).colorScheme;
+    final style = statusService.getStatusStyle(status, colorScheme);
+    return style.foregroundColor;
   }
 
   Color _getStatusBackgroundColor(String status) {
-    // Convert database status to display status if needed
-    final displayStatus = TaskStatus.statusString[status] ?? status;
-
-    switch (displayStatus) {
-      case 'Open':
-        return Colors.blue[50]!;
-      case 'In Progress':
-        return Colors.orange[50]!;
-      case 'In Progress (Tasker)':
-        return Colors.orange[50]!;
-      case 'Applying (Tasker)':
-        return Colors.blue[50]!;
-      case 'Rejected (Tasker)':
-        return Colors.grey[200]!;
-      case 'Dispute':
-        return Colors.brown[50]!;
-      case 'Pending Confirmation':
-        return Colors.purple[50]!;
-      case 'Pending Confirmation (Tasker)':
-        return Colors.purple[50]!;
-      case 'Completed':
-        return Colors.grey[200]!;
-      case 'Completed (Tasker)':
-        return Colors.grey[200]!;
-      default:
-        return Colors.grey[200]!;
-    }
+    final statusService = context.read<TaskStatusService>();
+    final colorScheme = Theme.of(context).colorScheme;
+    final style = statusService.getStatusStyle(status, colorScheme);
+    return style.backgroundColor;
   }
 
   /// 顯示圖片預覽對話框

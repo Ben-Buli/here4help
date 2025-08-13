@@ -25,16 +25,28 @@ try {
     Response::error('Method not allowed', 405);
   }
 
-  // Auth
-  $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
-  if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
-    throw new Exception('Authorization header required');
-  }
-  $payload = validateToken($m[1]);
-  if (!$payload) throw new Exception('Invalid or expired token');
-
   $db = Database::getInstance();
   $input = json_decode(file_get_contents('php://input'), true) ?? [];
+  
+  // Auth - 支援多種 token 傳遞方式
+  $token = null;
+  
+  // 嘗試從 Authorization header 獲取
+  $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+  if (!empty($auth_header) && preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
+    $token = $m[1];
+  }
+  // 備用方案：從 JSON 輸入獲取 token
+  elseif (isset($input['token'])) {
+    $token = $input['token'];
+  }
+  
+  if (empty($token)) {
+    throw new Exception('Authorization header required');
+  }
+  
+  $payload = validateToken($token);
+  if (!$payload) throw new Exception('Invalid or expired token');
 
   $task_id = isset($input['task_id']) ? (string)$input['task_id'] : '';
   $creator_id = isset($input['creator_id']) ? (int)$input['creator_id'] : 0;
@@ -88,6 +100,18 @@ try {
        WHERE cr.id = ?
        LIMIT 1',
       [$roomId]
+    );
+  }
+
+  Response::success(['room' => $room], 'Room ensured');
+} catch (Exception $e) {
+  error_log('ensure_room.php error: ' . $e->getMessage());
+  error_log('ensure_room.php trace: ' . $e->getTraceAsString());
+  Response::error('Server error: ' . $e->getMessage(), 500);
+}
+?>
+
+
     );
   }
 

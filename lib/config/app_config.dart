@@ -102,6 +102,16 @@ class AppConfig {
   static String get chatBlockUserUrl =>
       '$apiBaseUrl/backend/api/chat/block_user.php';
 
+  // Chat - Aggregated APIs (Performance Optimized)
+  static String get postedTasksWithApplicantsUrl =>
+      '$apiBaseUrl/backend/api/chat/get_posted_tasks_with_applicants.php';
+
+  // Task Favorites APIs
+  static String get taskFavoritesToggleUrl =>
+      '$apiBaseUrl/backend/api/tasks/favorites/toggle.php';
+  static String get taskFavoritesListUrl =>
+      '$apiBaseUrl/backend/api/tasks/favorites/list.php';
+
   // Tasks - Completion & Reviews & Payment
   static String get taskConfirmCompletionUrl =>
       '$apiBaseUrl/backend/api/tasks/confirm_completion.php';

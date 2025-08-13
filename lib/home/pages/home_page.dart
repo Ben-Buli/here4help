@@ -76,29 +76,40 @@ class _HomePageState extends State<HomePage> {
                                 child: Icon(Icons.person),
                               ),
                         const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(user?.name ?? 'User',
-                                style: const TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.bold)),
-                            Text(
-                                '${NumberFormat.decimalPattern().format(user?.points ?? 0)} points',
-                                style: const TextStyle(fontSize: 16)),
-                            const Row(
-                              children: [
-                                Icon(Icons.star, color: Colors.amber, size: 16),
-                                Icon(Icons.star, color: Colors.amber, size: 16),
-                                Icon(Icons.star, color: Colors.amber, size: 16),
-                                Icon(Icons.star, color: Colors.amber, size: 16),
-                                Icon(Icons.star, color: Colors.amber, size: 16),
-                                SizedBox(width: 4),
-                                Text('5 (16 comments)',
-                                    style: TextStyle(
-                                        fontSize: 12, color: Colors.grey))
-                              ],
-                            )
-                          ],
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(user?.name ?? 'User',
+                                  style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold)),
+                              Text(
+                                  '${NumberFormat.decimalPattern().format(user?.points ?? 0)} points',
+                                  style: const TextStyle(fontSize: 16)),
+                              const Row(
+                                children: [
+                                  Icon(Icons.star,
+                                      color: Colors.amber, size: 16),
+                                  Icon(Icons.star,
+                                      color: Colors.amber, size: 16),
+                                  Icon(Icons.star,
+                                      color: Colors.amber, size: 16),
+                                  Icon(Icons.star,
+                                      color: Colors.amber, size: 16),
+                                  Icon(Icons.star,
+                                      color: Colors.amber, size: 16),
+                                  SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text('5 (16 comments)',
+                                        style: TextStyle(
+                                            fontSize: 12, color: Colors.grey),
+                                        overflow: TextOverflow.ellipsis),
+                                  )
+                                ],
+                              )
+                            ],
+                          ),
                         ),
                       ],
                     ),

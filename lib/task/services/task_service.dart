@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../config/app_config.dart';
+import '../../services/task_status_service.dart';
 
 class TaskService extends ChangeNotifier {
   static final TaskService _instance = TaskService._internal();
@@ -246,25 +247,18 @@ class TaskService extends ChangeNotifier {
   }
 
   /// 取得任務狀態清單（從後端）
+  /// ⚠️ 已棄用：請使用 TaskStatusService.initialize() 替代
+  @Deprecated('Use TaskStatusService.initialize() instead')
   Future<void> loadStatuses({bool force = false}) async {
-    if (_statuses.isNotEmpty && !force) return;
-    try {
-      final response = await http.get(
-        Uri.parse(AppConfig.taskStatusesUrl),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(const Duration(seconds: 30));
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          _statuses
-            ..clear()
-            ..addAll(List<Map<String, dynamic>>.from(data['data'] ?? []));
-          notifyListeners();
-        }
-      }
-    } catch (e) {
-      debugPrint('TaskService loadStatuses error: $e');
-    }
+    // 委託給 TaskStatusService 處理
+    final statusService = TaskStatusService();
+    await statusService.initialize(force: force);
+
+    // 同步更新本地狀態列表以保持向後相容
+    _statuses.clear();
+    _statuses.addAll(
+        statusService.statuses.map((status) => status.toJson()).toList());
+    notifyListeners();
   }
 
   /// 載入我投遞的任務（同時提供 client_status_* 欄位）

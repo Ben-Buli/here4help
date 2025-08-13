@@ -129,16 +129,20 @@ class AuthService {
       debugPrint('🔍 Token: ${token.substring(0, 10)}...');
       debugPrint('🔍 API URL: ${AppConfig.profileUrl}');
 
+      // 由於 Apache/MAMP 的授權標頭問題，使用 JSON body 傳遞 token
+      final requestBody = jsonEncode({'token': token});
+
       final headers = {
-        'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       };
 
       debugPrint('🔍 Headers: $headers');
+      debugPrint('🔍 Request body: $requestBody');
 
-      final response = await http.get(
+      final response = await http.post(
         Uri.parse(AppConfig.profileUrl),
         headers: headers,
+        body: requestBody,
       );
 
       debugPrint('🔍 API 回應狀態碼: ${response.statusCode}');

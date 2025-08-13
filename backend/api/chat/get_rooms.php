@@ -25,12 +25,24 @@ try {
     Response::error('Method not allowed', 405);
   }
 
-  // Auth
+  // Auth - 支援多種 token 傳遞方式
+  $token = null;
+
+  // 嘗試從 Authorization header 獲取
   $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
-  if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
+  if (!empty($auth_header) && preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
+    $token = $m[1];
+  }
+  // 備用方案：從 GET 參數獲取 token
+  elseif (isset($_GET['token'])) {
+    $token = $_GET['token'];
+  }
+
+  if (empty($token)) {
     throw new Exception('Authorization header required');
   }
-  $payload = validateToken($m[1]);
+
+  $payload = validateToken($token);
   if (!$payload) throw new Exception('Invalid or expired token');
   $user_id = (int)$payload['user_id'];
 
@@ -70,7 +82,7 @@ try {
       t.title as task_title,
       t.description as task_description,
       t.status_id,
-      ts.name as task_status,
+      ts.code as task_status,
       ts.display_name as task_status_display,
               creator.name as creator_name,
         creator.avatar_url as creator_avatar,
@@ -135,8 +147,8 @@ try {
       ];
     }
     
-    // 清理不需要的欄位
-    unset($room['creator_name'], $room['creator_avatar'], $room['participant_name'], $room['participant_avatar']);
+    // 保留 creator 和 participant 資訊供前端使用
+    // 不清理 creator_name, creator_avatar, participant_name, participant_avatar
   }
 
   // 獲取總數

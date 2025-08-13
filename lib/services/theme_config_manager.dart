@@ -944,8 +944,29 @@ class ThemePreset {
       themes: (json['themes'] as List)
           .map((name) => ThemeScheme.getByName(name))
           .toList(),
-      icon: IconData(json['icon'], fontFamily: 'MaterialIcons'),
+      icon: _getIconFromCode(json['icon']),
     );
+  }
+
+  /// 根據代碼獲取對應的圖標，避免動態 IconData 創建
+  static IconData _getIconFromCode(int? code) {
+    // 常用圖標映射，避免動態創建 IconData
+    switch (code) {
+      case 0xe3b0: // Icons.business
+        return Icons.business;
+      case 0xe1ba: // Icons.color_lens
+        return Icons.color_lens;
+      case 0xe531: // Icons.flag
+        return Icons.flag;
+      case 0xe87c: // Icons.favorite
+        return Icons.favorite;
+      case 0xe8b8: // Icons.palette
+        return Icons.palette;
+      case 0xe8d2: // Icons.category
+        return Icons.category;
+      default:
+        return Icons.category; // 預設圖標
+    }
   }
 
   @override

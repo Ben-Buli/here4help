@@ -3,7 +3,7 @@ description: NCCU Social Task Posting APP  - Here4help.
 
 publish_to: 'none'
 
-version: 1.2.4+20250118
+version: 1.2.6+20250118-hotfix3
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -56,6 +56,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon/
-    - assets/demoData/
     - assets/images/avatar/
-    - assets/icon/
