@@ -188,3 +188,33 @@ build/
 # Flutter web specific
 web/firebase.json
 web/.firebase/
+
+# Environment variables (added in v1.2.3)
+.env
+
+# Test files (cleaned up in v1.2.4)
+test_*.html
+test_*.sh
+test_*.md
+
+# Backup directories (cleaned up in v1.2.4)
+backup/
+*.backup
+*.bak
+
+# Additional system files
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Additional IDE files
+.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# Project cleanup files
+tests/archived/
