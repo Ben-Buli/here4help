@@ -15,18 +15,18 @@ echo
 # 添加所有變更
 echo "📦 添加變更檔案..."
 
-# 文件結構重組
-git add docs/
-git add tests/
+# 首先處理所有刪除的檔案
+echo "🗑️ 處理刪除的檔案..."
+git add -u
 
-# 版本更新
-git add pubspec.yaml
+# 然後添加所有新檔案和目錄
+echo "📁 添加新的檔案結構..."
+git add docs/ tests/ .gitignore pubspec.yaml
+git add push_v1.2.3.sh push_v1.2.4.sh
 
-# 更新的 .gitignore
-git add .gitignore
-
-# 推送腳本
-git add push_v1.2.4.sh
+# 確保所有變更都被追蹤
+echo "✅ 確保所有變更被追蹤..."
+git add -A
 
 echo "✅ 檔案添加完成"
 echo
