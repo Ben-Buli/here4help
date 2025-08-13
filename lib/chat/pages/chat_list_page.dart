@@ -62,6 +62,9 @@ class _ChatListPageState extends State<ChatListPage>
   // Posted Tasks 應徵者資料快取
   final Map<String, List<Map<String, dynamic>>> _applicationsByTask = {};
 
+  // 手風琴展開狀態管理
+  final Set<String> _expandedTaskIds = <String>{};
+
   // 簡化的載入狀態
   bool _isLoading = true;
   String? _errorMessage;
@@ -229,8 +232,22 @@ class _ChatListPageState extends State<ChatListPage>
   Future<void> _fetchPage(int offset) async {
     await _seedIfNeeded();
     final service = TaskService();
-    final result =
-        await service.fetchTasksPage(limit: _pageSize, offset: offset);
+
+    // Posted Tasks 只載入當前用戶發布的任務
+    final userService = context.read<UserService>();
+    final currentUserId = userService.currentUser?.id;
+
+    Map<String, String>? filters;
+    if (currentUserId != null) {
+      filters = {'creator_id': currentUserId.toString()};
+    }
+
+    final result = await service.fetchTasksPage(
+      limit: _pageSize,
+      offset: offset,
+      filters: filters,
+    );
+
     if (!mounted) return;
     if (result.hasMore) {
       _pagingController.appendPage(result.tasks, offset + result.tasks.length);
@@ -1726,26 +1743,13 @@ class _ChatListPageState extends State<ChatListPage>
         pagingController: _pagingController,
         builderDelegate: PagedChildBuilderDelegate<Map<String, dynamic>>(
           itemBuilder: (context, task, index) {
-            // 依據原本 Posted Tasks 卡片邏輯構建
+            // Posted Tasks 分頁：所有任務都是當前用戶發布的任務
             final taskId = task['id'].toString();
-            final userService = context.read<UserService>();
-            final currentUserId = userService.currentUser?.id;
-            final isMyTask = currentUserId != null &&
-                (task['creator_id'] == currentUserId ||
-                    task['creator_id']?.toString() == currentUserId.toString());
+            final applications = _applicationsByTask[taskId] ?? [];
+            final applierChatItems =
+                _convertApplicationsToApplierChatItems(applications);
 
-            List<Map<String, dynamic>> applierChatItems;
-            if (isMyTask) {
-              final applications = _applicationsByTask[taskId] ?? [];
-              applierChatItems =
-                  _convertApplicationsToApplierChatItems(applications);
-            } else {
-              applierChatItems = chatRoomModel
-                  .where((applierChatItem) =>
-                      applierChatItem['taskId'] == task['id'])
-                  .toList();
-            }
-            return _taskCardWithapplierChatItems(task, applierChatItems);
+            return _buildPostedTasksCardWithAccordion(task, applierChatItems);
           },
           firstPageProgressIndicatorBuilder: (context) =>
               const Center(child: CircularProgressIndicator()),
@@ -2299,6 +2303,540 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
     return actions;
   }
 
+  /// Posted Tasks 分頁的任務卡片（使用 My Works 風格 + 手風琴功能）
+  Widget _buildPostedTasksCardWithAccordion(
+      Map<String, dynamic> task, List<Map<String, dynamic>> applierChatItems) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final displayStatus = _displayStatus(task);
+    final progressData = _getProgressData(displayStatus);
+    final progress = progressData['progress'] ?? 0.0;
+    final baseColor = progressData['color'] ?? Colors.grey[600]!;
+    final taskId = task['id'].toString();
+    final isExpanded = _expandedTaskIds.contains(taskId);
+
+    // 過濾可見的應徵者
+    final visibleAppliers =
+        applierChatItems.where((ap) => ap['isHidden'] != true).toList();
+    final unreadCount = _unreadByTask[task['id']] ?? 0;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 1,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Column(
+            children: [
+              // 主要任務卡片
+              InkWell(
+                onTap: () {
+                  if (mounted) {
+                    setState(() {
+                      if (isExpanded) {
+                        // 如果當前已展開，則收合
+                        _expandedTaskIds.remove(taskId);
+                      } else {
+                        // 如果當前未展開，則收合所有其他卡片，只展開當前卡片
+                        _expandedTaskIds.clear();
+                        _expandedTaskIds.add(taskId);
+                      }
+                    });
+                  }
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      // 左側：中空圓餅圖進度指示器
+                      SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: CustomPaint(
+                          painter: PieChartPainter(
+                            progress: progress,
+                            baseColor: baseColor,
+                            strokeWidth: 4,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '${(progress * 100).toInt()}%',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: baseColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // 中間：任務資訊
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 任務標題
+                            Text(
+                              task['title'] ?? 'Untitled Task',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+
+                            // 任務資訊 2x2 格局
+                            Container(
+                              constraints: const BoxConstraints(maxWidth: 200),
+                              child: Column(
+                                children: [
+                                  // 第一行：狀態 + 獎勵
+                                  Row(
+                                    children: [
+                                      // 狀態
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 4,
+                                                      vertical: 1),
+                                              decoration: BoxDecoration(
+                                                color:
+                                                    baseColor.withOpacity(0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                displayStatus,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: baseColor,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // 獎勵
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.attach_money,
+                                                size: 12,
+                                                color: Colors.grey[600]),
+                                            const SizedBox(width: 2),
+                                            Flexible(
+                                              child: Text(
+                                                '${task['reward_point'] ?? task['salary'] ?? 0}',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: colorScheme.primary,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  // 第二行：位置 + 日期
+                                  Row(
+                                    children: [
+                                      // 位置
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.location_on,
+                                                size: 12,
+                                                color: Colors.grey[500]),
+                                            const SizedBox(width: 2),
+                                            Flexible(
+                                              child: Text(
+                                                task['location'] ??
+                                                    'Unknown Location',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey[500],
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      // 日期
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.calendar_today,
+                                                size: 12,
+                                                color: Colors.grey[500]),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              DateFormat('MM/dd').format(
+                                                DateTime.parse(
+                                                    task['task_date'] ??
+                                                        DateTime.now()
+                                                            .toString()),
+                                              ),
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey[500],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  // 第三行：語言要求（跨兩列）
+                                  Row(
+                                    children: [
+                                      Icon(Icons.language,
+                                          size: 12, color: Colors.grey[500]),
+                                      const SizedBox(width: 2),
+                                      Flexible(
+                                        child: Text(
+                                          task['language_requirement'] ??
+                                              'No Requirement',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey[500],
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // 右側：應徵者數量和箭頭（視覺指示）
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (unreadCount > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                unreadCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          if (unreadCount > 0) const SizedBox(height: 4),
+                          // 只在有應徵者時顯示數量
+                          if (visibleAppliers.isNotEmpty)
+                            Text(
+                              '${visibleAppliers.length}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          if (visibleAppliers.isNotEmpty)
+                            const SizedBox(height: 2),
+                          // 手風琴箭頭圖標（會旋轉）
+                          AnimatedRotation(
+                            turns: isExpanded ? 0.25 : 0.0, // 向下或向右
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              Icons.chevron_right,
+                              color: Colors.grey[400],
+                              size: 20,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // 手風琴展開內容：應徵者卡片
+              if (isExpanded) ...[
+                // Action Bar
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    border: Border(
+                      top: BorderSide(color: Colors.grey[200]!, width: 1),
+                      bottom: BorderSide(color: Colors.grey[200]!, width: 1),
+                    ),
+                  ),
+                  child: displayStatus == 'Open'
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            // Info 按鈕
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () => _showTaskInfoDialog(task),
+                                icon: Icon(Icons.info_outline,
+                                    size: 16, color: colorScheme.primary),
+                                label: Text(
+                                  'Info',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: colorScheme.primary),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+
+                            // Edit 按鈕
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content:
+                                            Text('Edit feature coming soon')),
+                                  );
+                                },
+                                icon: Icon(
+                                  Icons.edit_outlined,
+                                  size: 16,
+                                  color: colorScheme.primary,
+                                ),
+                                label: Text(
+                                  'Edit',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: colorScheme.primary),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+
+                            // Delete 按鈕
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Confirm Delete'),
+                                      content: Text(
+                                          'Are you sure you want to delete task "${task['title']}"?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                  content: Text(
+                                                      'Delete feature coming soon')),
+                                            );
+                                          },
+                                          child: const Text('Delete',
+                                              style:
+                                                  TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                                icon: Icon(
+                                  Icons.delete_outline,
+                                  size: 16,
+                                  color: Colors.red,
+                                ),
+                                label: Text(
+                                  'Delete',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: Colors.red),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Center(
+                          // 非 Open 狀態時，只顯示居中的 Info 按鈕
+                          child: SizedBox(
+                            width: 120,
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showTaskInfoDialog(task),
+                              icon: Icon(Icons.info_outline,
+                                  size: 16, color: colorScheme.primary),
+                              label: Text(
+                                'Info',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: colorScheme.primary),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+
+                // 應徵者卡片列表
+                if (visibleAppliers.isNotEmpty)
+                  ...visibleAppliers.map((applier) => Container(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        child: Card(
+                          elevation: 0,
+                          color: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side:
+                                BorderSide(color: Colors.grey[200]!, width: 1),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            leading: CircleAvatar(
+                              backgroundColor: _getAvatarColor(applier['name']),
+                              child: Text(
+                                _getInitials(applier['name']),
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 14),
+                              ),
+                            ),
+                            title: Text(
+                              applier['name'] ?? 'Unknown',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              applier['sentMessages']?[0] ?? 'No messages',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.star,
+                                        color: Colors.amber[600], size: 14),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      '${applier['rating'] ?? 0.0}',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  '(${applier['reviewsCount'] ?? 0})',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            onTap: () {
+                              // TODO: Navigate to chat room
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content:
+                                        Text('Chat with ${applier['name']}')),
+                              );
+                            },
+                          ),
+                        ),
+                      ))
+                else
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      'No applicants',
+                      style: TextStyle(
+                        color: Colors.grey[500],
+                        fontSize: 14,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+              ],
+            ],
+          ),
+
+          // 倒數計時懸浮在右上角
+          if (_isCountdownStatus(displayStatus))
+            Positioned(
+              top: -8,
+              right: -8,
+              child: _buildCompactCountdownTimer(task),
+            ),
+        ],
+      ),
+    );
+  }
+
   /// My Works 分頁的聊天室列表項目
   Widget _buildMyWorksChatRoomItem(
       Map<String, dynamic> task, List<Map<String, dynamic>> applierChatItems) {
@@ -2483,7 +3021,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                       children: [
                         // 任務標題
                         Text(
-                          task['title'] ?? '未命名任務',
+                          task['title'] ?? 'Untitled Task',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,

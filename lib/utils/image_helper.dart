@@ -4,9 +4,10 @@ import 'path_mapper.dart';
 
 class ImageHelper {
   /// 處理用戶頭像圖片路徑
-  static ImageProvider? getAvatarImage(String? avatarUrl) {
+  static ImageProvider getAvatarImage(String? avatarUrl) {
     if (avatarUrl == null || avatarUrl.isEmpty) {
-      return null;
+      debugPrint('⚠️ avatarUrl 為空，返回默認頭像');
+      return getDefaultAvatar();
     }
 
     // 調試路徑映射（僅在調試模式下）

@@ -22,6 +22,7 @@ try {
     $status = $_GET['status'] ?? null;
     $location = $_GET['location'] ?? null;
     $language = $_GET['language'] ?? null;
+    $creator_id = $_GET['creator_id'] ?? null; // 添加 creator_id 過濾
     $limit = (int)($_GET['limit'] ?? 20);
     $offset = (int)($_GET['offset'] ?? 0);
     
@@ -61,6 +62,11 @@ try {
     if ($language) {
         $whereConditions[] = "language_requirement = ?";
         $params[] = $language;
+    }
+    
+    if ($creator_id) {
+        $whereConditions[] = "t.creator_id = ?";
+        $params[] = (int)$creator_id;
     }
     
     $whereClause = '';

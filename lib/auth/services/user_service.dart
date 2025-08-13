@@ -19,6 +19,9 @@ class UserService extends ChangeNotifier {
   /// 初始化用戶資訊 - 優先從資料庫獲取，備用 SharedPreferences
   Future<void> _initializeUser() async {
     try {
+      // 檢查當前 token 格式（調試用）
+      await _debugCurrentToken();
+
       // 首先嘗試從資料庫獲取最新的用戶資訊
       await _loadUserFromDatabase();
     } catch (e) {
@@ -28,6 +31,33 @@ class UserService extends ChangeNotifier {
     } finally {
       isLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// 調試當前 token 格式
+  Future<void> _debugCurrentToken() async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        debugPrint('🔍 當前沒有 token');
+        return;
+      }
+
+      debugPrint('🔍 當前 token 長度: ${token.length}');
+      debugPrint(
+          '🔍 Token 前 20 字元: ${token.substring(0, token.length > 20 ? 20 : token.length)}');
+
+      // 檢查是否為 JWT 格式 (通常以 eyJ 開頭)
+      if (token.startsWith('eyJ')) {
+        debugPrint('⚠️ 檢測到 JWT 格式的 token！');
+        debugPrint('⚠️ 但後端期望 base64 編碼的 JSON 格式');
+        debugPrint('💡 建議清除此 token 並重新登入');
+        debugPrint('💡 請先登出，然後重新登入以獲得正確格式的 token');
+      } else {
+        debugPrint('✅ Token 格式看起來正確（非 JWT）');
+      }
+    } catch (e) {
+      debugPrint('❌ 檢查 token 失敗: $e');
     }
   }
 
@@ -47,11 +77,8 @@ class UserService extends ChangeNotifier {
 
         // 如果 avatar_url 是空的，設置默認值
         if (_currentUser?.avatar_url.isEmpty == true) {
-          debugPrint('⚠️ avatar_url 是空的，設置默認值');
-          _currentUser = _currentUser?.copyWith(
-            avatar_url: 'assets/images/avatar/avatar-1.png',
-          );
-          debugPrint('✅ 已設置默認頭像 URL: ${_currentUser?.avatar_url}');
+          debugPrint('⚠️ avatar_url 是空的，保持為空讓 ImageHelper 處理默認頭像');
+          // 不需要手動設置，讓 ImageHelper.getAvatarImage() 自動處理
         }
 
         // 同時更新 SharedPreferences 作為備用
