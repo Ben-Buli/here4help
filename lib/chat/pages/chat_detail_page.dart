@@ -1507,21 +1507,29 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                                     Row(
                                       children: [
                                         Icon(Icons.description,
-                                            size: 16, color: Colors.amber[700]),
+                                            size: 16,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary),
                                         const SizedBox(width: 4),
                                         Text(
                                           'Application Submitted',
                                           style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.amber[700],
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary,
                                           ),
                                         ),
                                       ],
                                     ),
                                     const SizedBox(height: 4),
-                                    const Divider(
-                                        height: 1, color: Colors.amber),
+                                    Divider(
+                                        height: 1,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .secondary),
                                     const SizedBox(height: 4),
                                   ],
 

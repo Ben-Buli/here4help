@@ -196,50 +196,41 @@ class _ChatTitleWidgetState extends State<ChatTitleWidget> {
     if (room['chat_partner'] != null &&
         (room['chat_partner'] as Map).isNotEmpty) {
       final chatPartner = room['chat_partner'] as Map<String, dynamic>;
-      partnerName = (chatPartner['nickname'] as String?)?.trim().isNotEmpty == true
-          ? chatPartner['nickname'] as String
-          : chatPartner['name'] as String? ?? 'Chat Partner';
+      partnerName =
+          (chatPartner['nickname'] as String?)?.trim().isNotEmpty == true
+              ? chatPartner['nickname'] as String
+              : chatPartner['name'] as String? ?? 'Chat Partner';
       effectiveChatPartnerInfo = chatPartner;
       if (kDebugMode) {
         debugPrint('🔍 使用 room.chat_partner: $partnerName');
       }
     } else if (chatPartnerInfo.isNotEmpty) {
-      partnerName = (chatPartnerInfo['nickname'] as String?)?.trim().isNotEmpty == true
-          ? chatPartnerInfo['nickname'] as String
-          : chatPartnerInfo['name'] as String? ?? 'Chat Partner';
+      partnerName =
+          (chatPartnerInfo['nickname'] as String?)?.trim().isNotEmpty == true
+              ? chatPartnerInfo['nickname'] as String
+              : chatPartnerInfo['name'] as String? ?? 'Chat Partner';
       effectiveChatPartnerInfo = chatPartnerInfo;
       if (kDebugMode) {
         debugPrint('🔍 使用 chatPartnerInfo: $partnerName');
       }
     } else {
-      int? myId;
-      try {
-        // 不在此處 await，僅保持回退邏輯；標題優先使用已傳入資料
-        SharedPreferences.getInstance().then((prefs) {
-          // 不觸發重建，只用於非同步記錄
-          myId = prefs.getInt('user_id');
-        });
-      } catch (_) {}
-
-      final dynamic rawCreator = room['creator_id'] ?? room['creatorId'];
-      final int? creatorId = (rawCreator is int) ? rawCreator : int.tryParse('$rawCreator');
-      // participantId 僅用於備援比對時候擴充，先保留 creator/我方邏輯即可
-
-      final bool amCreator = (myId != null && creatorId != null && myId == creatorId);
-      if (amCreator) {
+      // 使用已推導出的 userRole 來決定顯示對方名稱（避免異步取得 myId 造成誤判）
+      if (userRole == 'creator') {
         partnerName = (room['participant_nickname'] as String?)?.trim().isNotEmpty == true
             ? room['participant_nickname'] as String
             : room['participant_name'] as String? ?? 'Chat Partner';
-      } else {
+      } else if (userRole == 'participant') {
         partnerName = (room['creator_nickname'] as String?)?.trim().isNotEmpty == true
             ? room['creator_nickname'] as String
             : room['creator_name'] as String? ?? 'Chat Partner';
+      } else {
+        partnerName = room['name'] as String? ?? 'Chat Partner';
       }
       if (partnerName.trim().isEmpty) {
         partnerName = room['name'] as String? ?? 'Chat Partner';
       }
       if (kDebugMode) {
-        debugPrint('🔍 由 creator/participant 推導: $partnerName');
+        debugPrint('🔍 由 userRole 推導: $partnerName');
       }
     }
 
