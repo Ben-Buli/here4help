@@ -2682,7 +2682,7 @@ extension _ChatListPageStateHandFoldingMethods on _ChatListPageState {
     // 建立 chatPartnerInfo（我的作品 => 對方為 creator）
     final chatPartnerInfo = {
       'id': creatorId?.toString(),
-      'name': task['creator_name'] ?? '任務發布者',
+      'name': task['creator_name'] ?? 'Creator',
       'avatar': task['creator_avatar'] ?? 'assets/images/avatar/avatar-1.png',
     };
 
@@ -2707,8 +2707,9 @@ extension _ChatListPageStateHandFoldingMethods on _ChatListPageState {
       userRole: 'participant',
       chatPartnerInfo: {
         'id': creatorId?.toString(),
-        'name': task['creator_name'] ?? '任務發布者',
-        'avatar': task['creator_avatar'] ?? 'assets/images/avatar/avatar-1.png',
+        'name': task['creator_name'] ?? 'Creator',
+        // 不預設圖片，交由詳情頁用文字頭像與主題配色處理
+        'avatar': '',
       },
     );
 
@@ -2725,7 +2726,7 @@ extension _ChatListPageStateHandFoldingMethods on _ChatListPageState {
       'userRole': 'participant',
       'chatPartnerInfo': {
         'id': creatorId?.toString(),
-        'name': task['creator_name'] ?? '任務發布者',
+        'name': task['creator_name'] ?? 'Creator',
         'avatar': task['creator_avatar'] ?? 'assets/images/avatar/avatar-1.png',
       },
     });
@@ -2970,7 +2971,8 @@ extension _ChatListPageStateHandFoldingMethods on _ChatListPageState {
             chatPartnerInfo: {
               'id': participantIdStr,
               'name': userName,
-              'avatar': avatarUrl,
+              // 不預設圖片，交由詳情頁用文字頭像與主題配色處理
+              'avatar': '',
             },
           );
 
