@@ -65,6 +65,10 @@ class _ChatListPageState extends State<ChatListPage>
   // 手風琴展開狀態管理
   final Set<String> _expandedTaskIds = <String>{};
 
+  // My Works 分頁篩選狀態
+  bool _showMyTasksOnly = false;
+  bool _showAppliedOnly = true; // 預設開啟
+
   // 簡化的載入狀態
   bool _isLoading = true;
   String? _errorMessage;
@@ -407,12 +411,30 @@ class _ChatListPageState extends State<ChatListPage>
       }
     }
 
-    // My Works 準則：被指派給我 或 我應徵過
+    // My Works 準則：根據篩選狀態決定顯示內容
     return allTasks.where((t) {
       final acceptorIsMe = (t['acceptor_id']?.toString() ?? '') ==
           (currentUserId?.toString() ?? '');
       final appliedByMe = t['applied_by_me'] == true;
-      return acceptorIsMe || appliedByMe;
+      
+      // 根據篩選狀態決定是否顯示
+      bool shouldShow = false;
+      
+      if (_showMyTasksOnly && _showAppliedOnly) {
+        // 兩個都勾選：顯示全部
+        shouldShow = acceptorIsMe || appliedByMe;
+      } else if (_showMyTasksOnly) {
+        // 只勾選我的任務：顯示被指派的任務
+        shouldShow = acceptorIsMe;
+      } else if (_showAppliedOnly) {
+        // 只勾選已應徵：顯示我應徵過的任務
+        shouldShow = appliedByMe;
+      } else {
+        // 都不勾選：顯示全部任務（不按任務類型過濾）
+        shouldShow = true;
+      }
+      
+      return shouldShow;
     }).toList();
   }
 
@@ -900,7 +922,7 @@ class _ChatListPageState extends State<ChatListPage>
     final String displayStatus = _displayStatus(task);
     final progressData = _getProgressData(displayStatus);
     final progress = progressData['progress'];
-    final color = progressData['color']; // ignore: unused_local_variable
+    final color = progressData['color'] ?? Colors.grey[600]!; // ignore: unused_local_variable
 
     return InkWell(
       onTap: () => _showTaskInfoDialog(task),
@@ -985,12 +1007,35 @@ class _ChatListPageState extends State<ChatListPage>
                     _buildCountdownTimer(task),
                     const SizedBox(height: 8),
                   ],
-                  Text(
-                    task['title'] ?? 'N/A',
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold),
-                    maxLines: null,
-                    softWrap: true,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          task['title'] ?? 'N/A',
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
+                          maxLines: null,
+                          softWrap: true,
+                        ),
+                      ),
+                      // Emoji 狀態列
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // 新任務圖標（發布未滿一週）
+                          if (_isNewTask(task)) 
+                            const Text('🌱', style: TextStyle(fontSize: 16)),
+                          const SizedBox(width: 4),
+                          // 熱門圖標（超過一位應徵者）
+                          if (_isPopularTask(task)) 
+                            const Text('🔥', style: TextStyle(fontSize: 16)),
+                          const SizedBox(width: 4),
+                          // 收藏圖標（當前使用者已收藏）
+                          if (_isFavoritedTask(task)) 
+                            const Text('❤️', style: TextStyle(fontSize: 16)),
+                        ],
+                      ),
+                    ],
                   ),
                   // 格狀排版的 task 資訊（上下欄對齊、左右有間隔，無背景色與圓角）- new layout
                   Padding(
@@ -1546,14 +1591,64 @@ class _ChatListPageState extends State<ChatListPage>
               isScrollable: false,
               labelPadding: const EdgeInsets.symmetric(horizontal: 8),
               indicatorPadding: EdgeInsets.zero,
-              tabs: const [
-                Tab(text: 'Posted Tasks'),
-                Tab(text: 'My Works'),
+              tabs: [
+                const Tab(text: 'Posted Tasks'),
+                Tab(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('My Works'),
+                      Text(
+                        '${_myWorksPagingController.itemList?.length ?? 0}',
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
-          // Removed or reduced vertical space above TabBar
-          // const SizedBox(height: 8),
+          // My Works 分頁篩選選項
+          if (_tabController.index == 1) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: CheckboxListTile(
+                      title: const Text('Show My Tasks', style: TextStyle(fontSize: 12)),
+                      value: _showMyTasksOnly,
+                      onChanged: (value) {
+                        setState(() {
+                          _showMyTasksOnly = value ?? false;
+                        });
+                        _myWorksPagingController.refresh();
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    ),
+                  ),
+                  Expanded(
+                    child: CheckboxListTile(
+                      title: const Text('Show Applied Tasks', style: TextStyle(fontSize: 12)),
+                      value: _showAppliedOnly,
+                      onChanged: (value) {
+                        setState(() {
+                          _showAppliedOnly = value ?? false;
+                        });
+                        _myWorksPagingController.refresh();
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          // 搜尋欄
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Row(
@@ -2031,6 +2126,137 @@ class _ChatListPageState extends State<ChatListPage>
       };
     }).toList();
   }
+
+  /// 獲取聊天對象信息
+  Map<String, dynamic> _getChatPartnerInfo(
+      Map<String, dynamic> task, String userRole,
+      [Map<String, dynamic>? room]) {
+    final currentUserId = context.read<UserService>().currentUser?.id;
+
+    debugPrint(
+        '🔍 _getChatPartnerInfo - userRole: $userRole, currentUserId: $currentUserId');
+    debugPrint('🔍 _getChatPartnerInfo - task keys: ${task.keys}');
+    debugPrint('🔍 _getChatPartnerInfo - room keys: ${room?.keys}');
+
+    if (userRole == 'creator') {
+      // 當前用戶是創建者，聊天對象是參與者
+      if (room != null && room.isNotEmpty) {
+        final dynamic id = room['user_id'] ?? room['participant_id'];
+        final String name =
+            room['name'] ?? room['participant_name'] ?? 'Applicant';
+        // 不使用預設圖，改用首字母圓形頭像
+        String? avatar;
+        final List<dynamic> avatarCandidates = [
+          room['participant_avatar_url'], // 從 ensure_room 返回
+          room['participant_avatar'], // 從 ensure_room 返回
+          (room['other_user'] is Map)
+              ? (room['other_user'] as Map)['avatar']
+              : null, // 從 get_rooms 返回
+          room['avatar'], // 通用字段
+          task['participant_avatar_url'], // 任務數據
+          task['participant_avatar'], // 任務數據
+          task['acceptor_avatar_url'], // 接受者數據
+          task['acceptor_avatar'], // 接受者數據
+        ];
+        for (final c in avatarCandidates) {
+          if (c != null && c.toString().isNotEmpty) {
+            avatar = c.toString();
+            break;
+          }
+        }
+
+        return {
+          'id': id?.toString(),
+          'name': name,
+          'avatar': avatar ?? '',
+        };
+      } else {
+        // 沒有聊天室，從任務數據推導
+        final String name = task['participant_name'] ?? 'Applicant';
+        String? avatar = task['participant_avatar_url'] ??
+            task['participant_avatar'] ??
+            task['acceptor_avatar_url'] ??
+            task['acceptor_avatar'];
+
+        return {
+          'id': task['participant_id']?.toString() ??
+              task['acceptor_id']?.toString(),
+          'name': name,
+          'avatar': avatar ?? '',
+        };
+      }
+    } else {
+      // 當前用戶是參與者，聊天對象是創建者
+      if (room != null && room.isNotEmpty) {
+        final dynamic id = room['creator_id'];
+        final String name = room['creator_name'] ?? 'Task Creator';
+        String? avatar = room['creator_avatar_url'] ?? room['creator_avatar'];
+
+        return {
+          'id': id?.toString(),
+          'name': name,
+          'avatar': avatar ?? '',
+        };
+      } else {
+        // 沒有聊天室，從任務數據推導
+        final String name = task['creator_name'] ?? 'Task Creator';
+        String? avatar = task['creator_avatar_url'] ?? task['creator_avatar'];
+
+        return {
+          'id': task['creator_id']?.toString(),
+          'name': name,
+          'avatar': avatar ?? '',
+        };
+      }
+    }
+  }
+
+  /// 判斷是否為新任務（發布未滿一週）
+  bool _isNewTask(Map<String, dynamic> task) {
+    try {
+      final createdAt = DateTime.parse(task['created_at'] ?? DateTime.now().toString());
+      final now = DateTime.now();
+      final difference = now.difference(createdAt);
+      return difference.inDays < 7;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 判斷是否為熱門任務（超過一位應徵者）
+  bool _isPopularTask(Map<String, dynamic> task) {
+    final applications = _applicationsByTask[task['id']?.toString()] ?? [];
+    return applications.length > 1;
+  }
+
+  /// 判斷是否為已收藏任務
+  bool _isFavoritedTask(Map<String, dynamic> task) {
+    // TODO: 實現收藏功能後，從收藏服務檢查
+    return false;
+  }
+
+  /// 獲取任務發布時間的距離描述
+  String _getTimeAgo(Map<String, dynamic> task) {
+    try {
+      final createdAt = DateTime.parse(task['created_at'] ?? DateTime.now().toString());
+      final now = DateTime.now();
+      final difference = now.difference(createdAt);
+      
+      if (difference.inDays > 30) {
+        return DateFormat('MM/dd').format(createdAt);
+      } else if (difference.inDays > 0) {
+        return '${difference.inDays} days ago';
+      } else if (difference.inHours > 0) {
+        return '${difference.inHours} hours ago';
+      } else if (difference.inMinutes > 0) {
+        return '${difference.inMinutes} minutes ago';
+      } else {
+        return 'Just now';
+      }
+    } catch (e) {
+      return 'Unknown';
+    }
+  }
 }
 
 // 根據 id 產生一致的顏色
@@ -2379,55 +2605,88 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // 任務標題
-                            Text(
-                              task['title'] ?? 'Untitled Task',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    task['title'] ?? 'Untitled Task',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                // Emoji 狀態列
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // 新任務圖標（發布未滿一週）
+                                    if (_isNewTask(task)) 
+                                      const Text('🌱', style: TextStyle(fontSize: 16)),
+                                    const SizedBox(width: 4),
+                                    // 熱門圖標（超過一位應徵者）
+                                    if (_isPopularTask(task)) 
+                                      const Text('🔥', style: TextStyle(fontSize: 16)),
+                                    const SizedBox(width: 4),
+                                    // 收藏圖標（當前使用者已收藏）
+                                    if (_isFavoritedTask(task)) 
+                                      const Text('❤️', style: TextStyle(fontSize: 16)),
+                                  ],
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 4),
 
+                            // 任務狀態和發布者
+                            Row(
+                              children: [
+                                // 狀態標籤
+                                Flexible(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: baseColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      displayStatus,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                        color: baseColor,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                // 發布者名稱（主題配色）
+                                Flexible(
+                                  child: Text(
+                                    'by ${task['creator_name'] ?? 'Unknown'}',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: colorScheme.secondary,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            
                             // 任務資訊 2x2 格局
                             Container(
                               constraints: const BoxConstraints(maxWidth: 200),
                               child: Column(
                                 children: [
-                                  // 第一行：狀態 + 獎勵
+                                  // 第一行：獎勵 + 位置
                                   Row(
                                     children: [
-                                      // 狀態
-                                      Expanded(
-                                        child: Row(
-                                          children: [
-                                            Flexible(
-                                              child: Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 4,
-                                                      vertical: 1),
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    baseColor.withOpacity(0.1),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                displayStatus,
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: baseColor,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            )),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
                                       // 獎勵
                                       Expanded(
                                         child: Row(
@@ -2450,12 +2709,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                           ],
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  // 第二行：位置 + 日期
-                                  Row(
-                                    children: [
+                                      const SizedBox(width: 8),
                                       // 位置
                                       Expanded(
                                         child: Row(
@@ -2470,7 +2724,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                                     'Unknown Location',
                                                 style: TextStyle(
                                                   fontSize: 11,
-                                                  color: Colors.grey[500],
+                                                  color: colorScheme.primary,
                                                 ),
                                                 overflow: TextOverflow.ellipsis,
                                               ),
@@ -2478,7 +2732,12 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                           ],
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  // 第二行：日期 + 語言要求
+                                  Row(
+                                    children: [
                                       // 日期
                                       Expanded(
                                         child: Row(
@@ -2496,30 +2755,32 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                               ),
                                               style: TextStyle(
                                                 fontSize: 11,
-                                                color: Colors.grey[500],
+                                                color: colorScheme.primary,
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 2),
-                                  // 第三行：語言要求（跨兩列）
-                                  Row(
-                                    children: [
-                                      Icon(Icons.language,
-                                          size: 12, color: Colors.grey[500]),
-                                      const SizedBox(width: 2),
-                                      Flexible(
-                                        child: Text(
-                                          task['language_requirement'] ??
-                                              'No Requirement',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey[500],
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
+                                      const SizedBox(width: 8),
+                                      // 語言要求
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.language,
+                                                size: 12, color: Colors.grey[500]),
+                                            const SizedBox(width: 2),
+                                            Flexible(
+                                              child: Text(
+                                                task['language_requirement'] ??
+                                                    'No Requirement',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: colorScheme.primary,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
@@ -2652,6 +2913,38 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                             ),
                             const SizedBox(width: 8),
 
+                            // Favorite 按鈕
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  // TODO: 實現收藏功能
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content:
+                                            Text('Favorite feature coming soon')),
+                                  );
+                                },
+                                icon: Icon(
+                                  Icons.favorite_border,
+                                  size: 16,
+                                  color: colorScheme.primary,
+                                ),
+                                label: Text(
+                                  'Favorite',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: colorScheme.primary),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+
                             // Delete 按鈕
                             Expanded(
                               child: OutlinedButton.icon(
@@ -2730,7 +3023,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                             ),
                           ),
                         ),
-                ),
+                      ),
 
                 // 應徵者卡片列表
                 if (visibleAppliers.isNotEmpty)
@@ -3021,100 +3314,170 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // 任務標題
-                        Text(
-                          task['title'] ?? 'Untitled Task',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-
-                        // 任務狀態和獎勵
                         Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: baseColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                displayStatus,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: baseColor,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(Icons.attach_money,
-                                size: 14, color: Colors.grey[600]),
-                            const SizedBox(width: 2),
-                            Text(
-                              '${task['reward_point'] ?? task['salary'] ?? 0}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-
-                        // 四個任務資訊欄位：位置、日期、語言要求（移除發布者）
-                        Row(
-                          children: [
-                            Icon(Icons.location_on,
-                                size: 12, color: Colors.grey[500]),
-                            const SizedBox(width: 2),
                             Expanded(
                               child: Text(
-                                task['location'] ?? '未知地點',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey[500],
+                                task['title'] ?? 'Untitled Task',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
                                 ),
+                                maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            Icon(Icons.calendar_today,
-                                size: 12, color: Colors.grey[500]),
-                            const SizedBox(width: 2),
-                            Text(
-                              DateFormat('MM/dd').format(
-                                DateTime.parse(task['task_date'] ??
-                                    DateTime.now().toString()),
-                              ),
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[500],
-                              ),
+                            // Emoji 狀態列
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // 新任務圖標（發布未滿一週）
+                                if (_isNewTask(task)) 
+                                  const Text('🌱', style: TextStyle(fontSize: 16)),
+                                const SizedBox(width: 4),
+                                // 熱門圖標（超過一位應徵者）
+                                if (_isPopularTask(task)) 
+                                  const Text('🔥', style: TextStyle(fontSize: 16)),
+                                const SizedBox(width: 4),
+                                // 收藏圖標（當前使用者已收藏）
+                                if (_isFavoritedTask(task)) 
+                                  const Text('❤️', style: TextStyle(fontSize: 16)),
+                              ],
                             ),
                           ],
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 4),
 
-                        // 語言要求
-                        Row(
-                          children: [
-                            Icon(Icons.language,
-                                size: 12, color: Colors.grey[500]),
-                            const SizedBox(width: 2),
-                            Text(
-                              task['language_requirement'] ?? '不限',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[500],
-                              ),
+                        // 任務狀態
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: baseColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            displayStatus,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: baseColor,
                             ),
-                          ],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+
+                        // 任務資訊 2x2 格局：位置、日期、獎勵、語言
+                        Container(
+                          constraints: const BoxConstraints(maxWidth: 200),
+                          child: Column(
+                            children: [
+                              // 第一行：位置 + 日期
+                              Row(
+                                children: [
+                                  // 位置
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.location_on,
+                                            size: 12, color: Colors.grey[500]),
+                                        const SizedBox(width: 2),
+                                        Flexible(
+                                          child: Text(
+                                            task['location'] ?? '未知地點',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey[500],
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // 日期
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.calendar_today,
+                                            size: 12, color: Colors.grey[500]),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          DateFormat('MM/dd').format(
+                                            DateTime.parse(task['task_date'] ??
+                                                DateTime.now().toString()),
+                                          ),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey[500],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              // 第二行：獎勵 + 語言
+                              Row(
+                                children: [
+                                  // 獎勵
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.attach_money,
+                                            size: 12, color: Colors.grey[600]),
+                                        const SizedBox(width: 2),
+                                        Flexible(
+                                          child: Text(
+                                            '${task['reward_point'] ?? task['salary'] ?? 0}',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w500,
+                                              color: colorScheme.primary,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // 語言要求
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.language,
+                                            size: 12, color: Colors.grey[500]),
+                                        const SizedBox(width: 2),
+                                        Flexible(
+                                          child: Text(
+                                            task['language_requirement'] ?? '不限',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey[500],
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        // 時間距離戳記
+                        Text(
+                          _getTimeAgo(task),
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[400],
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ],
                     ),
@@ -3198,84 +3561,102 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
           task['acceptor_avatar'], // 接受者數據
         ];
         for (final c in avatarCandidates) {
-          if (c is String &&
-              c.trim().isNotEmpty &&
-              !c.contains('assets/images/avatar/')) {
-            avatar = c;
+          if (c != null && c.toString().isNotEmpty) {
+            avatar = c.toString();
             break;
           }
         }
-        // 若找不到頭像網址，則用首字母圓形頭像（avatar 設為 null，UI 層判斷後渲染字母圓形頭像）
-        debugPrint(
-            '🎯 [Creator視角] 參與者資訊 - id: $id, name: $name, avatar: $avatar');
+
         return {
-          'id': id,
+          'id': id?.toString(),
           'name': name,
-          'avatar':
-              (avatar != null && avatar.trim().isNotEmpty) ? avatar : null,
-          'role': 'participant',
+          'avatar': avatar ?? '',
+        };
+      } else {
+        // 沒有聊天室，從任務數據推導
+        final String name = task['participant_name'] ?? 'Applicant';
+        String? avatar = task['participant_avatar_url'] ??
+            task['participant_avatar'] ??
+            task['acceptor_avatar_url'] ??
+            task['acceptor_avatar'];
+
+        return {
+          'id': task['participant_id']?.toString() ??
+              task['acceptor_id']?.toString(),
+          'name': name,
+          'avatar': avatar ?? '',
         };
       }
-      // 後備方案：從 task 獲取
-      final String name =
-          task['acceptor_name'] ?? task['participant_name'] ?? 'Applicant';
-      String? avatar;
-      final List<dynamic> taskAvatarCandidates = [
-        task['acceptor_avatar'],
-        task['participant_avatar'],
-      ];
-      for (final c in taskAvatarCandidates) {
-        if (c is String &&
-            c.trim().isNotEmpty &&
-            !c.contains('assets/images/avatar/')) {
-          avatar = c;
-          break;
-        }
-      }
-      // 若找不到頭像網址，則用首字母圓形頭像（avatar 設為 null，UI 層判斷後渲染字母圓形頭像）
-      debugPrint('🎯 [Creator視角-後備] 參與者資訊 - name: $name, avatar: $avatar');
-      return {
-        'id': task['acceptor_id'] ?? task['participant_id'],
-        'name': name,
-        'avatar': (avatar != null && avatar.trim().isNotEmpty) ? avatar : null,
-        'role': 'participant',
-      };
     } else {
       // 當前用戶是參與者，聊天對象是創建者
-      final String name =
-          task['creator_name'] ?? room?['creator_name'] ?? 'Creator';
-      final List<dynamic> creatorAvatarCandidates = [
-        room?['creator_avatar_url'], // 從 ensure_room 返回
-        room?['creator_avatar'], // 從 ensure_room 返回
-        (room?['other_user'] is Map)
-            ? room?['other_user']?['avatar']
-            : null, // 從 get_rooms 返回
-        (room?['chat_partner'] is Map)
-            ? room?['chat_partner']?['avatar_url']
-            : null,
-        (room?['chat_partner'] is Map)
-            ? room?['chat_partner']?['avatar']
-            : null,
-        task['creator_avatar_url'], // 任務數據
-        task['creator_avatar'], // 任務數據
-      ];
-      String? avatar;
-      for (final c in creatorAvatarCandidates) {
-        if (c is String &&
-            c.trim().isNotEmpty &&
-            !c.contains('assets/images/avatar/')) {
-          avatar = c;
-          break;
-        }
+      if (room != null && room.isNotEmpty) {
+        final dynamic id = room['creator_id'];
+        final String name = room['creator_name'] ?? 'Task Creator';
+        String? avatar = room['creator_avatar_url'] ?? room['creator_avatar'];
+
+        return {
+          'id': id?.toString(),
+          'name': name,
+          'avatar': avatar ?? '',
+        };
+      } else {
+        // 沒有聊天室，從任務數據推導
+        final String name = task['creator_name'] ?? 'Task Creator';
+        String? avatar = task['creator_avatar_url'] ?? task['creator_avatar'];
+
+        return {
+          'id': task['creator_id']?.toString(),
+          'name': name,
+          'avatar': avatar ?? '',
+        };
       }
-      // 若找不到頭像網址，則用首字母圓形頭像（avatar 設為 null，UI 層判斷後渲染字母圓形頭像）
-      debugPrint('🎯 [Participant視角] 創建者資訊 - name: $name, avatar: $avatar');
-      return {
-        'id': task['creator_id'],
-        'name': name,
-        'avatar': (avatar != null && avatar.trim().isNotEmpty) ? avatar : null,
-        'role': 'creator',
-      };
+    }
+  }
+
+  /// 判斷是否為新任務（發布未滿一週）
+  bool _isNewTask(Map<String, dynamic> task) {
+    try {
+      final createdAt = DateTime.parse(task['created_at'] ?? DateTime.now().toString());
+      final now = DateTime.now();
+      final difference = now.difference(createdAt);
+      return difference.inDays < 7;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// 判斷是否為熱門任務（超過一位應徵者）
+  bool _isPopularTask(Map<String, dynamic> task) {
+    final applications = _applicationsByTask[task['id']?.toString()] ?? [];
+    return applications.length > 1;
+  }
+
+  /// 判斷是否為已收藏任務
+  bool _isFavoritedTask(Map<String, dynamic> task) {
+    // TODO: 實現收藏功能後，從收藏服務檢查
+    return false;
+  }
+
+  /// 獲取任務發布時間的距離描述
+  String _getTimeAgo(Map<String, dynamic> task) {
+    try {
+      final createdAt = DateTime.parse(task['created_at'] ?? DateTime.now().toString());
+      final now = DateTime.now();
+      final difference = now.difference(createdAt);
+      
+      if (difference.inDays > 30) {
+        return DateFormat('MM/dd').format(createdAt);
+      } else if (difference.inDays > 0) {
+        return '${difference.inDays} days ago';
+      } else if (difference.inHours > 0) {
+        return '${difference.inHours} hours ago';
+      } else if (difference.inMinutes > 0) {
+        return '${difference.inMinutes} minutes ago';
+      } else {
+        return 'Just now';
+      }
+    } catch (e) {
+      return 'Unknown';
     }
   }
 }
