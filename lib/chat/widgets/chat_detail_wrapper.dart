@@ -49,73 +49,31 @@ class _ChatDetailWrapperState extends State<ChatDetailWrapper> {
 
             final roomId = ChatStorageService.extractRoomIdFromUrl(location);
             debugPrint('🔍 提取的 roomId: $roomId');
-            // 同時擷取 taskId（供最小資料構造使用）
-            String? urlTaskId;
-            try {
-              final frag = Uri.parse(location).fragment;
-              final fragUri = Uri.parse(frag.startsWith('/') ? frag : '/$frag');
-              urlTaskId = fragUri.queryParameters['taskId'];
-            } catch (_) {}
 
             if (roomId != null) {
-              // 若為舊格式（如 app_5），嘗試用 taskId 在會話或本地查找真實 BIGINT room_id
-              String effectiveRoomId = roomId;
-              if (roomId.startsWith('app_')) {
-                debugPrint('🔁 偵測到舊格式 roomId: $roomId，嘗試回退');
-                final fragUri = Uri.parse(location).fragment;
-                final parsedFrag =
-                    Uri.parse(fragUri.startsWith('/') ? fragUri : '/$fragUri');
-                final taskId = parsedFrag.queryParameters['taskId'];
-                debugPrint('🔍 從 URL 取得 taskId: $taskId');
-                // 嘗試從會話獲取真實 id
-                final session =
-                    await ChatSessionManager.getCurrentChatSession();
-                final sessionRoomId = session?['room']?['id']?.toString();
-                if (sessionRoomId != null && sessionRoomId.isNotEmpty) {
-                  effectiveRoomId = sessionRoomId;
-                  debugPrint('✅ 使用會話中的真實 room_id: $effectiveRoomId');
-                }
-              }
-
               final storedData =
-                  await ChatStorageService.getChatRoomData(effectiveRoomId);
+                  await ChatStorageService.getChatRoomData(roomId);
               debugPrint('🔍 從本地儲存獲取的數據: $storedData');
-              if (storedData != null) {
+
+              if (storedData != null && storedData.isNotEmpty) {
                 chatData = storedData;
                 debugPrint('✅ 使用本地儲存的數據');
-
-                // 將本地數據設置為當前會話
-                await ChatSessionManager.setCurrentChatSession(
-                  roomId: effectiveRoomId,
-                  room: storedData['room'] ?? {},
-                  task: storedData['task'] ?? {},
-                  userRole: storedData['userRole'] ?? '',
-                  chatPartnerInfo: storedData['chatPartnerInfo'] ?? {},
-                );
               } else {
-                // 本地沒有資料，構造最小資料集（支援直接貼連結進入）
-                debugPrint('ℹ️ 本地無資料，使用 URL 構造最小聊天室資料');
+                debugPrint('ℹ️ 本地儲存中沒有數據，將構造最小數據集');
+                // 構造最小數據集，包含 room_id
                 chatData = {
                   'room': {
-                    'id': effectiveRoomId,
-                    'roomId': effectiveRoomId,
-                    if (urlTaskId != null) 'taskId': urlTaskId,
-                    if (urlTaskId != null) 'task_id': urlTaskId,
+                    'id': roomId,
+                    'roomId': roomId,
                   },
-                  'task': {
-                    if (urlTaskId != null) 'id': urlTaskId,
-                  },
+                  'task': {},
+                  'userRole': 'participant',
+                  'chatPartnerInfo': {},
                 };
-                await ChatSessionManager.setCurrentChatSession(
-                  roomId: effectiveRoomId,
-                  room: chatData['room'] as Map<String, dynamic>,
-                  task: chatData['task'] as Map<String, dynamic>,
-                  userRole: '',
-                  chatPartnerInfo: const {},
-                );
               }
             } else {
               debugPrint('❌ 無法從 URL 提取 roomId');
+              chatData = null;
             }
           } catch (e) {
             debugPrint('❌ 無法存取 GoRouterState in ChatDetailWrapper: $e');
@@ -142,17 +100,9 @@ class _ChatDetailWrapperState extends State<ChatDetailWrapper> {
         setState(() {
           _chatData = chatData;
           _isLoading = false;
-          _hasError = chatData == null || chatData.isEmpty;
+          // 即使沒有數據也不設置為錯誤，讓 ChatDetailPage 自己處理
+          _hasError = false;
         });
-
-        // 如果沒有數據，3秒後自動重定向
-        if (_hasError) {
-          Future.delayed(const Duration(seconds: 3), () {
-            if (mounted) {
-              GoRouter.of(context).go('/chat');
-            }
-          });
-        }
       }
     } catch (e) {
       if (mounted) {
@@ -188,38 +138,7 @@ class _ChatDetailWrapperState extends State<ChatDetailWrapper> {
       );
     }
 
-    if (_hasError || _chatData == null) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Colors.orange,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Failed to load chat room',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'You will be redirected to the chat list in 3 seconds',
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => GoRouter.of(context).go('/chat'),
-                child: const Text('Return now'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return ChatDetailPage(data: _chatData!);
+    // 即使沒有數據也渲染 ChatDetailPage，讓它自己處理數據載入
+    return ChatDetailPage(data: _chatData);
   }
 }

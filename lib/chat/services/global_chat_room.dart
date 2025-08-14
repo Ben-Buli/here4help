@@ -1,4 +1,4 @@
-import 'package:here4help/chat/models/chat_room_model.dart';
+// 移除硬編碼的聊天室模型 import
 import 'package:here4help/task/services/task_service.dart';
 
 class GlobalChatRoom {
@@ -11,9 +11,10 @@ class GlobalChatRoom {
   final List<Map<String, dynamic>> _chatRooms = [];
 
   Future<void> loadChatRooms() async {
-    // 加載聊天房間資料（可從本地存儲或遠端獲取）
+    // 加載聊天房間資料（從 API 獲取，不再使用硬編碼數據）
     if (_chatRooms.isEmpty) {
-      _chatRooms.addAll(chatRoomModel);
+      // 這裡可以添加從 API 獲取聊天室的邏輯
+      // 暫時保持空列表
     }
   }
 

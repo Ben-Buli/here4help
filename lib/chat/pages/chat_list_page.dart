@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
-import 'package:here4help/chat/models/chat_room_model.dart';
+// 移除硬編碼的聊天室模型 import
 import 'package:intl/intl.dart';
 import 'package:here4help/chat/services/chat_storage_service.dart';
 import 'package:here4help/chat/services/chat_session_manager.dart';
@@ -836,29 +836,29 @@ class _ChatListPageState extends State<ChatListPage>
   }
 
   // Deprecated: 目前未使用
-  Color _getStatusChipBorderColor(String status) {
-    // Convert database status to display status if needed
-    final displayStatus = TaskStatus.getDisplayStatus(status);
+  // Color _getStatusChipBorderColor(String status) {
+  //   // Convert database status to display status if needed
+  //   final displayStatus = TaskStatus.getDisplayStatus(status);
 
-    switch (displayStatus) {
-      case 'Open':
-        return Colors.blue[100]!;
-      case 'In Progress':
-        return Colors.orange[100]!;
-      case 'Dispute':
-        return Colors.red[100]!;
-      case 'Pending Confirmation':
-        return Colors.purple[100]!;
-      case 'Completed':
-        return Colors.grey[100]!;
-      case 'Applying (Tasker)':
-        return Colors.blue[100]!;
-      case 'In Progress (Tasker)':
-        return Colors.orange[100]!;
-      default:
-        return Colors.grey[100]!;
-    }
-  }
+  //   switch (displayStatus) {
+  //     case 'Open':
+  //       return Colors.blue[100]!;
+  //     case 'In Progress':
+  //       return Colors.orange[100]!;
+  //     case 'Dispute':
+  //       return Colors.red[100]!;
+  //     case 'Pending Confirmation':
+  //       return Colors.purple[100]!;
+  //     case 'Completed':
+  //       return Colors.grey[100]!;
+  //     case 'Applying (Tasker)':
+  //       return Colors.blue[100]!;
+  //     case 'In Progress (Tasker)':
+  //       return Colors.orange[100]!;
+  //     default:
+  //       return Colors.grey[100]!;
+  //   }
+  // }
 
   bool _isCountdownStatus(String status) {
     // Convert database status to display status if needed
@@ -1015,9 +1015,6 @@ class _ChatListPageState extends State<ChatListPage>
                           if (_isPopularTask(task))
                             const Text('🔥', style: TextStyle(fontSize: 16)),
                           const SizedBox(width: 4),
-                          // 收藏圖標（當前使用者已收藏）
-                          if (_isFavoritedTask(task))
-                            const Text('❤️', style: TextStyle(fontSize: 16)),
                         ],
                       ),
                     ],
@@ -1244,13 +1241,6 @@ class _ChatListPageState extends State<ChatListPage>
                                 // Debug 資料值
                                 debugPrint(
                                     '🔍 點擊應徵者卡片 - taskId: $taskId, posterId: $posterId, applicantId: $applicantId');
-                                debugPrint('🔍 task keys: ${task.keys}');
-                                debugPrint(
-                                    '🔍 applierChatItem keys: ${applierChatItem.keys}');
-                                debugPrint(
-                                    '🔍 task[creator_id]: ${task['creator_id']} (${task['creator_id'].runtimeType})');
-                                debugPrint(
-                                    '🔍 applierChatItem[user_id]: ${applierChatItem['user_id']} (${applierChatItem['user_id'].runtimeType})');
 
                                 if (taskId.isEmpty ||
                                     posterId == null ||
@@ -1275,77 +1265,10 @@ class _ChatListPageState extends State<ChatListPage>
                                   return;
                                 }
 
-                                // 3) 準備聊天夥伴資訊與 room payload（使用真實 room_id）
-                                final partnerName = applierChatItem['name'] ??
-                                    applierChatItem['participant_name'] ??
-                                    'Applicant';
-                                final partnerAvatar =
-                                    applierChatItem['avatar'] ??
-                                        applierChatItem['participant_avatar'];
-                                final chatPartnerInfo = {
-                                  'id': applierChatItem['user_id'] ??
-                                      applierChatItem['participant_id'],
-                                  'name': partnerName,
-                                  'avatar': (partnerAvatar != null &&
-                                          partnerAvatar
-                                              .toString()
-                                              .trim()
-                                              .isNotEmpty)
-                                      ? partnerAvatar
-                                      : null, // 使用 null 讓 UI 層顯示首字母頭像
-                                  'role': 'participant',
-                                };
-
-                                final roomPayload = {
-                                  ...applierChatItem,
-                                  'id': roomData['id'],
-                                  'roomId': realRoomId,
-                                  'taskId': taskId,
-                                  'task_id': taskId,
-                                  'creator_id': posterId,
-                                  'participant_id': applicantId,
-                                  'participant_avatar':
-                                      applierChatItem['participant_avatar'] ??
-                                          applierChatItem['avatar'],
-                                };
-
-                                // 4) 保存持久化數據並設置當前會話（使用真實 room_id 作為 key）
-                                await ChatStorageService.savechatRoomData(
-                                  roomId: realRoomId,
-                                  room: roomPayload,
-                                  task: task,
-                                  userRole: userRole,
-                                  chatPartnerInfo: chatPartnerInfo,
-                                );
-                                await ChatSessionManager.setCurrentChatSession(
-                                  roomId: realRoomId,
-                                  room: roomPayload,
-                                  task: task,
-                                  userRole: userRole,
-                                  chatPartnerInfo: chatPartnerInfo,
-                                  sourceTab: 'posted-tasks',
-                                );
-
-                                // 5) 產生正確 URL 並導頁
-                                final chatUrl =
-                                    ChatStorageService.generateChatUrl(
-                                  roomId: realRoomId,
-                                  taskId: taskId,
-                                );
-                                final data = {
-                                  'room': roomPayload,
-                                  'task': task,
-                                  'userRole': userRole,
-                                  'chatPartnerInfo': chatPartnerInfo,
-                                };
-
-                                debugPrint('🔍 [Posted Tasks] 準備導航到聊天室');
+                                // 3) 簡化導航：只傳遞 room_id
                                 debugPrint(
-                                    '🔍 [Posted Tasks] chatUrl: $chatUrl');
-                                debugPrint(
-                                    '🔍 [Posted Tasks] extra data: $data');
-
-                                context.go(chatUrl, extra: data);
+                                    '🔍 [Posted Tasks] 準備導航到聊天室，room_id: $realRoomId');
+                                context.go('/chat/detail?room_id=$realRoomId');
                               },
                             ),
                           ),
@@ -1746,11 +1669,8 @@ class _ChatListPageState extends State<ChatListPage>
             applierChatItems =
                 _convertApplicationsToApplierChatItems(applications);
           } else {
-            // My Works 或非我的任務: 使用 demo 資料（暫時）
-            applierChatItems = chatRoomModel
-                .where((applierChatItem) =>
-                    applierChatItem['taskId'] == task['id'])
-                .toList();
+            // My Works 或非我的任務: 不使用硬編碼數據，使用空列表
+            applierChatItems = [];
           }
 
           // My Works 分頁使用特殊的聊天室列表設計
@@ -1800,10 +1720,8 @@ class _ChatListPageState extends State<ChatListPage>
         pagingController: _myWorksPagingController,
         builderDelegate: PagedChildBuilderDelegate<Map<String, dynamic>>(
           itemBuilder: (context, task, index) {
-            final applierChatItems = chatRoomModel
-                .where((room) => room['taskId'] == task['id'])
-                .toList();
-            return _buildMyWorksChatRoomItem(task, applierChatItems);
+            // 移除硬編碼的 chatRoomModel，直接使用 ensure_room 獲取真實數據
+            return _buildMyWorksChatRoomItem(task, []);
           },
           firstPageProgressIndicatorBuilder: (context) =>
               const Center(child: CircularProgressIndicator()),
@@ -2063,88 +1981,88 @@ class _ChatListPageState extends State<ChatListPage>
   }
 
   /// 獲取聊天對象信息
-  Map<String, dynamic> _getChatPartnerInfo(
-      Map<String, dynamic> task, String userRole,
-      [Map<String, dynamic>? room]) {
-    final currentUserId = context.read<UserService>().currentUser?.id;
+  // Map<String, dynamic> _getChatPartnerInfo(
+  //     Map<String, dynamic> task, String userRole,
+  //     [Map<String, dynamic>? room]) {
+  //   final currentUserId = context.read<UserService>().currentUser?.id;
 
-    debugPrint(
-        '🔍 _getChatPartnerInfo - userRole: $userRole, currentUserId: $currentUserId');
-    debugPrint('🔍 _getChatPartnerInfo - task keys: ${task.keys}');
-    debugPrint('🔍 _getChatPartnerInfo - room keys: ${room?.keys}');
+  //   debugPrint(
+  //       '🔍 _getChatPartnerInfo - userRole: $userRole, currentUserId: $currentUserId');
+  //   debugPrint('🔍 _getChatPartnerInfo - task keys: ${task.keys}');
+  //   debugPrint('🔍 _getChatPartnerInfo - room keys: ${room?.keys}');
 
-    if (userRole == 'creator') {
-      // 當前用戶是創建者，聊天對象是參與者
-      if (room != null && room.isNotEmpty) {
-        final dynamic id = room['user_id'] ?? room['participant_id'];
-        final String name =
-            room['name'] ?? room['participant_name'] ?? 'Applicant';
-        // 不使用預設圖，改用首字母圓形頭像
-        String? avatar;
-        final List<dynamic> avatarCandidates = [
-          room['participant_avatar_url'], // 從 ensure_room 返回
-          room['participant_avatar'], // 從 ensure_room 返回
-          (room['other_user'] is Map)
-              ? (room['other_user'] as Map)['avatar']
-              : null, // 從 get_rooms 返回
-          room['avatar'], // 通用字段
-          task['participant_avatar_url'], // 任務數據
-          task['participant_avatar'], // 任務數據
-          task['acceptor_avatar_url'], // 接受者數據
-          task['acceptor_avatar'], // 接受者數據
-        ];
-        for (final c in avatarCandidates) {
-          if (c != null && c.toString().isNotEmpty) {
-            avatar = c.toString();
-            break;
-          }
-        }
+  //   if (userRole == 'creator') {
+  //     // 當前用戶是創建者，聊天對象是參與者
+  //     if (room != null && room.isNotEmpty) {
+  //       final dynamic id = room['user_id'] ?? room['participant_id'];
+  //       final String name =
+  //           room['name'] ?? room['participant_name'] ?? 'Applicant';
+  //       // 不使用預設圖，改用首字母圓形頭像
+  //       String? avatar;
+  //       final List<dynamic> avatarCandidates = [
+  //         room['participant_avatar_url'], // 從 ensure_room 返回
+  //         room['participant_avatar'], // 從 ensure_room 返回
+  //         (room['other_user'] is Map)
+  //             ? (room['other_user'] as Map)['avatar']
+  //             : null, // 從 get_rooms 返回
+  //         room['avatar'], // 通用字段
+  //         task['participant_avatar_url'], // 任務數據
+  //         task['participant_avatar'], // 任務數據
+  //         task['acceptor_avatar_url'], // 接受者數據
+  //         task['acceptor_avatar'], // 接受者數據
+  //       ];
+  //       for (final c in avatarCandidates) {
+  //         if (c != null && c.toString().isNotEmpty) {
+  //           avatar = c.toString();
+  //           break;
+  //         }
+  //       }
 
-        return {
-          'id': id?.toString(),
-          'name': name,
-          'avatar': avatar ?? '',
-        };
-      } else {
-        // 沒有聊天室，從任務數據推導
-        final String name = task['participant_name'] ?? 'Applicant';
-        String? avatar = task['participant_avatar_url'] ??
-            task['participant_avatar'] ??
-            task['acceptor_avatar_url'] ??
-            task['acceptor_avatar'];
+  //       return {
+  //         'id': id?.toString(),
+  //         'name': name,
+  //         'avatar': avatar ?? '',
+  //       };
+  //     } else {
+  //       // 沒有聊天室，從任務數據推導
+  //       final String name = task['participant_name'] ?? 'Applicant';
+  //       String? avatar = task['participant_avatar_url'] ??
+  //           task['participant_avatar'] ??
+  //           task['acceptor_avatar_url'] ??
+  //           task['acceptor_avatar'];
 
-        return {
-          'id': task['participant_id']?.toString() ??
-              task['acceptor_id']?.toString(),
-          'name': name,
-          'avatar': avatar ?? '',
-        };
-      }
-    } else {
-      // 當前用戶是參與者，聊天對象是創建者
-      if (room != null && room.isNotEmpty) {
-        final dynamic id = room['creator_id'];
-        final String name = room['creator_name'] ?? 'Task Creator';
-        String? avatar = room['creator_avatar_url'] ?? room['creator_avatar'];
+  //       return {
+  //         'id': task['participant_id']?.toString() ??
+  //             task['acceptor_id']?.toString(),
+  //         'name': name,
+  //         'avatar': avatar ?? '',
+  //       };
+  //     }
+  //   } else {
+  //     // 當前用戶是參與者，聊天對象是創建者
+  //     if (room != null && room.isNotEmpty) {
+  //       final dynamic id = room['creator_id'];
+  //       final String name = room['creator_name'] ?? 'Task Creator';
+  //       String? avatar = room['creator_avatar_url'] ?? room['creator_avatar'];
 
-        return {
-          'id': id?.toString(),
-          'name': name,
-          'avatar': avatar ?? '',
-        };
-      } else {
-        // 沒有聊天室，從任務數據推導
-        final String name = task['creator_name'] ?? 'Task Creator';
-        String? avatar = task['creator_avatar_url'] ?? task['creator_avatar'];
+  //       return {
+  //         'id': id?.toString(),
+  //         'name': name,
+  //         'avatar': avatar ?? '',
+  //       };
+  //     } else {
+  //       // 沒有聊天室，從任務數據推導
+  //       final String name = task['creator_name'] ?? 'Task Creator';
+  //       String? avatar = task['creator_avatar_url'] ?? task['creator_avatar'];
 
-        return {
-          'id': task['creator_id']?.toString(),
-          'name': name,
-          'avatar': avatar ?? '',
-        };
-      }
-    }
-  }
+  //       return {
+  //         'id': task['creator_id']?.toString(),
+  //         'name': name,
+  //         'avatar': avatar ?? '',
+  //       };
+  //     }
+  //   }
+  // }
 
   /// 判斷是否為新任務（發布未滿一週）
   bool _isNewTask(Map<String, dynamic> task) {
@@ -2163,12 +2081,6 @@ class _ChatListPageState extends State<ChatListPage>
   bool _isPopularTask(Map<String, dynamic> task) {
     final applications = _applicationsByTask[task['id']?.toString()] ?? [];
     return applications.length > 1;
-  }
-
-  /// 判斷是否為已收藏任務
-  bool _isFavoritedTask(Map<String, dynamic> task) {
-    // TODO: 實現收藏功能後，從收藏服務檢查
-    return false;
   }
 
   /// 獲取任務發布時間的距離描述
@@ -2569,10 +2481,6 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                       const Text('🔥',
                                           style: TextStyle(fontSize: 16)),
                                     const SizedBox(width: 4),
-                                    // 收藏圖標（當前使用者已收藏）
-                                    if (_isFavoritedTask(task))
-                                      const Text('❤️',
-                                          style: TextStyle(fontSize: 16)),
                                   ],
                                 ),
                               ],
@@ -2854,38 +2762,6 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                             ),
                             const SizedBox(width: 8),
 
-                            // Favorite 按鈕
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: () {
-                                  // TODO: 實現收藏功能
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                        content: Text(
-                                            'Favorite feature coming soon')),
-                                  );
-                                },
-                                icon: Icon(
-                                  Icons.favorite_border,
-                                  size: 16,
-                                  color: colorScheme.primary,
-                                ),
-                                label: Text(
-                                  'Favorite',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: colorScheme.primary,
-                                  ),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: colorScheme.primary),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-
                             // Delete 按鈕
                             Expanded(
                               child: OutlinedButton.icon(
@@ -3110,39 +2986,10 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
               if (applierChatItems.isNotEmpty) {
                 final room = applierChatItems.first;
                 final roomId = room['id']?.toString() ?? 'unknown';
-                // 儲存持久化資料並設置當前會話（My Works）
-                await ChatStorageService.savechatRoomData(
-                  roomId: roomId,
-                  room: room,
-                  task: task,
-                  userRole: userRole,
-                  chatPartnerInfo: chatPartnerInfo,
-                );
-                await ChatSessionManager.setCurrentChatSession(
-                  roomId: roomId,
-                  room: room,
-                  task: task,
-                  userRole: userRole,
-                  chatPartnerInfo: chatPartnerInfo,
-                  sourceTab: 'my-works', // 記錄來源分頁
-                );
-                // 使用帶參數 URL，避免 appBarBuilder 拿不到 extra
-                final chatUrl = ChatStorageService.generateChatUrl(
-                  roomId: roomId,
-                  taskId: task['id']?.toString(),
-                );
-                final extraData = {
-                  'room': room,
-                  'task': task,
-                  'userRole': userRole,
-                  'chatPartnerInfo': chatPartnerInfo,
-                };
 
-                debugPrint('🔍 [My Works] 準備導航到聊天室');
-                debugPrint('🔍 [My Works] chatUrl: $chatUrl');
-                debugPrint('🔍 [My Works] extra data: $extraData');
-
-                context.go(chatUrl, extra: extraData);
+                // 簡化導航：只傳遞 room_id
+                debugPrint('🔍 [My Works] 準備導航到聊天室，room_id: $roomId');
+                context.go('/chat/detail?room_id=$roomId');
               } else {
                 // 沒有現成房間資料：回退為 ensure_room 建立/取得真實 BIGINT room_id 後導頁
                 try {
@@ -3175,46 +3022,9 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                     return;
                   }
 
-                  final fallbackRoomPayload = {
-                    'id': roomData['id'],
-                    'roomId': realRoomId,
-                    'taskId': taskId,
-                    'task_id': taskId,
-                    'creator_id': creatorId,
-                    'participant_id': participantId,
-                  };
-
-                  await ChatStorageService.savechatRoomData(
-                    roomId: realRoomId,
-                    room: fallbackRoomPayload,
-                    task: task,
-                    userRole: userRole,
-                    chatPartnerInfo: chatPartnerInfo,
-                  );
-                  await ChatSessionManager.setCurrentChatSession(
-                    roomId: realRoomId,
-                    room: fallbackRoomPayload,
-                    task: task,
-                    userRole: userRole,
-                    chatPartnerInfo: chatPartnerInfo,
-                    sourceTab: 'my-works',
-                  );
-
-                  final chatUrl = ChatStorageService.generateChatUrl(
-                    roomId: realRoomId,
-                    taskId: taskId,
-                  );
-
-                  final extraData = {
-                    'room': fallbackRoomPayload,
-                    'task': task,
-                    'userRole': userRole,
-                    'chatPartnerInfo': chatPartnerInfo,
-                  };
-
-                  debugPrint('🔁 [My Works] ensure_room 後導航到聊天室');
-                  debugPrint('🔁 [My Works] chatUrl: $chatUrl');
-                  context.go(chatUrl, extra: extraData);
+                  // 簡化導航：只傳遞 room_id
+                  debugPrint('🔍 [My Works] 準備導航到聊天室，room_id: $realRoomId');
+                  context.go('/chat/detail?room_id=$realRoomId');
                 } catch (e) {
                   debugPrint('❌ [My Works] ensure_room 失敗: $e');
                 }
@@ -3282,10 +3092,6 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                   const Text('🔥',
                                       style: TextStyle(fontSize: 16)),
                                 const SizedBox(width: 4),
-                                // 收藏圖標（當前使用者已收藏）
-                                if (_isFavoritedTask(task))
-                                  const Text('❤️',
-                                      style: TextStyle(fontSize: 16)),
                               ],
                             ),
                           ],
@@ -3500,7 +3306,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
               ? (room['other_user'] as Map)['avatar']
               : null, // 從 get_rooms 返回
           room['avatar'], // 通用字段
-          task['participant_avatar_url'], // 任務數據
+          task['participant_avatar_url'], //
           task['participant_avatar'], // 任務數據
           task['acceptor_avatar_url'], // 接受者數據
           task['acceptor_avatar'], // 接受者數據
@@ -3575,12 +3381,6 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
   bool _isPopularTask(Map<String, dynamic> task) {
     final applications = _applicationsByTask[task['id']?.toString()] ?? [];
     return applications.length > 1;
-  }
-
-  /// 判斷是否為已收藏任務
-  bool _isFavoritedTask(Map<String, dynamic> task) {
-    // TODO: 實現收藏功能後，從收藏服務檢查
-    return false;
   }
 
   /// 獲取任務發布時間的距離描述
@@ -3660,6 +3460,7 @@ class _CompactCountdownTimerWidgetState
     super.dispose();
   }
 
+  // Tasks Status Pending Confirmation:格式化倒數計時器
   String _formatCompactDuration(Duration d) {
     int totalSeconds = d.inSeconds;
     int days = totalSeconds ~/ (24 * 3600);
@@ -3670,6 +3471,7 @@ class _CompactCountdownTimerWidgetState
   }
 
   @override
+  // Tasks Status Pending Confirmation:倒數計時器
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

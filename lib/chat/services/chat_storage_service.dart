@@ -80,16 +80,24 @@ class ChatStorageService {
       debugPrint('🔍 URI query: ${uri.query}');
       debugPrint('🔍 URI fragment: ${uri.fragment}');
 
-      // 1) 普通情況（非 hash 路由）
-      String? roomId = uri.queryParameters['roomId'];
-      debugPrint('🔍 從 queryParameters 提取的 roomId: $roomId');
+      // 1) 普通情況（非 hash 路由）- 優先檢查 room_id（新格式）
+      String? roomId = uri.queryParameters['room_id'];
+      debugPrint('🔍 從 queryParameters 提取的 room_id: $roomId');
       if (roomId != null) {
-        debugPrint('✅ 成功提取 roomId (普通路由): $roomId');
+        debugPrint('✅ 成功提取 room_id (新格式): $roomId');
         return roomId;
       }
 
-      // 2) Flutter Web 預設 hash 路由：參數在 fragment 裡
-      final frag = uri.fragment; // 例如: "/chat/detail?roomId=app_5&taskId=..."
+      // 2) 檢查舊格式 roomId（向後相容）
+      roomId = uri.queryParameters['roomId'];
+      debugPrint('🔍 從 queryParameters 提取的 roomId (舊格式): $roomId');
+      if (roomId != null) {
+        debugPrint('✅ 成功提取 roomId (舊格式): $roomId');
+        return roomId;
+      }
+
+      // 3) Flutter Web 預設 hash 路由：參數在 fragment 裡
+      final frag = uri.fragment; // 例如: "/chat/detail?room_id=123&taskId=..."
       debugPrint('🔍 fragment: $frag');
 
       if (frag.isNotEmpty) {
@@ -98,8 +106,17 @@ class ChatStorageService {
         debugPrint(
             '🔍 fragment URI queryParameters: ${fragUri.queryParameters}');
 
+        // 優先檢查 room_id（新格式）
+        roomId = fragUri.queryParameters['room_id'];
+        debugPrint('🔍 從 fragment 提取的 room_id (新格式): $roomId');
+        if (roomId != null) {
+          debugPrint('✅ 成功提取 room_id (hash 路由): $roomId');
+          return roomId;
+        }
+
+        // 檢查舊格式 roomId（向後相容）
         roomId = fragUri.queryParameters['roomId'];
-        debugPrint('🔍 從 fragment 提取的 roomId: $roomId');
+        debugPrint('🔍 從 fragment 提取的 roomId (舊格式): $roomId');
         if (roomId != null) {
           debugPrint('✅ 成功提取 roomId (hash 路由): $roomId');
           return roomId;

@@ -425,4 +425,48 @@ class ChatService {
       throw Exception('封鎖操作失敗: $e');
     }
   }
+
+  /// 獲取聊天室詳細數據（聚合 API）
+  Future<Map<String, dynamic>> getChatDetailData({
+    required String roomId,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('未登入');
+      }
+
+      final queryParams = <String, String>{
+        'room_id': roomId,
+      };
+
+      final uri = Uri.parse('$_baseUrl/backend/api/chat/get_chat_detail_data.php')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return data['data'];
+        } else {
+          throw Exception(data['message'] ?? '獲取聊天室詳細數據失敗');
+        }
+      } else if (response.statusCode == 403) {
+        throw Exception('您沒有權限訪問此聊天室');
+      } else if (response.statusCode == 404) {
+        throw Exception('聊天室不存在');
+      } else {
+        throw Exception('網路錯誤: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('獲取聊天室詳細數據失敗: $e');
+    }
+  }
 }

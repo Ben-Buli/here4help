@@ -1,4 +1,4 @@
-/// 任務聊天室模型，包含任務相關資訊和聊天記錄
+/// 任務聊天室模型，包含任務相關資訊和聊天記錄（已棄用，請使用資料庫取代）
 final List<Map<String, dynamic>> chatRoomModel = [
   {
     "id": "room_1",
