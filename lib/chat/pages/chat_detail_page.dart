@@ -1278,6 +1278,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         {String? senderName, String? messageTime}) {
       // 先前的 opponentInfo 已不再使用，頭像/名稱以快取為準
 
+      // 檢查是否為應徵訊息
+      final isApplicationMessage = text.contains('Self‑recommendation') ||
+          text.contains('cover_letter') ||
+          text.contains('answers_json') ||
+          text.contains('Application Submitted');
+
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3.0),
         child: Column(
@@ -1309,24 +1315,110 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          constraints: const BoxConstraints(maxWidth: 300),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.secondary,
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(4),
-                              topRight: Radius.circular(16),
-                              bottomLeft: Radius.circular(16),
-                              bottomRight: Radius.circular(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 訊息氣泡
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              constraints: const BoxConstraints(maxWidth: 300),
+                              decoration: BoxDecoration(
+                                color: isApplicationMessage
+                                    ? Colors.amber[50]
+                                    : Theme.of(context).colorScheme.secondary,
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(4),
+                                  topRight: Radius.circular(16),
+                                  bottomLeft: Radius.circular(16),
+                                  bottomRight: Radius.circular(16),
+                                ),
+                                border: isApplicationMessage
+                                    ? Border.all(
+                                        color: Colors.amber[300]!, width: 1)
+                                    : null,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // 如果是應徵訊息，顯示特殊標識
+                                  if (isApplicationMessage) ...[
+                                    Row(
+                                      children: [
+                                        Icon(Icons.description,
+                                            size: 16, color: Colors.amber[700]),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Application Submitted',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.amber[700],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Divider(
+                                        height: 1, color: Colors.amber),
+                                    const SizedBox(height: 4),
+                                  ],
+
+                                  // 訊息內容
+                                  DefaultTextStyle.merge(
+                                    style: TextStyle(
+                                      color: isApplicationMessage
+                                          ? Colors.grey[800]
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .onSecondary,
+                                    ),
+                                    child: _buildMessageContent(text),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          child: DefaultTextStyle.merge(
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSecondary,
-                            ),
-                            child: _buildMessageContent(text),
-                          ),
+
+                            // 如果是應徵訊息，顯示 View Resume 按鈕
+                            if (isApplicationMessage) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.amber[100],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.amber[300]!),
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () =>
+                                        _showApplierResumeDialog(context),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 8),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.visibility,
+                                              size: 16,
+                                              color: Colors.amber[800]),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'View Resume',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.amber[800],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                       const SizedBox(width: 4),
@@ -1478,7 +1570,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         alertContent = Column(
           children: [
             Text(
-              '⏰ ${remainingTime.inDays}d ${remainingTime.inHours.remainder(24).toString().padLeft(2, '0')}:${remainingTime.inMinutes.remainder(60).toString().padLeft(2, '0')}:${remainingTime.inSeconds.remainder(60).toString().padLeft(2, '0')}',
+              '⏰ ${remainingTime.inDays}d ${remainingTime.inHours.remainder(24).toString().padLeft(2, '0')}:${remainingTime.inMinutes.remainder(60).toString().padLeft(2, '0')}:${remainingTime.inSeconds.remainder(60).toString().padLeft(2, '0')} until auto complete',
               style: const TextStyle(
                   fontWeight: FontWeight.bold, fontSize: 14, color: Colors.red),
             ),
@@ -1486,7 +1578,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                'If the poster does not confirm within 7 days, the task will be automatically marked as completed and the payment will be transferred.',
+                'Dear Poster, please confirm as soon as possible that the Tasker has completed the task. Otherwise, after the countdown ends, the payment will be automatically transferred to the Tasker.',
                 style: TextStyle(
                     fontSize: 12,
                     color: Colors.red,
@@ -2555,6 +2647,194 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           ),
         );
       },
+    );
+  }
+
+  /// 構建聊天訊息項目
+  Widget _buildMessageItem(Map<String, dynamic> message, int index) {
+    final isMe =
+        message['from_user_id']?.toString() == _currentUserId?.toString();
+    final messageText = message['message'] ?? '';
+    final messageTime = message['created_at'] ?? '';
+    final isApplicationMessage = message['is_application_message'] == true ||
+        (messageText.contains('Self‑recommendation') ||
+            messageText.contains('cover_letter') ||
+            messageText.contains('answers_json'));
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      child: Row(
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!isMe) ...[
+            // 對方頭像
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              child: CircleAvatar(
+                radius: 20,
+                backgroundImage: _opponentAvatarUrlCached != null &&
+                        _opponentAvatarUrlCached!.isNotEmpty
+                    ? ((_opponentAvatarUrlCached!.startsWith('http')
+                            ? NetworkImage(_opponentAvatarUrlCached!)
+                            : AssetImage(_opponentAvatarUrlCached!))
+                        as ImageProvider)
+                    : null,
+                backgroundColor: Colors.grey[400],
+                child: _opponentAvatarUrlCached == null ||
+                        _opponentAvatarUrlCached!.isEmpty
+                    ? Text(
+                        _opponentNameCached.isNotEmpty
+                            ? _opponentNameCached[0].toUpperCase()
+                            : 'U',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      )
+                    : null,
+              ),
+            ),
+          ],
+
+          // 訊息氣泡
+          Flexible(
+            child: Column(
+              crossAxisAlignment:
+                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                // 訊息內容
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isMe
+                        ? Theme.of(context).colorScheme.primary
+                        : (isApplicationMessage
+                            ? Colors.amber[50]
+                            : applierBubbleColor),
+                    borderRadius: BorderRadius.circular(16),
+                    border: isApplicationMessage
+                        ? Border.all(color: Colors.amber[300]!, width: 1)
+                        : null,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 如果是應徵訊息，顯示特殊標識
+                      if (isApplicationMessage) ...[
+                        Row(
+                          children: [
+                            Icon(Icons.description,
+                                size: 16, color: Colors.amber[700]),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Application Submitted',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        const Divider(height: 1, color: Colors.amber),
+                        const SizedBox(height: 4),
+                      ],
+
+                      // 訊息文字
+                      Text(
+                        messageText,
+                        style: TextStyle(
+                          color: isMe
+                              ? Colors.white
+                              : (isApplicationMessage
+                                  ? Colors.grey[800]
+                                  : Colors.black87),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 時間戳記
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    _formatMessageTime(messageTime),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ),
+
+                // 如果是應徵訊息且不是自己發的，顯示 View Resume 按鈕
+                if (isApplicationMessage && !isMe) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.amber[100],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.amber[300]!),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _showApplierResumeDialog(context),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.visibility,
+                                  size: 16, color: Colors.amber[800]),
+                              const SizedBox(width: 6),
+                              Text(
+                                'View Resume',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.amber[800],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          if (isMe) ...[
+            // 我的頭像
+            Container(
+              margin: const EdgeInsets.only(left: 8),
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                child: Text(
+                  'Me',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

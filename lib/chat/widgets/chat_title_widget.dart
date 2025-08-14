@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/chat/widgets/task_appbar_title.dart';
 import 'package:here4help/chat/services/chat_storage_service.dart';
 import 'package:here4help/chat/services/chat_session_manager.dart';
+import 'package:here4help/chat/services/chat_service.dart';
 
 /// 聊天室標題組件，只負責提供 titleWidget
 class ChatTitleWidget extends StatefulWidget {
@@ -69,6 +70,11 @@ class _ChatTitleWidgetState extends State<ChatTitleWidget> {
           if (storedData != null && storedData.isNotEmpty) {
             data = storedData;
             debugPrint('✅ 使用本地儲存的數據');
+          } else {
+            // 本地沒有，嘗試最小訊息讀取確保房間存在（不阻塞 UI）
+            try {
+              await ChatService().getMessages(roomId: roomId);
+            } catch (_) {}
           }
         } else {
           debugPrint('❌ 無法從 URL 提取 roomId');
@@ -85,6 +91,38 @@ class _ChatTitleWidgetState extends State<ChatTitleWidget> {
     }
 
     debugPrint('🔍 最終使用的數據: $data');
+
+    // 從 room/chatPartnerInfo 推導並補齊 userRole（如果缺）
+    if (data != null) {
+      final room = (data['room'] as Map<String, dynamic>?) ?? {};
+      // 若 URL 有 roomId，但 data['room'] 沒有 id，補齊
+      try {
+        final location = GoRouterState.of(context).uri.toString();
+        final urlRoomId = ChatStorageService.extractRoomIdFromUrl(location);
+        if (urlRoomId != null &&
+            (room['id'] == null && room['roomId'] == null)) {
+          room['id'] = urlRoomId;
+          room['roomId'] = urlRoomId;
+          data['room'] = room;
+        }
+      } catch (_) {}
+      // 若未顯式提供 userRole，根據當前用戶與 room 的 creator/participant 關係推導
+      if ((data['userRole'] == null ||
+          (data['userRole'] as String?)?.isEmpty == true)) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final myId = prefs.getInt('user_id');
+          final creatorId = room['creator_id'] ?? room['creatorId'];
+          if (myId != null && creatorId != null) {
+            final int? creator =
+                (creatorId is int) ? creatorId : int.tryParse('$creatorId');
+            if (creator != null) {
+              data['userRole'] = (creator == myId) ? 'creator' : 'participant';
+            }
+          }
+        } catch (_) {}
+      }
+    }
 
     if (!mounted) return;
     setState(() {

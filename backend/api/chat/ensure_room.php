@@ -110,16 +110,3 @@ try {
   Response::error('Server error: ' . $e->getMessage(), 500);
 }
 ?>
-
-
-    );
-  }
-
-  Response::success(['room' => $room], 'Room ensured');
-} catch (Exception $e) {
-  error_log('ensure_room.php error: ' . $e->getMessage());
-  error_log('ensure_room.php trace: ' . $e->getTraceAsString());
-  Response::error('Server error: ' . $e->getMessage(), 500);
-}
-?>
-

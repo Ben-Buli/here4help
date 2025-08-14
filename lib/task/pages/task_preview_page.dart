@@ -8,6 +8,7 @@ import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:provider/provider.dart';
+import 'package:here4help/chat/services/optimized_chat_service.dart';
 
 class TaskPreviewPage extends StatefulWidget {
   const TaskPreviewPage({super.key});
@@ -620,8 +621,18 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                           const SnackBar(
                               content: Text('Task posted successfully!')),
                         );
-                        // 導航到任務大廳並刷新
-                        context.go('/task');
+
+                        // 清除聊天服務的快取，確保新任務能立即顯示
+                        try {
+                          final chatService = OptimizedChatService();
+                          chatService.clearCache();
+                          debugPrint('🗑️ 已清除聊天服務快取');
+                        } catch (e) {
+                          debugPrint('⚠️ 清除快取失敗: $e');
+                        }
+
+                        // 導航到聊天頁面的 Posted Tasks 分頁，讓用戶看到新創建的任務
+                        context.go('/chat?tab=0');
                       }
                     } else {
                       if (mounted) {

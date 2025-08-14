@@ -273,10 +273,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
     final userName = user?.name ?? 'Unknown User';
     final avatarUrl = user?.avatar_url ?? '';
 
-    // Debug: 打印用戶資訊
-    debugPrint(
-        '🔍 PersonalInfoSection - User: ${user?.name}, Avatar: ${user?.avatar_url}');
-    debugPrint('🔍 PersonalInfoSection - 當前時間: ${DateTime.now()}');
+    // // Debug: 打印用戶資訊
+    // debugPrint(
+    //     '🔍 PersonalInfoSection - User: ${user?.name}, Avatar: ${user?.avatar_url}');
+    // debugPrint('🔍 PersonalInfoSection - 當前時間: ${DateTime.now()}');
 
     // 如果正在載入用戶資料，顯示載入狀態
     if (userService.isLoading) {

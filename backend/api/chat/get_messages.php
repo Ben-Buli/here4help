@@ -25,12 +25,25 @@ try {
     Response::error('Method not allowed', 405);
   }
 
-  // Auth
+  // Auth（支援 Authorization Header 與 token 傳參備援）
   $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
-  if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
+  $token = null;
+  if (!empty($auth_header) && preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
+    $token = $m[1];
+  }
+  // 備援：GET 或 POST JSON 帶入 token
+  if ($token === null) {
+    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+      if (!empty($_GET['token'])) $token = $_GET['token'];
+    } else {
+      $input = json_decode(file_get_contents('php://input'), true) ?? [];
+      if (!empty($input['token'])) $token = $input['token'];
+    }
+  }
+  if (empty($token)) {
     throw new Exception('Authorization header required');
   }
-  $payload = validateToken($m[1]);
+  $payload = validateToken($token);
   if (!$payload) throw new Exception('Invalid or expired token');
   $user_id = (int)$payload['user_id'];
 

@@ -74,6 +74,8 @@ class ChatService {
       final queryParams = <String, String>{
         'room_id': roomId,
         'limit': limit.toString(),
+        // 備援：某些環境不會傳遞 Authorization header，改以 token 查驗
+        'token': token,
       };
 
       if (beforeId != null) {
