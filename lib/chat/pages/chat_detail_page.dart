@@ -1412,7 +1412,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
 
     Widget buildOpponentBubble(String text, int? opponentUserId,
-        {String? senderName, String? messageTime, bool isApplyMessage = false}) {
+        {String? senderName,
+        String? messageTime,
+        bool isApplyMessage = false}) {
       // 先前的 opponentInfo 已不再使用，頭像/名稱以快取為準
 
       // 檢查是否為應徵訊息
@@ -1479,7 +1481,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                               constraints: const BoxConstraints(maxWidth: 300),
                               decoration: BoxDecoration(
                                 color: isApplicationMessage
-                                    ? Colors.amber[50]
+                                    ? Theme.of(context)
+                                        .colorScheme
+                                        .secondaryContainer
                                     : Theme.of(context).colorScheme.secondary,
                                 borderRadius: const BorderRadius.only(
                                   topLeft: Radius.circular(4),
@@ -1489,7 +1493,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                                 ),
                                 border: isApplicationMessage
                                     ? Border.all(
-                                        color: Colors.amber[300]!, width: 1)
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .secondary,
+                                        width: 1)
                                     : null,
                               ),
                               child: Column(
@@ -1522,12 +1529,14 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                                   DefaultTextStyle.merge(
                                     style: TextStyle(
                                       color: isApplicationMessage
-                                          ? Colors.grey[800]
+                                          ? Theme.of(context)
+                                              .colorScheme
+                                              .onSecondaryContainer
                                           : Theme.of(context)
                                               .colorScheme
                                               .onSecondary,
                                     ),
-                                      child: _buildMessageContent(displayText),
+                                    child: _buildMessageContent(displayText),
                                   ),
                                 ],
                               ),
@@ -1538,9 +1547,14 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                               const SizedBox(height: 8),
                               Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.amber[100],
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .secondaryContainer,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.amber[300]!),
+                                  border: Border.all(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondary),
                                 ),
                                 child: Material(
                                   color: Colors.transparent,
@@ -1556,14 +1570,18 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                                         children: [
                                           Icon(Icons.visibility,
                                               size: 16,
-                                              color: Colors.amber[800]),
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSecondaryContainer),
                                           const SizedBox(width: 6),
                                           Text(
                                             'View Resume',
                                             style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.bold,
-                                              color: Colors.amber[800],
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSecondaryContainer,
                                             ),
                                           ),
                                         ],
