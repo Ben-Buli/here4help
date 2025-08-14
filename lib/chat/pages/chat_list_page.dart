@@ -2402,7 +2402,8 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                       Expanded(
                                         child: Row(
                                           children: [
-                                            Container(
+                                            Flexible(
+                                              child: Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
                                                       horizontal: 4,
@@ -2422,7 +2423,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                                 ),
                                                 overflow: TextOverflow.ellipsis,
                                               ),
-                                            ),
+                                            )),
                                           ],
                                         ),
                                       ),
