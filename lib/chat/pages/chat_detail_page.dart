@@ -1112,50 +1112,51 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                           CircleAvatar(
+                          CircleAvatar(
                             radius: 30,
-                             backgroundImage: () {
-                               final avatar = applicationData?['applier_avatar'] ??
-                                   _opponentAvatarUrlCached;
-                               if (avatar == null || '$avatar'.isEmpty) {
-                                 return null;
-                               }
-                               if ('$avatar'.startsWith('http')) {
-                                 return NetworkImage('$avatar');
-                               }
-                               return ImageHelper.getAvatarImage('$avatar');
-                             }(),
-                             child: () {
-                               final name = applicationData?['applier_name'] ??
-                                   _opponentNameCached;
-                               if (applicationData?['applier_avatar'] != null ||
-                                   (_opponentAvatarUrlCached != null &&
-                                       _opponentAvatarUrlCached!.isNotEmpty)) {
-                                 return null;
-                               }
-                               final initial = (name?.isNotEmpty == true)
-                                   ? name![0].toUpperCase()
-                                   : 'U';
-                               return Text(initial,
-                                   style: const TextStyle(
-                                       color: Colors.white, fontSize: 20));
-                             }(),
+                            backgroundImage: () {
+                              final avatar =
+                                  applicationData?['applier_avatar'] ??
+                                      _opponentAvatarUrlCached;
+                              if (avatar == null || '$avatar'.isEmpty) {
+                                return null;
+                              }
+                              if ('$avatar'.startsWith('http')) {
+                                return NetworkImage('$avatar');
+                              }
+                              return ImageHelper.getAvatarImage('$avatar');
+                            }(),
+                            child: () {
+                              final name = applicationData?['applier_name'] ??
+                                  _opponentNameCached;
+                              if (applicationData?['applier_avatar'] != null ||
+                                  (_opponentAvatarUrlCached != null &&
+                                      _opponentAvatarUrlCached!.isNotEmpty)) {
+                                return null;
+                              }
+                              final initial = (name?.isNotEmpty == true)
+                                  ? name![0].toUpperCase()
+                                  : 'U';
+                              return Text(initial,
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 20));
+                            }(),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                 Text(
-                                   (applicationData?['applier_name'] ??
-                                           _opponentNameCached)
-                                       .toString()
-                                       .trim()
-                                       .isNotEmpty
-                                       ? (applicationData?['applier_name'] ??
-                                               _opponentNameCached)
-                                           .toString()
-                                       : 'Anonymous',
+                                Text(
+                                  (applicationData?['applier_name'] ??
+                                              _opponentNameCached)
+                                          .toString()
+                                          .trim()
+                                          .isNotEmpty
+                                      ? (applicationData?['applier_name'] ??
+                                              _opponentNameCached)
+                                          .toString()
+                                      : 'Anonymous',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,

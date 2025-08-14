@@ -122,7 +122,11 @@ class TaskAppBarTitle extends StatelessWidget {
               const SizedBox(height: 8),
               const Text('Posted by:',
                   style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('UserName: ${chatPartnerName ?? '—'}'),
+              Text('UserName: ' +
+                  (((task['creator_name'] as String?)?.trim().isNotEmpty ==
+                          true)
+                      ? (task['creator_name'] as String)
+                      : (chatPartnerName ?? '—'))),
               Row(
                 children: [
                   const Icon(Icons.star,
