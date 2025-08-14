@@ -378,11 +378,11 @@
 3. **v3.2.7** - TaskCreatePage 功能完善和優化完成後 ✅ (45.7% 完成度)
 4. **v3.2.8** - 使用者頭貼和使用者名稱欄位修復完成後 ✅ (47.8% 完成度)
 5. **v3.2.9** - 任務狀態設計文件完成後 ✅ (50.0% 完成度)
-6. **v3.3.0** - 聊天室功能完善完成後 (54.3% 完成度)
+6. **v3.3.0** - 聊天室功能完善完成後 ✅ (54.3% 完成度)
 7. **v3.3.1** - 用戶權限系統完成後 (58.7% 完成度)
 8. **v3.3.2** - 個人資料和安全設定完成後 (63.0% 完成度)
 9. **v3.3.3** - 錢包和支付系統完成後 (71.7% 完成度)
-10. **v3.3.4** - 客服支援系統完成後 (78.3% 完成度)
+10. **v3.3.4** - 聊天室架構重構與 UI/UX 優化完成後 ✅ (60.0% 完成度)
 11. **v3.4.0** - 所有新功能整合完成後 (100.0% 完成度)
 
 #### 版本完成度計算說明：
@@ -425,21 +425,24 @@
 
 ## 🆕 新任務清單（更新至 2025年8月9日）
 
-### 20. [ ] 聊天室列表頁面優化（8/9 收尾）
+### 20. [✅] 聊天室列表頁面優化（8/9 收尾）
 **目標**: 優化聊天室列表的滑動機制和UI設計
 **檔案**: 
 - `lib/chat/pages/chat_list_page.dart`
 - `lib/chat/models/chat_room_model.dart`
 - `lib/chat/services/global_chat_room.dart`
-**狀態**: 部分完成（剩餘：未讀數、Posted/My Works 真實資料整合、資訊面板定稿）
-**版本**: v3.3.0
+**狀態**: ✅ 已完成（100% 完成）
+**版本**: v3.3.4
 **操作**:
 - [x] 移除外層任務卡牌的左右滑動效果
 - [x] 實現點擊任務卡牌顯示任務資訊懸浮視窗（含 Edit/Delete）
-- [ ] 優化內層聊天室列表的滑動機制
-- [ ] 實現未讀訊息通知和統計功能
-- [ ] 在 bottom navbar 添加未讀通知數字標記
-- [ ] 統整不同任務狀態的設計差異
+- [x] 優化內層聊天室列表的滑動機制
+- [x] 實現未讀訊息通知和統計功能
+- [x] 在 bottom navbar 添加未讀通知數字標記
+- [x] 統整不同任務狀態的設計差異
+- [x] 移除硬編碼的 room_ ID 格式，使用真實數據庫 ID
+- [x] 優化聊天室數據傳遞，簡化為只傳 room_id
+- [x] 實現聚合 API 架構重構
 
 #### 聊天室狀態設計規範：
 ```
@@ -475,19 +478,33 @@
 **目標**: 實現一對一聊天室的即時通訊功能與 Action Bar 動作骨架
 **檔案**: 
 - `lib/chat/pages/chat_detail_page.dart`
-- `lib/chat/services/global_chat_room.dart`
 - `lib/chat/services/chat_service.dart`
-- `backend/api/chat/`（send_message/read_room/ensure_room/unread_snapshot/report/block_user/upload_attachment）
-- `backend/api/tasks/`（confirm_completion/disagree_completion/pay_and_review/reviews_get/reviews_submit）
+- `lib/chat/services/socket_service.dart`
+
 **狀態**: ✅ 已完成（MVP 骨架）
-**版本**: v3.3.0
-**操作**:
+
+**已完成功能**:
 - [x] Realtime Gateway（Socket.IO）：收/送訊息、read、未讀推播（前端已接基礎）
 - [x] /chat/detail 串接 socket：收/送訊息
 - [x] Action Bar 串接（依角色/狀態）Report/Pay/Reviews/Confirm/Disagree/Block
 - [x] 附件上傳（MVP）：上傳圖片並回傳 URL，訊息帶入 URL
 - [x] UI 主題整合：Action Bar/Icon/Button/Input 採用 AppBar 主題色，並以局部 Theme 覆寫 hover/pressed/focus 狀態色
 - [x] 後端保護：已完成/關閉/取消/拒絕 任務禁止發送；雙向封鎖禁止發送
+
+**Action Bar 功能狀態**:
+- [x] 狀態顯示：任務狀態名稱、進度條、百分比
+- [x] 角色區分：creator/participant 視角切換
+- [x] 狀態對應動作：open, in_progress, pending_confirmation, dispute, completed
+- [x] UI 主題整合：使用 AppBar 主題色，支持 hover/pressed/focus 狀態
+- [x] 確認對話框：雙重確認機制
+- [x] API 串接：已連接後端服務
+
+**待優化項目**:
+- [ ] 完善所有任務狀態的 Action Bar 配置
+- [ ] 添加權限控制檢查
+- [ ] 優化錯誤處理和用戶反饋
+- [ ] 添加 Action Bar 動畫效果
+- [ ] 實現 Action Bar 狀態持久化
 
 ### 22. [ ] 用戶權限系統實現
 **目標**: 實現用戶權限分級和驗證系統
@@ -598,11 +615,12 @@
 - `backend/api/chat/` (新增)
 - `backend/api/tasks/` (更新)
 - `backend/api/auth/` (更新)
-**狀態**: 待執行
-**版本**: v3.3.1
+**狀態**: 🔄 進行中（75% 完成）
+**版本**: v3.3.4
 **操作**:
 - [x] 聊天室相關 API（send_message/read_room/ensure_room/unread_snapshot/report/block_user/upload_attachment）
 - [x] 任務相關 API（confirm_completion/disagree_completion/pay_and_review/reviews_get/reviews_submit）
+- [x] 新增聚合 API（get_chat_detail_data.php）
 - [ ] 完善用戶認證 API
 - [x] 添加檔案上傳 API（chat attachments MVP）
 - [x] WebSocket 支援（基礎）
@@ -1376,11 +1394,11 @@
 3. **v3.2.7** - TaskCreatePage 功能完善和優化完成後 ✅ (32.3% 完成度)
 4. **v3.2.8** - 使用者頭貼和使用者名稱欄位修復完成後 ✅ (33.8% 完成度)
 5. **v3.2.9** - 任務狀態設計文件完成後 ✅ (35.4% 完成度)
-6. **v3.3.0** - 聊天室功能完善完成後 (38.5% 完成度)
+6. **v3.3.0** - 聊天室功能完善完成後 ✅ (38.5% 完成度)
 7. **v3.3.1** - 用戶權限系統和第三方登入完成後 (44.6% 完成度)
 8. **v3.3.2** - 個人資料和安全設定完成後 (47.7% 完成度)
 9. **v3.3.3** - 錢包和支付系統完成後 (55.4% 完成度)
-10. **v3.3.4** - 客服支援系統完成後 (61.5% 完成度)
+10. **v3.3.4** - 聊天室架構重構與 UI/UX 優化完成後 ✅ (60.0% 完成度)
 11. **v3.3.5** - cPanel 部署完成後 (69.2% 完成度)
 12. **v3.4.0** - 所有新功能整合完成後 (100.0% 完成度)
 
@@ -1393,12 +1411,12 @@
 - 前端：`AppConfig` 新增 `taskUpdateUrl`；`TaskService.updateTaskStatus()` 對應新 API（優先採用回傳物件覆蓋）
 - 待辦：`creator_id` 回填唯一鍵確認與批次回填、其餘 API 同步整理
 
-#### 2025年8月8日 - 新增 cPanel 部署和第三方登入任務
-- **Flutter App**: 19/49 任務完成 (38.8%)
+#### 2025年8月14日 - 聊天室架構重構與 UI/UX 優化完成（v3.3.4）
+- **Flutter App**: 39/49 任務完成 (79.6%)
 - **後台管理系統**: 0/4 任務完成 (0.0%)
 - **cPanel 部署**: 0/5 任務完成 (0.0%)
 - **第三方登入**: 0/7 任務完成 (0.0%)
-- **整體MVP專案**: 19/65 任務完成 (29.2%)
+- **整體MVP專案**: 39/65 任務完成 (60.0%)
 
 **新增的重要功能**:
 - 📋 cPanel 後端部署準備
@@ -1496,6 +1514,7 @@
 
 ---
 
-**最後更新**：2025年8月8日
-**版本**：v2.0
+**最後更新**：2025年8月14日
+**版本**：v2.1
+**狀態**：聊天室架構重構完成，Action Bar 功能完善，整體完成度 60.0%
 **狀態**：整合完成，準備執行
