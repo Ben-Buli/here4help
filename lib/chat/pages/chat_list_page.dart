@@ -65,9 +65,7 @@ class _ChatListPageState extends State<ChatListPage>
   // 手風琴展開狀態管理
   final Set<String> _expandedTaskIds = <String>{};
 
-  // My Works 分頁篩選狀態
-  bool _showMyTasksOnly = false;
-  bool _showAppliedOnly = true; // 預設開啟
+  // My Works 分頁篩選狀態（已移除，只顯示已應徵任務）
 
   // 簡化的載入狀態
   bool _isLoading = true;
@@ -411,30 +409,10 @@ class _ChatListPageState extends State<ChatListPage>
       }
     }
 
-    // My Works 準則：根據篩選狀態決定顯示內容
+    // My Works 準則：只顯示已應徵的任務
     return allTasks.where((t) {
-      final acceptorIsMe = (t['acceptor_id']?.toString() ?? '') ==
-          (currentUserId?.toString() ?? '');
       final appliedByMe = t['applied_by_me'] == true;
-      
-      // 根據篩選狀態決定是否顯示
-      bool shouldShow = false;
-      
-      if (_showMyTasksOnly && _showAppliedOnly) {
-        // 兩個都勾選：顯示全部
-        shouldShow = acceptorIsMe || appliedByMe;
-      } else if (_showMyTasksOnly) {
-        // 只勾選我的任務：顯示被指派的任務
-        shouldShow = acceptorIsMe;
-      } else if (_showAppliedOnly) {
-        // 只勾選已應徵：顯示我應徵過的任務
-        shouldShow = appliedByMe;
-      } else {
-        // 都不勾選：顯示全部任務（不按任務類型過濾）
-        shouldShow = true;
-      }
-      
-      return shouldShow;
+      return appliedByMe; // 只顯示我應徵過的任務
     }).toList();
   }
 
@@ -922,7 +900,8 @@ class _ChatListPageState extends State<ChatListPage>
     final String displayStatus = _displayStatus(task);
     final progressData = _getProgressData(displayStatus);
     final progress = progressData['progress'];
-    final color = progressData['color'] ?? Colors.grey[600]!; // ignore: unused_local_variable
+    final color = progressData['color'] ??
+        Colors.grey[600]!; // ignore: unused_local_variable
 
     return InkWell(
       onTap: () => _showTaskInfoDialog(task),
@@ -1023,15 +1002,15 @@ class _ChatListPageState extends State<ChatListPage>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           // 新任務圖標（發布未滿一週）
-                          if (_isNewTask(task)) 
+                          if (_isNewTask(task))
                             const Text('🌱', style: TextStyle(fontSize: 16)),
                           const SizedBox(width: 4),
                           // 熱門圖標（超過一位應徵者）
-                          if (_isPopularTask(task)) 
+                          if (_isPopularTask(task))
                             const Text('🔥', style: TextStyle(fontSize: 16)),
                           const SizedBox(width: 4),
                           // 收藏圖標（當前使用者已收藏）
-                          if (_isFavoritedTask(task)) 
+                          if (_isFavoritedTask(task))
                             const Text('❤️', style: TextStyle(fontSize: 16)),
                         ],
                       ),
@@ -1593,61 +1572,11 @@ class _ChatListPageState extends State<ChatListPage>
               indicatorPadding: EdgeInsets.zero,
               tabs: [
                 const Tab(text: 'Posted Tasks'),
-                Tab(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('My Works'),
-                      Text(
-                        '${_myWorksPagingController.itemList?.length ?? 0}',
-                        style: const TextStyle(fontSize: 10),
-                      ),
-                    ],
-                  ),
-                ),
+                const Tab(text: 'My Works'),
               ],
             ),
           ),
-          // My Works 分頁篩選選項
-          if (_tabController.index == 1) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: CheckboxListTile(
-                      title: const Text('Show My Tasks', style: TextStyle(fontSize: 12)),
-                      value: _showMyTasksOnly,
-                      onChanged: (value) {
-                        setState(() {
-                          _showMyTasksOnly = value ?? false;
-                        });
-                        _myWorksPagingController.refresh();
-                      },
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                    ),
-                  ),
-                  Expanded(
-                    child: CheckboxListTile(
-                      title: const Text('Show Applied Tasks', style: TextStyle(fontSize: 12)),
-                      value: _showAppliedOnly,
-                      onChanged: (value) {
-                        setState(() {
-                          _showAppliedOnly = value ?? false;
-                        });
-                        _myWorksPagingController.refresh();
-                      },
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+                  // My Works 分頁篩選選項（已移除，只顯示已應徵任務）
           // 搜尋欄
           Padding(
             padding: const EdgeInsets.all(12.0),
@@ -2214,7 +2143,8 @@ class _ChatListPageState extends State<ChatListPage>
   /// 判斷是否為新任務（發布未滿一週）
   bool _isNewTask(Map<String, dynamic> task) {
     try {
-      final createdAt = DateTime.parse(task['created_at'] ?? DateTime.now().toString());
+      final createdAt =
+          DateTime.parse(task['created_at'] ?? DateTime.now().toString());
       final now = DateTime.now();
       final difference = now.difference(createdAt);
       return difference.inDays < 7;
@@ -2238,10 +2168,11 @@ class _ChatListPageState extends State<ChatListPage>
   /// 獲取任務發布時間的距離描述
   String _getTimeAgo(Map<String, dynamic> task) {
     try {
-      final createdAt = DateTime.parse(task['created_at'] ?? DateTime.now().toString());
+      final createdAt =
+          DateTime.parse(task['created_at'] ?? DateTime.now().toString());
       final now = DateTime.now();
       final difference = now.difference(createdAt);
-      
+
       if (difference.inDays > 30) {
         return DateFormat('MM/dd').format(createdAt);
       } else if (difference.inDays > 0) {
@@ -2623,16 +2554,19 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     // 新任務圖標（發布未滿一週）
-                                    if (_isNewTask(task)) 
-                                      const Text('🌱', style: TextStyle(fontSize: 16)),
+                                    if (_isNewTask(task))
+                                      const Text('🌱',
+                                          style: TextStyle(fontSize: 16)),
                                     const SizedBox(width: 4),
                                     // 熱門圖標（超過一位應徵者）
-                                    if (_isPopularTask(task)) 
-                                      const Text('🔥', style: TextStyle(fontSize: 16)),
+                                    if (_isPopularTask(task))
+                                      const Text('🔥',
+                                          style: TextStyle(fontSize: 16)),
                                     const SizedBox(width: 4),
                                     // 收藏圖標（當前使用者已收藏）
-                                    if (_isFavoritedTask(task)) 
-                                      const Text('❤️', style: TextStyle(fontSize: 16)),
+                                    if (_isFavoritedTask(task))
+                                      const Text('❤️',
+                                          style: TextStyle(fontSize: 16)),
                                   ],
                                 ),
                               ],
@@ -2678,7 +2612,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                               ],
                             ),
                             const SizedBox(height: 4),
-                            
+
                             // 任務資訊 2x2 格局
                             Container(
                               constraints: const BoxConstraints(maxWidth: 200),
@@ -2767,7 +2701,8 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                         child: Row(
                                           children: [
                                             Icon(Icons.language,
-                                                size: 12, color: Colors.grey[500]),
+                                                size: 12,
+                                                color: Colors.grey[500]),
                                             const SizedBox(width: 2),
                                             Flexible(
                                               child: Text(
@@ -2920,8 +2855,8 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                   // TODO: 實現收藏功能
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                        content:
-                                            Text('Favorite feature coming soon')),
+                                        content: Text(
+                                            'Favorite feature coming soon')),
                                   );
                                 },
                                 icon: Icon(
@@ -3023,7 +2958,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                             ),
                           ),
                         ),
-                      ),
+                ),
 
                 // 應徵者卡片列表
                 if (visibleAppliers.isNotEmpty)
@@ -3332,16 +3267,19 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 // 新任務圖標（發布未滿一週）
-                                if (_isNewTask(task)) 
-                                  const Text('🌱', style: TextStyle(fontSize: 16)),
+                                if (_isNewTask(task))
+                                  const Text('🌱',
+                                      style: TextStyle(fontSize: 16)),
                                 const SizedBox(width: 4),
                                 // 熱門圖標（超過一位應徵者）
-                                if (_isPopularTask(task)) 
-                                  const Text('🔥', style: TextStyle(fontSize: 16)),
+                                if (_isPopularTask(task))
+                                  const Text('🔥',
+                                      style: TextStyle(fontSize: 16)),
                                 const SizedBox(width: 4),
                                 // 收藏圖標（當前使用者已收藏）
-                                if (_isFavoritedTask(task)) 
-                                  const Text('❤️', style: TextStyle(fontSize: 16)),
+                                if (_isFavoritedTask(task))
+                                  const Text('❤️',
+                                      style: TextStyle(fontSize: 16)),
                               ],
                             ),
                           ],
@@ -3453,7 +3391,8 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                         const SizedBox(width: 2),
                                         Flexible(
                                           child: Text(
-                                            task['language_requirement'] ?? '不限',
+                                            task['language_requirement'] ??
+                                                '不限',
                                             style: TextStyle(
                                               fontSize: 11,
                                               color: Colors.grey[500],
@@ -3616,7 +3555,8 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
   /// 判斷是否為新任務（發布未滿一週）
   bool _isNewTask(Map<String, dynamic> task) {
     try {
-      final createdAt = DateTime.parse(task['created_at'] ?? DateTime.now().toString());
+      final createdAt =
+          DateTime.parse(task['created_at'] ?? DateTime.now().toString());
       final now = DateTime.now();
       final difference = now.difference(createdAt);
       return difference.inDays < 7;
@@ -3640,10 +3580,11 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
   /// 獲取任務發布時間的距離描述
   String _getTimeAgo(Map<String, dynamic> task) {
     try {
-      final createdAt = DateTime.parse(task['created_at'] ?? DateTime.now().toString());
+      final createdAt =
+          DateTime.parse(task['created_at'] ?? DateTime.now().toString());
       final now = DateTime.now();
       final difference = now.difference(createdAt);
-      
+
       if (difference.inDays > 30) {
         return DateFormat('MM/dd').format(createdAt);
       } else if (difference.inDays > 0) {
