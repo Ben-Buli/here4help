@@ -1412,14 +1412,32 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
 
     Widget buildOpponentBubble(String text, int? opponentUserId,
-        {String? senderName, String? messageTime}) {
+        {String? senderName, String? messageTime, bool isApplyMessage = false}) {
       // 先前的 opponentInfo 已不再使用，頭像/名稱以快取為準
 
       // 檢查是否為應徵訊息
-      final isApplicationMessage = text.contains('Self‑recommendation') ||
+      final isApplicationMessage = isApplyMessage ||
+          text.contains('Self‑recommendation') ||
           text.contains('cover_letter') ||
           text.contains('answers_json') ||
           text.contains('Application Submitted');
+
+      // 若是應徵訊息，只在氣泡中顯示 cover_letter，
+      // 其餘 answers 內容改由 View Resume 視窗呈現
+      String displayText = text;
+      if (isApplicationMessage) {
+        final List<String> answerMarkers = <String>[
+          '應徵者回答：',
+          'Applicant Answers:',
+          'Answers:',
+        ];
+        for (final String marker in answerMarkers) {
+          if (displayText.contains(marker)) {
+            displayText = displayText.split(marker).first.trim();
+            break;
+          }
+        }
+      }
 
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3.0),
@@ -1509,7 +1527,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                                               .colorScheme
                                               .onSecondary,
                                     ),
-                                    child: _buildMessageContent(text),
+                                      child: _buildMessageContent(displayText),
                                   ),
                                 ],
                               ),
@@ -1787,6 +1805,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     final messageData = _chatMessages[adjustedIndex];
                     final messageText =
                         messageData['message']?.toString() ?? '';
+                    final messageKind = messageData['kind']?.toString();
                     final messageFromUserId = messageData['from_user_id'];
                     final messageTime =
                         messageData['created_at']?.toString() ?? '';
@@ -1816,8 +1835,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                         'status': status,
                       });
                     } else {
-                      return buildOpponentBubble(messageText, messageFromUserId,
-                          senderName: senderName, messageTime: messageTime);
+                      return buildOpponentBubble(
+                        messageText,
+                        messageFromUserId,
+                        senderName: senderName,
+                        messageTime: messageTime,
+                        isApplyMessage: (messageKind == 'applyMessage'),
+                      );
                     }
                   }
 

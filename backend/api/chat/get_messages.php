@@ -94,6 +94,7 @@ try {
       cm.id,
       cm.room_id,
       cm.from_user_id,
+      cm.kind,
       cm.message,
       cm.created_at,
       u.name as sender_name,
