@@ -39,8 +39,17 @@ class SocketService {
 
       _currentUserId = userId.toString();
 
+      if (kDebugMode) {
+        debugPrint(
+            '🔍 Socket 連接配置: userId=$_currentUserId, token=${token.substring(0, 20)}...');
+      }
+
       // Socket.IO 連接配置
       final socketUrl = AppConfig.socketUrl;
+
+      if (kDebugMode) {
+        debugPrint('🔍 Socket URL: $socketUrl');
+      }
 
       _socket = io.io(socketUrl, <String, dynamic>{
         'transports': ['websocket'],
@@ -48,6 +57,8 @@ class SocketService {
         'query': {
           'token': token,
         },
+        'timeout': 10000, // 10 秒超時
+        'forceNew': true, // 強制新連接
       });
 
       // 連接事件
@@ -88,9 +99,15 @@ class SocketService {
   void _setupEventListeners() {
     if (_socket == null) return;
 
+    if (kDebugMode) {
+      debugPrint('🔍 設置 Socket 事件監聽器');
+    }
+
     // 收到新訊息
     _socket!.on('message', (data) {
-      debugPrint('📨 Received message: $data');
+      if (kDebugMode) {
+        debugPrint('📨 Received message: $data');
+      }
       if (onMessageReceived != null) {
         onMessageReceived!(Map<String, dynamic>.from(data));
       }

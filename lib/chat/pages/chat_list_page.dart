@@ -1,6 +1,8 @@
 // home_page.dart
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:here4help/task/services/task_service.dart';
@@ -1502,7 +1504,7 @@ class _ChatListPageState extends State<ChatListPage>
         'name': app['applier_name'] ?? 'Anonymous',
         'rating': 4.0, // 預設評分，未來可從 API 取得
         'reviewsCount': 0, // 預設評論數，未來可從 API 取得
-        'questionReply': app['cover_letter'] ?? '',
+        'questionReply': _buildCoverLetter(app['cover_letter']),
         'sentMessages': [app['cover_letter'] ?? 'Applied for this task'],
         'user_id': app['user_id'],
         'application_id': app['application_id'],
@@ -1513,6 +1515,11 @@ class _ChatListPageState extends State<ChatListPage>
         'isHidden': false,
       };
     }).toList();
+  }
+
+  /// 構建應徵者的應徵信內容
+  String _buildCoverLetter(String? coverLetter) {
+    return coverLetter?.trim() ?? '';
   }
 
   /// 檢查是否有活躍的篩選條件
@@ -2967,6 +2974,11 @@ extension _ChatListPageStateHandFoldingMethods on _ChatListPageState {
             },
           );
 
+          // 構建應徵者的應徵信內容
+          final coverLetter = _buildCoverLetter(
+            app['cover_letter'],
+          );
+
           context.go(chatUrl, extra: {
             'room': {
               'id': ensuredRoomId,
@@ -2975,6 +2987,8 @@ extension _ChatListPageStateHandFoldingMethods on _ChatListPageState {
               'creatorId': creatorIdStr,
               'participantId': participantIdStr,
               'type': 'application',
+              'coverLetter': coverLetter, // 應徵信（cover_letter）
+              'answersJson': app['answers_json'], // 問題與回答（answers_json）
             },
             'task': task,
             'otherUser': {

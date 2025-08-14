@@ -25,17 +25,29 @@ try {
     Response::error('Method not allowed', 405);
   }
 
-  // Auth
-  $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
-  if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
-    throw new Exception('Authorization header required');
-  }
-  $payload = validateToken($m[1]);
-  if (!$payload) throw new Exception('Invalid or expired token');
-  $user_id = (int)$payload['user_id'];
-
   $db = Database::getInstance();
   $input = json_decode(file_get_contents('php://input'), true) ?? [];
+  
+  // Auth - 支援多種 token 傳遞方式
+  $token = null;
+  
+  // 嘗試從 Authorization header 獲取
+  $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+  if (!empty($auth_header) && preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
+    $token = $m[1];
+  }
+  // 備用方案：從 JSON 輸入獲取 token
+  elseif (isset($input['token'])) {
+    $token = $input['token'];
+  }
+  
+  if (empty($token)) {
+    throw new Exception('Authorization header required');
+  }
+  
+  $payload = validateToken($token);
+  if (!$payload) throw new Exception('Invalid or expired token');
+  $user_id = (int)$payload['user_id'];
   // 詳細紀錄請求內容以利除錯
   error_log('send_message payload: ' . json_encode($input, JSON_UNESCAPED_UNICODE));
 
@@ -102,28 +114,32 @@ try {
     }
   }
 
-  // Insert message（相容舊欄位 content）
+  // Insert message（根據實際表結構）
   try {
-    // 檢查是否存在 content 欄位（部分舊資料庫尚未移除）
-    $hasContentCol = false;
-    try {
-      $col = $db->fetch("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chat_messages' AND COLUMN_NAME = 'content' LIMIT 1");
-      $hasContentCol = !empty($col);
-    } catch (Exception $e) {
-      // 忽略檢查失敗，預設為無 content 欄位
-    }
-
-    if ($hasContentCol) {
-      // 同步寫入 content 與 message，避免 NOT NULL 無預設值造成失敗
+    // 檢查表結構，確定需要插入哪些欄位
+    $columns = $db->fetchAll("SHOW COLUMNS FROM chat_messages");
+    $columnNames = array_column($columns, 'Field');
+    
+    if (in_array('content', $columnNames) && in_array('message', $columnNames)) {
+      // 如果兩個欄位都存在，同時插入
       $db->query(
         "INSERT INTO chat_messages (room_id, from_user_id, message, content) VALUES (?, ?, ?, ?)",
         [$room_id, $user_id, $message, $message]
       );
-    } else {
+    } elseif (in_array('content', $columnNames)) {
+      // 只有 content 欄位
+      $db->query(
+        "INSERT INTO chat_messages (room_id, from_user_id, content) VALUES (?, ?, ?)",
+        [$room_id, $user_id, $message]
+      );
+    } elseif (in_array('message', $columnNames)) {
+      // 只有 message 欄位
       $db->query(
         "INSERT INTO chat_messages (room_id, from_user_id, message) VALUES (?, ?, ?)",
         [$room_id, $user_id, $message]
       );
+    } else {
+      throw new Exception('No suitable message column found in chat_messages table');
     }
   } catch (Exception $e) {
     error_log('send_message insert error: ' . $e->getMessage());

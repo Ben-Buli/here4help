@@ -6,70 +6,66 @@ import 'package:flutter/foundation.dart';
 class ChatSessionManager {
   static const String _currentChatKey = 'current_chat_room_session';
 
-  /// 保存當前聊天室會話信息
-  static Future<void> setCurrentChatSession({
-    required String roomId,
-    required Map<String, dynamic> room,
-    required Map<String, dynamic> task,
-    required String userRole,
-    required Map<String, dynamic> chatPartnerInfo,
-    String? sourceTab, // 來源分頁 ('posted-tasks' 或 'my-works')
-  }) async {
+  /// 保存當前聊天室會話
+  static Future<void> saveCurrentChatSession(
+      Map<String, dynamic> chatData) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final roomId = chatData['room']?['id']?.toString() ??
+          chatData['room']?['roomId']?.toString();
+      final userRole = chatData['userRole']?.toString() ?? '';
 
-      final sessionData = {
-        'roomId': roomId,
-        'room': room,
-        'task': task,
-        'userRole': userRole,
-        'chatPartnerInfo': chatPartnerInfo,
-        'sourceTab': sourceTab, // 記錄來源分頁
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-      };
+      if (kDebugMode) {
+        debugPrint('🔄 ChatSessionManager: 已保存當前聊天室會話');
+        debugPrint('🔄 roomId: $roomId');
+        debugPrint('🔄 userRole: $userRole');
+      }
 
-      final jsonString = jsonEncode(sessionData);
-      await prefs.setString(_currentChatKey, jsonString);
-
-      debugPrint('🔄 ChatSessionManager: 已保存當前聊天室會話');
-      debugPrint('🔄 roomId: $roomId');
-      debugPrint('🔄 userRole: $userRole');
+      // 保存會話數據
+      await prefs.setString('current_chat_session', jsonEncode(chatData));
+      await prefs.setString('current_chat_session_timestamp',
+          DateTime.now().millisecondsSinceEpoch.toString());
     } catch (e) {
-      debugPrint('❌ ChatSessionManager: 保存會話失敗: $e');
+      debugPrint('❌ 保存聊天室會話失敗: $e');
     }
   }
 
-  /// 獲取當前聊天室會話信息
+  /// 獲取當前聊天室會話
   static Future<Map<String, dynamic>?> getCurrentChatSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonString = prefs.getString(_currentChatKey);
+      final sessionDataStr = prefs.getString('current_chat_session');
+      final timestampStr = prefs.getString('current_chat_session_timestamp');
 
-      if (jsonString == null) {
-        debugPrint('🔄 ChatSessionManager: 無當前聊天室會話');
+      if (sessionDataStr == null || timestampStr == null) {
+        if (kDebugMode) {
+          debugPrint('🔄 ChatSessionManager: 無當前聊天室會話');
+        }
         return null;
       }
 
-      final sessionData = jsonDecode(jsonString) as Map<String, dynamic>;
-
-      // 檢查會話是否過期（1小時）
-      final timestamp = sessionData['timestamp'] as int? ?? 0;
+      final timestamp = int.tryParse(timestampStr) ?? 0;
       final now = DateTime.now().millisecondsSinceEpoch;
-      const oneHour = 60 * 60 * 1000; // 1小時的毫秒數
+      final sessionAge = now - timestamp;
 
-      if (now - timestamp > oneHour) {
-        debugPrint('🔄 ChatSessionManager: 會話已過期，清除');
+      // 會話過期時間：30 分鐘
+      if (sessionAge > 30 * 60 * 1000) {
         await clearCurrentChatSession();
+        if (kDebugMode) {
+          debugPrint('🔄 ChatSessionManager: 會話已過期，清除');
+        }
         return null;
       }
 
-      debugPrint('🔄 ChatSessionManager: 找到有效的聊天室會話');
-      debugPrint('🔄 roomId: ${sessionData['roomId']}');
-      debugPrint('🔄 userRole: ${sessionData['userRole']}');
-
+      final sessionData = jsonDecode(sessionDataStr) as Map<String, dynamic>;
+      if (kDebugMode) {
+        debugPrint('🔄 ChatSessionManager: 找到有效的聊天室會話');
+        debugPrint('🔄 roomId: ${sessionData['roomId']}');
+        debugPrint('🔄 userRole: ${sessionData['userRole']}');
+      }
       return sessionData;
     } catch (e) {
-      debugPrint('❌ ChatSessionManager: 獲取會話失敗: $e');
+      debugPrint('❌ 獲取聊天室會話失敗: $e');
       return null;
     }
   }
@@ -78,10 +74,13 @@ class ChatSessionManager {
   static Future<void> clearCurrentChatSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_currentChatKey);
-      debugPrint('🔄 ChatSessionManager: 已清除當前聊天室會話');
+      await prefs.remove('current_chat_session');
+      await prefs.remove('current_chat_session_timestamp');
+      if (kDebugMode) {
+        debugPrint('🔄 ChatSessionManager: 已清除當前聊天室會話');
+      }
     } catch (e) {
-      debugPrint('❌ ChatSessionManager: 清除會話失敗: $e');
+      debugPrint('❌ 清除聊天室會話失敗: $e');
     }
   }
 

@@ -72,6 +72,10 @@ class AppConfig {
     return '$apiBaseUrl/backend/api/tasks/applications/apply.php';
   }
 
+  static String get applicationApplyWithChatUrl {
+    return '$apiBaseUrl/backend/api/tasks/applications/apply_with_chat.php';
+  }
+
   static String get applicationApproveUrl {
     return '$apiBaseUrl/backend/api/tasks/applications/approve.php';
   }

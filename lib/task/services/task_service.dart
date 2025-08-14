@@ -291,7 +291,7 @@ class TaskService extends ChangeNotifier {
     }
   }
 
-  /// 送出應徵
+  /// 送出應徵（使用聚合 API，包含聊天室創建和訊息發送）
   Future<Map<String, dynamic>> applyForTask({
     required String taskId,
     required int userId,
@@ -305,9 +305,11 @@ class TaskService extends ChangeNotifier {
     if (coverLetter != null) body['cover_letter'] = coverLetter;
     if (answers != null && answers.isNotEmpty) body['answers'] = answers;
 
+    // 使用新的聚合 API
     final resp = await http
         .post(
-          Uri.parse(AppConfig.applicationApplyUrl),
+          Uri.parse(AppConfig.applicationApplyWithChatUrl ??
+              AppConfig.applicationApplyUrl),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(body),
         )

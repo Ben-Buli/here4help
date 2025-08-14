@@ -18,6 +18,9 @@ import 'package:here4help/utils/path_mapper.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'dart:html' as html;
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, required this.data});
@@ -219,8 +222,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       final int? participant = (participantId is int)
           ? participantId
           : int.tryParse('$participantId');
-      debugPrint(
-          '👥 resolve opponent: currentUserId=$_currentUserId, creator=$creator, participant=$participant');
+      if (kDebugMode) {
+        debugPrint(
+            '👥 resolve opponent: currentUserId=$_currentUserId, creator=$creator, participant=$participant');
+      }
       if (creator == _currentUserId) return participant;
       if (participant == _currentUserId) return creator;
       return participant ?? creator;
@@ -423,8 +428,20 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   @override
   void initState() {
     super.initState();
-    _loadCurrentUserId();
-    _initializeChat(); // 載入當前用戶 ID
+
+    // 先設置 roomId
+    _currentRoomId = widget.data['room']['id']?.toString() ??
+        widget.data['room']['roomId']?.toString();
+
+    if (kDebugMode) {
+      debugPrint('🔍 initState: 設置 _currentRoomId = $_currentRoomId');
+    }
+
+    _loadCurrentUserId().then((_) {
+      if (mounted) {
+        _initializeChat(); // 等待當前用戶 ID 載入完成後再初始化聊天室
+      }
+    });
 
     // 初始化狀態 Bar 動畫：顯示 3 秒後往下滑動消失
     _statusBarController = AnimationController(
@@ -574,35 +591,74 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   /// 初始化聊天室
   Future<void> _initializeChat() async {
-    await _loadChatMessages();
-    await _setupSocket();
+    if (_currentRoomId != null) {
+      if (kDebugMode) {
+        debugPrint('🔍 _initializeChat: 開始初始化聊天室，roomId = $_currentRoomId');
+      }
+      await _loadChatMessages();
+      await _setupSocket();
+    } else {
+      if (kDebugMode) {
+        debugPrint('❌ 無法取得 roomId，跳過聊天室初始化');
+      }
+    }
   }
 
   /// 設置 Socket.IO 連接
   Future<void> _setupSocket() async {
     try {
-      // 連接 Socket.IO
-      await _socketService.connect();
+      if (kDebugMode) {
+        debugPrint('🔍 _setupSocket: 開始設置 Socket 連接');
+      }
 
-      // 設置事件監聽器
+      // 設置事件監聽器（在連接前設置，確保不會錯過事件）
       _socketService.onMessageReceived = _onMessageReceived;
       _socketService.onUnreadUpdate = _onUnreadUpdate;
 
-      // 加入當前聊天室
-      _currentRoomId = widget.data['room']['id']?.toString() ??
-          widget.data['room']['roomId']?.toString();
+      // 連接 Socket.IO
+      await _socketService.connect();
 
+      // 等待連接完成
+      int retryCount = 0;
+      while (!_socketService.isConnected && retryCount < 10) {
+        if (kDebugMode) {
+          debugPrint('⏳ 等待 Socket 連接... 嘗試 $retryCount/10');
+        }
+        await Future.delayed(Duration(milliseconds: 500));
+        retryCount++;
+      }
+
+      if (!_socketService.isConnected) {
+        if (kDebugMode) {
+          debugPrint('❌ Socket 連接超時');
+        }
+        return;
+      }
+
+      if (kDebugMode) {
+        debugPrint('✅ Socket 連接成功，開始加入房間');
+      }
+
+      // 加入當前聊天室
       if (_currentRoomId != null) {
         _socketService.joinRoom(_currentRoomId!);
         // 標記為已讀
         _socketService.markRoomAsRead(_currentRoomId!);
         // 每次建立/切換聊天室時，解析一次對方身份與頭像
         _resolveOpponentIdentity();
-      }
 
-      debugPrint('✅ Socket setup completed for room: $_currentRoomId');
+        if (kDebugMode) {
+          debugPrint('✅ Socket setup completed for room: $_currentRoomId');
+        }
+      } else {
+        if (kDebugMode) {
+          debugPrint('❌ _currentRoomId 為 null，無法加入房間');
+        }
+      }
     } catch (e) {
-      debugPrint('❌ Socket setup failed: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Socket setup failed: $e');
+      }
     }
   }
 
@@ -622,8 +678,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         _opponentAvatarUrlCached =
             (url != null && url.trim().isNotEmpty) ? url : null;
       });
-      debugPrint(
-          '🧩 Opponent resolved: id=${oppId ?? 'null'}, name=$_opponentNameCached, avatar=${_opponentAvatarUrlCached ?? 'null'}');
+      if (kDebugMode) {
+        debugPrint(
+            '🧩 Opponent resolved: id=${oppId ?? 'null'}, name=$_opponentNameCached, avatar=${_opponentAvatarUrlCached ?? 'null'}');
+      }
     } catch (_) {}
   }
 
@@ -644,7 +702,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           _showNewMsgBanner = true;
         });
       }
-      _loadChatMessages();
+
+      // 避免在初始化期間重複載入訊息
+      if (!_isLoadingMessages) {
+        _loadChatMessages();
+      }
     }
   }
 
@@ -672,24 +734,50 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   /// 從資料庫載入聊天訊息
   Future<void> _loadChatMessages() async {
     if (_isLoadingMessages) return;
+    _isLoadingMessages = true;
 
     try {
-      setState(() {
-        _isLoadingMessages = true;
-      });
-
-      final roomId = widget.data['room']['id']?.toString() ??
-          widget.data['room']['roomId']?.toString();
+      final roomId = _currentRoomId;
+      if (kDebugMode) {
+        debugPrint(
+            '🔍 _loadChatMessages: 開始載入，_currentRoomId = $_currentRoomId');
+      }
 
       if (roomId == null || roomId.isEmpty) {
-        debugPrint('❌ 無法取得 roomId');
+        if (kDebugMode) {
+          debugPrint('❌ 無法取得 roomId');
+        }
         return;
       }
 
-      debugPrint('🔍 載入聊天訊息，roomId: $roomId');
+      if (kDebugMode) {
+        debugPrint('🔍 載入聊天訊息，roomId: $roomId');
+      }
 
       final result = await ChatService().getMessages(roomId: roomId);
+
+      // 只在調試模式下輸出詳細信息
+      if (kDebugMode) {
+        debugPrint('🔍 API 返回結果: $result');
+        debugPrint('🔍 API 返回結果類型: ${result.runtimeType}');
+        debugPrint('🔍 API 返回結果鍵: ${result.keys.toList()}');
+      }
+
       final messages = result['messages'] as List<dynamic>? ?? [];
+
+      if (kDebugMode) {
+        debugPrint('🔍 解析後的訊息陣列: $messages');
+        debugPrint('🔍 訊息數量: ${messages.length}');
+        debugPrint('🔍 訊息陣列類型: ${messages.runtimeType}');
+      }
+
+      if (messages.isEmpty) {
+        if (kDebugMode) {
+          debugPrint('⚠️ 訊息陣列為空，檢查 API 返回結果');
+          debugPrint('⚠️ result 內容: $result');
+        }
+      }
+
       // 讀取對方最後已讀訊息 ID 供渲染使用
       resultOpponentLastReadId =
           (result['opponent_last_read_message_id'] is int)
@@ -708,9 +796,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         }
       }
 
-      debugPrint('✅ 成功載入 ${_chatMessages.length} 條訊息');
+      if (kDebugMode) {
+        debugPrint('✅ 成功載入 ${_chatMessages.length} 條訊息');
+      }
     } catch (e) {
-      debugPrint('❌ 載入聊天訊息失敗: $e');
+      if (kDebugMode) {
+        debugPrint('❌ 載入聊天訊息失敗: $e');
+      }
       if (mounted) {
         setState(() {
           _isLoadingMessages = false;
@@ -913,8 +1005,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
 
     try {
+      // 獲取 taskId 和 applicantId（在整個方法中都需要）
       final taskId = widget.data['task']['id']?.toString() ?? '';
-      // 嘗試從多個來源推斷 applicantId（優先 room.participant_id）
       final dynamic rawApplicantId = widget.data['room']['participant_id'] ??
           widget.data['room']['user_id'] ??
           widget.data['chatPartnerInfo']?['id'] ??
@@ -923,24 +1015,69 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           ? rawApplicantId
           : int.tryParse(rawApplicantId.toString()) ?? 0;
 
-      final applicationData = await _getApplicationData(taskId, applicantId);
+      // 優先使用從 extra 傳遞的數據
+      final coverLetter = widget.data['room']['coverLetter'];
+      final answersJson = widget.data['room']['answersJson'];
+      Map<String, dynamic> answers = {};
+
+      if (answersJson != null) {
+        try {
+          if (answersJson is String && answersJson.isNotEmpty) {
+            answers = jsonDecode(answersJson);
+          } else if (answersJson is Map<String, dynamic>) {
+            answers = answersJson;
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('❌ 解析 answers_json 失敗: $e');
+          }
+        }
+      }
+
+      // 如果沒有 answers_json，則嘗試從 API 獲取
+      Map<String, dynamic>? applicationData;
+      if (answers.isEmpty) {
+        applicationData = await _getApplicationData(taskId, applicantId);
+        if (applicationData != null) {
+          // 解析 API 返回的 answers_json
+          final dynamic raw = applicationData['answers_json'];
+          try {
+            if (raw != null) {
+              if (raw is String && raw.isNotEmpty) {
+                answers = jsonDecode(raw);
+              } else if (raw is Map<String, dynamic>) {
+                answers = raw;
+              }
+            }
+          } catch (e) {
+            if (kDebugMode) {
+              debugPrint('❌ 解析 API answers_json 失敗: $e');
+            }
+          }
+        }
+      }
+
       // 關閉載入對話框（安全）
       closeLoaderSafely();
 
-      if (applicationData != null) {
-        // 安全解析 answers_json（可能為字串或已是物件），鍵為「問題原文」
-        Map<String, dynamic> answers = {};
-        final dynamic raw = applicationData['answers_json'];
-        try {
-          if (raw != null) {
-            if (raw is String && raw.isNotEmpty) {
-              answers = jsonDecode(raw);
-            } else if (raw is Map<String, dynamic>) {
-              answers = raw;
+      // 如果有 answers 數據，顯示對話框
+      if (answers.isNotEmpty || applicationData != null) {
+        // 使用已經解析好的 answers 變量，或者從 applicationData 獲取
+        if (answers.isEmpty && applicationData != null) {
+          final dynamic raw = applicationData['answers_json'];
+          try {
+            if (raw != null) {
+              if (raw is String && raw.isNotEmpty) {
+                answers = jsonDecode(raw);
+              } else if (raw is Map<String, dynamic>) {
+                answers = raw;
+              }
+            }
+          } catch (e) {
+            if (kDebugMode) {
+              debugPrint('Error parsing answers_json: $e');
             }
           }
-        } catch (e) {
-          debugPrint('Error parsing answers_json: $e');
         }
 
         // 顯示真實的應徵資料（避免與上一個對話框同幀衝突）
@@ -978,17 +1115,17 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                           CircleAvatar(
                             radius: 30,
                             backgroundImage:
-                                applicationData['applier_avatar'] != null
-                                    ? (applicationData['applier_avatar']
+                                applicationData?['applier_avatar'] != null
+                                    ? (applicationData?['applier_avatar']
                                             .startsWith('http')
                                         ? NetworkImage(
-                                            applicationData['applier_avatar'])
-                                        : AssetImage(applicationData[
+                                            applicationData?['applier_avatar'])
+                                        : AssetImage(applicationData?[
                                             'applier_avatar']) as ImageProvider)
                                     : null,
-                            child: applicationData['applier_avatar'] == null
+                            child: applicationData?['applier_avatar'] == null
                                 ? Text(
-                                    (applicationData['applier_name'] ?? 'U')[0]
+                                    (applicationData?['applier_name'] ?? 'U')[0]
                                         .toUpperCase(),
                                     style: const TextStyle(
                                         color: Colors.white, fontSize: 20),
@@ -1001,7 +1138,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  applicationData['applier_name'] ??
+                                  applicationData?['applier_name'] ??
                                       'Anonymous',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
@@ -1010,7 +1147,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Application Time : ${applicationData['created_at'] ?? 'Unknown'}',
+                                  'Application Time : ${applicationData?['created_at'] ?? 'Unknown'}',
                                   style: const TextStyle(
                                     color: Colors.grey,
                                     fontSize: 12,
@@ -1024,7 +1161,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                       const SizedBox(height: 20),
 
                       // Self-recommendation（以 cover_letter 為主）
-                      if ((applicationData['cover_letter'] ?? '')
+                      if ((applicationData?['cover_letter'] ?? '')
                           .toString()
                           .trim()
                           .isNotEmpty) ...[
@@ -1042,7 +1179,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: Colors.grey[300]!),
                           ),
-                          child: Text((applicationData['cover_letter'] ?? '')
+                          child: Text((applicationData?['cover_letter'] ?? '')
                               .toString()),
                         ),
                         const SizedBox(height: 16),
@@ -2634,10 +2771,59 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     ),
                     child: IconButton(
                       icon: const Icon(Icons.download, color: Colors.white),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('下載功能開發中')),
-                        );
+                      onPressed: () async {
+                        try {
+                          // 顯示下載中提示
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            const SnackBar(
+                              content: Text('正在下載圖片...'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+
+                          // 下載圖片
+                          final response = await http.get(Uri.parse(imageUrl));
+                          if (response.statusCode == 200) {
+                            // 獲取檔案名稱
+                            final fileName = imageUrl.split('/').last;
+
+                            // 在 Web 環境中，使用瀏覽器的下載功能
+                            if (kIsWeb) {
+                              final blob = html.Blob([response.bodyBytes]);
+                              final url =
+                                  html.Url.createObjectUrlFromBlob(blob);
+                              final anchor = html.AnchorElement(href: url)
+                                ..setAttribute('download', fileName)
+                                ..click();
+                              html.Url.revokeObjectUrl(url);
+
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                SnackBar(
+                                  content: Text('圖片已下載: $fileName'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            } else {
+                              // 在原生環境中，保存到相冊
+                              // 這裡需要添加相冊權限和保存邏輯
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text('原生環境下載功能開發中'),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                            }
+                          } else {
+                            throw Exception('下載失敗: ${response.statusCode}');
+                          }
+                        } catch (e) {
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(
+                              content: Text('下載失敗: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
                       },
                     ),
                   ),

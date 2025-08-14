@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/chat/services/chat_service.dart';
 import 'package:here4help/chat/services/socket_service.dart';
+import 'package:here4help/services/error_handler_service.dart';
 
 /// 任務投遞應徵履歷表單頁面
 class TaskApplyPage extends StatefulWidget {
@@ -245,21 +246,24 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                       ElevatedButton(
                         onPressed: () async {
                           if (!_formKey.currentState!.validate()) return;
+
+                          // 顯示加載中提示
+                          ErrorHandlerService.showLoading(context, '正在提交應徵...');
+
                           try {
                             final userService = context.read<UserService>();
                             await userService.ensureUserLoaded();
                             final currentUser = userService.currentUser;
                             if (currentUser == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Please login first')),
-                              );
+                              ErrorHandlerService.hideCurrent(context);
+                              ErrorHandlerService.showError(context, '請先登入');
                               return;
                             }
 
                             final taskService = TaskService();
                             final intro = _selfIntroController.text.trim();
                             final q1 = _englishController.text.trim();
+
                             // 組裝新格式 answers：以「問題原文」為鍵
                             final Map<String, String> answers = {};
                             if (applicationQuestion != null &&
@@ -268,69 +272,40 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                               answers[applicationQuestion.trim()] = q1;
                             }
 
-                            await taskService.applyForTask(
-                              taskId: taskId,
-                              userId: currentUser.id,
-                              coverLetter: intro,
-                              answers: answers.isEmpty ? null : answers,
+                            // 使用聚合 API：應徵、創建聊天室、發送訊息（帶重試機制）
+                            final result =
+                                await ErrorHandlerService.executeWithRetry(
+                              operation: () => taskService.applyForTask(
+                                taskId: taskId,
+                                userId: currentUser.id,
+                                coverLetter: intro,
+                                answers: answers.isEmpty ? null : answers,
+                              ),
+                              operationName: 'TaskApplication',
+                              shouldRetry: (error) =>
+                                  ErrorHandlerService.isNetworkError(error),
                             );
 
-                            // 取得任務資料，用於組合聊天室 payload
+                            // 隱藏加載提示
+                            ErrorHandlerService.hideCurrent(context);
+
+                            // 顯示成功提示
+                            ErrorHandlerService.showSuccess(
+                                context, '應徵提交成功！正在跳轉到聊天室...');
+
+                            // 取得任務資料
                             final task = taskService.getTaskById(taskId) ?? {};
                             final posterId = task['creator_id'] ?? 0;
                             final applicantId = currentUser.id;
-
-                            // 使用 ChatService 創建實際的聊天室
-                            final chatService = ChatService();
-                            final roomResult = await chatService.ensureRoom(
-                              taskId: taskId,
-                              creatorId: posterId,
-                              participantId: applicantId,
-                            );
-                            final roomData = roomResult['room'];
-                            final roomId = roomData['id'].toString();
-
-                            // 應徵成功後，主動發送第一則訊息（使用 cover_letter 與可用回答摘要）
-                            try {
-                              final String answersSummary = (answers.isNotEmpty)
-                                  ? answers.entries
-                                      .map((e) => '${e.key}: ${e.value}')
-                                      .join('\n')
-                                  : '';
-                              final String autoMessage = [
-                                if (intro.isNotEmpty) intro,
-                                if (answersSummary.isNotEmpty) answersSummary,
-                              ].join('\n\n');
-
-                              if (autoMessage.trim().isNotEmpty) {
-                                final sendRes = await chatService.sendMessage(
-                                  roomId: roomId,
-                                  message: autoMessage.trim(),
-                                  taskId: taskId,
-                                );
-
-                                // 透過 Socket.IO 同步推播（若可用）
-                                try {
-                                  final socket = SocketService();
-                                  await socket.connect();
-                                  socket.sendMessage(
-                                    roomId: roomId,
-                                    text: autoMessage.trim(),
-                                    messageId:
-                                        sendRes['message_id']?.toString(),
-                                  );
-                                } catch (_) {}
-                              }
-                            } catch (e) {
-                              // 自動訊息失敗不阻擋流程
-                            }
+                            final roomId = result['room_id']?.toString() ?? '';
 
                             if (mounted) {
                               // 使用真實的聊天室ID跳轉到聊天詳情頁面
                               context.go('/chat/detail', extra: {
                                 'task': task,
                                 'room': {
-                                  'id': roomData['id'], // 使用資料庫生成的真實 room_id
+                                  'id': int.tryParse(roomId) ??
+                                      0, // 使用聚合 API 返回的 room_id
                                   'roomId': roomId, // 保持字串版本以兼容現有代碼
                                   'taskId': taskId,
                                   'task_id': taskId,
@@ -358,9 +333,22 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                               });
                             }
                           } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Apply failed: $e')),
+                            // 隱藏加載提示
+                            ErrorHandlerService.hideCurrent(context);
+
+                            // 記錄錯誤
+                            await ErrorHandlerService.logError(
+                              e.toString(),
+                              context: 'TaskApplication',
                             );
+
+                            // 顯示用戶友好的錯誤信息
+                            final errorMessage =
+                                ErrorHandlerService.getUserFriendlyMessage(
+                              e is Exception ? e : Exception(e.toString()),
+                            );
+                            ErrorHandlerService.showError(
+                                context, errorMessage);
                           }
                         },
                         child: const Text('Confirm Submission'),

@@ -44,6 +44,8 @@ class _ChatDetailWrapperState extends State<ChatDetailWrapper> {
         } else {
           // 2. 如果會話中沒有，嘗試從本地儲存恢復
           try {
+            // 在 async 方法中使用 context 前先檢查 mounted
+            if (!mounted) return;
             final location = GoRouterState.of(context).uri.toString();
             debugPrint('🔍 當前位置: $location');
 
@@ -85,13 +87,7 @@ class _ChatDetailWrapperState extends State<ChatDetailWrapper> {
                 debugPrint('✅ 使用本地儲存的數據');
 
                 // 將本地數據設置為當前會話
-                await ChatSessionManager.setCurrentChatSession(
-                  roomId: effectiveRoomId,
-                  room: storedData['room'] ?? {},
-                  task: storedData['task'] ?? {},
-                  userRole: storedData['userRole'] ?? '',
-                  chatPartnerInfo: storedData['chatPartnerInfo'] ?? {},
-                );
+                await ChatSessionManager.saveCurrentChatSession(storedData);
               } else {
                 // 本地沒有資料，構造最小資料集（支援直接貼連結進入）
                 debugPrint('ℹ️ 本地無資料，使用 URL 構造最小聊天室資料');
@@ -106,13 +102,7 @@ class _ChatDetailWrapperState extends State<ChatDetailWrapper> {
                     if (urlTaskId != null) 'id': urlTaskId,
                   },
                 };
-                await ChatSessionManager.setCurrentChatSession(
-                  roomId: effectiveRoomId,
-                  room: chatData['room'] as Map<String, dynamic>,
-                  task: chatData['task'] as Map<String, dynamic>,
-                  userRole: '',
-                  chatPartnerInfo: const {},
-                );
+                await ChatSessionManager.saveCurrentChatSession(chatData);
               }
             } else {
               debugPrint('❌ 無法從 URL 提取 roomId');
@@ -125,14 +115,7 @@ class _ChatDetailWrapperState extends State<ChatDetailWrapper> {
       } else {
         debugPrint('✅ 使用傳入的數據');
         // 如果有傳入數據，也設置為當前會話
-        final roomId = chatData['room']?['id']?.toString() ?? 'unknown';
-        await ChatSessionManager.setCurrentChatSession(
-          roomId: roomId,
-          room: chatData['room'] ?? {},
-          task: chatData['task'] ?? {},
-          userRole: chatData['userRole'] ?? '',
-          chatPartnerInfo: chatData['chatPartnerInfo'] ?? {},
-        );
+        await ChatSessionManager.saveCurrentChatSession(chatData);
         debugPrint('✅ 已將傳入數據設置為當前會話');
       }
 
