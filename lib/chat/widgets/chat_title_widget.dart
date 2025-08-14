@@ -155,6 +155,63 @@ class _ChatTitleWidgetState extends State<ChatTitleWidget> {
     if (kDebugMode) {
       debugPrint('🔍 ChatTitleWidget._init() 完成，_chatData: $_chatData');
     }
+
+    // 若尚未有聊天對象資訊，嘗試以訊息回填（以對方第一則訊息的 sender 為主）
+    _backfillPartnerFromMessagesIfNeeded();
+  }
+
+  Future<void> _backfillPartnerFromMessagesIfNeeded() async {
+    try {
+      if (!mounted || _chatData == null) return;
+      final room = (_chatData!['room'] as Map<String, dynamic>?) ?? {};
+      Map<String, dynamic> partner =
+          (_chatData!['chatPartnerInfo'] as Map<String, dynamic>?) ?? {};
+      final hasName = (partner['name'] as String?)?.trim().isNotEmpty == true ||
+          (room['participant_name'] as String?)?.trim().isNotEmpty == true ||
+          (room['creator_name'] as String?)?.trim().isNotEmpty == true;
+      if (hasName) return; // 已經有名稱就不再回填
+
+      final String? roomId = (room['id'] ?? room['roomId'])?.toString();
+      if (roomId == null || roomId.isEmpty) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final int? myId = prefs.getInt('user_id');
+      final data = await ChatService().getMessages(roomId: roomId, limit: 50);
+      final List<dynamic> msgs = (data['messages'] as List<dynamic>? ?? []);
+      if (msgs.isEmpty) return;
+      // 找到第一筆「對方」訊息
+      Map<String, dynamic>? other;
+      for (final m in msgs) {
+        final map = Map<String, dynamic>.from(m as Map);
+        final fromId = map['from_user_id'];
+        if (myId == null || (fromId != myId)) {
+          other = map;
+          break;
+        }
+      }
+      if (other == null) return;
+      partner = {
+        'id': other['from_user_id'],
+        'name': other['sender_name'],
+        'avatar_url': other['sender_avatar'],
+      }..removeWhere((k, v) => v == null || ('$v').isEmpty);
+
+      // 回寫到本地狀態
+      if (!mounted) return;
+      setState(() {
+        _chatData = {
+          ...?_chatData,
+          'chatPartnerInfo': partner,
+        };
+      });
+      if (kDebugMode) {
+        debugPrint('🔁 以訊息回填 chatPartnerInfo: $partner');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('⚠️ 回填聊天對象資訊失敗: $e');
+      }
+    }
   }
 
   @override
@@ -216,13 +273,15 @@ class _ChatTitleWidgetState extends State<ChatTitleWidget> {
     } else {
       // 使用已推導出的 userRole 來決定顯示對方名稱（避免異步取得 myId 造成誤判）
       if (userRole == 'creator') {
-        partnerName = (room['participant_nickname'] as String?)?.trim().isNotEmpty == true
-            ? room['participant_nickname'] as String
-            : room['participant_name'] as String? ?? 'Chat Partner';
+        partnerName =
+            (room['participant_nickname'] as String?)?.trim().isNotEmpty == true
+                ? room['participant_nickname'] as String
+                : room['participant_name'] as String? ?? 'Chat Partner';
       } else if (userRole == 'participant') {
-        partnerName = (room['creator_nickname'] as String?)?.trim().isNotEmpty == true
-            ? room['creator_nickname'] as String
-            : room['creator_name'] as String? ?? 'Chat Partner';
+        partnerName =
+            (room['creator_nickname'] as String?)?.trim().isNotEmpty == true
+                ? room['creator_nickname'] as String
+                : room['creator_name'] as String? ?? 'Chat Partner';
       } else {
         partnerName = room['name'] as String? ?? 'Chat Partner';
       }

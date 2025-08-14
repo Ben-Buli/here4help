@@ -1108,38 +1108,54 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 應徵者基本資訊
+                      // 應徵者基本資訊（優先使用 applicationData；缺失則回退使用快取之對手資訊）
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          CircleAvatar(
+                           CircleAvatar(
                             radius: 30,
-                            backgroundImage:
-                                applicationData?['applier_avatar'] != null
-                                    ? (applicationData?['applier_avatar']
-                                            .startsWith('http')
-                                        ? NetworkImage(
-                                            applicationData?['applier_avatar'])
-                                        : AssetImage(applicationData?[
-                                            'applier_avatar']) as ImageProvider)
-                                    : null,
-                            child: applicationData?['applier_avatar'] == null
-                                ? Text(
-                                    (applicationData?['applier_name'] ?? 'U')[0]
-                                        .toUpperCase(),
-                                    style: const TextStyle(
-                                        color: Colors.white, fontSize: 20),
-                                  )
-                                : null,
+                             backgroundImage: () {
+                               final avatar = applicationData?['applier_avatar'] ??
+                                   _opponentAvatarUrlCached;
+                               if (avatar == null || '$avatar'.isEmpty) {
+                                 return null;
+                               }
+                               if ('$avatar'.startsWith('http')) {
+                                 return NetworkImage('$avatar');
+                               }
+                               return ImageHelper.getAvatarImage('$avatar');
+                             }(),
+                             child: () {
+                               final name = applicationData?['applier_name'] ??
+                                   _opponentNameCached;
+                               if (applicationData?['applier_avatar'] != null ||
+                                   (_opponentAvatarUrlCached != null &&
+                                       _opponentAvatarUrlCached!.isNotEmpty)) {
+                                 return null;
+                               }
+                               final initial = (name?.isNotEmpty == true)
+                                   ? name![0].toUpperCase()
+                                   : 'U';
+                               return Text(initial,
+                                   style: const TextStyle(
+                                       color: Colors.white, fontSize: 20));
+                             }(),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  applicationData?['applier_name'] ??
-                                      'Anonymous',
+                                 Text(
+                                   (applicationData?['applier_name'] ??
+                                           _opponentNameCached)
+                                       .toString()
+                                       .trim()
+                                       .isNotEmpty
+                                       ? (applicationData?['applier_name'] ??
+                                               _opponentNameCached)
+                                           .toString()
+                                       : 'Anonymous',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
