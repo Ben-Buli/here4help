@@ -658,7 +658,7 @@ class ThemeScheme {
     appBarSubtitleColor: Colors.white,
   );
 
-  /// LGBTQ+ - 彩虹驕傲六色主題（Red/Orange/Yellow/Green/Blue/Violet）
+  /// Emotions - 彩虹驕傲六色主題（Red/Orange/Yellow/Green/Blue/Violet）
   static const ThemeScheme rainbowPride = ThemeScheme(
     name: 'rainbow_pride',
     displayName: 'Rainbow Pride',
@@ -703,10 +703,10 @@ class ThemeScheme {
     gradientEnd: Alignment(1.0, 1.0),
   );
 
-  /// LGBTQ+ - Trans（Light Blue / White / Pink 漸層）
-  static const ThemeScheme trans = ThemeScheme(
-    name: 'trans',
-    displayName: 'Trans',
+  /// Emotions - Blue / White / Pink 漸層
+  static const ThemeScheme bluePink = ThemeScheme(
+    name: 'blue_pink',
+    displayName: 'Blue Pink',
     primary: Color(0xFF55CDFC), // Light Blue
     secondary: Color(0xFFF7A8B8), // Pink
     accent: Color(0xFFFFFFFF), // White（作為點綴）
@@ -744,10 +744,10 @@ class ThemeScheme {
     gradientEnd: Alignment(1.0, 1.0),
   );
 
-  /// LGBTQ+ - Lesbian（以旗幟橘/粉/洋紅為基礎，UI 取高對比組合）
-  static const ThemeScheme lesbianTheme = ThemeScheme(
-    name: 'lesbian_theme',
-    displayName: 'Lesbian',
+  /// Emotions - Pink（以旗幟橘/粉/洋紅為基礎，UI 取高對比組合）
+  static const ThemeScheme pinkTheme = ThemeScheme(
+    name: 'pink_theme',
+    displayName: 'Pink',
     // 經典旗幟色系：深洋紅/粉紫/橘，採 UI 高對比
     primary: Color(0xFFA30262), // 深洋紅
     secondary: Color(0xFFD362A4), // 粉紫
@@ -786,10 +786,10 @@ class ThemeScheme {
     gradientEnd: Alignment(1.0, 1.0),
   );
 
-  /// LGBTQ+ - Non-binary（黃/白/紫/黑，UI 取紫為 primary、黃為 secondary）
-  static const ThemeScheme nonBinaryTheme = ThemeScheme(
-    name: 'non_binary_theme',
-    displayName: 'Non-binary',
+  /// Emotions - Yellow_white_purple（黃/白/紫/黑，UI 取紫為 primary、黃為 secondary）
+  static const ThemeScheme yellowWhitePurple = ThemeScheme(
+    name: 'yellow_white_purple',
+    displayName: 'Yellow_white_purple',
     primary: Color(0xFF9B59D0), // 紫
     secondary: Color(0xFFFFF433), // 黃
     accent: Color(0xFF111111), // 黑
@@ -828,7 +828,7 @@ class ThemeScheme {
     gradientEnd: Alignment(1.0, 1.0),
   );
 
-  /// LGBTQ+ - Bear Gay（棕/橙/黃/棕褐/白/灰/黑，UI 取溫暖棕橙）
+  /// Emotions - Bear Gay（棕/橙/黃/棕褐/白/灰/黑，UI 取溫暖棕橙）
   static const ThemeScheme bearGayFlat = ThemeScheme(
     name: 'bear_gay_flat',
     displayName: 'Bears',
@@ -872,7 +872,7 @@ class ThemeScheme {
     gradientEnd: Alignment(1.0, 1.0),
   );
 
-  /// LGBTQ+ - Pride S-Curve（S 曲線彩虹背景，UI 元素採藍主色以維持可讀性）
+  /// Emotions - Pride S-Curve（S 曲線彩虹背景，UI 元素採藍主色以維持可讀性）
   static const ThemeScheme prideSCurve = ThemeScheme(
     name: 'pride_s_curve',
     displayName: 'Pride S-Curve',
@@ -1042,9 +1042,9 @@ class ThemeScheme {
     taipei,
     taipei101,
     rainbowPride,
-    trans,
-    lesbianTheme,
-    nonBinaryTheme,
+    bluePink,
+    pinkTheme,
+    yellowWhitePurple,
     bearGayFlat,
     prideSCurve,
     sunsetBeach,

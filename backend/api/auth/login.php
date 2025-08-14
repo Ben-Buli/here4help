@@ -59,7 +59,7 @@ try {
         throw new Exception('Invalid email or password');
     }
     
-    // 生成 JWT Token
+    // 生成 base64 編碼的 JSON Token
     $payload = [
         'user_id' => $user['id'],
         'email' => $user['email'],
@@ -68,9 +68,16 @@ try {
         'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
     ];
     
-    // 這裡應該使用 JWT 庫生成 token
-    // 暫時使用簡單的 base64 編碼作為示例
+    // 使用 base64 編碼 JSON 數據
     $token = base64_encode(json_encode($payload));
+    
+    // 驗證生成的 token 格式
+    $decoded = base64_decode($token);
+    $decodedPayload = json_decode($decoded, true);
+    
+    if (!$decodedPayload || !isset($decodedPayload['user_id'])) {
+        throw new Exception('Token generation failed');
+    }
     
     // 更新最後更新時間（因為沒有 last_login 欄位）
     $db->query(

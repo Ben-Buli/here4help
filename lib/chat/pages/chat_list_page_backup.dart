@@ -1462,7 +1462,7 @@ class _ChatListPageState extends State<ChatListPage>
               'id': task['creator_id'],
               'name': task['creator_name'] ?? '任務發布者',
               'avatar':
-                  task['creator_avatar'] ?? 'assets/images/avatar/avatar-1.png',
+                  task['creator_avatar'] ?? 'assets/images/avatar/default.png',
             },
           });
         },

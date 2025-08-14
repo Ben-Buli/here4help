@@ -263,9 +263,9 @@ class _AchievementBox extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          // 若為 lesbian theme，使用粉藍-白-粉紅漸層
+                          // 若為 pink theme，使用粉藍-白-粉紅漸層
                           if (themeManager.currentTheme.name
-                              .startsWith('lesbian_theme')) ...[
+                              .startsWith('pink_theme')) ...[
                             const Color(0xFF89CFF0),
                             const Color(0xFFFFFFFF),
                             const Color(0xFFF8A1C4),

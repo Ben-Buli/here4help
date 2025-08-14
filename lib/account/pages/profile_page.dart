@@ -43,7 +43,7 @@ class _ProfilePageState extends State<ProfilePage> {
   final List<String> genderOptions = [
     'Male',
     'Female',
-    'Non-binary',
+    'Yellow_white_purple',
     'Genderfluid',
     'Agender',
     'Bigender',

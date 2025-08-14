@@ -43,7 +43,7 @@
 與註冊頁面保持一致：
 - Male
 - Female
-- Non-binary
+- Yellow_white_purple
 - Genderfluid
 - Agender
 - Bigender

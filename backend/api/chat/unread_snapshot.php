@@ -32,19 +32,42 @@ try {
         Response::error('Method not allowed', 405);
     }
 
+    // 調試 header 讀取
+    error_log("Debug: 開始讀取 Authorization header");
+    error_log("Debug: HTTP_AUTHORIZATION = " . ($_SERVER['HTTP_AUTHORIZATION'] ?? 'not set'));
+    error_log("Debug: REDIRECT_HTTP_AUTHORIZATION = " . ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? 'not set'));
+    
     $auth_header = '';
+    
+    // 方法 1: 直接從 $_SERVER 讀取
     if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
         $auth_header = $_SERVER['HTTP_AUTHORIZATION'];
-    } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        error_log("Debug: 從 HTTP_AUTHORIZATION 讀取: $auth_header");
+    }
+    // 方法 2: 從 REDIRECT_HTTP_AUTHORIZATION 讀取
+    elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
         $auth_header = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-    } elseif (function_exists('getallheaders')) {
+        error_log("Debug: 從 REDIRECT_HTTP_AUTHORIZATION 讀取: $auth_header");
+    }
+    // 方法 3: 使用 getallheaders() 函數
+    elseif (function_exists('getallheaders')) {
         $headers = getallheaders();
+        error_log("Debug: getallheaders() 結果: " . print_r($headers, true));
         if (isset($headers['Authorization'])) {
             $auth_header = $headers['Authorization'];
+            error_log("Debug: 從 getallheaders() 讀取: $auth_header");
         }
     }
+    // 方法 4: 從 $_GET 讀取（作為備用方案）
+    elseif (isset($_GET['token'])) {
+        $auth_header = 'Bearer ' . $_GET['token'];
+        error_log("Debug: 從 GET 參數讀取 token: $auth_header");
+    }
+    
+    error_log("Debug: Final Authorization header = $auth_header");
 
     if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $matches)) {
+        error_log("Debug: Authorization header is empty or invalid format");
         throw new Exception('Authorization header required');
     }
 
@@ -87,4 +110,5 @@ try {
     Response::error('Server error: ' . $e->getMessage(), 500);
 }
 ?>
+
 

@@ -84,7 +84,7 @@ class PathMapper {
 
   /// 獲取預設頭像路徑
   static String getDefaultAvatarPath() {
-    return 'assets/images/avatar/avatar-1.png';
+    return 'assets/images/avatar/default.png';
   }
 
   /// 調試路徑映射

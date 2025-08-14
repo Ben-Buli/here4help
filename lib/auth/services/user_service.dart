@@ -47,12 +47,18 @@ class UserService extends ChangeNotifier {
       debugPrint(
           '🔍 Token 前 20 字元: ${token.substring(0, token.length > 20 ? 20 : token.length)}');
 
-      // 檢查是否為 JWT 格式 (通常以 eyJ 開頭)
+      // 檢查 token 格式
       if (token.startsWith('eyJ')) {
-        debugPrint('⚠️ 檢測到 JWT 格式的 token！');
-        debugPrint('⚠️ 但後端期望 base64 編碼的 JSON 格式');
-        debugPrint('💡 建議清除此 token 並重新登入');
-        debugPrint('💡 請先登出，然後重新登入以獲得正確格式的 token');
+        // 進一步驗證是否真的是 JWT 格式
+        // JWT 通常有三個部分，用 . 分隔
+        if (token.split('.').length == 3) {
+          debugPrint('⚠️ 檢測到 JWT 格式的 token！');
+          debugPrint('⚠️ 但後端期望 base64 編碼的 JSON 格式');
+          debugPrint('💡 建議清除此 token 並重新登入');
+          debugPrint('💡 請先登出，然後重新登入以獲得正確格式的 token');
+        } else {
+          debugPrint('✅ Token 以 eyJ 開頭，但結構不是 JWT（可能是 base64 編碼的 JSON）');
+        }
       } else {
         debugPrint('✅ Token 格式看起來正確（非 JWT）');
       }

@@ -51,7 +51,7 @@ class ImageHelper {
 
   /// 獲取預設頭像
   static ImageProvider getDefaultAvatar() {
-    return const AssetImage('assets/images/avatar/avatar-1.png');
+    return const AssetImage('assets/images/avatar/default.png');
   }
 
   /// 處理圖片錯誤的回調

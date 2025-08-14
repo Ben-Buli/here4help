@@ -384,35 +384,41 @@ class _ChatListPageState extends State<ChatListPage>
     WidgetsBinding.instance.addObserver(this);
   }
 
-  // 整理 My Works 清單：把 tasks 與 myApplications 合併，並標記 client 狀態
+  // 整理 My Works 清單：直接使用 API 返回的應徵數據
   List<Map<String, dynamic>> _composeMyWorks(
       TaskService service, int? currentUserId) {
-    final allTasks = List<Map<String, dynamic>>.from(service.tasks);
     final apps = service.myApplications;
-    final Set<String> appliedTaskIds =
-        apps.map((e) => (e['id'] ?? e['task_id']).toString()).toSet();
 
-    // 標記 applied_by_me 與覆蓋顯示狀態
-    for (final t in allTasks) {
-      final id = (t['id'] ?? '').toString();
-      if (appliedTaskIds.contains(id)) {
-        t['applied_by_me'] = true;
-        // 來自 API 的 client 狀態優先
-        final app = apps.firstWhere(
-            (e) => (e['id'] == id) || (e['task_id']?.toString() == id),
-            orElse: () => {});
-        if (app.isNotEmpty) {
-          t['status_display'] =
-              app['client_status_display'] ?? t['status_display'];
-          t['status_code'] = app['client_status_code'] ?? t['status_code'];
-        }
-      }
+    // 如果沒有應徵數據，返回空列表
+    if (apps.isEmpty) {
+      debugPrint('⚠️ My Works: 沒有應徵數據');
+      return [];
     }
 
-    // My Works 準則：只顯示已應徵的任務
-    return allTasks.where((t) {
-      final appliedByMe = t['applied_by_me'] == true;
-      return appliedByMe; // 只顯示我應徵過的任務
+    debugPrint('🔍 My Works: 找到 ${apps.length} 筆應徵記錄');
+
+    // 直接使用 API 返回的應徵數據，轉換為任務格式
+    return apps.map((app) {
+      // 將應徵數據轉換為任務格式
+      return {
+        'id': app['id'],
+        'title': app['title'],
+        'description': app['description'],
+        'reward_point': app['reward_point'],
+        'location': app['location'],
+        'task_date': app['task_date'],
+        'language_requirement': app['language_requirement'],
+        'status_code': app['client_status_code'] ?? app['status_code'],
+        'status_display': app['client_status_display'] ?? app['status_display'],
+        'creator_id': app['creator_id'],
+        'creator_name': app['creator_name'],
+        'creator_avatar': app['creator_avatar'],
+        'applied_by_me': true,
+        'application_id': app['application_id'],
+        'application_status': app['application_status'],
+        'application_created_at': app['application_created_at'],
+        'application_updated_at': app['application_updated_at'],
+      };
     }).toList();
   }
 
@@ -1576,7 +1582,7 @@ class _ChatListPageState extends State<ChatListPage>
               ],
             ),
           ),
-                  // My Works 分頁篩選選項（已移除，只顯示已應徵任務）
+          // My Works 分頁篩選選項（已移除，只顯示已應徵任務）
           // 搜尋欄
           Padding(
             padding: const EdgeInsets.all(12.0),

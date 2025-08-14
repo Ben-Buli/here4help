@@ -45,7 +45,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   final List<String> genderOptions = [
     'Male',
     'Female',
-    'Non-binary',
+    'Yellow_white_purple',
     'Genderfluid',
     'Agender',
     'Bigender',

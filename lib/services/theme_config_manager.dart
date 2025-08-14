@@ -307,12 +307,12 @@ class ThemeConfigManager extends ChangeNotifier {
       // 將 Glass、Blue Grey、Main 也併入 Business 分類
       return 'Business';
     } else if (baseName.contains('rainbow_pride') ||
-        baseName.contains('trans') ||
-        baseName.contains('lesbian_theme') ||
-        baseName.contains('non_binary_theme') ||
+        baseName.contains('blue_pink') ||
+        baseName.contains('pink_theme') ||
+        baseName.contains('yellow_white_purple') ||
         baseName.contains('bear_gay_flat') ||
         baseName.contains('pride_s_curve')) {
-      return 'LGBTQ+';
+      return 'Emotions';
     } else {
       return 'Other';
     }
@@ -630,12 +630,12 @@ class ThemeConfigManager extends ChangeNotifier {
             const Color(0xFF26C6DA).withValues(alpha: 0.8), // 淺碧綠色
           ];
         }
-        // LGBTQ+ 分類：AppBar 與 BottomNav 一致（交由 AppScaffold 用 navigationBarBackground 顏色渲染）
+        // Emotions 分類：AppBar 與 BottomNav 一致（交由 AppScaffold 用 navigationBarBackground 顏色渲染）
         // 這裡回傳空陣列代表不使用漸層
         if (theme.name.contains('rainbow_pride') ||
-            theme.name.contains('trans') ||
-            theme.name.contains('lesbian_theme') ||
-            theme.name.contains('non_binary_theme') ||
+            theme.name.contains('bluePink') ||
+            theme.name.contains('pink_theme') ||
+            theme.name.contains('yellow_white_purple') ||
             theme.name.contains('bear_gay_flat')) {
           return [];
         }
@@ -677,11 +677,11 @@ class ThemeConfigManager extends ChangeNotifier {
       case 'business':
         return Colors.white.withValues(alpha: 0.3); // Business 主題使用半透明白色
       default:
-        // LGBTQ+ 類主題：白色液態玻璃
+        // Emotions 類主題：白色液態玻璃
         if (theme.name.contains('rainbow_pride') ||
-            theme.name.contains('trans') ||
-            theme.name.contains('lesbian_theme') ||
-            theme.name.contains('non_binary_theme') ||
+            theme.name.contains('bluePink') ||
+            theme.name.contains('pink_theme') ||
+            theme.name.contains('yellow_white_purple') ||
             theme.name.contains('bear_gay_flat')) {
           return Colors.white.withValues(alpha: 0.3);
         }
