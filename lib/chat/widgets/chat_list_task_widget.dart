@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:here4help/services/theme_config_manager.dart';
 import 'package:provider/provider.dart';
+import 'package:here4help/services/theme_config_manager.dart';
+import 'package:here4help/chat/providers/chat_list_provider.dart';
 
 /// 聊天列表標題組件
 /// - 主標題：Chats（較小字體，透明度 0.7 的白色 bold 字體）
@@ -8,12 +9,12 @@ import 'package:provider/provider.dart';
 class ChatListTaskWidget extends StatefulWidget {
   const ChatListTaskWidget({
     super.key,
-    required this.onTabChanged,
+    this.onTabChanged,
     this.initialTab = 0,
   });
 
   /// Tab 切換回調
-  final Function(int) onTabChanged;
+  final Function(int)? onTabChanged;
 
   /// 初始選中的 tab
   final int initialTab;
@@ -36,8 +37,8 @@ class _ChatListTaskWidgetState extends State<ChatListTaskWidget>
     );
 
     _tabController.addListener(() {
-      if (_tabController.indexIsChanging) {
-        widget.onTabChanged(_tabController.index);
+      if (_tabController.indexIsChanging && widget.onTabChanged != null) {
+        widget.onTabChanged!(_tabController.index);
       }
     });
   }

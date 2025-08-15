@@ -25,10 +25,13 @@ import 'package:here4help/auth/pages/student_id_page.dart';
 
 // ==================== chat 模組 ====================
 import 'package:here4help/chat/pages/chat_list_page.dart';
+import 'package:here4help/chat/pages/chat_page_wrapper.dart';
 import 'package:here4help/chat/widgets/chat_detail_wrapper.dart';
 import 'package:here4help/chat/widgets/chat_title_widget.dart';
 import 'package:here4help/chat/widgets/chat_list_task_widget.dart';
 import 'package:here4help/chat/providers/chat_providers.dart';
+import 'package:here4help/chat/providers/chat_list_provider.dart';
+import 'package:provider/provider.dart';
 
 // ==================== explore 模組 ====================
 
@@ -80,24 +83,18 @@ final List<Map<String, dynamic>> shellPages = [
   },
   {
     'path': '/chat',
-    'child': ChatProviders(
-      child: ChatListPage(key: ChatListPage.globalKey),
-    ),
+    'child': const ChatPageWrapper(),
     'title': 'Chats',
     'showBottomNav': true,
     'showBackArrow': true,
     'titleWidgetBuilder': (context, data) {
+      // 使用靜態實例連接 AppBar 與 ChatListPage
       return ChatListTaskWidget(
-        initialTab: ChatListPage.globalKey.currentState?.currentTabIndex ?? 0,
+        initialTab: 0,
         onTabChanged: (index) {
-          // 通過 GlobalKey 通知 ChatListPage 切換 tab
-          final chatListState = ChatListPage.globalKey.currentState;
-          if (chatListState != null) {
-            chatListState.switchTab(index);
-          }
+          // 透過靜態實例調用 switchTab 方法
+          ChatListProvider.instance?.switchTab(index);
         },
-        key: ValueKey(ChatListPage.globalKey.currentState?.currentTabIndex ??
-            0), // 添加 key 來強制重建
       );
     },
   },

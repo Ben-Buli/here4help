@@ -549,7 +549,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                         horizontal: 12, vertical: 12),
                     child: Center(
                       child: Text(
-                        '/hour',
+                        'points',
                         style: TextStyle(
                           color: theme.primary,
                           fontWeight: FontWeight.w500,
