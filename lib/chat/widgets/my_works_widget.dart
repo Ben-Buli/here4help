@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import 'package:here4help/chat/providers/chat_list_provider.dart';
 import 'package:here4help/chat/widgets/task_card_components.dart';
+import 'package:here4help/chat/services/chat_service.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
 
@@ -176,12 +178,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
   Widget build(BuildContext context) {
     return Consumer<ChatListProvider>(
       builder: (context, chatProvider, child) {
-        // 當篩選條件改變時，刷新列表
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (chatProvider.currentTabIndex == 1) {
-            _pagingController.refresh();
-          }
-        });
+        // 已移除自動刷新邏輯，避免無窮循環
 
         return Stack(
           children: [
@@ -204,11 +201,11 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
                     return _buildTaskCard(task);
                   },
                   firstPageProgressIndicatorBuilder: (context) =>
-                      const Center(child: CircularProgressIndicator()),
+                      _buildLoadingAnimation(),
                   newPageProgressIndicatorBuilder: (context) =>
-                      const Center(child: CircularProgressIndicator()),
+                      _buildPaginationLoadingAnimation(),
                   noItemsFoundIndicatorBuilder: (context) =>
-                      const Center(child: Text('No tasks found')),
+                      _buildEmptyState(),
                 ),
               ),
             ),
@@ -226,7 +223,6 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
   /// My Works 分頁的聊天室列表項目
   Widget _buildMyWorksChatRoomItem(Map<String, dynamic> task) {
-    final taskId = task['id']?.toString() ?? '';
     final colorScheme = Theme.of(context).colorScheme;
     final displayStatus = TaskCardUtils.displayStatus(task);
     final progressData = TaskCardUtils.getProgressData(displayStatus);
@@ -247,11 +243,48 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
         children: [
           InkWell(
             onTap: () async {
-              // TODO: 實現導航到聊天室
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content: Text('Navigate to chat for: ${task['title']}')),
-              );
+              // 實現導航到聊天室
+              final userService = context.read<UserService>();
+              final currentUserId = userService.currentUser?.id;
+              final taskId = task['id']?.toString() ?? '';
+              final creatorId = (task['creator_id'] is int)
+                  ? task['creator_id']
+                  : int.tryParse('${task['creator_id']}') ?? 0;
+              final participantId = (currentUserId is int)
+                  ? currentUserId
+                  : int.tryParse('$currentUserId') ?? 0;
+
+              if (taskId.isEmpty || creatorId <= 0 || participantId <= 0) {
+                debugPrint('❌ [My Works] ensure_room 參數不足');
+                return;
+              }
+
+              try {
+                final chatService = ChatService();
+                final roomResult = await chatService.ensureRoom(
+                  taskId: taskId,
+                  creatorId: creatorId,
+                  participantId: participantId,
+                  type: 'application',
+                );
+                final roomData = roomResult['room'] ?? {};
+                final String realRoomId = roomData['id']?.toString() ?? '';
+                if (realRoomId.isEmpty) {
+                  debugPrint('❌ [My Works] ensure_room 未取得 room_id');
+                  return;
+                }
+
+                // 導航到聊天室
+                debugPrint('🔍 [My Works] 準備導航到聊天室，room_id: $realRoomId');
+                context.go('/chat/detail?room_id=$realRoomId');
+              } catch (e) {
+                debugPrint('❌ [My Works] ensure_room 失敗: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('無法進入聊天室: $e')),
+                  );
+                }
+              }
             },
             borderRadius: BorderRadius.circular(12),
             child: Padding(
@@ -501,6 +534,87 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     );
   }
 
+  /// 建構主要載入動畫
+  Widget _buildLoadingAnimation() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 50,
+            height: 50,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Loading my works...',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 建構分頁載入動畫 
+  Widget _buildPaginationLoadingAnimation() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 建構空狀態
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.work_outline,
+            size: 64,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No applications found',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You haven\'t applied to any tasks yet',
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 建構 Scroll to Top 按鈕
   Widget _buildScrollToTopButton() {
     return Positioned(
@@ -512,13 +626,11 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
         onPressed: () {
           // 滾動到頂部
           final scrollController = PrimaryScrollController.of(context);
-          if (scrollController != null) {
-            scrollController.animateTo(
-              0,
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeInOut,
-            );
-          }
+          scrollController?.animateTo(
+            0,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+          );
         },
         child: const Icon(Icons.keyboard_arrow_up, size: 24),
       ),

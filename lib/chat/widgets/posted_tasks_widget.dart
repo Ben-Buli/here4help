@@ -71,6 +71,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
         final taskId = task['id'].toString();
         final applications = chatProvider.applicationsByTask[taskId] ?? [];
         _applicationsByTask[taskId] = applications;
+        // debugPrint('🔍 [Posted Tasks] 任務 $taskId 有 ${applications.length} 個應徵者');
       }
 
       // 應用篩選和排序
@@ -182,12 +183,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
   Widget build(BuildContext context) {
     return Consumer<ChatListProvider>(
       builder: (context, chatProvider, child) {
-        // 當篩選條件改變時，刷新列表
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (chatProvider.currentTabIndex == 0) {
-            _pagingController.refresh();
-          }
-        });
+        // 已移除自動刷新邏輯，避免無窮循環
 
         return RefreshIndicator(
           onRefresh: () async {
@@ -210,11 +206,11 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
                     return _buildTaskCard(task);
                   },
                   firstPageProgressIndicatorBuilder: (context) =>
-                      const Center(child: CircularProgressIndicator()),
+                      _buildLoadingAnimation(),
                   newPageProgressIndicatorBuilder: (context) =>
-                      const Center(child: CircularProgressIndicator()),
+                      _buildPaginationLoadingAnimation(),
                   noItemsFoundIndicatorBuilder: (context) =>
-                      const Center(child: Text('No tasks found')),
+                      _buildEmptyState(),
                 ),
               ),
               // Scroll to top button
@@ -231,6 +227,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
     final applications = _applicationsByTask[taskId] ?? [];
     final applierChatItems =
         _convertApplicationsToApplierChatItems(applications);
+
+    // debugPrint('🔍 [Posted Tasks] 建構任務卡片 $taskId，應徵者數量: ${applierChatItems.length}');
 
     return _buildPostedTasksCardWithAccordion(task, applierChatItems);
   }
@@ -273,7 +271,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
                       if (isExpanded) {
                         _expandedTaskIds.remove(taskId);
                       } else {
-                        _expandedTaskIds.clear();
+                        // 允許多個任務同時展開，不清除其他展開的任務
                         _expandedTaskIds.add(taskId);
                       }
                     });
@@ -429,22 +427,30 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
                 ),
               ),
 
-              // 手風琴展開內容
-              if (isExpanded) ...[
-                _buildActionBar(task, colorScheme),
-                if (visibleAppliers.isNotEmpty)
-                  ...visibleAppliers.map((applier) =>
-                      _buildApplierCard(applier, taskId, colorScheme))
-                else
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'No applicants',
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-              ],
+              // 手風琴展開內容 - 添加動畫效果
+              AnimatedSize(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                child: isExpanded
+                    ? Column(
+                        children: [
+                          _buildActionBar(task, colorScheme),
+                          if (visibleAppliers.isNotEmpty)
+                            ...visibleAppliers.map((applier) =>
+                                _buildApplierCard(applier, taskId, colorScheme))
+                          else
+                            const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text(
+                                'No applicants',
+                                style: TextStyle(color: Colors.grey, fontSize: 14),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
             ],
           ),
 
@@ -772,6 +778,87 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
     );
   }
 
+  /// 建構主要載入動畫
+  Widget _buildLoadingAnimation() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 50,
+            height: 50,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Loading tasks...',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 建構分頁載入動畫 
+  Widget _buildPaginationLoadingAnimation() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 建構空狀態
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.inbox_outlined,
+            size: 64,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No tasks found',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Try adjusting your search or filters',
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 建構 Scroll to Top 按鈕
   Widget _buildScrollToTopButton() {
     return Positioned(
@@ -783,13 +870,11 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
         onPressed: () {
           // 滾動到頂部
           final scrollController = PrimaryScrollController.of(context);
-          if (scrollController != null) {
-            scrollController.animateTo(
-              0,
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeInOut,
-            );
-          }
+          scrollController?.animateTo(
+            0,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeInOut,
+          );
         },
         child: const Icon(Icons.keyboard_arrow_up, size: 24),
       ),

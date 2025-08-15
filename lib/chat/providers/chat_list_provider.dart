@@ -245,14 +245,18 @@ class ChatListProvider extends ChangeNotifier {
       final taskService = TaskService();
       final tasks = taskService.tasks;
 
+      debugPrint('🔍 開始載入應徵者資料，總任務數: ${tasks.length}');
+
       _applicationsByTask.clear();
 
       for (final task in tasks) {
         final taskId = task['id'].toString();
         try {
           final applications = await taskService.loadApplicationsByTask(taskId);
+          debugPrint('🔍 任務 $taskId 應徵者數量: ${applications.length}');
           if (applications.isNotEmpty) {
             _applicationsByTask[taskId] = applications;
+            debugPrint('✅ 任務 $taskId 已儲存 ${applications.length} 個應徵者');
           }
         } catch (e) {
           debugPrint('❌ 載入任務 $taskId 的應徵者失敗: $e');
@@ -260,6 +264,7 @@ class ChatListProvider extends ChangeNotifier {
       }
 
       debugPrint('📄 應徵者資料載入完成: ${_applicationsByTask.length} 個任務有應徵者');
+      debugPrint('📄 應徵者資料詳細: $_applicationsByTask');
     } catch (e) {
       debugPrint('❌ 載入應徵者資料失敗: $e');
     }

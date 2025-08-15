@@ -1061,9 +1061,14 @@ class _TaskListPageState extends State<TaskListPage> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       elevation: 1,
-                      child: Stack(
-                        children: [
-                          Padding(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          _showTaskDetailDialog(task);
+                        },
+                        child: Stack(
+                          children: [
+                            Padding(
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1301,7 +1306,8 @@ class _TaskListPageState extends State<TaskListPage> {
                                   : 'Add to favorites',
                             ),
                           ),
-                        ],
+                          ],
+                        ),
                       ),
                     );
                   },
