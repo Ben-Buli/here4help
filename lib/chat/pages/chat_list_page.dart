@@ -37,10 +37,16 @@ class _ChatListPageState extends State<ChatListPage>
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String searchQuery = '';
-  // 篩選狀態變數（nullable, 無選擇時為 null）
-  String? selectedLocation;
-  String? selectedHashtag;
-  String? selectedStatus;
+
+  // 篩選狀態變數（改為支援多選）
+  Set<String> selectedLocations = {};
+  Set<String> selectedStatuses = {};
+
+  // 排序狀態變數
+  String _currentSortBy = 'updated_time';
+  bool _sortAscending = false; // 預設 Z-A (降序)
+  bool _showSortOptions = false; // 控制排序選項的顯示/隱藏
+
   // Tasker 篩選狀態
   bool taskerFilterEnabled = false;
   late TabController _tabController;
@@ -70,10 +76,11 @@ class _ChatListPageState extends State<ChatListPage>
   // 簡化的載入狀態
   bool _isLoading = true;
   String? _errorMessage;
+
   bool get _hasActiveFilters =>
-      (selectedLocation != null && selectedLocation!.isNotEmpty) ||
-      (selectedStatus != null && selectedStatus!.isNotEmpty) ||
-      (searchQuery.isNotEmpty);
+      selectedLocations.isNotEmpty ||
+      selectedStatuses.isNotEmpty ||
+      searchQuery.isNotEmpty;
 
   /// 使用預載入服務初始化數據
   Future<void> _initializeWithPreload() async {
@@ -115,12 +122,15 @@ class _ChatListPageState extends State<ChatListPage>
     setState(() {
       _searchController.clear();
       searchQuery = '';
-      selectedLocation = null;
-      selectedHashtag = null;
-      selectedStatus = null;
+      selectedLocations.clear();
+      selectedStatuses.clear();
+      _currentSortBy = 'updated_time';
+      _sortAscending = false;
+      _showSortOptions = false;
     });
     // 重新載入分頁
     _pagingController.refresh();
+    _myWorksPagingController.refresh();
   }
 
   void _openFilterOptions({
@@ -133,8 +143,11 @@ class _ChatListPageState extends State<ChatListPage>
       showDragHandle: true,
       isScrollControlled: true,
       builder: (ctx) {
-        String tempLocation = selectedLocation ?? '';
-        String tempStatus = selectedStatus ?? '';
+        String tempLocation =
+            selectedLocations.isEmpty ? '' : selectedLocations.first;
+        String tempStatus =
+            selectedStatuses.isEmpty ? '' : selectedStatuses.first;
+
         return Padding(
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
@@ -148,28 +161,41 @@ class _ChatListPageState extends State<ChatListPage>
             children: [
               Text('Filter options', style: theme.textTheme.titleMedium),
               const SizedBox(height: 12),
+
+              // Location 下拉選單
               DropdownButtonFormField<String>(
                 value: tempLocation.isEmpty ? null : tempLocation,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Location'),
-                hint: const Text('Any'),
-                items: locationOptions
-                    .map(
-                        (loc) => DropdownMenuItem(value: loc, child: Text(loc)))
-                    .toList(),
+                hint: const Text('All'),
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('All')),
+                  ...locationOptions.map((loc) => DropdownMenuItem(
+                        value: loc,
+                        child: Text(loc),
+                      )),
+                ],
                 onChanged: (val) => tempLocation = val ?? '',
               ),
+
               const SizedBox(height: 12),
+
+              // Status 下拉選單
               DropdownButtonFormField<String>(
                 value: tempStatus.isEmpty ? null : tempStatus,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Status'),
-                hint: const Text('Any'),
-                items: statusOptions
-                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                    .toList(),
+                hint: const Text('All'),
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('All')),
+                  ...statusOptions.map((status) => DropdownMenuItem(
+                        value: status,
+                        child: Text(status),
+                      )),
+                ],
                 onChanged: (val) => tempStatus = val ?? '',
               ),
+
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -188,13 +214,15 @@ class _ChatListPageState extends State<ChatListPage>
                     child: ElevatedButton.icon(
                       onPressed: () {
                         setState(() {
-                          selectedLocation =
-                              tempLocation.isEmpty ? null : tempLocation;
-                          selectedStatus =
-                              tempStatus.isEmpty ? null : tempStatus;
+                          selectedLocations =
+                              tempLocation.isEmpty ? {} : {tempLocation};
+                          selectedStatuses =
+                              tempStatus.isEmpty ? {} : {tempStatus};
                         });
                         Navigator.of(ctx).pop();
+                        // 篩選變化時重新載入分頁
                         _pagingController.refresh();
+                        _myWorksPagingController.refresh();
                       },
                       icon: const Icon(Icons.check),
                       label: const Text('Apply'),
@@ -207,6 +235,213 @@ class _ChatListPageState extends State<ChatListPage>
           ),
         );
       },
+    );
+  }
+
+  /// 排序功能
+  void _setSortOrder(String sortBy) {
+    setState(() {
+      if (_currentSortBy == sortBy) {
+        // 如果點擊同一個排序選項，切換升序/降序
+        _sortAscending = !_sortAscending;
+      } else {
+        // 如果點擊不同的排序選項，設為新選項並預設為升序
+        _currentSortBy = sortBy;
+        _sortAscending = true;
+      }
+    });
+
+    // 重新載入分頁以應用新的排序
+    _pagingController.refresh();
+    _myWorksPagingController.refresh();
+  }
+
+  /// 排序任務列表
+  List<Map<String, dynamic>> _sortTasks(List<Map<String, dynamic>> tasks) {
+    final sortedTasks = List<Map<String, dynamic>>.from(tasks);
+
+    sortedTasks.sort((a, b) {
+      int comparison = 0;
+
+      switch (_currentSortBy) {
+        case 'updated_time':
+          final timeA =
+              DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
+          final timeB =
+              DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
+          comparison = timeA.compareTo(timeB);
+          break;
+
+        case 'applicant_count':
+          final countA =
+              (_applicationsByTask[a['id']?.toString()] ?? []).length;
+          final countB =
+              (_applicationsByTask[b['id']?.toString()] ?? []).length;
+          comparison = countA.compareTo(countB);
+          break;
+
+        case 'status_code':
+          final statusA = a['status_code'] ?? '';
+          final statusB = b['status_code'] ?? '';
+          comparison = statusA.compareTo(statusB);
+          break;
+
+        default:
+          comparison = 0;
+      }
+
+      return _sortAscending ? comparison : -comparison;
+    });
+
+    return sortedTasks;
+  }
+
+  /// 篩選任務列表
+  List<Map<String, dynamic>> _filterTasks(List<Map<String, dynamic>> tasks) {
+    return tasks.where((task) {
+      final title = (task['title'] ?? '').toString().toLowerCase();
+      final location = (task['location'] ?? '').toString();
+      final description = (task['description'] ?? '').toString().toLowerCase();
+      final status = _displayStatus(task);
+      final query = searchQuery.toLowerCase();
+
+      // 搜尋篩選
+      final matchQuery = query.isEmpty ||
+          title.contains(query) ||
+          location.toLowerCase().contains(query) ||
+          description.contains(query);
+
+      // 位置篩選（單選）
+      final matchLocation =
+          selectedLocations.isEmpty || selectedLocations.contains(location);
+
+      // 狀態篩選（單選）
+      final matchStatus =
+          selectedStatuses.isEmpty || selectedStatuses.contains(status);
+
+      return matchQuery && matchLocation && matchStatus;
+    }).toList();
+  }
+
+  /// 建構排序按鈕
+  Widget _buildSortButton({
+    required String label,
+    required String sortBy,
+    required IconData icon,
+  }) {
+    final isActive = _currentSortBy == sortBy;
+    final theme = Theme.of(context);
+
+    return GestureDetector(
+      onTap: () => _setSortOrder(sortBy),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color:
+              isActive ? theme.colorScheme.primary : theme.colorScheme.surface,
+          border: Border.all(
+            color: isActive
+                ? theme.colorScheme.primary
+                : theme.colorScheme.outline.withOpacity(0.3),
+            width: 1,
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isActive
+                  ? theme.colorScheme.onPrimary
+                  : theme.colorScheme.onSurface,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isActive
+                    ? theme.colorScheme.onPrimary
+                    : theme.colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              isActive
+                  ? (_sortAscending ? Icons.arrow_upward : Icons.arrow_downward)
+                  : Icons.unfold_more,
+              size: 14,
+              color: isActive
+                  ? theme.colorScheme.onPrimary
+                  : theme.colorScheme.onSurface,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 建構緊湊的排序選項（新版本，節省空間）
+  Widget _buildCompactSortChip({
+    required String label,
+    required String sortBy,
+    required IconData icon,
+  }) {
+    final isActive = _currentSortBy == sortBy;
+    final theme = Theme.of(context);
+
+    return GestureDetector(
+      onTap: () => _setSortOrder(sortBy),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isActive ? theme.colorScheme.primary : Colors.transparent,
+          border: Border(
+            bottom: BorderSide(
+              color: isActive
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.outline.withOpacity(0.3),
+              width: isActive ? 2 : 1,
+            ),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isActive
+                  ? theme.colorScheme.onPrimary
+                  : theme.colorScheme.onSurface,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                color: isActive
+                    ? theme.colorScheme.onPrimary
+                    : theme.colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              isActive
+                  ? (_sortAscending ? Icons.arrow_upward : Icons.arrow_downward)
+                  : Icons.unfold_more,
+              size: 12,
+              color: isActive
+                  ? theme.colorScheme.onPrimary
+                  : theme.colorScheme.onSurface,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -251,10 +486,30 @@ class _ChatListPageState extends State<ChatListPage>
     );
 
     if (!mounted) return;
-    if (result.hasMore) {
-      _pagingController.appendPage(result.tasks, offset + result.tasks.length);
+
+    // 應用篩選和排序
+    final filteredTasks = _filterTasks(result.tasks);
+    final sortedTasks = _sortTasks(filteredTasks);
+
+    // 檢查是否有篩選條件
+    final hasFilters = searchQuery.isNotEmpty ||
+        selectedLocations.isNotEmpty ||
+        selectedStatuses.isNotEmpty;
+
+    if (hasFilters) {
+      // 如果有篩選條件，需要重新計算分頁
+      if (filteredTasks.isNotEmpty) {
+        _pagingController.appendPage(sortedTasks, offset + sortedTasks.length);
+      } else {
+        _pagingController.appendLastPage([]);
+      }
     } else {
-      _pagingController.appendLastPage(result.tasks);
+      // 沒有篩選條件，正常分頁
+      if (result.hasMore) {
+        _pagingController.appendPage(sortedTasks, offset + sortedTasks.length);
+      } else {
+        _pagingController.appendLastPage(sortedTasks);
+      }
     }
   }
 
@@ -265,28 +520,17 @@ class _ChatListPageState extends State<ChatListPage>
       await taskService.loadMyApplications(currentUserId);
     }
     final all = _composeMyWorks(taskService, currentUserId);
-    final filtered = all.where((task) {
-      final title = (task['title'] ?? '').toString().toLowerCase();
-      final location = (task['location'] ?? '').toString();
-      final description = (task['description'] ?? '').toString().toLowerCase();
-      final status = _displayStatus(task);
-      final query = searchQuery.toLowerCase();
-      final matchQuery = query.isEmpty ||
-          title.contains(query) ||
-          location.toLowerCase().contains(query) ||
-          description.contains(query);
-      final matchLocation =
-          selectedLocation == null || selectedLocation == location;
-      final matchStatus = selectedStatus == null || selectedStatus == status;
-      return matchQuery && matchLocation && matchStatus;
-    }).toList();
+
+    // 應用篩選和排序
+    final filtered = _filterTasks(all);
+    final sorted = _sortTasks(filtered);
 
     final start = offset;
-    final end = (offset + _pageSize) > filtered.length
-        ? filtered.length
+    final end = (offset + _pageSize) > sorted.length
+        ? sorted.length
         : (offset + _pageSize);
-    final slice = filtered.sublist(start, end);
-    final hasMore = end < filtered.length;
+    final slice = sorted.sublist(start, end);
+    final hasMore = end < sorted.length;
     if (!mounted) return;
     if (hasMore) {
       _myWorksPagingController.appendPage(slice, end);
@@ -355,9 +599,10 @@ class _ChatListPageState extends State<ChatListPage>
           // 重設搜尋與篩選
           _searchController.clear();
           searchQuery = '';
-          selectedLocation = null;
-          selectedHashtag = null;
-          selectedStatus = null;
+          selectedLocations.clear();
+          selectedStatuses.clear();
+          _currentSortBy = 'updated_time';
+          _sortAscending = false;
         });
         // 切換分頁時同步刷新各自分頁控制器
         _pagingController.refresh();
@@ -1506,68 +1751,140 @@ class _ChatListPageState extends State<ChatListPage>
             ),
           ),
           // My Works 分頁篩選選項（已移除，只顯示已應徵任務）
-          // 搜尋欄
+          // 搜尋欄 + 排序功能
           Padding(
             padding: const EdgeInsets.all(12.0),
-            child: Row(
+            child: Column(
               children: [
-                // Search bar + inline actions
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    focusNode: _searchFocusNode,
-                    onChanged: (value) {
-                      setState(() {
-                        searchQuery = value.toLowerCase();
-                      });
-                    },
-                    onEditingComplete: () {
-                      FocusScope.of(context).unfocus();
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Search...',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (_searchController.text.isNotEmpty)
-                            IconButton(
-                              icon: const Icon(Icons.clear),
-                              onPressed: () {
-                                setState(() {
-                                  _searchController.clear();
-                                  searchQuery = '';
-                                });
-                              },
-                              tooltip: 'Clear',
-                            ),
-                          IconButton(
-                            icon: Icon(Icons.filter_list,
-                                color: _hasActiveFilters
-                                    ? Theme.of(context).colorScheme.primary
-                                    : IconTheme.of(context).color),
-                            tooltip: 'Filter options',
-                            onPressed: () {
-                              _openFilterOptions(
-                                locationOptions: locationOptions,
-                                statusOptions: statusOptions,
-                              );
-                            },
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.refresh,
-                                color: Theme.of(context).colorScheme.primary),
-                            tooltip: 'Reset',
-                            onPressed: _resetFilters,
-                          ),
-                        ],
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                // 搜尋欄主體
+                Row(
+                  children: [
+                    // 排序展開/收合按鈕
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      child: IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _showSortOptions = !_showSortOptions;
+                          });
+                        },
+                        icon: Icon(
+                          _showSortOptions
+                              ? Icons.keyboard_arrow_up
+                              : Icons.sort,
+                          color: _currentSortBy != 'updated_time' ||
+                                  _sortAscending != false
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.onSurface,
+                        ),
+                        tooltip: 'Sort options',
+                        style: IconButton.styleFrom(
+                          backgroundColor: _currentSortBy != 'updated_time' ||
+                                  _sortAscending != false
+                              ? Theme.of(context).colorScheme.primaryContainer
+                              : Colors.transparent,
+                        ),
                       ),
                     ),
-                  ),
+
+                    // Search bar + inline actions
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        onChanged: (value) {
+                          setState(() {
+                            searchQuery = value.toLowerCase();
+                          });
+                          // 搜尋變化時重新載入分頁
+                          _pagingController.refresh();
+                          _myWorksPagingController.refresh();
+                        },
+                        onEditingComplete: () {
+                          FocusScope.of(context).unfocus();
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'Search...',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (_searchController.text.isNotEmpty)
+                                IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchController.clear();
+                                      searchQuery = '';
+                                    });
+                                  },
+                                  tooltip: 'Clear',
+                                ),
+                              IconButton(
+                                icon: Icon(Icons.filter_list,
+                                    color: _hasActiveFilters
+                                        ? Theme.of(context).colorScheme.primary
+                                        : IconTheme.of(context).color),
+                                tooltip: 'Filter options',
+                                onPressed: () {
+                                  _openFilterOptions(
+                                    locationOptions: locationOptions,
+                                    statusOptions: statusOptions,
+                                  );
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.refresh,
+                                    color:
+                                        Theme.of(context).colorScheme.primary),
+                                tooltip: 'Reset',
+                                onPressed: _resetFilters,
+                              ),
+                            ],
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+
+                // 排序選項展開區域
+                if (_showSortOptions)
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    height: 40,
+                    margin: const EdgeInsets.only(top: 8),
+                    child: Row(
+                      children: [
+                        // 更新時間排序
+                        _buildCompactSortChip(
+                          label: 'Time',
+                          sortBy: 'updated_time',
+                          icon: Icons.update,
+                        ),
+                        const SizedBox(width: 8),
+
+                        // 應徵人數排序（僅限 Posted Tasks 分頁）
+                        if (_tabController.index == 0)
+                          _buildCompactSortChip(
+                            label: 'Count',
+                            sortBy: 'applicant_count',
+                            icon: Icons.people,
+                          ),
+                        if (_tabController.index == 0) const SizedBox(width: 8),
+
+                        // 任務狀態排序
+                        _buildCompactSortChip(
+                          label: 'Status',
+                          sortBy: 'status_code',
+                          icon: Icons.sort_by_alpha,
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
@@ -1635,10 +1952,9 @@ class _ChatListPageState extends State<ChatListPage>
           location.toLowerCase().contains(query) ||
           description.contains(query);
       final matchLocation =
-          selectedLocation == null || selectedLocation == location;
-      final displayStatus = status;
+          selectedLocations.isEmpty || selectedLocations.contains(location);
       final matchStatus =
-          selectedStatus == null || selectedStatus == displayStatus;
+          selectedStatuses.isEmpty || selectedStatuses.contains(status);
       // My Works：接受者是我，或我有應徵紀錄
       final isMyWork = taskerEnabled
           ? ((task['acceptor_id']?.toString() == currentUserId?.toString()) ||
@@ -2455,6 +2771,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                           children: [
                             // 任務標題
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Expanded(
                                   child: Text(
@@ -2463,8 +2780,9 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: null,
+                                    softWrap: true,
+                                    overflow: TextOverflow.visible,
                                   ),
                                 ),
                                 // Emoji 狀態列
@@ -2511,18 +2829,6 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                // 發布者名稱（主題配色）
-                                Flexible(
-                                  child: Text(
-                                    'by ${task['creator_name'] ?? 'Unknown'}',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: colorScheme.secondary,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
                               ],
                             ),
                             const SizedBox(height: 4),
@@ -2867,7 +3173,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                               ),
                             ),
                             title: Text(
-                              applier['name'] ?? 'Unknown',
+                              applier['name'] ?? 'Unknown name',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w500,
                                 fontSize: 14,
@@ -2985,7 +3291,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
             onTap: () async {
               if (applierChatItems.isNotEmpty) {
                 final room = applierChatItems.first;
-                final roomId = room['id']?.toString() ?? 'unknown';
+                final roomId = room['id']?.toString() ?? 'unknown room_id';
 
                 // 簡化導航：只傳遞 room_id
                 debugPrint('🔍 [My Works] 準備導航到聊天室，room_id: $roomId');
@@ -3118,118 +3424,151 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                         const SizedBox(height: 4),
 
                         // 任務資訊 2x2 格局：位置、日期、獎勵、語言
-                        Container(
-                          constraints: const BoxConstraints(maxWidth: 200),
-                          child: Column(
-                            children: [
-                              // 第一行：位置 + 日期
-                              Row(
-                                children: [
-                                  // 位置
-                                  Expanded(
-                                    child: Row(
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                constraints:
+                                    const BoxConstraints(maxWidth: 200),
+                                child: Column(
+                                  children: [
+                                    // 第一行：位置 + 日期
+                                    Row(
                                       children: [
-                                        Icon(Icons.location_on,
-                                            size: 12, color: Colors.grey[500]),
-                                        const SizedBox(width: 2),
-                                        Flexible(
-                                          child: Text(
-                                            task['location'] ?? '未知地點',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.grey[500],
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
+                                        // 位置
+                                        Expanded(
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.location_on,
+                                                  size: 12,
+                                                  color: Colors.grey[500]),
+                                              const SizedBox(width: 2),
+                                              Flexible(
+                                                child: Text(
+                                                  task['location'] ??
+                                                      'Not specified location.',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey[500],
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        // 日期
+                                        Expanded(
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.calendar_today,
+                                                  size: 12,
+                                                  color: Colors.grey[500]),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                DateFormat('MM/dd').format(
+                                                  DateTime.parse(
+                                                      task['task_date'] ??
+                                                          DateTime.now()
+                                                              .toString()),
+                                                ),
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Colors.grey[500],
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  // 日期
-                                  Expanded(
-                                    child: Row(
+                                    const SizedBox(height: 4),
+                                    // 第二行：獎勵 + 語言
+                                    Row(
                                       children: [
-                                        Icon(Icons.calendar_today,
-                                            size: 12, color: Colors.grey[500]),
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          DateFormat('MM/dd').format(
-                                            DateTime.parse(task['task_date'] ??
-                                                DateTime.now().toString()),
+                                        // 獎勵
+                                        Expanded(
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.attach_money,
+                                                  size: 12,
+                                                  color: Colors.grey[600]),
+                                              const SizedBox(width: 2),
+                                              Flexible(
+                                                child: Text(
+                                                  '${task['reward_point'] ?? task['salary'] ?? 0}',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: colorScheme.primary,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey[500],
+                                        ),
+                                        const SizedBox(width: 8),
+                                        // 語言要求
+                                        Expanded(
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.language,
+                                                  size: 12,
+                                                  color: Colors.grey[500]),
+                                              const SizedBox(width: 2),
+                                              Flexible(
+                                                child: Text(
+                                                  task['language_requirement'] ??
+                                                      'No language requirement.',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey[500],
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                              const SizedBox(height: 4),
-                              // 第二行：獎勵 + 語言
-                              Row(
-                                children: [
-                                  // 獎勵
-                                  Expanded(
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.attach_money,
-                                            size: 12, color: Colors.grey[600]),
-                                        const SizedBox(width: 2),
-                                        Flexible(
-                                          child: Text(
-                                            '${task['reward_point'] ?? task['salary'] ?? 0}',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500,
-                                              color: colorScheme.primary,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  // 語言要求
-                                  Expanded(
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.language,
-                                            size: 12, color: Colors.grey[500]),
-                                        const SizedBox(width: 2),
-                                        Flexible(
-                                          child: Text(
-                                            task['language_requirement'] ??
-                                                '不限',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.grey[500],
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                            ),
+
+                            // 右側：未讀訊息數字圖標
+                            if (unreadCount > 0)
+                              Container(
+                                margin: const EdgeInsets.only(left: 8),
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.message,
+                                  size: 16,
+                                  color: colorScheme.onPrimary,
+                                ),
                               ),
-                            ],
-                          ),
+                          ],
                         ),
                         const SizedBox(height: 4),
-                        // 時間距離戳記
-                        Text(
-                          _getTimeAgo(task),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[400],
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
+                        // // 時間距離戳記 (聊天室列表不需要顯示 )
+                        // Text(
+                        //   _getTimeAgo(task),
+                        //   style: TextStyle(
+                        //     fontSize: 10,
+                        //     color: Colors.grey[400],
+                        //     fontStyle: FontStyle.italic,
+                        //   ),
+                        // ),
                       ],
                     ),
                   ),
