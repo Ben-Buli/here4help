@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:here4help/chat/providers/chat_list_provider.dart';
 import 'package:here4help/chat/widgets/task_card_components.dart';
 import 'package:here4help/chat/services/chat_service.dart';
+import 'package:here4help/chat/services/chat_storage_service.dart';
+import 'package:here4help/chat/services/chat_session_manager.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
 
@@ -29,17 +31,17 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     _pagingController.addPageRequestListener((offset) {
       _fetchMyWorksPage(offset);
     });
-    
+
     // 監聽 ChatListProvider 的篩選條件變化（僅針對當前tab）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final chatProvider = context.read<ChatListProvider>();
       chatProvider.addListener(_handleProviderChanges);
     });
   }
-  
+
   void _handleProviderChanges() {
     if (!mounted) return;
-    
+
     try {
       final chatProvider = context.read<ChatListProvider>();
       // 只有當前是 My Works 分頁時才刷新
@@ -204,38 +206,37 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
   @override
   Widget build(BuildContext context) {
     return Stack(
-          children: [
-            RefreshIndicator(
-              onRefresh: () async {
-                final chatProvider = context.read<ChatListProvider>();
-                await chatProvider.cacheManager.forceRefresh();
-                _pagingController.refresh();
-              },
-              child: PagedListView<int, Map<String, dynamic>>(
-                padding: const EdgeInsets.only(
-                  left: 12,
-                  right: 12,
-                  top: 12,
-                  bottom: 80, // 保留底部距離，避免被 scroll to top button 遮擋
-                ),
-                pagingController: _pagingController,
-                builderDelegate:
-                    PagedChildBuilderDelegate<Map<String, dynamic>>(
-                  itemBuilder: (context, task, index) {
-                    return _buildTaskCard(task);
-                  },
-                  firstPageProgressIndicatorBuilder: (context) =>
-                      _buildLoadingAnimation(),
-                  newPageProgressIndicatorBuilder: (context) =>
-                      _buildPaginationLoadingAnimation(),
-                  noItemsFoundIndicatorBuilder: (context) => _buildEmptyState(),
-                ),
-              ),
+      children: [
+        RefreshIndicator(
+          onRefresh: () async {
+            final chatProvider = context.read<ChatListProvider>();
+            await chatProvider.cacheManager.forceRefresh();
+            _pagingController.refresh();
+          },
+          child: PagedListView<int, Map<String, dynamic>>(
+            padding: const EdgeInsets.only(
+              left: 12,
+              right: 12,
+              top: 12,
+              bottom: 80, // 保留底部距離，避免被 scroll to top button 遮擋
             ),
-            // Scroll to top button
-            _buildScrollToTopButton(),
-          ],
-        );
+            pagingController: _pagingController,
+            builderDelegate: PagedChildBuilderDelegate<Map<String, dynamic>>(
+              itemBuilder: (context, task, index) {
+                return _buildTaskCard(task);
+              },
+              firstPageProgressIndicatorBuilder: (context) =>
+                  _buildLoadingAnimation(),
+              newPageProgressIndicatorBuilder: (context) =>
+                  _buildPaginationLoadingAnimation(),
+              noItemsFoundIndicatorBuilder: (context) => _buildEmptyState(),
+            ),
+          ),
+        ),
+        // Scroll to top button
+        _buildScrollToTopButton(),
+      ],
+    );
   }
 
   Widget _buildTaskCard(Map<String, dynamic> task) {
@@ -294,6 +295,29 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
                   debugPrint('❌ [My Works] ensure_room 未取得 room_id');
                   return;
                 }
+
+                // 載入聊天室詳細數據
+                debugPrint('🔍 [My Works] 載入聊天室數據，room_id: $realRoomId');
+                final chatData =
+                    await chatService.getChatDetailData(roomId: realRoomId);
+
+                // 保存到本地儲存
+                await ChatStorageService.savechatRoomData(
+                  roomId: realRoomId,
+                  room: chatData['room'] ?? {},
+                  task: chatData['task'] ?? {},
+                  userRole: chatData['user_role'] ?? 'participant',
+                  chatPartnerInfo: chatData['chat_partner_info'],
+                );
+
+                // 設置為當前會話
+                await ChatSessionManager.setCurrentChatSession(
+                  roomId: realRoomId,
+                  room: chatData['room'] ?? {},
+                  task: chatData['task'] ?? {},
+                  userRole: chatData['user_role'] ?? 'participant',
+                  chatPartnerInfo: chatData['chat_partner_info'] ?? {},
+                );
 
                 // 導航到聊天室
                 debugPrint('🔍 [My Works] 準備導航到聊天室，room_id: $realRoomId');

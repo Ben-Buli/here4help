@@ -274,11 +274,12 @@ try {
     $response = [
         'success' => true,
         'data' => [
-            'chat_room' => [
+            'room' => [
                 'id' => $chatData['id'],
                 'task_id' => $chatData['task_id'],
                 'creator_id' => $chatData['creator_id'],
-                'participant_id' => $chatData['participant_id']
+                'participant_id' => $chatData['participant_id'],
+                'created_at' => $chatData['created_at'] ?? null
             ],
             'task' => [
                 'id' => $chatData['task_id'],

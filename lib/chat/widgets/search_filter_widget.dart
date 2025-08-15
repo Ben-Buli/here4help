@@ -88,7 +88,7 @@ class _SearchFilterWidgetState extends State<SearchFilterWidget> {
                         ),
                         tooltip: 'Filter options',
                         onPressed: () {
-                          // TODO: 實現篩選選項對話框
+                          _showFilterOptions(context, chatProvider, theme);
                         },
                       ),
                       IconButton(
@@ -98,6 +98,8 @@ class _SearchFilterWidgetState extends State<SearchFilterWidget> {
                           _searchController.clear();
                           _searchFocusNode.unfocus();
                           chatProvider.resetFilters();
+                          // 滾動到頂部
+                          _scrollToTop();
                         },
                       ),
                     ],
@@ -215,5 +217,225 @@ class _SearchFilterWidgetState extends State<SearchFilterWidget> {
         ),
       ),
     );
+  }
+
+  /// 顯示篩選選項對話框
+  void _showFilterOptions(
+      BuildContext context, ChatListProvider chatProvider, dynamic theme) {
+    // 創建暫時的篩選狀態
+    Set<String> tempSelectedLocations =
+        Set.from(chatProvider.selectedLocations);
+    Set<String> tempSelectedStatuses = Set.from(chatProvider.selectedStatuses);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setModalState) {
+          return DraggableScrollableSheet(
+            initialChildSize: 0.7,
+            maxChildSize: 0.9,
+            minChildSize: 0.5,
+            expand: false,
+            builder: (context, scrollController) => Container(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 標題
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Filter Options',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: theme.onSurface,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  Expanded(
+                    child: ListView(
+                      controller: scrollController,
+                      children: [
+                        // 位置篩選
+                        Text(
+                          'Location',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: theme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: theme.outlineVariant),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              hint: Text('Select Location',
+                                  style: TextStyle(
+                                      color: theme.onSurface
+                                          .withValues(alpha: 0.6))),
+                              value: tempSelectedLocations.isEmpty
+                                  ? (chatProvider.selectedLocations.isEmpty
+                                      ? null
+                                      : 'All')
+                                  : tempSelectedLocations.first,
+                              items: [
+                                'All',
+                                'NCCU',
+                                'NTU',
+                                'NTUST',
+                                'Taipei',
+                                'New Taipei City'
+                              ]
+                                  .map((location) => DropdownMenuItem(
+                                        value: location,
+                                        child: Text(location),
+                                      ))
+                                  .toList(),
+                              onChanged: (value) {
+                                setModalState(() {
+                                  if (value == 'All' || value == null) {
+                                    tempSelectedLocations.clear();
+                                  } else {
+                                    tempSelectedLocations.clear();
+                                    tempSelectedLocations.add(value);
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // 狀態篩選
+                        Text(
+                          'Status',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: theme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: theme.outlineVariant),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              hint: Text('Select Status',
+                                  style: TextStyle(
+                                      color: theme.onSurface
+                                          .withValues(alpha: 0.6))),
+                              value: tempSelectedStatuses.isEmpty
+                                  ? (chatProvider.selectedStatuses.isEmpty
+                                      ? null
+                                      : 'All')
+                                  : tempSelectedStatuses.first,
+                              items: [
+                                'All',
+                                'Open',
+                                'In Progress',
+                                'Completed',
+                                'Pending Review'
+                              ]
+                                  .map((status) => DropdownMenuItem(
+                                        value: status,
+                                        child: Text(status),
+                                      ))
+                                  .toList(),
+                              onChanged: (value) {
+                                setModalState(() {
+                                  if (value == 'All' || value == null) {
+                                    tempSelectedStatuses.clear();
+                                  } else {
+                                    tempSelectedStatuses.clear();
+                                    tempSelectedStatuses.add(value);
+                                  }
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 底部按鈕
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setModalState(() {
+                              tempSelectedLocations.clear();
+                              tempSelectedStatuses.clear();
+                            });
+                          },
+                          child: const Text('Clear All'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // 應用篩選條件
+                            chatProvider
+                                .updateLocationFilter(tempSelectedLocations);
+                            chatProvider
+                                .updateStatusFilter(tempSelectedStatuses);
+                            Navigator.of(context).pop();
+                          },
+                          child: const Text('Apply'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 滾動到頂部
+  void _scrollToTop() {
+    try {
+      final scrollController = PrimaryScrollController.of(context);
+      if (scrollController.hasClients) {
+        scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ ScrollController error: $e');
+    }
   }
 }

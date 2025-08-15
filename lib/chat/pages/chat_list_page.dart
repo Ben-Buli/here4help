@@ -153,16 +153,24 @@ class _ChatListPageState extends State<ChatListPage>
             // 更新狀態指示器
             const UpdateStatusBanner(),
 
-            // 搜尋欄 + 排序功能
-            const SearchFilterWidget(),
-
             // 內容區域 - 使用 TabBarView 實現左右滑動效果
+            // 每個分頁都有自己的搜尋篩選組件，確保狀態獨立
             Expanded(
               child: TabBarView(
                 controller: chatProvider.tabController,
                 children: const [
-                  PostedTasksWidget(),
-                  MyWorksWidget(),
+                  Column(
+                    children: [
+                      SearchFilterWidget(),
+                      Expanded(child: PostedTasksWidget()),
+                    ],
+                  ),
+                  Column(
+                    children: [
+                      SearchFilterWidget(),
+                      Expanded(child: MyWorksWidget()),
+                    ],
+                  ),
                 ],
               ),
             ),

@@ -3,10 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
+import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:here4help/chat/providers/chat_list_provider.dart';
 import 'package:here4help/chat/widgets/task_card_components.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 
 /// Posted Tasks 分頁組件
 /// 從原 ChatListPage 中抽取的 Posted Tasks 相關功能
@@ -28,26 +30,23 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
   // 手風琴展開狀態管理
   final Set<String> _expandedTaskIds = <String>{};
 
-  // 置頂任務管理
-  final Set<String> _pinnedTaskIds = <String>{};
-
   @override
   void initState() {
     super.initState();
     _pagingController.addPageRequestListener((offset) {
       _fetchPage(offset);
     });
-    
+
     // 監聽 ChatListProvider 的篩選條件變化（僅針對當前tab）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final chatProvider = context.read<ChatListProvider>();
       chatProvider.addListener(_handleProviderChanges);
     });
   }
-  
+
   void _handleProviderChanges() {
     if (!mounted) return;
-    
+
     try {
       final chatProvider = context.read<ChatListProvider>();
       // 只有當前是 Posted Tasks 分頁時才刷新
@@ -110,7 +109,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
       // 直接從聚合API獲取應徵者數據
       for (final task in result.tasks) {
         final taskId = task['id'].toString();
-        final applicants = task['applicants'] ?? [];
+        final applicantsRaw = task['applicants'] ?? [];
+        final List<Map<String, dynamic>> applicants = (applicantsRaw is List)
+            ? applicantsRaw.map((e) => Map<String, dynamic>.from(e)).toList()
+            : [];
         _applicationsByTask[taskId] = applicants;
         // debugPrint('🔍 [Posted Tasks] 任務 $taskId 有 ${applicants.length} 個應徵者');
       }
@@ -119,27 +121,33 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
       final filteredTasks = _filterTasks(result.tasks, chatProvider);
       final sortedTasks = _sortTasks(filteredTasks, chatProvider);
 
-      // 檢查是否有篩選條件
-      final hasFilters = chatProvider.hasActiveFilters;
+      // 修正分頁邏輯 - 統一處理，避免重複卡片
+      final hasMoreData = result.hasMore && sortedTasks.length >= _pageSize;
 
-      if (hasFilters) {
-        // 如果有篩選條件，需要重新計算分頁
-        if (filteredTasks.isNotEmpty) {
-          _pagingController.appendPage(
-              sortedTasks, offset + sortedTasks.length);
-        } else {
-          _pagingController.appendLastPage([]);
-        }
-      } else {
-        // 沒有篩選條件，正常分頁
-        if (result.hasMore) {
-          _pagingController.appendPage(
-              sortedTasks, offset + sortedTasks.length);
+      if (sortedTasks.isNotEmpty) {
+        // 計算下一頁的正確 offset
+        final nextPageKey = hasMoreData ? offset + _pageSize : null;
+
+        if (nextPageKey != null) {
+          _pagingController.appendPage(sortedTasks, nextPageKey);
         } else {
           _pagingController.appendLastPage(sortedTasks);
         }
+      } else {
+        // 沒有數據時，檢查是否為搜尋/篩選結果
+        if (chatProvider.hasActiveFilters ||
+            chatProvider.searchQuery.isNotEmpty) {
+          _pagingController.appendLastPage([]);
+        } else if (offset == 0) {
+          // 第一頁就沒有數據
+          _pagingController.appendLastPage([]);
+        } else {
+          // 後續頁面沒有更多數據
+          _pagingController.appendLastPage([]);
+        }
       }
     } catch (error) {
+      debugPrint('❌ [Posted Tasks] 獲取任務失敗: $error');
       if (mounted) {
         _pagingController.error = error;
       }
@@ -223,68 +231,73 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
-          onRefresh: () async {
-            final chatProvider = context.read<ChatListProvider>();
-            await chatProvider.cacheManager.forceRefresh();
-            _pagingController.refresh();
-          },
-          child: Stack(
-            children: [
-              PagedListView<int, Map<String, dynamic>>(
-                padding: const EdgeInsets.only(
-                  left: 12,
-                  right: 12,
-                  top: 12,
-                  bottom: 80, // 保留底部距離，避免被 scroll to top button 遮擋
-                ),
-                pagingController: _pagingController,
-                builderDelegate:
-                    PagedChildBuilderDelegate<Map<String, dynamic>>(
-                  itemBuilder: (context, task, index) {
-                    return _buildTaskCard(task);
-                  },
-                  firstPageProgressIndicatorBuilder: (context) =>
-                      _buildLoadingAnimation(),
-                  newPageProgressIndicatorBuilder: (context) =>
-                      _buildPaginationLoadingAnimation(),
-                  noItemsFoundIndicatorBuilder: (context) =>
-                      _buildEmptyState(),
-                ),
-              ),
-              // Scroll to top button
-              _buildScrollToTopButton(),
-            ],
+      onRefresh: () async {
+        final chatProvider = context.read<ChatListProvider>();
+        await chatProvider.cacheManager.forceRefresh();
+        _pagingController.refresh();
+      },
+      child: Stack(
+        children: [
+          PagedListView<int, Map<String, dynamic>>(
+            padding: const EdgeInsets.only(
+              left: 12,
+              right: 12,
+              top: 12,
+              bottom: 80, // 保留底部距離，避免被 scroll to top button 遮擋
+            ),
+            pagingController: _pagingController,
+            builderDelegate: PagedChildBuilderDelegate<Map<String, dynamic>>(
+              itemBuilder: (context, task, index) {
+                return _buildTaskCard(task);
+              },
+              firstPageProgressIndicatorBuilder: (context) =>
+                  _buildLoadingAnimation(),
+              newPageProgressIndicatorBuilder: (context) =>
+                  _buildPaginationLoadingAnimation(),
+              noItemsFoundIndicatorBuilder: (context) => _buildEmptyState(),
+            ),
           ),
-        );
+          // Scroll to top button
+          _buildScrollToTopButton(),
+        ],
+      ),
+    );
   }
 
   Widget _buildTaskCard(Map<String, dynamic> task) {
     final taskId = task['id'].toString();
     final applicants = _applicationsByTask[taskId] ?? [];
-    
+
     // 新的聚合API直接返回應徵者資料，不需要轉換
-    final applierChatItems = applicants.map((applicant) => {
-      'id': 'app_${applicant['application_id'] ?? applicant['user_id']}',
-      'taskId': taskId,
-      'name': applicant['applier_name'] ?? 'Anonymous',
-      'avatar': applicant['applier_avatar'],
-      'rating': applicant['avg_rating'] ?? 0.0,
-      'reviewsCount': applicant['review_count'] ?? 0,
-      'questionReply': applicant['cover_letter'] ?? '',
-      'sentMessages': [applicant['first_message_snippet'] ?? 'Applied for this task'],
-      'user_id': applicant['user_id'],
-      'application_id': applicant['application_id'],
-      'application_status': applicant['application_status'] ?? 'applied',
-      'answers_json': applicant['answers_json'],
-      'created_at': applicant['application_created_at'],
-      'chat_room_id': applicant['chat_room_id'], // 新增聊天室ID
-      'isMuted': false,
-      'isHidden': false,
-    }).toList();
+    final applierChatItems = applicants
+        .map((applicant) => {
+              'id':
+                  'app_${applicant['application_id'] ?? applicant['user_id']}',
+              'taskId': taskId,
+              'name': applicant['applier_name'] ?? 'Anonymous',
+              'avatar': applicant['applier_avatar'],
+              'rating': applicant['avg_rating'] ?? 0.0,
+              'reviewsCount': applicant['review_count'] ?? 0,
+              'questionReply': applicant['cover_letter'] ?? '',
+              'sentMessages': [
+                applicant['first_message_snippet'] ?? 'Applied for this task'
+              ],
+              'user_id': applicant['user_id'],
+              'application_id': applicant['application_id'],
+              'application_status':
+                  applicant['application_status'] ?? 'applied',
+              'answers_json': applicant['answers_json'],
+              'created_at': applicant['application_created_at'],
+              'chat_room_id': applicant['chat_room_id'], // 新增聊天室ID
+              'isMuted': false,
+              'isHidden': false,
+            })
+        .toList();
 
     // debugPrint('🔍 [Posted Tasks] 建構任務卡片 $taskId，應徵者數量: ${applierChatItems.length}');
 
-    return _buildPostedTasksCardWithAccordion(task, applierChatItems.cast<Map<String, dynamic>>());
+    return _buildPostedTasksCardWithAccordion(
+        task, applierChatItems.cast<Map<String, dynamic>>());
   }
 
   /// Posted Tasks 分頁的任務卡片（使用 My Works 風格 + 手風琴功能）
@@ -307,11 +320,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: _isTaskPinned(taskId)
-            ? BorderSide(color: colorScheme.secondary, width: 2)
-            : BorderSide.none,
       ),
-      elevation: _isTaskPinned(taskId) ? 2 : 1,
+      elevation: 1,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -325,7 +335,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
                       if (isExpanded) {
                         _expandedTaskIds.remove(taskId);
                       } else {
-                        // 允許多個任務同時展開，不清除其他展開的任務
+                        // 一次只能展開一個任務，關閉其他任務
+                        _expandedTaskIds.clear();
                         _expandedTaskIds.add(taskId);
                       }
                     });
@@ -497,7 +508,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
                               padding: EdgeInsets.all(16),
                               child: Text(
                                 'No applicants',
-                                style: TextStyle(color: Colors.grey, fontSize: 14),
+                                style:
+                                    TextStyle(color: Colors.grey, fontSize: 14),
                                 textAlign: TextAlign.center,
                               ),
                             ),
@@ -625,7 +637,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
 
   Widget _buildActionBar(Map<String, dynamic> task, ColorScheme colorScheme) {
     final displayStatus = TaskCardUtils.displayStatus(task);
-    final taskId = task['id'].toString();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -640,24 +651,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
           ? Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // Pin 按鈕
-                SizedBox(
-                  width: 36,
-                  child: IconButton(
-                    onPressed: () => _toggleTaskPin(taskId),
-                    icon: Icon(
-                      _isTaskPinned(taskId)
-                          ? Icons.push_pin
-                          : Icons.push_pin_outlined,
-                      size: 18,
-                      color: _isTaskPinned(taskId)
-                          ? colorScheme.secondary
-                          : colorScheme.primary,
-                    ),
-                    tooltip: _isTaskPinned(taskId) ? 'Unpin' : 'Pin',
-                  ),
-                ),
-                const SizedBox(width: 4),
                 // Info 按鈕
                 Expanded(
                   child: OutlinedButton.icon(
@@ -678,12 +671,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
                 // Edit 按鈕
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Edit feature coming soon')),
-                      );
-                    },
+                    onPressed: () => _navigateToEditTask(task),
                     icon: Icon(Icons.edit_outlined,
                         size: 16, color: colorScheme.primary),
                     label: Text('Edit',
@@ -691,6 +679,23 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
                             fontSize: 12, color: colorScheme.primary)),
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: colorScheme.primary),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Delete 按鈕（僅限 Open 狀態）
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _confirmDeleteTask(task),
+                    icon: Icon(Icons.delete_outline,
+                        size: 16, color: colorScheme.error),
+                    label: Text('Delete',
+                        style:
+                            TextStyle(fontSize: 12, color: colorScheme.error)),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: colorScheme.error),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                     ),
@@ -728,9 +733,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
         color: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          side: _isTaskPinned(taskId)
-              ? BorderSide(color: colorScheme.secondary, width: 2)
-              : BorderSide(color: Colors.grey[200]!, width: 1),
+          side: BorderSide(color: Colors.grey[200]!, width: 1),
         ),
         child: ListTile(
           contentPadding:
@@ -780,7 +783,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
               context.go('/chat/detail?room_id=$chatRoomId');
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Chat room not available for ${applier['name']}')),
+                SnackBar(
+                    content:
+                        Text('Chat room not available for ${applier['name']}')),
               );
             }
           },
@@ -789,31 +794,127 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
     );
   }
 
-
-
-  /// 切換任務置頂狀態
-  void _toggleTaskPin(String taskId) {
-    setState(() {
-      if (_pinnedTaskIds.contains(taskId)) {
-        _pinnedTaskIds.remove(taskId);
-      } else {
-        _pinnedTaskIds.add(taskId);
-      }
-    });
-    _pagingController.refresh();
-  }
-
-  /// 檢查任務是否置頂
-  bool _isTaskPinned(String taskId) {
-    return _pinnedTaskIds.contains(taskId);
-  }
-
-  /// 顯示任務資訊對話框
+  /// 顯示任務資訊對話框（使用 awesome_dialog）
   void _showTaskInfoDialog(Map<String, dynamic> task) {
-    // TODO: 實現任務資訊對話框
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Show info for: ${task['title']}')),
+    final themeManager = context.read<ThemeConfigManager>();
+    final theme = themeManager.effectiveTheme;
+
+    AwesomeDialog(
+      context: context,
+      dialogType: DialogType.info,
+      animType: AnimType.bottomSlide,
+      title: task['title'] ?? 'Task Details',
+      titleTextStyle: TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
+        color: theme.onSurface,
+      ),
+      desc: _buildTaskDescription(task),
+      descTextStyle: TextStyle(
+        fontSize: 14,
+        color: theme.onSurface.withValues(alpha: 0.8),
+        height: 1.4,
+      ),
+      btnOkColor: theme.primary,
+      btnOkText: 'Close',
+      btnOkOnPress: () {},
+      dialogBackgroundColor: theme.surface,
+      headerAnimationLoop: false,
+      width: MediaQuery.of(context).size.width * 0.9,
+      padding: const EdgeInsets.all(16),
+    ).show();
+  }
+
+  /// 構建任務描述文字
+  String _buildTaskDescription(Map<String, dynamic> task) {
+    final applicants = _applicationsByTask[task['id'].toString()] ?? [];
+    final applicantCount = applicants.length;
+
+    return '''📝 Description: ${task['description'] ?? 'No description provided'}
+
+📍 Location: ${task['location'] ?? 'Not specified'}
+
+💰 Reward: ${task['reward_point'] ?? '0'} points
+
+🌐 Language: ${task['language_requirement'] ?? 'Not specified'}
+
+📊 Status: ${TaskCardUtils.displayStatus(task)}
+
+👥 Applicants: $applicantCount
+
+📅 Created: ${_formatDate(task['created_at'])}
+
+🔄 Updated: ${_formatDate(task['updated_at'])}''';
+  }
+
+  /// 格式化日期顯示
+  String _formatDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return 'Unknown';
+
+    try {
+      final date = DateTime.parse(dateStr);
+      return DateFormat('yyyy/MM/dd HH:mm').format(date);
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
+  /// 前往編輯任務頁面
+  void _navigateToEditTask(Map<String, dynamic> task) {
+    context.go('/task/create', extra: {'editTask': task});
+  }
+
+  /// 確認刪除任務
+  void _confirmDeleteTask(Map<String, dynamic> task) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Task'),
+        content: Text(
+            'Are you sure you want to delete "${task['title']}"?\n\nThis action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _deleteTask(task);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
+  }
+
+  /// 刪除任務（設置狀態為 canceled）
+  void _deleteTask(Map<String, dynamic> task) async {
+    try {
+      final taskService = TaskService();
+      await taskService.updateTaskStatus(
+        task['id'].toString(),
+        'canceled',
+        statusId: 8,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Task deleted successfully')),
+        );
+        _pagingController.refresh();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete task: $e')),
+        );
+      }
+    }
   }
 
   /// 建構主要載入動畫
@@ -836,7 +937,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
           Text(
             'Loading tasks...',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
               fontSize: 14,
             ),
           ),
@@ -845,7 +949,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
     );
   }
 
-  /// 建構分頁載入動畫 
+  /// 建構分頁載入動畫
   Widget _buildPaginationLoadingAnimation() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -873,7 +977,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
           Icon(
             Icons.inbox_outlined,
             size: 64,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
           ),
           const SizedBox(height: 16),
           Text(
@@ -881,7 +986,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w500,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 8),
@@ -889,7 +997,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
             'Try adjusting your search or filters',
             style: TextStyle(
               fontSize: 14,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.4),
             ),
           ),
         ],

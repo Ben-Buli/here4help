@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/chat/providers/chat_list_provider.dart';
@@ -26,6 +27,8 @@ class ChatListTaskWidget extends StatefulWidget {
 class _ChatListTaskWidgetState extends State<ChatListTaskWidget>
     with TickerProviderStateMixin {
   late TabController _tabController;
+  Timer? _providerSyncRetryTimer;
+  bool _isRegisteredWithProvider = false;
 
   @override
   void initState() {
@@ -37,26 +40,74 @@ class _ChatListTaskWidgetState extends State<ChatListTaskWidget>
     );
 
     _tabController.addListener(() {
-      if (_tabController.indexIsChanging && widget.onTabChanged != null) {
-        widget.onTabChanged!(_tabController.index);
+      if (_tabController.indexIsChanging) {
+        // 優先調用外部回調
+        if (widget.onTabChanged != null) {
+          widget.onTabChanged!(_tabController.index);
+        } else {
+          // 如果沒有外部回調，嘗試與 ChatListProvider 同步（如果可用）
+          _syncWithProviderIfAvailable();
+        }
       }
     });
+
+    // 延遲註冊到 Provider（如果可用）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncWithProviderIfAvailable();
+    });
+  }
+
+  /// 與 ChatListProvider 同步（如果可用）
+  void _syncWithProviderIfAvailable() {
+    final providerInstance = ChatListProvider.instance;
+    if (providerInstance != null) {
+      providerInstance.registerExternalTabController(_tabController);
+      _isRegisteredWithProvider = true;
+      // 與當前 Provider 的索引同步
+      if (_tabController.index != providerInstance.currentTabIndex) {
+        _tabController.animateTo(providerInstance.currentTabIndex);
+      }
+      // 完成後停止重試計時器
+      _providerSyncRetryTimer?.cancel();
+      _providerSyncRetryTimer = null;
+    } else {
+      // Provider 尚未初始化，啟動短期重試機制
+      if (_providerSyncRetryTimer == null) {
+        debugPrint('🔍 ChatListProvider.instance 尚未就緒，啟動重試');
+        _providerSyncRetryTimer =
+            Timer.periodic(const Duration(milliseconds: 200), (timer) {
+          if (!mounted) {
+            timer.cancel();
+            return;
+          }
+          _syncWithProviderIfAvailable();
+          if (_isRegisteredWithProvider) {
+            timer.cancel();
+          }
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _providerSyncRetryTimer?.cancel();
+    _providerSyncRetryTimer = null;
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
   void didUpdateWidget(ChatListTaskWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     // 當外部傳入的 initialTab 改變時，同步更新內部狀態
-    if (oldWidget.initialTab != widget.initialTab) {
+    if (oldWidget.initialTab != widget.initialTab &&
+        _tabController.index != widget.initialTab) {
       _tabController.animateTo(widget.initialTab);
     }
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+  // 移除重複的 dispose（上方已有擴充版本）
 
   @override
   Widget build(BuildContext context) {

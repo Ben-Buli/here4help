@@ -84,7 +84,16 @@ class ChatListProvider extends ChangeNotifier {
 
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
-        switchTab(_tabController.index);
+        // TabBarView 滑動時，更新當前索引並同步外部 TabController
+        _currentTabIndex = _tabController.index;
+
+        // 同步外部 TabController（AppBar 中的）
+        if (_externalTabController != null &&
+            _externalTabController!.index != _currentTabIndex) {
+          _externalTabController!.animateTo(_currentTabIndex);
+        }
+
+        notifyListeners(); // 通知其他監聽者
       }
     });
 

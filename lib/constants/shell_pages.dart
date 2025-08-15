@@ -29,9 +29,8 @@ import 'package:here4help/chat/pages/chat_page_wrapper.dart';
 import 'package:here4help/chat/widgets/chat_detail_wrapper.dart';
 import 'package:here4help/chat/widgets/chat_title_widget.dart';
 import 'package:here4help/chat/widgets/chat_list_task_widget.dart';
-import 'package:here4help/chat/providers/chat_providers.dart';
+
 import 'package:here4help/chat/providers/chat_list_provider.dart';
-import 'package:provider/provider.dart';
 
 // ==================== explore 模組 ====================
 
@@ -88,11 +87,11 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': true,
     'showBackArrow': true,
     'titleWidgetBuilder': (context, data) {
-      // 使用靜態實例連接 AppBar 與 ChatListPage
+      // 透過 ChatListProvider 的靜態實例建立雙向同步
       return ChatListTaskWidget(
-        initialTab: 0,
+        initialTab: ChatListProvider.instance?.currentTabIndex ?? 0,
         onTabChanged: (index) {
-          // 透過靜態實例調用 switchTab 方法
+          // AppBar tab 被點擊時，通知 Provider 進行切換（會同步 TabBarView）
           ChatListProvider.instance?.switchTab(index);
         },
       );

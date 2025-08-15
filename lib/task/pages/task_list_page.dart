@@ -1069,243 +1069,245 @@ class _TaskListPageState extends State<TaskListPage> {
                         child: Stack(
                           children: [
                             Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // 任務標題和操作按鈕
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        task['title'] ?? 'Untitled Task',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // 任務標題和操作按鈕
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          task['title'] ?? 'Untitled Task',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // 操作按鈕區域 - 只保留三個點選單
-                                    PopupMenuButton<String>(
-                                      icon:
-                                          const Icon(Icons.more_vert, size: 20),
-                                      onSelected: (value) {
-                                        if (value == 'report') {
-                                          _showReportDialog(task);
-                                        }
-                                      },
-                                      itemBuilder: (context) => [
-                                        const PopupMenuItem(
-                                          value: 'report',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.flag_outlined),
-                                              SizedBox(width: 8),
-                                              Text('Report'),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-
-                                // 任務資訊 - 按照截圖右邊的佈局
-                                Row(
-                                  children: [
-                                    // 左側：Applicant、Location、Language
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          // Applicant
-                                          Row(
-                                            children: [
-                                              Icon(Icons.person_outline,
-                                                  size: 14,
-                                                  color: Colors.grey[600]),
-                                              const SizedBox(width: 4),
-                                              Expanded(
-                                                child: Text(
-                                                  task['creator_name'] ??
-                                                      'Unknown User',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: theme.primary,
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          // Location
-                                          Row(
-                                            children: [
-                                              Icon(Icons.location_on,
-                                                  size: 14,
-                                                  color: Colors.grey[600]),
-                                              const SizedBox(width: 4),
-                                              Expanded(
-                                                child: Text(
-                                                  task['location'] ??
-                                                      'Unknown Location',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: theme.primary,
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          // Language
-                                          Row(
-                                            children: [
-                                              Icon(Icons.chat_outlined,
-                                                  size: 14,
-                                                  color: Colors.grey[600]),
-                                              const SizedBox(width: 4),
-                                              Expanded(
-                                                child: Text(
-                                                  task['language_requirement'] ??
-                                                      'No Requirement',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: theme.primary,
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
+                                      const SizedBox(width: 8),
+                                      // 操作按鈕區域 - 只保留三個點選單
+                                      PopupMenuButton<String>(
+                                        icon: const Icon(Icons.more_vert,
+                                            size: 20),
+                                        onSelected: (value) {
+                                          if (value == 'report') {
+                                            _showReportDialog(task);
+                                          }
+                                        },
+                                        itemBuilder: (context) => [
+                                          const PopupMenuItem(
+                                            value: 'report',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.flag_outlined),
+                                                SizedBox(width: 8),
+                                                Text('Report'),
+                                              ],
+                                            ),
                                           ),
                                         ],
                                       ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    // 右側：Date、Reward
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          // Date
-                                          Row(
-                                            children: [
-                                              Icon(Icons.access_time,
-                                                  size: 14,
-                                                  color: Colors.grey[600]),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                DateFormat('MM/dd').format(
-                                                  DateTime.parse(
-                                                      task['task_date'] ??
-                                                          DateTime.now()
-                                                              .toString()),
-                                                ),
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: theme.primary,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          // Reward
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                  Icons
-                                                      .monetization_on_outlined,
-                                                  size: 14,
-                                                  color: Colors.grey[600]),
-                                              const SizedBox(width: 4),
-                                              Expanded(
-                                                child: Text(
-                                                  '${task['reward_point'] ?? task['salary'] ?? 0}',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w500,
-                                                    color: theme.primary,
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-
-                                // New/Popular 狀態 + 時間距離戳記（合併顯示）
-                                Row(
-                                  children: [
-                                    if (_isNewTask(task)) ...[
-                                      const Icon(Icons.eco,
-                                          size: 16, color: Colors.green),
-                                      const SizedBox(width: 6),
-                                      const Text('New',
-                                          style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.green)),
-                                      const SizedBox(width: 16),
-                                    ] else if (_isPopularTask(task)) ...[
-                                      const Icon(Icons.local_fire_department,
-                                          size: 16, color: Colors.red),
-                                      const SizedBox(width: 6),
-                                      const Text('Popular',
-                                          style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.red)),
-                                      const SizedBox(width: 16),
                                     ],
-                                    const Icon(Icons.schedule,
-                                        size: 16, color: Colors.grey),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      _getTimeAgo(task),
-                                      style: const TextStyle(
-                                          fontSize: 14, color: Colors.grey),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          // 書籤按鈕 - 固定在右下角
-                          Positioned(
-                            right: 8,
-                            bottom: 8,
-                            child: IconButton(
-                              icon: Icon(
-                                isFavorite
-                                    ? Icons.bookmark
-                                    : Icons.bookmark_border,
-                                size: 22,
-                                color: isFavorite ? Colors.amber : null,
+                                  ),
+                                  const SizedBox(height: 8),
+
+                                  // 任務資訊 - 按照截圖右邊的佈局
+                                  Row(
+                                    children: [
+                                      // 左側：Applicant、Location、Language
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            // Applicant
+                                            Row(
+                                              children: [
+                                                Icon(Icons.person_outline,
+                                                    size: 14,
+                                                    color: Colors.grey[600]),
+                                                const SizedBox(width: 4),
+                                                Expanded(
+                                                  child: Text(
+                                                    task['creator_name'] ??
+                                                        'Unknown User',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: theme.primary,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            // Location
+                                            Row(
+                                              children: [
+                                                Icon(Icons.location_on,
+                                                    size: 14,
+                                                    color: Colors.grey[600]),
+                                                const SizedBox(width: 4),
+                                                Expanded(
+                                                  child: Text(
+                                                    task['location'] ??
+                                                        'Unknown Location',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: theme.primary,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            // Language
+                                            Row(
+                                              children: [
+                                                Icon(Icons.chat_outlined,
+                                                    size: 14,
+                                                    color: Colors.grey[600]),
+                                                const SizedBox(width: 4),
+                                                Expanded(
+                                                  child: Text(
+                                                    task['language_requirement'] ??
+                                                        'No Requirement',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: theme.primary,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      // 右側：Date、Reward
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            // Date
+                                            Row(
+                                              children: [
+                                                Icon(Icons.access_time,
+                                                    size: 14,
+                                                    color: Colors.grey[600]),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  DateFormat('MM/dd').format(
+                                                    DateTime.parse(
+                                                        task['task_date'] ??
+                                                            DateTime.now()
+                                                                .toString()),
+                                                  ),
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: theme.primary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            // Reward
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                    Icons
+                                                        .monetization_on_outlined,
+                                                    size: 14,
+                                                    color: Colors.grey[600]),
+                                                const SizedBox(width: 4),
+                                                Expanded(
+                                                  child: Text(
+                                                    '${task['reward_point'] ?? task['salary'] ?? 0}',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: theme.primary,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+
+                                  // New/Popular 狀態 + 時間距離戳記（合併顯示）
+                                  Row(
+                                    children: [
+                                      if (_isNewTask(task)) ...[
+                                        const Icon(Icons.eco,
+                                            size: 16, color: Colors.green),
+                                        const SizedBox(width: 6),
+                                        const Text('New',
+                                            style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.green)),
+                                        const SizedBox(width: 16),
+                                      ] else if (_isPopularTask(task)) ...[
+                                        const Icon(Icons.local_fire_department,
+                                            size: 16, color: Colors.red),
+                                        const SizedBox(width: 6),
+                                        const Text('Popular',
+                                            style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.red)),
+                                        const SizedBox(width: 16),
+                                      ],
+                                      const Icon(Icons.schedule,
+                                          size: 16, color: Colors.grey),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        _getTimeAgo(task),
+                                        style: const TextStyle(
+                                            fontSize: 14, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              onPressed: () => _toggleFavorite(taskId),
-                              tooltip: isFavorite
-                                  ? 'Remove from favorites'
-                                  : 'Add to favorites',
                             ),
-                          ),
+                            // 書籤按鈕 - 固定在右下角
+                            Positioned(
+                              right: 8,
+                              bottom: 8,
+                              child: IconButton(
+                                icon: Icon(
+                                  isFavorite
+                                      ? Icons.bookmark
+                                      : Icons.bookmark_border,
+                                  size: 22,
+                                  color: isFavorite ? Colors.amber : null,
+                                ),
+                                onPressed: () => _toggleFavorite(taskId),
+                                tooltip: isFavorite
+                                    ? 'Remove from favorites'
+                                    : 'Add to favorites',
+                              ),
+                            ),
                           ],
                         ),
                       ),

@@ -66,9 +66,9 @@ class TaskService extends ChangeNotifier {
     }
   }
 
-    /// 取得任務分頁（回傳 items 與 hasMore）
+  /// 取得任務分頁（回傳 items 與 hasMore）
   Future<({List<Map<String, dynamic>> tasks, bool hasMore})> fetchTasksPage({
-required int limit,
+    required int limit,
     required int offset,
     Map<String, String>? filters,
   }) async {
@@ -105,7 +105,8 @@ required int limit,
   }
 
   /// 取得 Posted Tasks 聚合資料（含應徵者和聊天室）
-  Future<({List<Map<String, dynamic>> tasks, bool hasMore})> fetchPostedTasksAggregated({
+  Future<({List<Map<String, dynamic>> tasks, bool hasMore})>
+      fetchPostedTasksAggregated({
     required int limit,
     required int offset,
     required String creatorId,
@@ -120,16 +121,22 @@ required int limit,
       if (filters != null) {
         query.addAll(filters);
       }
-      
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/backend/api/tasks/posted_tasks_aggregated.php')
+
+      final uri = Uri.parse(
+              '${AppConfig.apiBaseUrl}/backend/api/tasks/posted_tasks_aggregated.php')
           .replace(queryParameters: query);
-      
+
+      debugPrint('🔍 [Posted Tasks Aggregated] API URL: $uri');
       final resp = await http.get(uri, headers: {
         'Content-Type': 'application/json'
       }).timeout(const Duration(seconds: 30));
-      
+
+      debugPrint(
+          '🔍 [Posted Tasks Aggregated] Response Status: ${resp.statusCode}');
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
+        debugPrint(
+            '🔍 [Posted Tasks Aggregated] Response Success: ${data['success']}');
         if (data['success'] == true) {
           final payload = data['data'] ?? {};
           final itemsRaw = payload['tasks'] ?? [];
@@ -137,8 +144,15 @@ required int limit,
               ? itemsRaw.map((e) => Map<String, dynamic>.from(e)).toList()
               : [];
           final hasMore = (payload['pagination']?['has_more'] ?? false) == true;
+          debugPrint('🔍 [Posted Tasks Aggregated] 成功獲取 ${items.length} 個任務');
           return (tasks: items, hasMore: hasMore);
+        } else {
+          debugPrint(
+              '❌ [Posted Tasks Aggregated] API Error: ${data['message']}');
         }
+      } else {
+        debugPrint(
+            '❌ [Posted Tasks Aggregated] HTTP Error: ${resp.statusCode} - ${resp.body}');
       }
       return (tasks: <Map<String, dynamic>>[], hasMore: false);
     } catch (e) {
