@@ -259,6 +259,8 @@ class _AppScaffoldState extends State<AppScaffold> {
             child: AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
+              scrolledUnderElevation: 0, // 滾動時不改變背景色
+              surfaceTintColor: Colors.transparent, // 移除 Material 3 的表面色調
               centerTitle: widget.centerTitle,
               leading: widget.showBackArrow && _canGoBack()
                   ? IconButton(
@@ -315,8 +317,8 @@ class _AppScaffoldState extends State<AppScaffold> {
             backgroundColor: Colors.transparent,
             type: BottomNavigationBarType.fixed,
             currentIndex: _getCurrentIndex(context),
-            showSelectedLabels: false,
-            showUnselectedLabels: false,
+            showSelectedLabels: true,
+            showUnselectedLabels: true,
             selectedItemColor: themeManager.navigationBarSelectedColor,
             unselectedItemColor: themeManager.navigationBarUnselectedColor,
             elevation: 0,

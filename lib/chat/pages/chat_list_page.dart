@@ -11,6 +11,8 @@ import 'package:intl/intl.dart';
 import 'package:here4help/chat/services/chat_storage_service.dart';
 import 'package:here4help/chat/services/chat_session_manager.dart';
 import 'package:here4help/chat/services/chat_service.dart';
+import 'package:here4help/chat/services/chat_cache_manager.dart';
+import 'package:here4help/chat/widgets/update_status_indicator.dart';
 import 'package:here4help/constants/task_status.dart';
 import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/services/data_preload_service.dart';
@@ -26,6 +28,10 @@ class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key, this.initialTab = 0});
 
   final int initialTab; // 初始分頁：0 = Posted Tasks, 1 = My Works
+
+  // 創建一個靜態的 GlobalKey 來控制 ChatListPage
+  static final GlobalKey<_ChatListPageState> globalKey =
+      GlobalKey<_ChatListPageState>();
 
   @override
   State<ChatListPage> createState() => _ChatListPageState();
@@ -45,7 +51,6 @@ class _ChatListPageState extends State<ChatListPage>
   // 排序狀態變數
   String _currentSortBy = 'updated_time';
   bool _sortAscending = false; // 預設 Z-A (降序)
-  bool _showSortOptions = false; // 控制排序選項的顯示/隱藏
 
   // Tasker 篩選狀態
   bool taskerFilterEnabled = false;
@@ -71,30 +76,39 @@ class _ChatListPageState extends State<ChatListPage>
   // 手風琴展開狀態管理
   final Set<String> _expandedTaskIds = <String>{};
 
+  // 置頂任務管理
+  final Set<String> _pinnedTaskIds = <String>{};
+
   // My Works 分頁篩選狀態（已移除，只顯示已應徵任務）
 
   // 簡化的載入狀態
   bool _isLoading = true;
   String? _errorMessage;
 
+  // 快取管理器
+  late ChatCacheManager _cacheManager;
+
   bool get _hasActiveFilters =>
       selectedLocations.isNotEmpty ||
       selectedStatuses.isNotEmpty ||
       searchQuery.isNotEmpty;
 
-  /// 使用預載入服務初始化數據
-  Future<void> _initializeWithPreload() async {
+  /// 使用快取系統初始化數據
+  Future<void> _initializeWithCache() async {
     if (!mounted) return;
 
-    final preloadService = DataPreloadService();
-
     try {
-      // 檢查數據是否已經預載入
-      if (preloadService.isDataLoaded('chat_data')) {
-        debugPrint('🚀 聊天數據已預載入，直接載入應徵者資料...');
+      debugPrint('🚀 開始使用快取系統初始化...');
 
-        // 只需要載入應徵者數據
-        await _loadApplicationsForPostedTasks();
+      // 初始化快取
+      await _cacheManager.initializeCache();
+
+      // 如果快取有效，直接使用快取數據
+      if (_cacheManager.isCacheValid && !_cacheManager.isCacheEmpty) {
+        debugPrint('✅ 快取有效，使用快取數據');
+
+        // 將快取數據載入到本地狀態
+        await _loadDataFromCache();
 
         if (mounted) {
           setState(() {
@@ -102,13 +116,16 @@ class _ChatListPageState extends State<ChatListPage>
             _errorMessage = null;
           });
         }
-        debugPrint('⚡ 快速載入完成！');
+        debugPrint('⚡ 快取載入完成！');
+
+        // 進入頁面後輕量檢查更新
+        _checkForUpdatesAfterEnter();
       } else {
-        debugPrint('🔄 數據未預載入，執行完整載入...');
+        debugPrint('🔄 快取無效或為空，執行完整載入...');
         await _loadChatData();
       }
     } catch (e) {
-      debugPrint('❌ 聊天數據初始化失敗: $e');
+      debugPrint('❌ 快取初始化失敗: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -116,6 +133,58 @@ class _ChatListPageState extends State<ChatListPage>
         });
       }
     }
+  }
+
+  /// 從快取載入數據到本地狀態
+  Future<void> _loadDataFromCache() async {
+    try {
+      // 將快取數據載入到本地狀態
+
+      // 載入 Posted Tasks 快取
+      _applicationsByTask.clear();
+      for (final task in _cacheManager.postedTasksCache) {
+        if (task['applications'] != null) {
+          _applicationsByTask[task['id'].toString()] =
+              List<Map<String, dynamic>>.from(task['applications']);
+        }
+      }
+
+      // 載入 My Works 快取
+      // 注意：這裡需要將快取數據轉換為 TaskService 的格式
+
+      debugPrint('📋 快取數據載入完成');
+    } catch (e) {
+      debugPrint('❌ 快取數據載入失敗: $e');
+    }
+  }
+
+  /// 進入頁面後輕量檢查更新
+  void _checkForUpdatesAfterEnter() {
+    // 延遲 1 秒後檢查更新，避免與初始化衝突
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        _cacheManager.checkForUpdates();
+      }
+    });
+  }
+
+  /// 切換任務置頂狀態
+  void _toggleTaskPin(String taskId) {
+    setState(() {
+      if (_pinnedTaskIds.contains(taskId)) {
+        _pinnedTaskIds.remove(taskId);
+      } else {
+        _pinnedTaskIds.add(taskId);
+      }
+    });
+
+    // 刷新分頁控制器以應用新的排序
+    _pagingController.refresh();
+  }
+
+  /// 檢查任務是否置頂
+  bool _isTaskPinned(String taskId) {
+    return _pinnedTaskIds.contains(taskId);
   }
 
   void _resetFilters() {
@@ -126,7 +195,7 @@ class _ChatListPageState extends State<ChatListPage>
       selectedStatuses.clear();
       _currentSortBy = 'updated_time';
       _sortAscending = false;
-      _showSortOptions = false;
+      // 注意：不重置置頂狀態，保持置頂任務的優先排序
     });
     // 重新載入分頁
     _pagingController.refresh();
@@ -142,6 +211,7 @@ class _ChatListPageState extends State<ChatListPage>
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
+      useRootNavigator: true, // 使用根導航器，超出 app_scaffold.dart 的包裹
       builder: (ctx) {
         String tempLocation =
             selectedLocations.isEmpty ? '' : selectedLocations.first;
@@ -261,6 +331,21 @@ class _ChatListPageState extends State<ChatListPage>
     final sortedTasks = List<Map<String, dynamic>>.from(tasks);
 
     sortedTasks.sort((a, b) {
+      final taskIdA = a['id']?.toString() ?? '';
+      final taskIdB = b['id']?.toString() ?? '';
+
+      // 置頂任務優先排序（最高優先級）
+      final isPinnedA = _isTaskPinned(taskIdA);
+      final isPinnedB = _isTaskPinned(taskIdB);
+
+      if (isPinnedA && !isPinnedB) return -1; // A 置頂，B 不置頂，A 在前
+      if (!isPinnedA && isPinnedB) return 1; // A 不置頂，B 置頂，B 在前
+      if (isPinnedA && isPinnedB) {
+        // 兩個都置頂，按置頂時間排序（先置頂的在前面）
+        // 這裡可以擴展為記錄置頂時間
+      }
+
+      // 非置頂任務按原有邏輯排序
       int comparison = 0;
 
       switch (_currentSortBy) {
@@ -281,9 +366,23 @@ class _ChatListPageState extends State<ChatListPage>
           break;
 
         case 'status_code':
+          // 使用從 task_statuses 獲取的狀態順序進行排序
           final statusA = a['status_code'] ?? '';
           final statusB = b['status_code'] ?? '';
-          comparison = statusA.compareTo(statusB);
+
+          // 獲取 TaskService 中的狀態順序
+          final taskService = TaskService();
+          final statuses = taskService.statuses;
+
+          // 找到狀態在列表中的位置（索引越小，順序越前）
+          final indexA = statuses.indexWhere((s) => s['code'] == statusA);
+          final indexB = statuses.indexWhere((s) => s['code'] == statusB);
+
+          // 如果找不到狀態，放在最後
+          final orderA = indexA >= 0 ? indexA : statuses.length;
+          final orderB = indexB >= 0 ? indexB : statuses.length;
+
+          comparison = orderA.compareTo(orderB);
           break;
 
         default:
@@ -300,22 +399,18 @@ class _ChatListPageState extends State<ChatListPage>
   List<Map<String, dynamic>> _filterTasks(List<Map<String, dynamic>> tasks) {
     return tasks.where((task) {
       final title = (task['title'] ?? '').toString().toLowerCase();
-      final location = (task['location'] ?? '').toString();
-      final description = (task['description'] ?? '').toString().toLowerCase();
-      final status = _displayStatus(task);
       final query = searchQuery.toLowerCase();
 
-      // 搜尋篩選
-      final matchQuery = query.isEmpty ||
-          title.contains(query) ||
-          location.toLowerCase().contains(query) ||
-          description.contains(query);
+      // 搜尋篩選：僅限任務標題名稱
+      final matchQuery = query.isEmpty || title.contains(query);
 
       // 位置篩選（單選）
+      final location = (task['location'] ?? '').toString();
       final matchLocation =
           selectedLocations.isEmpty || selectedLocations.contains(location);
 
       // 狀態篩選（單選）
+      final status = _displayStatus(task);
       final matchStatus =
           selectedStatuses.isEmpty || selectedStatuses.contains(status);
 
@@ -384,7 +479,7 @@ class _ChatListPageState extends State<ChatListPage>
     );
   }
 
-  /// 建構緊湊的排序選項（新版本，節省空間）
+  /// 建構緊湊的排序選項（pill shape 膠囊形狀）
   Widget _buildCompactSortChip({
     required String label,
     required String sortBy,
@@ -393,54 +488,86 @@ class _ChatListPageState extends State<ChatListPage>
     final isActive = _currentSortBy == sortBy;
     final theme = Theme.of(context);
 
-    return GestureDetector(
-      onTap: () => _setSortOrder(sortBy),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: isActive ? theme.colorScheme.primary : Colors.transparent,
-          border: Border(
-            bottom: BorderSide(
+    return MouseRegion(
+      cursor: SystemMouseCursors.click, // 添加 cursor: pointer
+      child: GestureDetector(
+        onTap: () => _setSortOrder(sortBy),
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 4), // 縮減上下高度
+          decoration: BoxDecoration(
+            color: isActive ? theme.colorScheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(20), // Pill shape 膠囊形狀
+            border: Border.all(
               color: isActive
                   ? theme.colorScheme.primary
                   : theme.colorScheme.outline.withOpacity(0.3),
-              width: isActive ? 2 : 1,
+              width: 1,
             ),
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isActive
-                  ? theme.colorScheme.onPrimary
-                  : theme.colorScheme.onSurface,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 14,
                 color: isActive
                     ? theme.colorScheme.onPrimary
                     : theme.colorScheme.onSurface,
               ),
-            ),
-            const SizedBox(width: 2),
-            Icon(
-              isActive
-                  ? (_sortAscending ? Icons.arrow_upward : Icons.arrow_downward)
-                  : Icons.unfold_more,
-              size: 12,
-              color: isActive
-                  ? theme.colorScheme.onPrimary
-                  : theme.colorScheme.onSurface,
-            ),
-          ],
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                  color: isActive
+                      ? theme.colorScheme.onPrimary
+                      : theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                isActive
+                    ? (_sortAscending
+                        ? Icons.arrow_upward
+                        : Icons.arrow_downward)
+                    : Icons.unfold_more,
+                size: 12,
+                color: isActive
+                    ? theme.colorScheme.onPrimary
+                    : theme.colorScheme.onSurface,
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  /// 建構 Scroll to Top 按鈕
+  Widget _buildScrollToTopButton(PagingController pagingController) {
+    return AnimatedOpacity(
+      opacity: 1.0, // 可以根據滾動位置調整透明度
+      duration: const Duration(milliseconds: 300),
+      child: FloatingActionButton(
+        // 移除 mini: true，讓按鈕變成圓形
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        onPressed: () {
+          // 滾動到頂部
+          if (pagingController.itemList != null &&
+              pagingController.itemList!.isNotEmpty) {
+            // 使用 ScrollController 滾動到頂部
+            final scrollController = PrimaryScrollController.of(context);
+            scrollController?.animateTo(
+              0,
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+            );
+          }
+        },
+        child: const Icon(Icons.keyboard_arrow_up, size: 24), // 增加圖標大小
       ),
     );
   }
@@ -579,8 +706,11 @@ class _ChatListPageState extends State<ChatListPage>
   void initState() {
     super.initState();
 
-    // 使用預載入服務，如果數據已預載入則立即可用
-    _initializeWithPreload();
+    // 初始化快取管理器
+    _cacheManager = ChatCacheManager();
+
+    // 使用快取系統，如果數據已快取則立即可用
+    _initializeWithCache();
 
     // 設定分頁監聽
     _pagingController.addPageRequestListener((offset) {
@@ -594,19 +724,7 @@ class _ChatListPageState extends State<ChatListPage>
         TabController(length: 2, vsync: this, initialIndex: widget.initialTab);
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
-        setState(() {
-          taskerFilterEnabled = _tabController.index == 1;
-          // 重設搜尋與篩選
-          _searchController.clear();
-          searchQuery = '';
-          selectedLocations.clear();
-          selectedStatuses.clear();
-          _currentSortBy = 'updated_time';
-          _sortAscending = false;
-        });
-        // 切換分頁時同步刷新各自分頁控制器
-        _pagingController.refresh();
-        _myWorksPagingController.refresh();
+        _handleTabChanged(_tabController.index);
       }
     });
 
@@ -628,6 +746,37 @@ class _ChatListPageState extends State<ChatListPage>
     // 添加應用生命週期監聽
     WidgetsBinding.instance.addObserver(this);
   }
+
+  /// 處理 tab 切換
+  void _handleTabChanged(int index) {
+    // 先切換 tab 控制器
+    _tabController.animateTo(index);
+
+    setState(() {
+      taskerFilterEnabled = index == 1;
+      // 重設搜尋與篩選
+      _searchController.clear();
+      searchQuery = '';
+      selectedLocations.clear();
+      selectedStatuses.clear();
+      _currentSortBy = 'updated_time';
+      _sortAscending = false;
+      // 注意：不重置置頂狀態，保持置頂任務的優先排序
+    });
+
+    // 移除分頁控制器的刷新，保持數據狀態
+    // _pagingController.refresh();
+    // _myWorksPagingController.refresh();
+  }
+
+  /// 公開的 tab 切換方法，供外部調用
+  void switchTab(int index) {
+    _handleTabChanged(index);
+    // 移除分頁控制器的刷新，保持數據狀態
+  }
+
+  /// 獲取當前選中的 tab 索引
+  int get currentTabIndex => _tabController.index;
 
   // 整理 My Works 清單：直接使用 API 返回的應徵數據
   List<Map<String, dynamic>> _composeMyWorks(
@@ -1732,173 +1881,142 @@ class _ChatListPageState extends State<ChatListPage>
         .where((e) => e.isNotEmpty)
         .toList();
 
-    return DefaultTabController(
-      length: 2,
-      initialIndex: taskerFilterEnabled ? 1 : 0,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-            child: TabBar(
-              controller: _tabController,
-              isScrollable: false,
-              labelPadding: const EdgeInsets.symmetric(horizontal: 8),
-              indicatorPadding: EdgeInsets.zero,
-              tabs: [
-                const Tab(text: 'Posted Tasks'),
-                const Tab(text: 'My Works'),
-              ],
-            ),
-          ),
-          // My Works 分頁篩選選項（已移除，只顯示已應徵任務）
-          // 搜尋欄 + 排序功能
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              children: [
-                // 搜尋欄主體
-                Row(
-                  children: [
-                    // 排序展開/收合按鈕
-                    Container(
-                      margin: const EdgeInsets.only(right: 8),
-                      child: IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _showSortOptions = !_showSortOptions;
-                          });
-                        },
-                        icon: Icon(
-                          _showSortOptions
-                              ? Icons.keyboard_arrow_up
-                              : Icons.sort,
-                          color: _currentSortBy != 'updated_time' ||
-                                  _sortAscending != false
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.onSurface,
+    return Column(
+      children: [
+        // 更新狀態指示器
+        UpdateStatusBanner(),
+
+        // 搜尋欄 + 排序功能
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            children: [
+              // 搜尋欄主體
+              Row(
+                children: [
+                  // 排序展開/收合按鈕
+
+                  // Search bar + inline actions
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      focusNode: _searchFocusNode,
+                      onChanged: (value) {
+                        setState(() {
+                          searchQuery = value.toLowerCase();
+                        });
+                        // 搜尋變化時重新載入分頁
+                        _pagingController.refresh();
+                        _myWorksPagingController.refresh();
+                      },
+                      onEditingComplete: () {
+                        FocusScope.of(context).unfocus();
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Search task titles...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_searchController.text.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.clear),
+                                onPressed: () {
+                                  setState(() {
+                                    _searchController.clear();
+                                    searchQuery = '';
+                                  });
+                                },
+                                tooltip: 'Clear',
+                              ),
+                            IconButton(
+                              icon: Icon(Icons.filter_list,
+                                  color: _hasActiveFilters
+                                      ? Theme.of(context).colorScheme.primary
+                                      : IconTheme.of(context).color),
+                              tooltip: 'Filter options',
+                              onPressed: () {
+                                _openFilterOptions(
+                                  locationOptions: locationOptions,
+                                  statusOptions: statusOptions,
+                                );
+                              },
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.refresh,
+                                  color: Theme.of(context).colorScheme.primary),
+                              tooltip: 'Reset',
+                              onPressed: _resetFilters,
+                            ),
+                          ],
                         ),
-                        tooltip: 'Sort options',
-                        style: IconButton.styleFrom(
-                          backgroundColor: _currentSortBy != 'updated_time' ||
-                                  _sortAscending != false
-                              ? Theme.of(context).colorScheme.primaryContainer
-                              : Colors.transparent,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),
+                  ),
+                ],
+              ),
 
-                    // Search bar + inline actions
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        focusNode: _searchFocusNode,
-                        onChanged: (value) {
-                          setState(() {
-                            searchQuery = value.toLowerCase();
-                          });
-                          // 搜尋變化時重新載入分頁
-                          _pagingController.refresh();
-                          _myWorksPagingController.refresh();
-                        },
-                        onEditingComplete: () {
-                          FocusScope.of(context).unfocus();
-                        },
-                        decoration: InputDecoration(
-                          hintText: 'Search...',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_searchController.text.isNotEmpty)
-                                IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    setState(() {
-                                      _searchController.clear();
-                                      searchQuery = '';
-                                    });
-                                  },
-                                  tooltip: 'Clear',
-                                ),
-                              IconButton(
-                                icon: Icon(Icons.filter_list,
-                                    color: _hasActiveFilters
-                                        ? Theme.of(context).colorScheme.primary
-                                        : IconTheme.of(context).color),
-                                tooltip: 'Filter options',
-                                onPressed: () {
-                                  _openFilterOptions(
-                                    locationOptions: locationOptions,
-                                    statusOptions: statusOptions,
-                                  );
-                                },
-                              ),
-                              IconButton(
-                                icon: Icon(Icons.refresh,
-                                    color:
-                                        Theme.of(context).colorScheme.primary),
-                                tooltip: 'Reset',
-                                onPressed: _resetFilters,
-                              ),
-                            ],
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
+              // 排序選項區域
+              Container(
+                height: 32, // 縮減高度
+                margin: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    // 更新時間排序
+                    _buildCompactSortChip(
+                      label: 'Time',
+                      sortBy: 'updated_time',
+                      icon: Icons.update,
+                    ),
+                    const SizedBox(width: 8),
+
+                    // 應徵人數排序（僅限 Posted Tasks 分頁）
+                    if (_tabController.index == 0)
+                      _buildCompactSortChip(
+                        label: 'Applicants',
+                        sortBy: 'applicant_count',
+                        icon: Icons.people,
                       ),
+                    if (_tabController.index == 0) const SizedBox(width: 8),
+
+                    // 任務狀態排序
+                    _buildCompactSortChip(
+                      label: 'Status',
+                      sortBy: 'status_code',
+                      icon: Icons.sort_by_alpha,
                     ),
                   ],
                 ),
-
-                // 排序選項展開區域
-                if (_showSortOptions)
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    height: 40,
-                    margin: const EdgeInsets.only(top: 8),
-                    child: Row(
-                      children: [
-                        // 更新時間排序
-                        _buildCompactSortChip(
-                          label: 'Time',
-                          sortBy: 'updated_time',
-                          icon: Icons.update,
-                        ),
-                        const SizedBox(width: 8),
-
-                        // 應徵人數排序（僅限 Posted Tasks 分頁）
-                        if (_tabController.index == 0)
-                          _buildCompactSortChip(
-                            label: 'Count',
-                            sortBy: 'applicant_count',
-                            icon: Icons.people,
-                          ),
-                        if (_tabController.index == 0) const SizedBox(width: 8),
-
-                        // 任務狀態排序
-                        _buildCompactSortChip(
-                          label: 'Status',
-                          sortBy: 'status_code',
-                          icon: Icons.sort_by_alpha,
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
+              ),
+            ],
           ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildPostedTasksPaged(),
-                _buildMyWorksPaged(),
-              ],
-            ),
+        ),
+
+        // 內容區域 - 使用 PageView 實現左右滑動效果
+        Expanded(
+          child: PageView(
+            controller: PageController(initialPage: _tabController.index),
+            physics: const PageScrollPhysics(), // 添加頁面滑動物理效果
+            onPageChanged: (index) {
+              // 當頁面滑動時，同步更新 tab 控制器
+              if (_tabController.index != index) {
+                _tabController.animateTo(index);
+                // 移除刷新邏輯，保持數據狀態
+                setState(() {
+                  taskerFilterEnabled = index == 1;
+                });
+              }
+            },
+            children: [
+              _buildPostedTasksPaged(),
+              _buildMyWorksPaged(),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1919,6 +2037,7 @@ class _ChatListPageState extends State<ChatListPage>
       'Pending Confirmation': 2,
       'Dispute': 3,
       'Completed': 4,
+      'Rejected': 7,
     };
     final tasks = taskerEnabled
         ? _composeMyWorks(taskService, currentUserId)
@@ -1945,12 +2064,8 @@ class _ChatListPageState extends State<ChatListPage>
       //     .map((h) => h.toString())
       //     .toList();
       final status = _displayStatus(task);
-      final description = (task['description'] ?? '').toString().toLowerCase();
       final query = searchQuery.toLowerCase();
-      final matchQuery = query.isEmpty ||
-          title.contains(query) ||
-          location.toLowerCase().contains(query) ||
-          description.contains(query);
+      final matchQuery = query.isEmpty || title.contains(query);
       final matchLocation =
           selectedLocations.isEmpty || selectedLocations.contains(location);
       final matchStatus =
@@ -2002,51 +2117,96 @@ class _ChatListPageState extends State<ChatListPage>
 
   // Posted Tasks 分頁 + 保留原卡 UI
   Widget _buildPostedTasksPaged() {
-    return RefreshIndicator(
-      onRefresh: () async => _pagingController.refresh(),
-      child: PagedListView<int, Map<String, dynamic>>(
-        padding: const EdgeInsets.all(12),
-        pagingController: _pagingController,
-        builderDelegate: PagedChildBuilderDelegate<Map<String, dynamic>>(
-          itemBuilder: (context, task, index) {
-            // Posted Tasks 分頁：所有任務都是當前用戶發布的任務
-            final taskId = task['id'].toString();
-            final applications = _applicationsByTask[taskId] ?? [];
-            final applierChatItems =
-                _convertApplicationsToApplierChatItems(applications);
-
-            return _buildPostedTasksCardWithAccordion(task, applierChatItems);
+    return Stack(
+      children: [
+        RefreshIndicator(
+          onRefresh: () async {
+            // 使用快取管理器的強制刷新
+            await _cacheManager.forceRefresh();
+            // 重新載入快取數據到本地狀態
+            await _loadDataFromCache();
+            // 刷新分頁控制器
+            _pagingController.refresh();
           },
-          firstPageProgressIndicatorBuilder: (context) =>
-              const Center(child: CircularProgressIndicator()),
-          newPageProgressIndicatorBuilder: (context) =>
-              const Center(child: CircularProgressIndicator()),
-          noItemsFoundIndicatorBuilder: (context) =>
-              const Center(child: Text('No tasks found')),
+          child: PagedListView<int, Map<String, dynamic>>(
+            padding: const EdgeInsets.only(
+              left: 12,
+              right: 12,
+              top: 12,
+              bottom: 80, // 保留底部距離，避免被 scroll to top button 遮擋
+            ),
+            pagingController: _pagingController,
+            builderDelegate: PagedChildBuilderDelegate<Map<String, dynamic>>(
+              itemBuilder: (context, task, index) {
+                // Posted Tasks 分頁：所有任務都是當前用戶發布的任務
+                final taskId = task['id'].toString();
+                final applications = _applicationsByTask[taskId] ?? [];
+                final applierChatItems =
+                    _convertApplicationsToApplierChatItems(applications);
+
+                return _buildPostedTasksCardWithAccordion(
+                    task, applierChatItems);
+              },
+              firstPageProgressIndicatorBuilder: (context) =>
+                  const Center(child: CircularProgressIndicator()),
+              newPageProgressIndicatorBuilder: (context) =>
+                  const Center(child: CircularProgressIndicator()),
+              noItemsFoundIndicatorBuilder: (context) =>
+                  const Center(child: Text('No tasks found')),
+            ),
+          ),
         ),
-      ),
+        // Scroll to top button
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: _buildScrollToTopButton(_pagingController),
+        ),
+      ],
     );
   }
 
   Widget _buildMyWorksPaged() {
-    return RefreshIndicator(
-      onRefresh: () async => _myWorksPagingController.refresh(),
-      child: PagedListView<int, Map<String, dynamic>>(
-        padding: const EdgeInsets.all(12),
-        pagingController: _myWorksPagingController,
-        builderDelegate: PagedChildBuilderDelegate<Map<String, dynamic>>(
-          itemBuilder: (context, task, index) {
-            // 移除硬編碼的 chatRoomModel，直接使用 ensure_room 獲取真實數據
-            return _buildMyWorksChatRoomItem(task, []);
+    return Stack(
+      children: [
+        RefreshIndicator(
+          onRefresh: () async {
+            // 使用快取管理器的強制刷新
+            await _cacheManager.forceRefresh();
+            // 重新載入快取數據到本地狀態
+            await _loadDataFromCache();
+            // 刷新分頁控制器
+            _myWorksPagingController.refresh();
           },
-          firstPageProgressIndicatorBuilder: (context) =>
-              const Center(child: CircularProgressIndicator()),
-          newPageProgressIndicatorBuilder: (context) =>
-              const Center(child: CircularProgressIndicator()),
-          noItemsFoundIndicatorBuilder: (context) =>
-              const Center(child: Text('No tasks found')),
+          child: PagedListView<int, Map<String, dynamic>>(
+            padding: const EdgeInsets.only(
+              left: 12,
+              right: 12,
+              top: 12,
+              bottom: 80, // 保留底部距離，避免被 scroll to top button 遮擋
+            ),
+            pagingController: _myWorksPagingController,
+            builderDelegate: PagedChildBuilderDelegate<Map<String, dynamic>>(
+              itemBuilder: (context, task, index) {
+                // 移除硬編碼的 chatRoomModel，直接使用 ensure_room 獲取真實數據
+                return _buildMyWorksChatRoomItem(task, []);
+              },
+              firstPageProgressIndicatorBuilder: (context) =>
+                  const Center(child: CircularProgressIndicator()),
+              newPageProgressIndicatorBuilder: (context) =>
+                  const Center(child: CircularProgressIndicator()),
+              noItemsFoundIndicatorBuilder: (context) =>
+                  const Center(child: Text('No tasks found')),
+            ),
+          ),
         ),
-      ),
+        // Scroll to top button
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: _buildScrollToTopButton(_myWorksPagingController),
+        ),
+      ],
     );
   }
 
@@ -2712,8 +2872,13 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: _isTaskPinned(taskId)
+            ? BorderSide(color: colorScheme.secondary, width: 2)
+            : BorderSide.none,
+      ),
+      elevation: _isTaskPinned(taskId) ? 2 : 1,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -3015,6 +3180,32 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                       ? Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
+                            // Pin 按鈕（圖釘圖標）
+                            SizedBox(
+                              width: 36, // 設定較小的寬度
+                              child: IconButton(
+                                onPressed: () => _toggleTaskPin(taskId),
+                                icon: Icon(
+                                  _isTaskPinned(taskId)
+                                      ? Icons.push_pin
+                                      : Icons.push_pin_outlined,
+                                  size: 18,
+                                  color: _isTaskPinned(taskId)
+                                      ? colorScheme
+                                          .secondary // 置頂狀態使用主題的 secondary 色
+                                      : colorScheme
+                                          .primary, // 未置頂使用主題的 primary 色
+                                ),
+                                tooltip:
+                                    _isTaskPinned(taskId) ? 'Unpin' : 'Pin',
+                                style: IconButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 0, vertical: 4),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+
                             // Info 按鈕
                             Expanded(
                               child: OutlinedButton.icon(
@@ -3158,8 +3349,11 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                           color: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
-                            side:
-                                BorderSide(color: Colors.grey[200]!, width: 1),
+                            side: _isTaskPinned(taskId)
+                                ? BorderSide(
+                                    color: colorScheme.secondary, width: 2)
+                                : BorderSide(
+                                    color: Colors.grey[200]!, width: 1),
                           ),
                           child: ListTile(
                             contentPadding: const EdgeInsets.symmetric(
@@ -3257,6 +3451,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
   /// My Works 分頁的聊天室列表項目
   Widget _buildMyWorksChatRoomItem(
       Map<String, dynamic> task, List<Map<String, dynamic>> applierChatItems) {
+    final taskId = task['id']?.toString() ?? '';
     final colorScheme = Theme.of(context).colorScheme;
     final displayStatus = _displayStatus(task);
     final progressData = _getProgressData(displayStatus);
@@ -3282,8 +3477,13 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: _isTaskPinned(taskId)
+            ? BorderSide(color: colorScheme.secondary, width: 2)
+            : BorderSide.none,
+      ),
+      elevation: _isTaskPinned(taskId) ? 2 : 1,
       child: Stack(
         clipBehavior: Clip.none,
         children: [

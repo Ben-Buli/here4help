@@ -27,6 +27,8 @@ import 'package:here4help/auth/pages/student_id_page.dart';
 import 'package:here4help/chat/pages/chat_list_page.dart';
 import 'package:here4help/chat/widgets/chat_detail_wrapper.dart';
 import 'package:here4help/chat/widgets/chat_title_widget.dart';
+import 'package:here4help/chat/widgets/chat_list_task_widget.dart';
+import 'package:here4help/chat/providers/chat_providers.dart';
 
 // ==================== explore 模組 ====================
 
@@ -78,10 +80,26 @@ final List<Map<String, dynamic>> shellPages = [
   },
   {
     'path': '/chat',
-    'child': const ChatListPage(),
+    'child': ChatProviders(
+      child: ChatListPage(key: ChatListPage.globalKey),
+    ),
     'title': 'Chats',
     'showBottomNav': true,
-    'showBackArrow': true
+    'showBackArrow': true,
+    'titleWidgetBuilder': (context, data) {
+      return ChatListTaskWidget(
+        initialTab: ChatListPage.globalKey.currentState?.currentTabIndex ?? 0,
+        onTabChanged: (index) {
+          // 通過 GlobalKey 通知 ChatListPage 切換 tab
+          final chatListState = ChatListPage.globalKey.currentState;
+          if (chatListState != null) {
+            chatListState.switchTab(index);
+          }
+        },
+        key: ValueKey(ChatListPage.globalKey.currentState?.currentTabIndex ??
+            0), // 添加 key 來強制重建
+      );
+    },
   },
   {
     'path': '/chat/my-works',
