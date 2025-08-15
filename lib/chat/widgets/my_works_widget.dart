@@ -29,10 +29,37 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     _pagingController.addPageRequestListener((offset) {
       _fetchMyWorksPage(offset);
     });
+    
+    // 監聽 ChatListProvider 的篩選條件變化（僅針對當前tab）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final chatProvider = context.read<ChatListProvider>();
+      chatProvider.addListener(_handleProviderChanges);
+    });
+  }
+  
+  void _handleProviderChanges() {
+    if (!mounted) return;
+    
+    try {
+      final chatProvider = context.read<ChatListProvider>();
+      // 只有當前是 My Works 分頁時才刷新
+      if (chatProvider.currentTabIndex == 1) {
+        _pagingController.refresh();
+      }
+    } catch (e) {
+      // Context may not be available
+    }
   }
 
   @override
   void dispose() {
+    // 移除 provider listener
+    try {
+      final chatProvider = context.read<ChatListProvider>();
+      chatProvider.removeListener(_handleProviderChanges);
+    } catch (e) {
+      // Provider may not be available during dispose
+    }
     _pagingController.dispose();
     super.dispose();
   }
@@ -176,14 +203,11 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ChatListProvider>(
-      builder: (context, chatProvider, child) {
-        // 已移除自動刷新邏輯，避免無窮循環
-
-        return Stack(
+    return Stack(
           children: [
             RefreshIndicator(
               onRefresh: () async {
+                final chatProvider = context.read<ChatListProvider>();
                 await chatProvider.cacheManager.forceRefresh();
                 _pagingController.refresh();
               },
@@ -204,8 +228,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
                       _buildLoadingAnimation(),
                   newPageProgressIndicatorBuilder: (context) =>
                       _buildPaginationLoadingAnimation(),
-                  noItemsFoundIndicatorBuilder: (context) =>
-                      _buildEmptyState(),
+                  noItemsFoundIndicatorBuilder: (context) => _buildEmptyState(),
                 ),
               ),
             ),
@@ -213,8 +236,6 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
             _buildScrollToTopButton(),
           ],
         );
-      },
-    );
   }
 
   Widget _buildTaskCard(Map<String, dynamic> task) {
@@ -554,7 +575,10 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
           Text(
             'Loading my works...',
             style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
               fontSize: 14,
             ),
           ),
@@ -563,7 +587,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     );
   }
 
-  /// 建構分頁載入動畫 
+  /// 建構分頁載入動畫
   Widget _buildPaginationLoadingAnimation() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -591,7 +615,8 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
           Icon(
             Icons.work_outline,
             size: 64,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            color:
+                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
           ),
           const SizedBox(height: 16),
           Text(
@@ -599,7 +624,10 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w500,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 8),
@@ -607,7 +635,10 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
             'You haven\'t applied to any tasks yet',
             style: TextStyle(
               fontSize: 14,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.4),
             ),
           ),
         ],
@@ -626,7 +657,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
         onPressed: () {
           // 滾動到頂部
           final scrollController = PrimaryScrollController.of(context);
-          scrollController?.animateTo(
+          scrollController.animateTo(
             0,
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeInOut,

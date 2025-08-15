@@ -13,6 +13,9 @@ class ChatListProvider extends ChangeNotifier {
   // 靜態實例，用於外部訪問
   static ChatListProvider? _instance;
 
+  // 外部 TabController（如 AppBar 中的）
+  TabController? _externalTabController;
+
   // 搜索和篩選狀態 - 分頁獨立
   final Map<int, String> _searchQueries = {0: '', 1: ''};
   final Map<int, Set<String>> _selectedLocations = {
@@ -95,6 +98,11 @@ class ChatListProvider extends ChangeNotifier {
   /// 獲取當前實例（用於外部訪問）
   static ChatListProvider? get instance => _instance;
 
+  /// 註冊外部 TabController（如 AppBar 中的）
+  void registerExternalTabController(TabController externalController) {
+    _externalTabController = externalController;
+  }
+
   /// 切換 Tab
   void switchTab(int index) {
     if (_currentTabIndex == index) return;
@@ -104,6 +112,12 @@ class ChatListProvider extends ChangeNotifier {
     // 同步內部 TabController（ChatListPage 中的 TabBarView）
     if (_tabController.index != index) {
       _tabController.animateTo(index);
+    }
+
+    // 同步外部 TabController
+    if (_externalTabController != null &&
+        _externalTabController!.index != index) {
+      _externalTabController!.animateTo(index);
     }
 
     // 不重置篩選條件，每個分頁保持獨立狀態

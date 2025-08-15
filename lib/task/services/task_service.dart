@@ -66,9 +66,9 @@ class TaskService extends ChangeNotifier {
     }
   }
 
-  /// 取得任務分頁（回傳 items 與 hasMore）
+    /// 取得任務分頁（回傳 items 與 hasMore）
   Future<({List<Map<String, dynamic>> tasks, bool hasMore})> fetchTasksPage({
-    required int limit,
+required int limit,
     required int offset,
     Map<String, String>? filters,
   }) async {
@@ -100,6 +100,49 @@ class TaskService extends ChangeNotifier {
       return (tasks: <Map<String, dynamic>>[], hasMore: false);
     } catch (e) {
       debugPrint('fetchTasksPage error: $e');
+      return (tasks: <Map<String, dynamic>>[], hasMore: false);
+    }
+  }
+
+  /// 取得 Posted Tasks 聚合資料（含應徵者和聊天室）
+  Future<({List<Map<String, dynamic>> tasks, bool hasMore})> fetchPostedTasksAggregated({
+    required int limit,
+    required int offset,
+    required String creatorId,
+    Map<String, String>? filters,
+  }) async {
+    try {
+      final query = <String, String>{
+        'limit': '$limit',
+        'offset': '$offset',
+        'creator_id': creatorId,
+      };
+      if (filters != null) {
+        query.addAll(filters);
+      }
+      
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/backend/api/tasks/posted_tasks_aggregated.php')
+          .replace(queryParameters: query);
+      
+      final resp = await http.get(uri, headers: {
+        'Content-Type': 'application/json'
+      }).timeout(const Duration(seconds: 30));
+      
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        if (data['success'] == true) {
+          final payload = data['data'] ?? {};
+          final itemsRaw = payload['tasks'] ?? [];
+          final List<Map<String, dynamic>> items = (itemsRaw is List)
+              ? itemsRaw.map((e) => Map<String, dynamic>.from(e)).toList()
+              : [];
+          final hasMore = (payload['pagination']?['has_more'] ?? false) == true;
+          return (tasks: items, hasMore: hasMore);
+        }
+      }
+      return (tasks: <Map<String, dynamic>>[], hasMore: false);
+    } catch (e) {
+      debugPrint('fetchPostedTasksAggregated error: $e');
       return (tasks: <Map<String, dynamic>>[], hasMore: false);
     }
   }

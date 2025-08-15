@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import 'package:here4help/chat/providers/chat_list_provider.dart';
 import 'package:here4help/chat/widgets/task_card_components.dart';
 import 'package:here4help/task/services/task_service.dart';
@@ -36,10 +37,37 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
     _pagingController.addPageRequestListener((offset) {
       _fetchPage(offset);
     });
+    
+    // 監聽 ChatListProvider 的篩選條件變化（僅針對當前tab）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final chatProvider = context.read<ChatListProvider>();
+      chatProvider.addListener(_handleProviderChanges);
+    });
+  }
+  
+  void _handleProviderChanges() {
+    if (!mounted) return;
+    
+    try {
+      final chatProvider = context.read<ChatListProvider>();
+      // 只有當前是 Posted Tasks 分頁時才刷新
+      if (chatProvider.currentTabIndex == 0) {
+        _pagingController.refresh();
+      }
+    } catch (e) {
+      // Context may not be available
+    }
   }
 
   @override
   void dispose() {
+    // 移除 provider listener
+    try {
+      final chatProvider = context.read<ChatListProvider>();
+      chatProvider.removeListener(_handleProviderChanges);
+    } catch (e) {
+      // Provider may not be available during dispose
+    }
     _pagingController.dispose();
     super.dispose();
   }
@@ -53,25 +81,38 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
       final userService = context.read<UserService>();
       final currentUserId = userService.currentUser?.id;
 
-      Map<String, String>? filters;
-      if (currentUserId != null) {
-        filters = {'creator_id': currentUserId.toString()};
+      if (currentUserId == null) {
+        _pagingController.appendLastPage([]);
+        return;
       }
 
-      final result = await service.fetchTasksPage(
+      // 構建篩選條件
+      Map<String, String>? filters;
+      if (chatProvider.selectedLocations.isNotEmpty) {
+        filters ??= {};
+        filters['location'] = chatProvider.selectedLocations.first;
+      }
+      if (chatProvider.selectedStatuses.isNotEmpty) {
+        filters ??= {};
+        filters['status'] = chatProvider.selectedStatuses.first;
+      }
+
+      // 使用新的聚合API
+      final result = await service.fetchPostedTasksAggregated(
         limit: _pageSize,
         offset: offset,
+        creatorId: currentUserId.toString(),
         filters: filters,
       );
 
       if (!mounted) return;
 
-      // 從 Provider 獲取應徵者數據並更新本地快取
+      // 直接從聚合API獲取應徵者數據
       for (final task in result.tasks) {
         final taskId = task['id'].toString();
-        final applications = chatProvider.applicationsByTask[taskId] ?? [];
-        _applicationsByTask[taskId] = applications;
-        // debugPrint('🔍 [Posted Tasks] 任務 $taskId 有 ${applications.length} 個應徵者');
+        final applicants = task['applicants'] ?? [];
+        _applicationsByTask[taskId] = applicants;
+        // debugPrint('🔍 [Posted Tasks] 任務 $taskId 有 ${applicants.length} 個應徵者');
       }
 
       // 應用篩選和排序
@@ -181,12 +222,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ChatListProvider>(
-      builder: (context, chatProvider, child) {
-        // 已移除自動刷新邏輯，避免無窮循環
-
-        return RefreshIndicator(
+    return RefreshIndicator(
           onRefresh: () async {
+            final chatProvider = context.read<ChatListProvider>();
             await chatProvider.cacheManager.forceRefresh();
             _pagingController.refresh();
           },
@@ -218,19 +256,35 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
             ],
           ),
         );
-      },
-    );
   }
 
   Widget _buildTaskCard(Map<String, dynamic> task) {
     final taskId = task['id'].toString();
-    final applications = _applicationsByTask[taskId] ?? [];
-    final applierChatItems =
-        _convertApplicationsToApplierChatItems(applications);
+    final applicants = _applicationsByTask[taskId] ?? [];
+    
+    // 新的聚合API直接返回應徵者資料，不需要轉換
+    final applierChatItems = applicants.map((applicant) => {
+      'id': 'app_${applicant['application_id'] ?? applicant['user_id']}',
+      'taskId': taskId,
+      'name': applicant['applier_name'] ?? 'Anonymous',
+      'avatar': applicant['applier_avatar'],
+      'rating': applicant['avg_rating'] ?? 0.0,
+      'reviewsCount': applicant['review_count'] ?? 0,
+      'questionReply': applicant['cover_letter'] ?? '',
+      'sentMessages': [applicant['first_message_snippet'] ?? 'Applied for this task'],
+      'user_id': applicant['user_id'],
+      'application_id': applicant['application_id'],
+      'application_status': applicant['application_status'] ?? 'applied',
+      'answers_json': applicant['answers_json'],
+      'created_at': applicant['application_created_at'],
+      'chat_room_id': applicant['chat_room_id'], // 新增聊天室ID
+      'isMuted': false,
+      'isHidden': false,
+    }).toList();
 
     // debugPrint('🔍 [Posted Tasks] 建構任務卡片 $taskId，應徵者數量: ${applierChatItems.length}');
 
-    return _buildPostedTasksCardWithAccordion(task, applierChatItems);
+    return _buildPostedTasksCardWithAccordion(task, applierChatItems.cast<Map<String, dynamic>>());
   }
 
   /// Posted Tasks 分頁的任務卡片（使用 My Works 風格 + 手風琴功能）
@@ -720,38 +774,22 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
             ],
           ),
           onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Chat with ${applier['name']}')),
-            );
+            final chatRoomId = applier['chat_room_id'];
+            if (chatRoomId != null) {
+              // 直接跳轉到聊天詳情頁面
+              context.go('/chat/detail?room_id=$chatRoomId');
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Chat room not available for ${applier['name']}')),
+              );
+            }
           },
         ),
       ),
     );
   }
 
-  /// 將應徵者資料轉換為聊天室格式
-  List<Map<String, dynamic>> _convertApplicationsToApplierChatItems(
-      List<Map<String, dynamic>> applications) {
-    return applications.map((app) {
-      return {
-        'id': 'app_${app['application_id'] ?? app['user_id']}',
-        'taskId': app['task_id'],
-        'name': app['applier_name'] ?? 'Anonymous',
-        'avatar': app['applier_avatar'],
-        'rating': 4.0,
-        'reviewsCount': 0,
-        'questionReply': app['cover_letter'] ?? '',
-        'sentMessages': [app['cover_letter'] ?? 'Applied for this task'],
-        'user_id': app['user_id'],
-        'application_id': app['application_id'],
-        'application_status': app['application_status'] ?? 'applied',
-        'answers_json': app['answers_json'],
-        'created_at': app['created_at'],
-        'isMuted': false,
-        'isHidden': false,
-      };
-    }).toList();
-  }
+
 
   /// 切換任務置頂狀態
   void _toggleTaskPin(String taskId) {
@@ -870,7 +908,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
         onPressed: () {
           // 滾動到頂部
           final scrollController = PrimaryScrollController.of(context);
-          scrollController?.animateTo(
+          scrollController.animateTo(
             0,
             duration: const Duration(milliseconds: 500),
             curve: Curves.easeInOut,
