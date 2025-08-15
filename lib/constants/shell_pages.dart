@@ -133,7 +133,11 @@ final List<Map<String, dynamic>> shellPages = [
   },
   {
     'path': '/task/create',
-    'child': const TaskCreatePage(),
+    'builder': (context, data) {
+      return TaskCreatePage(
+        editData: data as Map<String, dynamic>?,
+      );
+    },
     'title': 'Posting Task',
     'showBottomNav': true,
     'showBackArrow': true

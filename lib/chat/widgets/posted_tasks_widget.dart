@@ -861,7 +861,16 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
 
   /// 前往編輯任務頁面
   void _navigateToEditTask(Map<String, dynamic> task) {
-    context.go('/task/create', extra: {'editTask': task});
+    final taskId = task['id']?.toString();
+    if (taskId == null || taskId.isEmpty) {
+      context.go('/task/create', extra: task);
+      return;
+    }
+    // 優先載入聚合資料再前往編輯
+    TaskService()
+        .fetchTaskEditData(taskId)
+        .then((fullTask) => context.go('/task/create', extra: fullTask ?? task))
+        .catchError((_) => context.go('/task/create', extra: task));
   }
 
   /// 確認刪除任務

@@ -161,6 +161,26 @@ class TaskService extends ChangeNotifier {
     }
   }
 
+  /// 取得任務的編輯資料（完整任務 + application_questions）
+  Future<Map<String, dynamic>?> fetchTaskEditData(String taskId) async {
+    try {
+      final uri = Uri.parse(
+          '${AppConfig.apiBaseUrl}/backend/api/tasks/task_edit_data.php?id=$taskId');
+      final resp = await http
+          .get(uri, headers: {'Content-Type': 'application/json'})
+          .timeout(const Duration(seconds: 30));
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        if (data['success'] == true) {
+          return Map<String, dynamic>.from(data['data'] ?? {});
+        }
+      }
+    } catch (e) {
+      debugPrint('fetchTaskEditData error: $e');
+    }
+    return null;
+  }
+
   /// Poster 確認完成（自動轉點與異動紀錄由後端處理）
   Future<Map<String, dynamic>> confirmCompletion({
     required String taskId,

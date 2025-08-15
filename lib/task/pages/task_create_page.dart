@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
+import 'package:here4help/config/app_config.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/auth/services/user_service.dart';
@@ -23,7 +24,10 @@ const String kTimeField = 'Time';
 const String kPostingPeriodField = 'Posting period';
 
 class TaskCreatePage extends StatefulWidget {
-  const TaskCreatePage({super.key});
+  const TaskCreatePage({super.key, this.editData});
+
+  /// 若不為空，表示編輯模式，並填入預設值
+  final Map<String, dynamic>? editData;
 
   @override
   State<TaskCreatePage> createState() => _PostFormPageState();
@@ -57,22 +61,44 @@ class _PostFormPageState extends State<TaskCreatePage> {
   void initState() {
     super.initState();
 
-    // 初始化表單欄位
-    _titleController.text = 'Opening Bank Account (Demo)';
-    _taskDescriptionController = TextEditingController(
-        text:
-            'Need help with opening a bank account. Looking for someone who can guide me through the process and accompany me to the bank.');
-    final formatter = NumberFormat('#,##0', 'en_US');
-    _rewardPointController.text = formatter.format(500);
-    _locationLabel = 'NCCU';
-    _locationSearchController.text = 'NCCU';
-    final now = DateTime.now();
-    _taskDate = DateTime(now.year, now.month, now.day, now.hour, now.minute);
-    _periodStart = DateTime(2025, 9, 10, 12, 0);
-    _periodEnd = DateTime(2025, 9, 10, 13, 0);
-    // 初始化為空列表，讓用戶可以自由添加問題
-    _applicationQuestions.clear();
-    _languageRequirement = 'English,Japanese';
+    // 初始化表單欄位（若為編輯模式，優先載入 editData）
+    _taskDescriptionController = TextEditingController();
+    if (widget.editData != null && widget.editData!.isNotEmpty) {
+      final t = widget.editData!;
+      _titleController.text = (t['title'] ?? '').toString();
+      _taskDescriptionController.text = (t['description'] ?? '').toString();
+      final formatter = NumberFormat('#,##0', 'en_US');
+      final rp = t['reward_point']?.toString() ?? '0';
+      _rewardPointController.text = formatter.format(int.tryParse(rp) ?? 0);
+      _locationLabel = (t['location'] ?? 'NCCU').toString();
+      _locationSearchController.text = _locationLabel;
+      // task_date 可能為 yyyy-MM-dd 或完整時間
+      final dateStr = (t['task_date'] ?? t['created_at'] ?? '').toString();
+      _taskDate = dateStr.isNotEmpty ? DateTime.tryParse(dateStr) : null;
+      _periodStart = null;
+      _periodEnd = null;
+      _applicationQuestions
+        ..clear()
+        ..addAll(List<String>.from((t['application_questions'] ?? [])
+            .map((q) => (q is Map && q['application_question'] != null)
+                ? q['application_question'].toString()
+                : (q?.toString() ?? '')).where((e) => e.isNotEmpty)));
+      _languageRequirement = (t['language_requirement'] ?? '').toString();
+    } else {
+      _titleController.text = 'Opening Bank Account (Demo)';
+      _taskDescriptionController.text =
+          'Need help with opening a bank account. Looking for someone who can guide me through the process and accompany me to the bank.';
+      final formatter = NumberFormat('#,##0', 'en_US');
+      _rewardPointController.text = formatter.format(500);
+      _locationLabel = 'NCCU';
+      _locationSearchController.text = 'NCCU';
+      final now = DateTime.now();
+      _taskDate = DateTime(now.year, now.month, now.day, now.hour, now.minute);
+      _periodStart = DateTime(2025, 9, 10, 12, 0);
+      _periodEnd = DateTime(2025, 9, 10, 13, 0);
+      _applicationQuestions.clear();
+      _languageRequirement = 'English,Japanese';
+    }
 
     _loadUniversities();
     _loadLanguages();
@@ -2114,13 +2140,34 @@ class _PostFormPageState extends State<TaskCreatePage> {
 
     try {
       final taskService = TaskService();
-      final success = await taskService.createTask(taskData);
+      final isEditMode = widget.editData != null && widget.editData!.isNotEmpty;
+      bool success = false;
+      if (isEditMode) {
+        // 編輯模式：呼叫 update.php
+        final body = {
+          'id': widget.editData!['id']?.toString() ?? '',
+          ...taskData,
+        };
+        final resp = await http
+            .put(
+              Uri.parse(AppConfig.taskUpdateUrl),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode(body),
+            )
+            .timeout(const Duration(seconds: 30));
+        if (resp.statusCode == 200) {
+          final data = jsonDecode(resp.body);
+          success = data['success'] == true;
+        }
+      } else {
+        success = await taskService.createTask(taskData);
+      }
 
       if (success) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('任務創建成功！'),
+            SnackBar(
+              content: Text(isEditMode ? '任務已更新！' : '任務創建成功！'),
               backgroundColor: Colors.green,
             ),
           );
