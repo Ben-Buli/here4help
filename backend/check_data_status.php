@@ -36,9 +36,9 @@ try {
     }
     
     echo "\n💬 聊天訊息：\n";
-    $messages = $db->fetchAll("SELECT id, room_id, from_user_id, LEFT(message, 50) as message_preview, created_at FROM chat_messages ORDER BY created_at");
+    $messages = $db->fetchAll("SELECT id, room_id, from_user_id, LEFT(content, 50) as content_preview, created_at FROM chat_messages ORDER BY created_at");
     foreach ($messages as $msg) {
-        $preview = $msg['message_preview'] . (strlen($msg['message_preview']) >= 50 ? '...' : '');
+        $preview = $msg['content_preview'] . (strlen($msg['content_preview']) >= 50 ? '...' : '');
         echo "  ID {$msg['id']}: 聊天室 {$msg['room_id']}, 發送者 {$msg['from_user_id']}, 內容: {$preview} - {$msg['created_at']}\n";
     }
     

@@ -196,7 +196,7 @@ class DatabaseStructureValidator {
             $this->errors[] = "chat_messages 表格不存在";
         } else {
             // 檢查必要欄位
-            $requiredFields = ['id', 'room_id', 'from_user_id', 'message', 'created_at'];
+            $requiredFields = ['id', 'room_id', 'from_user_id', 'content', 'created_at'];
             foreach ($requiredFields as $field) {
                 $found = false;
                 foreach ($chatMessages as $col) {

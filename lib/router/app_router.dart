@@ -16,6 +16,10 @@ import 'package:here4help/widgets/error_page.dart';
 import 'package:here4help/layout/app_scaffold.dart';
 import 'package:here4help/constants/shell_pages.dart';
 
+// ===== Debug 模組 =====
+import 'package:here4help/debug/unread_api_test_page.dart';
+import 'package:here4help/debug/unread_timing_test_page.dart';
+
 // 定義 Account 模組的路由與對應頁面
 class AccountRouteItem {
   final String route;
@@ -210,6 +214,13 @@ final GoRouter appRouter = GoRouter(
     GoRoute(path: '/banned', builder: (_, __) => const BannedPage()),
     GoRoute(
         path: '/unauthorized', builder: (_, __) => const UnauthorizedPage()),
+    // Debug 頁面
+    GoRoute(
+        path: '/debug/unread-api',
+        builder: (_, __) => const UnreadApiTestPage()),
+    GoRoute(
+        path: '/debug/unread-timing',
+        builder: (_, __) => const UnreadTimingTestPage()),
     // ... 其他 routes ...
   ],
   // ❌ 找不到路由或錯誤時顯示的備援頁面

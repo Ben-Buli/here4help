@@ -86,12 +86,12 @@ class AppConfig {
   static String get socketUrl => isDevelopment ? devSocketUrl : prodSocketUrl;
 
   // Chat APIs (MVP)
-  static String get unreadSnapshotUrl =>
-      '$apiBaseUrl/backend/api/chat/unread_snapshot.php';
+  static String get unreadByTasksUrl =>
+      '$apiBaseUrl/backend/api/chat/unread_by_tasks.php';
   static String get chatSendMessageUrl =>
       '$apiBaseUrl/backend/api/chat/send_message.php';
-  static String get chatReadRoomUrl =>
-      '$apiBaseUrl/backend/api/chat/read_room.php';
+  static String get chatReadRoomV2Url =>
+      '$apiBaseUrl/backend/api/chat/read_room_v2.php';
   static String get ensureRoomUrl =>
       '$apiBaseUrl/backend/api/chat/ensure_room.php';
   static String get chatUploadAttachmentUrl =>

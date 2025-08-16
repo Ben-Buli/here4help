@@ -20,6 +20,7 @@ import 'package:here4help/services/theme_config_manager.dart';
 import 'dart:ui';
 // import 'package:go_router/go_router.dart';
 import 'package:here4help/services/notification_service.dart';
+import 'package:here4help/chat/services/chat_storage_service.dart';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, this.data});
@@ -451,10 +452,15 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           _chatData = chatData;
           _userRole = chatData['user_role'] ?? 'participant';
           _currentRoomId = roomId;
+        });
 
-          // 更新任務狀態相關數據
-          if (_task != null) {
-            final task = _task!;
+        // 保存完整的聊天室數據到本地儲存
+        await _saveChatRoomData(chatData, roomId);
+
+        // 更新任務狀態相關數據
+        final task = chatData['task'];
+        if (task != null) {
+          setState(() {
             // 只在真正需要倒計時時才啟動，避免不必要的通知
             if (task['status']?['code'] == 'pending_confirmation_tasker') {
               // 檢查是否真的需要倒計時（避免測試數據觸發）
@@ -513,8 +519,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             } else {
               remainingTime = const Duration();
             }
-          }
-        });
+          });
+        }
 
         // 載入聊天訊息
         await _loadChatMessages();
@@ -702,6 +708,23 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           _isLoadingMessages = false;
         });
       }
+    }
+  }
+
+  /// 保存聊天室數據到本地儲存
+  Future<void> _saveChatRoomData(
+      Map<String, dynamic> chatData, String roomId) async {
+    try {
+      await ChatStorageService.savechatRoomData(
+        roomId: roomId,
+        room: chatData['room'] ?? {},
+        task: chatData['task'] ?? {},
+        userRole: chatData['user_role']?.toString(),
+        chatPartnerInfo: chatData['chat_partner_info'],
+      );
+      debugPrint('✅ 聊天室數據已保存到本地儲存: roomId=$roomId');
+    } catch (e) {
+      debugPrint('❌ 保存聊天室數據失敗: $e');
     }
   }
 

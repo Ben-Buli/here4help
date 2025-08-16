@@ -81,7 +81,7 @@ try {
       cm.id,
       cm.room_id,
       cm.from_user_id,
-      cm.message,
+      cm.content as message,
       cm.created_at,
       u.name as sender_name,
       u.avatar_url as sender_avatar
@@ -101,13 +101,16 @@ try {
     $message['is_own'] = $message['from_user_id'] == $user_id;
   }
 
-  // 獲取未讀訊息數量
+  // 獲取未讀訊息數量（只計算他人發送的訊息，排除 from_user_id 為 NULL 的訊息，避免重複計算）
   $unread_count = $db->fetch("
-    SELECT COUNT(*) as count
+    SELECT COUNT(DISTINCT cm.id) as count
     FROM chat_messages cm
     LEFT JOIN chat_reads cr ON cm.room_id = cr.room_id AND cr.user_id = ?
-    WHERE cm.room_id = ? AND cm.id > COALESCE(cr.last_read_message_id, 0)
-  ", [$user_id, $room_id]);
+    WHERE cm.room_id = ? 
+    AND cm.from_user_id IS NOT NULL
+    AND cm.from_user_id != ? 
+    AND cm.id > COALESCE(cr.last_read_message_id, 0)
+  ", [$user_id, $room_id, $user_id]);
 
   // 取得對方的最後已讀訊息 ID（用於前端顯示我的訊息是否被已讀）
   $opponent_id = ($room['creator_id'] == $user_id) ? (int)$room['participant_id'] : (int)$room['creator_id'];

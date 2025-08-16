@@ -36,6 +36,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
   // 未讀映射（room_id -> count）
   Map<String, int> _unreadByRoom = {};
   StreamSubscription<Map<String, int>>? _unreadSub;
+  bool _unreadDataLoaded = false; // 新增：追蹤未讀數據是否已載入
 
   void _updatePostedTabUnreadFlag() {
     bool hasUnread = false;
@@ -52,18 +53,28 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
       }
       if (hasUnread) break;
     }
+
     try {
       final provider = context.read<ChatListProvider>();
       // 只有當狀態真正改變時才更新，避免無限循環
       if (provider.hasUnreadForTab(0) != hasUnread) {
+        debugPrint('🔄 [Posted Tasks] 更新 Tab 未讀狀態: $hasUnread');
         provider.setTabHasUnread(0, hasUnread);
+      } else {
+        debugPrint('🔄 [Posted Tasks] Tab 未讀狀態未改變，跳過更新: $hasUnread');
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('❌ [Posted Tasks] 更新 Tab 未讀狀態失敗: $e');
+    }
   }
 
   @override
   void initState() {
     super.initState();
+
+    // 確保未讀數據已載入
+    _ensureUnreadDataLoaded();
+
     _pagingController.addPageRequestListener((offset) {
       // 若剛發生 provider 事件且當前仍在 build 期，延後一幀避免循環
       if (context.mounted) {
@@ -82,12 +93,30 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
     // 監聽未讀快照
     _unreadSub = NotificationCenter().byRoomStream.listen((map) {
       if (!mounted) return;
+      debugPrint('🔍 [Posted Tasks] 收到未讀數據更新: ${map.length} 個房間');
       setState(() {
         _unreadByRoom = Map<String, int>.from(map);
+        _unreadDataLoaded = true; // 標記未讀數據已載入
       });
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _updatePostedTabUnreadFlag());
     });
+  }
+
+  /// 確保未讀數據已載入
+  Future<void> _ensureUnreadDataLoaded() async {
+    try {
+      debugPrint('🔄 [Posted Tasks] 開始確保未讀數據載入...');
+
+      // 等待 NotificationCenter 初始化完成
+      await NotificationCenter().waitForUnreadData();
+
+      // 強制刷新快照
+      await NotificationCenter().service.refreshSnapshot();
+      debugPrint('✅ [Posted Tasks] 未讀數據初始化完成');
+    } catch (e) {
+      debugPrint('❌ [Posted Tasks] 未讀數據初始化失敗: $e');
+    }
   }
 
   void _handleProviderChanges() {
@@ -98,11 +127,20 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
       // 只有當前是 Posted Tasks 分頁時才刷新
       if (chatProvider.currentTabIndex == 0) {
         // 避免在 build 期間觸發 refresh 造成循環
-        WidgetsBinding.instance
-            .addPostFrameCallback((_) => _pagingController.refresh());
+        // 同時避免因未讀狀態更新而觸發的循環刷新
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          // 只有在真正需要刷新時才刷新（篩選條件變化，而不是未讀狀態變化）
+          if (chatProvider.hasActiveFilters ||
+              chatProvider.searchQuery.isNotEmpty) {
+            debugPrint('🔄 [Posted Tasks] 篩選條件變化，觸發刷新');
+            _pagingController.refresh();
+          } else {
+            debugPrint('🔄 [Posted Tasks] 未讀狀態變化，跳過刷新');
+          }
+        });
       }
     } catch (e) {
-      // Context may not be available
+      debugPrint('❌ [Posted Tasks] Provider 變化處理失敗: $e');
     }
   }
 

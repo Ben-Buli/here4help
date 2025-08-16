@@ -217,7 +217,7 @@ try {
     // 6. 檢查是否需要生成 View Resume 訊息
     $hasViewResumeMessage = false;
     foreach ($chatMessages as $message) {
-        if (strpos($message['message'], '申請已提交') !== false) {
+        if (strpos($message['content'] ?? '', '申請已提交') !== false) {
             $hasViewResumeMessage = true;
             break;
         }
@@ -240,7 +240,7 @@ try {
         // 嘗試寫入 View Resume 訊息（若表結構不符則忽略錯誤）
         try {
             $stmt = $pdo->prepare("
-                INSERT INTO chat_messages (room_id, from_user_id, message, created_at)
+                INSERT INTO chat_messages (room_id, from_user_id, content, created_at)
                 VALUES (?, ?, ?, ?)
             ");
             $stmt->execute([

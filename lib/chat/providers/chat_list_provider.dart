@@ -79,6 +79,7 @@ class ChatListProvider extends ChangeNotifier {
 
   void _emit(String event) {
     _lastEvent = event;
+    debugPrint('📡 [ChatListProvider] 發出事件: $event');
     notifyListeners();
   }
 
@@ -190,10 +191,20 @@ class ChatListProvider extends ChangeNotifier {
   }
 
   /// 更新某個分頁是否有未讀（供 Posted/MyWorks widget 設定）
+  /// 添加防循環機制，避免無限刷新
   void setTabHasUnread(int tabIndex, bool value) {
-    if (_tabHasUnread[tabIndex] == value) return;
+    // 只有當狀態真正改變時才更新，避免無限循環
+    if (_tabHasUnread[tabIndex] == value) {
+      debugPrint(
+          '🔄 [ChatListProvider] 未讀狀態未改變，跳過通知: tab=$tabIndex, value=$value');
+      return;
+    }
+
+    debugPrint('✅ [ChatListProvider] 更新未讀狀態: tab=$tabIndex, $value');
     _tabHasUnread[tabIndex] = value;
-    _emit('unread');
+
+    // 使用特定事件類型，避免觸發不必要的刷新
+    _emit('unread_update');
   }
 
   /// 更新載入狀態

@@ -227,9 +227,9 @@ try {
                 }
                 
                 $db->query(
-                    "INSERT INTO chat_messages (room_id, from_user_id, content, message, sender_id, created_at) 
-                     VALUES (?, ?, ?, ?, ?, NOW())",
-                    [$roomId, $application['user_id'], $messageContent, $messageContent, $application['user_id']]
+                    "INSERT INTO chat_messages (room_id, from_user_id, content, created_at) 
+                     VALUES (?, ?, ?, NOW())",
+                    [$roomId, $application['user_id'], $messageContent]
                 );
                 echo "✅ 應徵訊息創建成功\n";
                 
@@ -257,9 +257,9 @@ try {
         
         foreach ($messages as $msgData) {
             $db->query(
-                "INSERT INTO chat_messages (room_id, from_user_id, content, message, sender_id, created_at) 
-                 VALUES (?, ?, ?, ?, ?, NOW())",
-                [$roomId, $msgData['from_user_id'], $msgData['message'], $msgData['message'], $msgData['from_user_id']]
+                "INSERT INTO chat_messages (room_id, from_user_id, content, created_at) 
+                 VALUES (?, ?, ?, NOW())",
+                [$roomId, $msgData['from_user_id'], $msgData['message']]
             );
         }
         echo "✅ 聊天訊息創建成功 (聊天室 ID: {$roomId})\n";

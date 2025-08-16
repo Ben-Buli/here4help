@@ -116,12 +116,12 @@ try {
     if ($hasContentCol) {
       // 同步寫入 content 與 message，避免 NOT NULL 無預設值造成失敗
       $db->query(
-        "INSERT INTO chat_messages (room_id, from_user_id, message, content) VALUES (?, ?, ?, ?)",
+        "INSERT INTO chat_messages (room_id, from_user_id, content) VALUES (?, ?, ?)",
         [$room_id, $user_id, $message, $message]
       );
     } else {
       $db->query(
-        "INSERT INTO chat_messages (room_id, from_user_id, message) VALUES (?, ?, ?)",
+        "INSERT INTO chat_messages (room_id, from_user_id, content) VALUES (?, ?, ?)",
         [$room_id, $user_id, $message]
       );
     }

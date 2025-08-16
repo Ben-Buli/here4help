@@ -30,6 +30,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
   Map<String, int> _unreadByRoom = {};
   StreamSubscription<Map<String, int>>? _unreadSub;
+  bool _unreadDataLoaded = false; // 新增：追蹤未讀數據是否已載入
 
   void _updateMyWorksTabUnreadFlag() {
     bool hasUnread = false;
@@ -40,18 +41,28 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
         break;
       }
     }
+
     try {
       final provider = context.read<ChatListProvider>();
       // 只有當狀態真正改變時才更新，避免無限循環
       if (provider.hasUnreadForTab(1) != hasUnread) {
+        debugPrint('🔄 [My Works] 更新 Tab 未讀狀態: $hasUnread');
         provider.setTabHasUnread(1, hasUnread);
+      } else {
+        debugPrint('🔄 [My Works] Tab 未讀狀態未改變，跳過更新: $hasUnread');
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('❌ [My Works] 更新 Tab 未讀狀態失敗: $e');
+    }
   }
 
   @override
   void initState() {
     super.initState();
+
+    // 確保未讀數據已載入
+    _ensureUnreadDataLoaded();
+
     _pagingController.addPageRequestListener((offset) {
       if (context.mounted) {
         WidgetsBinding.instance
@@ -69,12 +80,30 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
     _unreadSub = NotificationCenter().byRoomStream.listen((map) {
       if (!mounted) return;
+      debugPrint('🔍 [My Works] 收到未讀數據更新: ${map.length} 個房間');
       setState(() {
         _unreadByRoom = Map<String, int>.from(map);
+        _unreadDataLoaded = true; // 標記未讀數據已載入
       });
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _updateMyWorksTabUnreadFlag());
     });
+  }
+
+  /// 確保未讀數據已載入
+  Future<void> _ensureUnreadDataLoaded() async {
+    try {
+      debugPrint('🔄 [My Works] 開始確保未讀數據載入...');
+
+      // 等待 NotificationCenter 初始化完成
+      await NotificationCenter().waitForUnreadData();
+
+      // 強制刷新快照
+      await NotificationCenter().service.refreshSnapshot();
+      debugPrint('✅ [My Works] 未讀數據初始化完成');
+    } catch (e) {
+      debugPrint('❌ [My Works] 未讀數據初始化失敗: $e');
+    }
   }
 
   void _handleProviderChanges() {
@@ -84,11 +113,21 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       final chatProvider = context.read<ChatListProvider>();
       // 只有當前是 My Works 分頁時才刷新
       if (chatProvider.currentTabIndex == 1) {
-        WidgetsBinding.instance
-            .addPostFrameCallback((_) => _pagingController.refresh());
+        // 避免在 build 期間觸發 refresh 造成循環
+        // 同時避免因未讀狀態更新而觸發的循環刷新
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          // 只有在真正需要刷新時才刷新（篩選條件變化，而不是未讀狀態變化）
+          if (chatProvider.hasActiveFilters ||
+              chatProvider.searchQuery.isNotEmpty) {
+            debugPrint('🔄 [My Works] 篩選條件變化，觸發刷新');
+            _pagingController.refresh();
+          } else {
+            debugPrint('🔄 [My Works] 未讀狀態變化，跳過刷新');
+          }
+        });
       }
     } catch (e) {
-      // Context may not be available
+      debugPrint('❌ [My Works] Provider 變化處理失敗: $e');
     }
   }
 

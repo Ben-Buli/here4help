@@ -89,17 +89,13 @@ try {
                 INSERT INTO chat_messages (
                     room_id, 
                     from_user_id, 
-                    sender_id,
                     kind, 
                     content, 
-                    message,
                     created_at
-                ) VALUES (?, ?, ?, 'applyMessage', ?, ?, '2025-08-01 00:00:00')
+                ) VALUES (?, ?, 'applyMessage', ?, '2025-08-01 00:00:00')
             ", [
                 $app['room_id'],
                 $app['user_id'],
-                $app['user_id'],
-                $messageContent,
                 $messageContent
             ]);
             

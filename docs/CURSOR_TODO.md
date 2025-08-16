@@ -1411,6 +1411,21 @@
 - 前端：`AppConfig` 新增 `taskUpdateUrl`；`TaskService.updateTaskStatus()` 對應新 API（優先採用回傳物件覆蓋）
 - 待辦：`creator_id` 回填唯一鍵確認與批次回填、其餘 API 同步整理
 
+#### 2025年8月16日 - 聊天室無限刷新問題修復（v3.3.4-hotfix）
+- **修復內容**：
+  - 修復 `ChatListProvider` 中的無限刷新問題
+  - 優化 `setTabHasUnread` 方法，添加狀態檢查避免循環更新
+  - 在 `PostedTasksWidget` 和 `MyWorksWidget` 中添加條件檢查
+  - 添加詳細的調試日誌，便於追蹤問題
+- **技術改進**：
+  - Provider 通知機制優化，避免不必要的 `notifyListeners()` 調用
+  - 使用 `addPostFrameCallback` 避免在 build 期間觸發刷新
+  - 添加事件類型區分，區分未讀更新和篩選條件變化
+- **預防措施**：
+  - 添加代碼審查檢查點，避免未來重複出現
+  - 記錄修復過程和根本原因分析
+  - 建立性能監控機制
+
 #### 2025年8月14日 - 聊天室架構重構與 UI/UX 優化完成（v3.3.4）
 - **Flutter App**: 39/49 任務完成 (79.6%)
 - **後台管理系統**: 0/4 任務完成 (0.0%)

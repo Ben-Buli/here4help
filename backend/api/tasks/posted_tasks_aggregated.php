@@ -108,7 +108,7 @@ try {
                 
                 -- 獲取最新聊天訊息片段
                 COALESCE(
-                    (SELECT SUBSTRING(cm.message, 1, 100)
+                    (SELECT SUBSTRING(cm.content, 1, 100)
                      FROM chat_messages cm 
                      WHERE cm.room_id = cr.id 
                      ORDER BY cm.created_at DESC 

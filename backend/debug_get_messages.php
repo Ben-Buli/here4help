@@ -49,7 +49,7 @@ try {
             cm.id,
             cm.room_id,
             cm.from_user_id,
-            cm.message,
+            cm.content,
             cm.created_at
           FROM chat_messages cm
           WHERE cm.room_id = ?

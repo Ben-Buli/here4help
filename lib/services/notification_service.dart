@@ -268,7 +268,7 @@ class SocketNotificationService implements NotificationService {
     try {
       final token = await _getToken();
       await http.post(
-        Uri.parse(AppConfig.chatReadRoomUrl),
+        Uri.parse(AppConfig.chatReadRoomV2Url),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -287,7 +287,7 @@ class SocketNotificationService implements NotificationService {
     try {
       final token = await _getToken();
       final resp = await http.get(
-        Uri.parse(AppConfig.unreadSnapshotUrl),
+        Uri.parse(AppConfig.unreadByTasksUrl),
         headers: {'Authorization': 'Bearer $token'},
       );
       if (resp.statusCode == 200) {
@@ -355,6 +355,7 @@ class NotificationCenter {
   NotificationCenter._internal();
 
   NotificationService _service = NotificationServicePlaceholder();
+  bool _isInitialized = false; // 新增：追蹤初始化狀態
 
   final StreamController<int> _totalUnreadForwarder =
       StreamController<int>.broadcast();
@@ -377,6 +378,7 @@ class NotificationCenter {
       _statusForwarder.stream;
 
   NotificationService get service => _service;
+  bool get isInitialized => _isInitialized; // 新增：檢查初始化狀態
 
   Future<void> use(NotificationService service) async {
     await _s1?.cancel();
@@ -388,6 +390,32 @@ class NotificationCenter {
     _s2 = _service.observeUnreadByTask().listen(_byTaskForwarder.add);
     _s3 = _service.observeUnreadByRoom().listen(_byRoomForwarder.add);
     _s4 = _service.observeConnectionStatus().listen(_statusForwarder.add);
+
+    // 標記為已初始化
+    _isInitialized = true;
+    print('✅ NotificationCenter 已初始化完成');
+  }
+
+  /// 等待未讀數據載入完成
+  Future<void> waitForUnreadData(
+      {Duration timeout = const Duration(seconds: 10)}) async {
+    if (_isInitialized && _service is! NotificationServicePlaceholder) {
+      print('✅ NotificationCenter 已初始化，直接返回');
+      return;
+    }
+
+    print('⏳ 等待 NotificationCenter 初始化...');
+    final startTime = DateTime.now();
+
+    while (!_isInitialized || _service is NotificationServicePlaceholder) {
+      if (DateTime.now().difference(startTime) > timeout) {
+        print('⚠️ NotificationCenter 初始化超時，使用佔位服務');
+        break;
+      }
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+
+    print('✅ NotificationCenter 初始化等待完成');
   }
 
   Future<void> dispose() async {

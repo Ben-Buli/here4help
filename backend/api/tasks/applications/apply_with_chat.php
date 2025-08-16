@@ -122,7 +122,7 @@ try {
         }
 
         $db->query(
-            'INSERT INTO chat_messages (room_id, from_user_id, message, created_at) VALUES (?, ?, ?, NOW())',
+            'INSERT INTO chat_messages (room_id, from_user_id, content, created_at) VALUES (?, ?, ?, NOW())',
             [$roomId, $userId, $messageContent]
         );
 

@@ -77,7 +77,7 @@ try {
         participant.name as participant_name,
       participant.avatar_url as participant_avatar,
       -- 最新訊息
-      latest_msg.message as last_message,
+      latest_msg.content as last_message,
       latest_msg.created_at as last_message_time,
       latest_msg.from_user_id as last_message_sender_id,
       -- 未讀訊息數量

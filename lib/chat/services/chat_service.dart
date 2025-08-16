@@ -242,7 +242,7 @@ class ChatService {
       }
 
       final response = await http.post(
-        Uri.parse('$_baseUrl/backend/api/chat/read_room.php'),
+        Uri.parse('$_baseUrl/backend/api/chat/read_room_v2.php'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -267,7 +267,7 @@ class ChatService {
     }
   }
 
-  /// 獲取未讀訊息快照
+  /// 獲取未讀訊息快照 (使用新的角色邏輯 API)
   Future<Map<String, dynamic>> getUnreadSnapshot() async {
     try {
       final token = await AuthService.getToken();
@@ -275,8 +275,8 @@ class ChatService {
         throw Exception('未登入');
       }
 
-      final response = await http.post(
-        Uri.parse('$_baseUrl/backend/api/chat/unread_snapshot.php'),
+      final response = await http.get(
+        Uri.parse('$_baseUrl/backend/api/chat/unread_by_tasks.php?scope=all'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -440,8 +440,9 @@ class ChatService {
         'room_id': roomId,
       };
 
-      final uri = Uri.parse('$_baseUrl/backend/api/chat/get_chat_detail_data.php')
-          .replace(queryParameters: queryParams);
+      final uri =
+          Uri.parse('$_baseUrl/backend/api/chat/get_chat_detail_data.php')
+              .replace(queryParameters: queryParams);
 
       final response = await http.get(
         uri,
