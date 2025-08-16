@@ -300,7 +300,13 @@ try {
                     'display_name' => $chatData['status_display'],
                     'progress_ratio' => $chatData['progress_ratio'],
                     'sort_order' => $chatData['sort_order']
-                ]
+                ],
+                // 新增：角色視角的映射狀態
+                'mapped_status' => _calculateMappedStatus(
+                    $chatData['status_id'],
+                    $chatData['application_status'] ?? null,
+                    ($currentUserId == $chatData['creator_id']) ? 'creator' : 'participant'
+                )
             ],
             'application_questions' => $applicationQuestions,
             'users' => [
@@ -358,4 +364,106 @@ try {
         ]);
     }
 }
-?> 
+?>
+
+<?php
+/**
+ * 計算角色視角的映射狀態
+ * 根據 tasks.status_id + task_applications.status 組合，返回對應的顯示狀態
+ */
+function _calculateMappedStatus($taskStatusId, $applicationStatus, $userRole) {
+    // 預設狀態
+    $defaultStatus = 'Unknown';
+    
+    try {
+        switch ($taskStatusId) {
+            case 1: // pending
+                if ($userRole == 'creator') {
+                    $defaultStatus = 'Open';
+                } else {
+                    // participant 視角
+                    switch ($applicationStatus) {
+                        case 'applied':
+                        case 'pending':
+                            $defaultStatus = 'Pending Review';
+                            break;
+                        case 'accepted':
+                            $defaultStatus = 'Accepted';
+                            break;
+                        case 'rejected':
+                            $defaultStatus = 'Rejected';
+                            break;
+                        default:
+                            $defaultStatus = 'Applied';
+                    }
+                }
+                break;
+                
+            case 2: // in_progress
+                if ($userRole == 'creator') {
+                    $defaultStatus = 'In Progress';
+                } else {
+                    // participant 視角
+                    switch ($applicationStatus) {
+                        case 'accepted':
+                            $defaultStatus = 'In Progress';
+                            break;
+                        case 'rejected':
+                            $defaultStatus = 'Rejected';
+                            break;
+                        default:
+                            $defaultStatus = 'In Progress';
+                    }
+                }
+                break;
+                
+            case 3: // pending_confirmation
+                if ($userRole == 'creator') {
+                    $defaultStatus = 'Pending Confirmation';
+                } else {
+                    // participant 視角
+                    switch ($applicationStatus) {
+                        case 'accepted':
+                            $defaultStatus = 'Pending Confirmation';
+                            break;
+                        case 'rejected':
+                            $defaultStatus = 'Rejected';
+                            break;
+                        default:
+                            $defaultStatus = 'Pending Confirmation';
+                    }
+                }
+                break;
+                
+            case 4: // completed
+                if ($userRole == 'creator') {
+                    $defaultStatus = 'Completed';
+                } else {
+                    // participant 視角
+                    switch ($applicationStatus) {
+                        case 'accepted':
+                            $defaultStatus = 'Completed';
+                            break;
+                        case 'rejected':
+                            $defaultStatus = 'Rejected';
+                            break;
+                        default:
+                            $defaultStatus = 'Completed';
+                    }
+                }
+                break;
+                
+            case 5: // cancelled
+                $defaultStatus = 'Cancelled';
+                break;
+                
+            default:
+                $defaultStatus = 'Unknown';
+        }
+    } catch (Exception $e) {
+        error_log('❌ 狀態映射錯誤: ' . $e->getMessage());
+        $defaultStatus = 'Unknown';
+    }
+    
+    return $defaultStatus;
+} 

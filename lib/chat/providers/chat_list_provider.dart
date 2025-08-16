@@ -29,10 +29,16 @@ class ChatListProvider extends ChangeNotifier {
 
   // 排序狀態 - 分頁獨立
   final Map<int, String> _currentSortBy = {
-    0: 'status_order',
-    1: 'status_order'
+    0: 'updated_time', // 改為 updated_time 作為預設
+    1: 'updated_time'
   };
   final Map<int, bool> _sortAscending = {0: false, 1: false};
+
+  // 相關性搜尋狀態
+  final Map<int, bool> _crossLocationSearch = {0: false, 1: false};
+
+  // 追蹤用戶是否手動選擇過排序
+  final Map<int, bool> _hasManualSortOverride = {0: false, 1: false};
 
   // 分頁未讀提示（小圓點）
   final Map<int, bool> _tabHasUnread = {0: false, 1: false};
@@ -59,6 +65,8 @@ class ChatListProvider extends ChangeNotifier {
   String get currentSortBy =>
       _currentSortBy[_currentTabIndex] ?? 'updated_time';
   bool get sortAscending => _sortAscending[_currentTabIndex] ?? false;
+  bool get crossLocationSearch =>
+      _crossLocationSearch[_currentTabIndex] ?? false;
   bool hasUnreadForTab(int tabIndex) => _tabHasUnread[tabIndex] ?? false;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
@@ -147,11 +155,38 @@ class ChatListProvider extends ChangeNotifier {
     _emit('tab');
   }
 
-  /// 更新搜索查詢
+  /// 設置搜尋查詢
+  void setSearchQuery(String query) {
+    final currentQuery = _searchQueries[_currentTabIndex] ?? '';
+    if (currentQuery != query) {
+      _searchQueries[_currentTabIndex] = query;
+
+      // 智能排序：有搜尋時建議設為 relevance，但尊重用戶的手動選擇
+      if (query.trim().isNotEmpty && currentSortBy != 'relevance') {
+        // 只有在用戶沒有手動覆蓋過排序時，才自動切換
+        if (!(_hasManualSortOverride[_currentTabIndex] ?? false)) {
+          _currentSortBy[_currentTabIndex] = 'relevance';
+          _sortAscending[_currentTabIndex] = false;
+          debugPrint('🔍 [ChatListProvider] 建議切換到相關性排序');
+        } else {
+          debugPrint('🔍 [ChatListProvider] 用戶已手動選擇排序，保持當前選擇');
+        }
+      } else if (query.trim().isEmpty && currentSortBy == 'relevance') {
+        // 搜尋清空時，如果當前是 relevance，則切換回 updated_time
+        _currentSortBy[_currentTabIndex] = 'updated_time';
+        _sortAscending[_currentTabIndex] = false;
+        // 重置手動覆蓋標記
+        _hasManualSortOverride[_currentTabIndex] = false;
+        debugPrint('🔍 [ChatListProvider] 搜尋清空，切換到時間排序');
+      }
+
+      _emit('search_changed');
+    }
+  }
+
+  /// 更新搜尋查詢（別名方法，保持向後兼容）
   void updateSearchQuery(String query) {
-    if (searchQuery == query) return;
-    _searchQueries[_currentTabIndex] = query;
-    _emit('criteria');
+    setSearchQuery(query);
   }
 
   /// 更新位置篩選
@@ -167,17 +202,39 @@ class ChatListProvider extends ChangeNotifier {
   }
 
   /// 設置排序方式
-  void setSortOrder(String sortBy) {
-    final currentSort = currentSortBy;
-    final currentAsc = sortAscending;
-
-    if (currentSort == sortBy) {
-      _sortAscending[_currentTabIndex] = !currentAsc;
-    } else {
+  void setSortOrder(String sortBy, {bool ascending = false}) {
+    if (_currentSortBy[_currentTabIndex] != sortBy ||
+        _sortAscending[_currentTabIndex] != ascending) {
       _currentSortBy[_currentTabIndex] = sortBy;
-      _sortAscending[_currentTabIndex] = true;
+      _sortAscending[_currentTabIndex] = ascending;
+
+      // 追蹤用戶手動選擇的排序
+      if (sortBy != 'relevance' ||
+          _searchQueries[_currentTabIndex]?.isNotEmpty == true) {
+        _hasManualSortOverride[_currentTabIndex] = true;
+        debugPrint('🔍 [ChatListProvider] 用戶手動選擇排序: $sortBy');
+      }
+
+      _emit('sort_changed');
     }
-    _emit('criteria');
+  }
+
+  /// 設置跨位置搜尋
+  void setCrossLocationSearch(bool enabled) {
+    if (_crossLocationSearch[_currentTabIndex] != enabled) {
+      _crossLocationSearch[_currentTabIndex] = enabled;
+      _emit('cross_location_search_changed');
+    }
+  }
+
+  /// 智能設置排序（有搜尋時自動設為 relevance）
+  void setSmartSortOrder(String sortBy, {bool ascending = false}) {
+    // 如果有搜尋查詢且選擇了 relevance，則自動設置
+    if (searchQuery.isNotEmpty && sortBy == 'relevance') {
+      setSortOrder('relevance', ascending: false);
+    } else {
+      setSortOrder(sortBy, ascending: ascending);
+    }
   }
 
   /// 重置當前分頁的所有篩選條件
@@ -187,6 +244,7 @@ class ChatListProvider extends ChangeNotifier {
     _selectedStatuses[_currentTabIndex]?.clear();
     _currentSortBy[_currentTabIndex] = 'updated_time';
     _sortAscending[_currentTabIndex] = false;
+    _hasManualSortOverride[_currentTabIndex] = false; // 重置手動覆蓋標記
     _emit('criteria');
   }
 

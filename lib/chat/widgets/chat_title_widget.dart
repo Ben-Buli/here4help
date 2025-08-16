@@ -84,6 +84,12 @@ class _ChatTitleWidgetState extends State<ChatTitleWidget> {
       debugPrint('✅ 使用傳入的數據作為後備');
     }
 
+    // 確保 data 不為 null
+    if (data == null) {
+      data = <String, dynamic>{};
+      debugPrint('⚠️ 沒有可用數據，使用空 Map');
+    }
+
     debugPrint('🔍 最終使用的數據: $data');
 
     if (!mounted) return;
@@ -101,7 +107,7 @@ class _ChatTitleWidgetState extends State<ChatTitleWidget> {
     debugPrint('🔍 _loading: $_loading');
     debugPrint('🔍 _chatData: $_chatData');
     debugPrint('🔍 _chatData == null: ${_chatData == null}');
-    debugPrint('🔍 _chatData!.isEmpty: ${_chatData?.isEmpty}');
+    debugPrint('🔍 _chatData?.isEmpty: ${_chatData?.isEmpty}');
 
     if (_loading) {
       debugPrint('⏳ 顯示 Loading 標題');

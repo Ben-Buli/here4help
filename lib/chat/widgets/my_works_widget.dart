@@ -162,19 +162,33 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
   Future<void> _fetchMyWorksPage(int offset) async {
     try {
+      debugPrint('🔍 [My Works] _fetchMyWorksPage 開始，offset: $offset');
+
       final chatProvider = context.read<ChatListProvider>();
       final taskService = TaskService();
       final currentUserId = context.read<UserService>().currentUser?.id;
 
+      debugPrint('🔍 [My Works] 當前用戶 ID: $currentUserId');
+      debugPrint('🔍 [My Works] TaskService 實例: $taskService');
+
       if (currentUserId != null) {
+        debugPrint('🔍 [My Works] 開始載入用戶應徵資料...');
         await taskService.loadMyApplications(currentUserId);
+        debugPrint('🔍 [My Works] 應徵資料載入完成');
+      } else {
+        debugPrint('❌ [My Works] 當前用戶 ID 為空');
+        return;
       }
 
       final all = _composeMyWorks(taskService, currentUserId);
+      debugPrint('🔍 [My Works] 組合後的任務數量: ${all.length}');
 
       // 應用篩選和排序
       final filtered = _filterTasks(all, chatProvider);
+      debugPrint('🔍 [My Works] 篩選後的任務數量: ${filtered.length}');
+
       final sorted = _sortTasks(filtered, chatProvider);
+      debugPrint('🔍 [My Works] 排序後的任務數量: ${sorted.length}');
 
       final start = offset;
       final end = (offset + _pageSize) > sorted.length
@@ -183,18 +197,26 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       final slice = sorted.sublist(start, end);
       final hasMore = end < sorted.length;
 
+      debugPrint(
+          '🔍 [My Works] 分頁處理: start=$start, end=$end, slice=${slice.length}, hasMore=$hasMore');
+
       if (!mounted) return;
 
       if (hasMore) {
         _pagingController.appendPage(slice, end);
+        debugPrint('✅ [My Works] 添加分頁數據，下一頁 key: $end');
       } else {
         _pagingController.appendLastPage(slice);
+        debugPrint('✅ [My Works] 添加最後一頁數據');
       }
 
       // 資料載入完成後更新未讀標記
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _updateMyWorksTabUnreadFlag());
+
+      debugPrint('✅ [My Works] _fetchMyWorksPage 完成');
     } catch (error) {
+      debugPrint('❌ [My Works] _fetchMyWorksPage 錯誤: $error');
       if (mounted) {
         _pagingController.error = error;
       }
@@ -206,13 +228,23 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       TaskService service, int? currentUserId) {
     final apps = service.myApplications;
 
+    // 添加詳細的除錯資訊
+    debugPrint('🔍 [My Works] _composeMyWorks 開始');
+    debugPrint('🔍 [My Works] currentUserId: $currentUserId');
+    debugPrint('🔍 [My Works] service.myApplications 長度: ${apps.length}');
+    debugPrint('🔍 [My Works] service.myApplications 內容: $apps');
+
     // 如果沒有應徵數據，返回空列表
     if (apps.isEmpty) {
+      debugPrint('⚠️ [My Works] 沒有應徵數據，返回空列表');
       return [];
     }
 
     // 直接使用 API 返回的應徵數據，轉換為任務格式
-    return apps.map((app) {
+    final result = apps.map((app) {
+      debugPrint('🔍 [My Works] 處理應徵記錄: ${app['id']}');
+      debugPrint('🔍 [My Works] 應徵記錄內容: $app');
+
       return {
         'id': app['id'],
         'title': app['title'],
@@ -235,6 +267,11 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
         'application_updated_at': app['application_updated_at'],
       };
     }).toList();
+
+    debugPrint('✅ [My Works] _composeMyWorks 完成，返回 ${result.length} 個任務');
+    debugPrint('🔍 [My Works] 轉換後的任務列表: $result');
+
+    return result;
   }
 
   /// 正規化搜尋文本 - 與 PostedTasks 一致，移除特殊字符並轉為小寫
@@ -287,12 +324,9 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
       if (!matchQuery) return false;
 
-      // 位置篩選：若有搜尋關鍵字，為了完整搜尋結果，暫時忽略位置篩選
-      bool matchLocation = true;
-      if (!hasSearchQuery) {
-        matchLocation = chatProvider.selectedLocations.isEmpty ||
-            chatProvider.selectedLocations.contains(location);
-      }
+      // 位置篩選：始終尊重使用者的位置篩選
+      final matchLocation = chatProvider.selectedLocations.isEmpty ||
+          chatProvider.selectedLocations.contains(location);
       if (!matchLocation) return false;
 
       // 狀態篩選
@@ -334,7 +368,17 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
           comparison = timeA.compareTo(timeB);
           break;
 
+        case 'status_id':
+          // 使用 status_id 進行數值排序
+          final statusIdA =
+              int.tryParse(a['status_id']?.toString() ?? '0') ?? 0;
+          final statusIdB =
+              int.tryParse(b['status_id']?.toString() ?? '0') ?? 0;
+          comparison = statusIdA.compareTo(statusIdB);
+          break;
+
         case 'status_code':
+          // 使用 status_code 進行字串排序（備用）
           final statusA = a['status_code'] ?? '';
           final statusB = b['status_code'] ?? '';
           comparison = statusA.compareTo(statusB);

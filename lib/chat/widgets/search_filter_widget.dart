@@ -112,49 +112,116 @@ class _SearchFilterWidgetState extends State<SearchFilterWidget> {
                   ),
                 ),
               ),
-
-              // 排序選項區域
-              Container(
-                height: 32,
-                margin: const EdgeInsets.only(top: 8),
-                child: Row(
+              const SizedBox(height: 12),
+              // 排序狀態提示
+              if (chatProvider.searchQuery.isNotEmpty)
+                Row(
                   children: [
-                    // 更新時間排序
-                    _buildCompactSortChip(
-                      context: context,
-                      chatProvider: chatProvider,
-                      theme: theme,
-                      label: 'Time',
-                      sortBy: 'updated_time',
-                      icon: Icons.update,
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: theme.primary.withValues(alpha: 0.7),
                     ),
                     const SizedBox(width: 8),
-
-                    // 應徵人數排序（僅限 Posted Tasks 分頁）
-                    if (chatProvider.currentTabIndex == 0) ...[
-                      _buildCompactSortChip(
-                        context: context,
-                        chatProvider: chatProvider,
-                        theme: theme,
-                        label: 'Applicants',
-                        sortBy: 'applicant_count',
-                        icon: Icons.people,
+                    Expanded(
+                      child: Text(
+                        chatProvider.currentSortBy == 'relevance'
+                            ? 'Sorting by relevance (recommended for search)'
+                            : 'Sorting by ${chatProvider.currentSortBy.replaceAll('_', ' ')} (overridden)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: theme.primary.withValues(alpha: 0.7),
+                          fontStyle: FontStyle.italic,
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                    ],
-
-                    // 任務狀態排序
-                    _buildCompactSortChip(
-                      context: context,
-                      chatProvider: chatProvider,
-                      theme: theme,
-                      label: 'Status',
-                      sortBy: 'status_code',
-                      icon: Icons.sort_by_alpha,
                     ),
                   ],
                 ),
+              const SizedBox(height: 8),
+              // 排序選項
+              Row(
+                children: [
+                  Text(
+                    'Order by: ',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.onSurface.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // 相關性排序（只有有搜尋時才顯示）
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          if (chatProvider.searchQuery.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _buildCompactSortChip(
+                                context: context,
+                                chatProvider: chatProvider,
+                                theme: theme,
+                                label: 'Relevance',
+                                sortBy: 'relevance',
+                                icon: Icons.search,
+                              ),
+                            ),
+                          // 時間排序
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: _buildCompactSortChip(
+                              context: context,
+                              chatProvider: chatProvider,
+                              theme: theme,
+                              label: 'Updated Time',
+                              sortBy: 'updated_time',
+                              icon: Icons.access_time,
+                            ),
+                          ),
+                          // 狀態排序
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: _buildCompactSortChip(
+                              context: context,
+                              chatProvider: chatProvider,
+                              theme: theme,
+                              label: 'Status Order',
+                              sortBy: 'status_order',
+                              icon: Icons.sort_by_alpha,
+                            ),
+                          ),
+                          // 熱門度(應徵者數量）排序
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: _buildCompactSortChip(
+                              context: context,
+                              chatProvider: chatProvider,
+                              theme: theme,
+                              label: 'Popularity',
+                              sortBy: 'applicant_count',
+                              icon: Icons.people,
+                            ),
+                          ),
+                          // 狀態ID排序
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: _buildCompactSortChip(
+                              context: context,
+                              chatProvider: chatProvider,
+                              theme: theme,
+                              label: 'Status ID',
+                              sortBy: 'status_id',
+                              icon: Icons.sort,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
+              // ),
             ],
           ),
         );
@@ -383,6 +450,36 @@ class _SearchFilterWidgetState extends State<SearchFilterWidget> {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 24),
+
+                        // 跨位置搜尋開關
+                        if (chatProvider.searchQuery.isNotEmpty)
+                          Row(
+                            children: [
+                              Checkbox(
+                                value: chatProvider.crossLocationSearch,
+                                onChanged: (value) {
+                                  chatProvider
+                                      .setCrossLocationSearch(value ?? false);
+                                },
+                              ),
+                              Text(
+                                '跨位置搜尋',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.onSurface.withValues(alpha: 0.8),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '(忽略位置篩選，搜尋所有地點)',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: theme.onSurface.withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),

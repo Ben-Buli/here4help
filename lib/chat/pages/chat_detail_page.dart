@@ -101,7 +101,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     if (text.isEmpty) {
       return const Text('', style: TextStyle(fontSize: 14));
     }
-    
+
     final imageUrl = _extractFirstImageUrl(text);
     if (imageUrl == null) {
       return Text(
@@ -1385,6 +1385,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       final time =
           message['time'] ?? DateFormat('HH:mm').format(DateTime.now());
 
+      debugPrint(
+          '🔍 [My Works] buildMyMessageBubble: text="$text", message=$message');
+
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3.0),
         child: Row(
@@ -1412,7 +1415,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onPrimaryContainer,
                       ),
-                      child: _buildMessageContent(text),
+                      child: Text(
+                        text,
+                        style: const TextStyle(fontSize: 14),
+                        softWrap: true,
+                        overflow: TextOverflow.visible,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -1589,19 +1597,24 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                   if (adjustedIndex < _chatMessages.length) {
                     final messageData = _chatMessages[adjustedIndex];
                     final messageText =
-                        messageData['message']?.toString() ?? '';
+                        messageData['content']?.toString() ?? 'No message';
                     final messageFromUserId = messageData['from_user_id'];
                     final messageTime =
                         messageData['created_at']?.toString() ?? '';
                     final senderName =
                         messageData['sender_name']?.toString() ?? 'Unknown';
 
+                    // 添加除錯資訊
+                    debugPrint(
+                        '🔍 [Chat Detail] 訊息資料: messageData=$messageData');
+                    debugPrint(
+                        '🔍 [Chat Detail] 訊息文字: messageText="$messageText"');
+                    debugPrint(
+                        '🔍 [Chat Detail] 訊息來源: messageFromUserId=$messageFromUserId, currentUserId=$_currentUserId');
+
                     // 判斷這條訊息是否來自當前用戶
                     final isMyMessage = _currentUserId != null &&
                         messageFromUserId == _currentUserId;
-
-                    // debugPrint(
-                    //     '🔍 Message judgment: messageFromUserId=$messageFromUserId, currentUserId=$_currentUserId, isMyMessage=$isMyMessage, text=$messageText');
 
                     // 根據是否為我方訊息決定氣泡樣式
                     if (isMyMessage) {

@@ -1,364 +1,360 @@
-# Here4Help 資料庫架構文件
 
-## 概述
-本文檔描述了 Here4Help 專案的完整資料庫架構，包含所有表格的結構、關係和用途。
+# Here4Help 資料庫文件（重編版，含現況與必須異動）
 
-## 資料庫資訊
-- **資料庫名稱**: `hero4helpdemofhs_hero4help`
-- **字符集**: `utf8mb4`
-- **排序規則**: `utf8mb4_unicode_ci`
-- **引擎**: InnoDB
+> 目的：提供一份「可維運、可開發」的單一事實來源（Single Source of Truth）。本文件分為 **As-Is（目前實際資料庫）** 與 **To-Be（必要一致化異動）**。所有 API 與前端必須以本文件為準。
 
-## 表格架構
+---
 
-### 1. 管理員相關表格
+## 0) 全域約定
 
-#### `admins` - 管理員帳戶
+- **DB 名稱**：`hero4helpdemofhs_hero4help`
+- **字元集 / Collation**：`utf8mb4` / `utf8mb4_unicode_ci`
+- **引擎**：InnoDB
+- **時間欄位慣例**：`created_at`、`updated_at`（`updated_at` 預設 `ON UPDATE CURRENT_TIMESTAMP`）
+- **軟刪除**：目前未導入，若未來需要請新增 `deleted_at`。
+
+---
+
+## 1) As‑Is 概觀（來自目前 SQL Dump）
+
+> 來源：`extracted_schema.md`（完整 `CREATE TABLE` 內容已萃取）。此處列出核心表格與用途，供對照。
+
+### 1.1 使用者
+- `users`：使用者主檔，`id` 為 BIGINT UNSIGNED，自增。`email` 唯一。
+
+### 1.2 任務（Tasks）
+- `tasks`：任務主檔，`id` 為 `varchar(36)`（UUID），`status_id` 數值對 `task_statuses.id`。
+- `task_statuses`：任務狀態字典，含 `code` 與 `display_name`。
+
+> **差異提醒**：現行 `task_applications.status` 為 `ENUM('pending','approved','rejected','completed','cancelled')`（與規格不一致）。
+
+- `task_applications`：任務應徵關聯（現況的 `status` Enum 如上）。
+- `application_questions`：任務申請額外提問與回覆。
+
+### 1.3 聊天（Chat）
+- `chat_rooms`：1v1 聊天室（`creator_id` ↔ `participant_id` 對應 `users.id`，綁定 `task_id`）。
+- `chat_messages`：訊息（`kind` = `'user'|'system'|'applyMessage'`）。
+- `chat_reads`：**已改為**含 `id` 自增主鍵 + `UNIQUE(user_id, room_id)`，紀錄 `last_read_message_id`。
+
+### 1.4 評價 / 點數 / 推薦碼
+- `reviews`：單向評價（現況用表）。
+- `points` / `point_requests`：點數流水與充值申請。
+- `referral_codes` / `referral_uses`：推薦碼與使用紀錄。
+
+### 1.5 管理與系統
+- `admins` / `admin_activity_logs` / `admin_login_logs`：管理員與稽核。
+- `cache` / `cache_locks`：快取與鎖。
+
+---
+
+## 2) To‑Be 一致化異動（**必做**）
+
+> 下列異動與[聊天模組規格](chat_module_spec.md)對齊，並確保 **角色映射視角**、**未讀計算**、**評分可追溯** 與 **單一受雇者** 的一致性。
+
+### 2.1 應徵狀態（Applications）標準化
+- 將 `task_applications.status` **改為**：`ENUM('applied','accepted','rejected')`（簡潔、與流程一致）。
+- 強制 **單一受雇者**：新增 **產生欄位** `accepted_flag`，僅在 `status='accepted'` 時為 `1`，並建立唯一鍵 `(task_id, accepted_flag)`。
+
 ```sql
-CREATE TABLE `admins` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `username` varchar(50) NOT NULL,
-  `email` varchar(255) NOT NULL,
-  `password` varchar(255) NOT NULL,
-  `full_name` varchar(100) NOT NULL,
-  `role` enum('super_admin','admin','developer','moderator') DEFAULT 'admin',
-  `status` enum('active','reset','inactive','suspended') DEFAULT 'active',
-  `last_login` timestamp NULL DEFAULT NULL,
-  `login_attempts` int DEFAULT '0',
-  `locked_until` timestamp NULL DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-);
+ALTER TABLE `task_applications`
+  MODIFY COLUMN `status` ENUM('applied','accepted','rejected') NOT NULL DEFAULT 'applied';
+
+ALTER TABLE `task_applications`
+  ADD COLUMN `accepted_flag` TINYINT
+    AS (CASE WHEN `status` = 'accepted' THEN 1 ELSE NULL END) STORED,
+  ADD UNIQUE KEY `uk_task_one_accept` (`task_id`, `accepted_flag`);
 ```
 
-#### `admin_activity_logs` - 管理員活動日誌
+> **說明**：確保任務只能有 **一個**被接受的應徵者（DB 層級最後防線）。
+
+### 2.2 任務狀態日誌（倒數用）
+- 新增 `task_status_logs`，用來記錄任務狀態切換（用於 Pending Confirmation 七日倒數）。
+
 ```sql
-CREATE TABLE `admin_activity_logs` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `admin_id` int NOT NULL,
-  `action` varchar(100) NOT NULL,
-  `table_name` varchar(50) DEFAULT NULL,
-  `record_id` int DEFAULT NULL,
-  `old_data` json DEFAULT NULL,
-  `new_data` json DEFAULT NULL,
-  `ip_address` varchar(45) DEFAULT NULL,
-  `user_agent` text,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-);
+CREATE TABLE IF NOT EXISTS `task_status_logs` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `task_id` VARCHAR(36) NOT NULL,
+  `from_status_id` INT DEFAULT NULL,
+  `to_status_id` INT NOT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_task_status_time` (`task_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-#### `admin_login_logs` - 管理員登入日誌
+### 2.3 評分資料模型（可追溯到受評者）
+- 新增 / 取代 `reviews` 為 `task_ratings`，以 **最終受雇者** 為受評對象，防重複：`(task_id, rater_id, tasker_id)` 唯一。
+
 ```sql
-CREATE TABLE `admin_login_logs` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `admin_id` int NOT NULL,
-  `login_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `logout_time` timestamp NULL DEFAULT NULL,
-  `ip_address` varchar(45) DEFAULT NULL,
-  `user_agent` text,
-  `status` enum('success','failed','locked') DEFAULT 'success',
-  PRIMARY KEY (`id`)
-);
+CREATE TABLE IF NOT EXISTS `task_ratings` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `task_id` VARCHAR(36) NOT NULL,
+  `rater_id` BIGINT UNSIGNED NOT NULL,
+  `tasker_id` BIGINT UNSIGNED NOT NULL, -- 受評者 = 最終 accepted 應徵者
+  `rating` TINYINT NOT NULL,
+  `comment` VARCHAR(255) DEFAULT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_task_rater_tasker` (`task_id`, `rater_id`, `tasker_id`),
+  KEY `idx_task` (`task_id`),
+  KEY `idx_rater` (`rater_id`),
+  KEY `idx_tasker` (`tasker_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-### 2. 任務相關表格
+> **備註**：若需保留 `reviews` 作為歷史資料，可維持但前端/報表一律改讀 `task_ratings`。
 
-#### `tasks` - 任務主表
+### 2.4 聊天訊息類型補完（圖片訊息）
+- 將 `chat_messages.kind` **擴充** 為：`ENUM('user','system','applyMessage','image')`，其中 `image` 類型的 `content` 僅儲存圖片 URL。
+
 ```sql
-CREATE TABLE `tasks` (
-  `id` varchar(36) NOT NULL,
-  `creator_id` bigint UNSIGNED NOT NULL,
-  `title` varchar(255) NOT NULL,
-  `description` text NOT NULL,
-  `location` varchar(255) NOT NULL,
-  `budget_min` decimal(10,2) NOT NULL,
-  `budget_max` decimal(10,2) NOT NULL,
-  `start_datetime` datetime NOT NULL,
-  `end_datetime` datetime NOT NULL,
-  `status_id` int NOT NULL DEFAULT 1,
-  `popular` tinyint(1) DEFAULT 0,
-  `new` tinyint(1) DEFAULT 1,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-);
+ALTER TABLE `chat_messages`
+  MODIFY COLUMN `kind` ENUM('user','system','applyMessage','image') NOT NULL DEFAULT 'user';
 ```
 
-#### `task_statuses` - 任務狀態
-```sql
-CREATE TABLE `task_statuses` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `code` varchar(50) NOT NULL,
-  `display_name` varchar(100) NOT NULL,
-  `progress_ratio` decimal(3,2) DEFAULT 0.00,
-  `sort_order` int DEFAULT 0,
-  `include_in_unread` tinyint(1) DEFAULT 1,
-  `is_active` tinyint(1) DEFAULT 1,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-);
-```
+### 2.5 已讀指標（chat_reads）一致性
+- 現況已具備：`id` 自增、`UNIQUE(user_id, room_id)`、`last_read_message_id`。  
+- 規範：**所有未讀計算**僅依 `last_read_message_id`（不逐則寫回）。
 
-#### `task_applications` - 任務申請
-```sql
-CREATE TABLE `task_applications` (
-  `id` varchar(36) NOT NULL,
-  `task_id` varchar(36) NOT NULL,
-  `user_id` bigint UNSIGNED NOT NULL,
-  `status` enum('pending','approved','rejected','completed','cancelled') DEFAULT 'pending',
-  `cover_letter` text,
-  `proposed_budget` decimal(10,2) DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-);
-```
+### 2.6 任務狀態字典（`task_statuses`）比對
+- 確保 `task_statuses` 具備下列 code（可依序號）與 `display_name`：  
+  `open` / `in_progress` / `pending_confirmation` / `dispute` / `completed` / `closed` / `cancelled`
 
-#### `application_questions` - 申請問題
-```sql
-CREATE TABLE `application_questions` (
-  `id` varchar(36) NOT NULL,
-  `task_id` varchar(36) NOT NULL,
-  `application_question` text NOT NULL,
-  `applier_reply` text,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-);
-```
+> 若現有不一致，**請補齊/對齊**，避免頁面映射混亂。
 
-### 3. 用戶相關表格
+---
 
-#### `users` - 用戶主表
+## 3) 目標 ER（精簡文字版）
+
+- **users** (1) ——< **tasks**(creator_id)  
+- **tasks** (1) ——< **task_applications**(task_id, user_id)  
+- **tasks** (1) ——< **chat_rooms**(task_id) ——< **chat_messages**  
+- **users** (1) ——< **chat_rooms**(creator_id / participant_id)  
+- **users** (1) ——< **chat_messages**(from_user_id)  
+- **users** (1) ——< **chat_reads**(user_id, room_id UNIQUE)  
+- **tasks** (1) ——< **task_status_logs**  
+- **users** (1) ——< **task_ratings**(rater_id / tasker_id)  
+- **users** (1) ——< **referral_codes** ——< **referral_uses**  
+- **users** (1) ——< **points** / **point_requests**  
+
+---
+
+## 4) 標準化 DDL（To‑Be 完整範本）
+
+> 下列為 **最終一致版本** 的主要表 DDL（可直接對照、或用於初始化測試環境）。
+
+### 4.1 使用者
 ```sql
 CREATE TABLE `users` (
-  `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL,
-  `email` varchar(255) NOT NULL UNIQUE,
-  `password` varchar(255) NOT NULL,
-  `avatar_url` varchar(500) DEFAULT NULL,
-  `phone` varchar(20) DEFAULT NULL,
-  `student_id` varchar(50) DEFAULT NULL,
-  `university` varchar(255) DEFAULT NULL,
-  `major` varchar(255) DEFAULT NULL,
-  `year_level` varchar(50) DEFAULT NULL,
-  `status` enum('active','inactive','banned') DEFAULT 'active',
-  `email_verified_at` timestamp NULL DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(255) NOT NULL,
+  `email` VARCHAR(255) NOT NULL UNIQUE,
+  `password` VARCHAR(255) NOT NULL,
+  `avatar_url` VARCHAR(500) DEFAULT NULL,
+  `phone` VARCHAR(20) DEFAULT NULL,
+  `status` ENUM('active','inactive','banned') DEFAULT 'active',
+  `email_verified_at` TIMESTAMP NULL DEFAULT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-### 4. 聊天相關表格
+### 4.2 任務
+```sql
+CREATE TABLE `tasks` (
+  `id` VARCHAR(36) NOT NULL,
+  `creator_id` BIGINT UNSIGNED NOT NULL,
+  `title` VARCHAR(255) NOT NULL,
+  `description` TEXT NOT NULL,
+  `location` VARCHAR(255) NOT NULL,
+  `budget_min` DECIMAL(10,2) NOT NULL,
+  `budget_max` DECIMAL(10,2) NOT NULL,
+  `start_datetime` DATETIME NOT NULL,
+  `end_datetime` DATETIME NOT NULL,
+  `status_id` INT NOT NULL DEFAULT 1,
+  `popular` TINYINT(1) DEFAULT 0,
+  `new` TINYINT(1) DEFAULT 1,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_tasks_creator` (`creator_id`),
+  KEY `idx_tasks_status` (`status_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-#### `chat_rooms` - 聊天室
+CREATE TABLE `task_statuses` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `code` VARCHAR(50) NOT NULL,
+  `display_name` VARCHAR(100) NOT NULL,
+  `progress_ratio` DECIMAL(3,2) DEFAULT 0.00,
+  `sort_order` INT DEFAULT 0,
+  `include_in_unread` TINYINT(1) DEFAULT 1,
+  `is_active` TINYINT(1) DEFAULT 1,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+### 4.3 應徵
+```sql
+CREATE TABLE `task_applications` (
+  `id` VARCHAR(36) NOT NULL,
+  `task_id` VARCHAR(36) NOT NULL,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `status` ENUM('applied','accepted','rejected') NOT NULL DEFAULT 'applied',
+  `accepted_flag` TINYINT AS (CASE WHEN `status`='accepted' THEN 1 ELSE NULL END) STORED,
+  `cover_letter` TEXT,
+  `proposed_budget` DECIMAL(10,2) DEFAULT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_app_task` (`task_id`),
+  KEY `idx_app_user` (`user_id`),
+  UNIQUE KEY `uk_task_one_accept` (`task_id`, `accepted_flag`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `application_questions` (
+  `id` VARCHAR(36) NOT NULL,
+  `task_id` VARCHAR(36) NOT NULL,
+  `application_question` TEXT NOT NULL,
+  `applier_reply` TEXT,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+### 4.4 聊天
 ```sql
 CREATE TABLE `chat_rooms` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `task_id` varchar(36) NOT NULL,
-  `creator_id` bigint UNSIGNED NOT NULL,
-  `participant_id` bigint UNSIGNED NOT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-);
-```
-
-#### `chat_messages` - 聊天訊息
-```sql
-CREATE TABLE `chat_messages` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `room_id` bigint NOT NULL,
-  `kind` enum('user','system','applyMessage') DEFAULT 'user',
-  `content` text NOT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `read_at` timestamp NULL DEFAULT NULL,
-  `from_user_id` bigint UNSIGNED NOT NULL,
-  PRIMARY KEY (`id`)
-);
-```
-
-#### `chat_reads` - 聊天已讀狀態 ⚠️ 需要添加自增 ID
-```sql
-CREATE TABLE `chat_reads` (
-  `id` bigint NOT NULL AUTO_INCREMENT, -- 新增自增 ID
-  `user_id` bigint UNSIGNED NOT NULL,
-  `room_id` bigint NOT NULL,
-  `last_read_message_id` bigint DEFAULT 0,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `task_id` VARCHAR(36) NOT NULL,
+  `creator_id` BIGINT UNSIGNED NOT NULL,
+  `participant_id` BIGINT UNSIGNED NOT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `user_room_unique` (`user_id`, `room_id`)
-);
+  KEY `idx_room_task` (`task_id`),
+  KEY `idx_room_creator` (`creator_id`),
+  KEY `idx_room_participant` (`participant_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `chat_messages` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `room_id` BIGINT NOT NULL,
+  `kind` ENUM('user','system','applyMessage','image') NOT NULL DEFAULT 'user',
+  `content` TEXT NOT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  `read_at` TIMESTAMP NULL DEFAULT NULL,
+  `from_user_id` BIGINT UNSIGNED NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_msg_room_id` (`room_id`, `id`),
+  KEY `idx_msg_room_from_id` (`room_id`, `from_user_id`, `id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `chat_reads` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `room_id` BIGINT NOT NULL,
+  `last_read_message_id` BIGINT DEFAULT 0,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_room_unique` (`user_id`, `room_id`),
+  KEY `idx_reads_room` (`room_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-### 5. 推薦碼相關表格
-
-#### `referral_codes` - 推薦碼
+### 4.5 任務狀態日誌
 ```sql
-CREATE TABLE `referral_codes` (
-  `id` varchar(36) NOT NULL,
-  `user_id` bigint UNSIGNED NOT NULL,
-  `code` varchar(20) NOT NULL UNIQUE,
-  `max_uses` int DEFAULT 10,
-  `used_count` int DEFAULT 0,
-  `is_active` tinyint(1) DEFAULT 1,
-  `expires_at` timestamp NULL DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-);
+CREATE TABLE `task_status_logs` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `task_id` VARCHAR(36) NOT NULL,
+  `from_status_id` INT DEFAULT NULL,
+  `to_status_id` INT NOT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_task_status_time` (`task_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-#### `referral_uses` - 推薦碼使用記錄
+### 4.6 評分（新）
 ```sql
-CREATE TABLE `referral_uses` (
-  `id` varchar(36) NOT NULL,
-  `referral_code_id` varchar(36) NOT NULL,
-  `used_by_user_id` bigint UNSIGNED NOT NULL,
-  `used_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-);
+CREATE TABLE `task_ratings` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `task_id` VARCHAR(36) NOT NULL,
+  `rater_id` BIGINT UNSIGNED NOT NULL,
+  `tasker_id` BIGINT UNSIGNED NOT NULL,
+  `rating` TINYINT NOT NULL,
+  `comment` VARCHAR(255) DEFAULT NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_task_rater_tasker` (`task_id`, `rater_id`, `tasker_id`),
+  KEY `idx_task` (`task_id`),
+  KEY `idx_rater` (`rater_id`),
+  KEY `idx_tasker` (`tasker_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-### 6. 點數相關表格
+### 4.7 點數 / 推薦碼（沿用現況）
+> 與現況一致（如需移轉可貼現有 DDL），此處略。
 
-#### `points` - 點數記錄
-```sql
-CREATE TABLE `points` (
-  `id` varchar(36) NOT NULL,
-  `user_id` bigint UNSIGNED NOT NULL,
-  `amount` int NOT NULL,
-  `type` enum('earn','spend','refund','bonus') NOT NULL,
-  `description` varchar(255) NOT NULL,
-  `related_task_id` varchar(36) DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-);
-```
+---
 
-#### `point_requests` - 點數充值請求
-```sql
-CREATE TABLE `point_requests` (
-  `id` varchar(36) NOT NULL,
-  `user_id` bigint UNSIGNED NOT NULL,
-  `amount` int NOT NULL,
-  `payment_method` varchar(50) NOT NULL,
-  `status` enum('pending','approved','rejected','completed') DEFAULT 'pending',
-  `admin_notes` text,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-);
-```
+## 5) 外鍵建議（可選，但建議在新環境強化）
+> 生產環境若擔心歷史髒資料導致 FK 失敗，可先以 **應用層與定時清理** 保護，之後逐步補上 FK。
 
-### 7. 評價相關表格
+- `tasks.creator_id` → `users(id)`
+- `task_applications.task_id` → `tasks(id)`；`task_applications.user_id` → `users(id)`
+- `chat_rooms.task_id` → `tasks(id)`；`chat_rooms.creator_id/participant_id` → `users(id)`
+- `chat_messages.room_id` → `chat_rooms(id)`；`chat_messages.from_user_id` → `users(id)`
+- `chat_reads.room_id` → `chat_rooms(id)`；`chat_reads.user_id` → `users(id)`
+- `task_ratings.tasker_id` / `rater_id` → `users(id)`；`task_ratings.task_id` → `tasks(id)`
 
-#### `reviews` - 評價
-```sql
-CREATE TABLE `reviews` (
-  `id` varchar(36) NOT NULL,
-  `task_id` varchar(36) NOT NULL,
-  `reviewer_id` bigint UNSIGNED NOT NULL,
-  `reviewee_id` bigint UNSIGNED NOT NULL,
-  `rating` tinyint NOT NULL,
-  `comment` text,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`)
-);
-```
+---
 
-### 8. 系統相關表格
+## 6) 索引策略（與查詢對齊）
+- 取房最新訊息 / 分頁：`chat_messages(room_id, id)`
+- 計未讀（對方訊息 + 分界）：`chat_messages(room_id, from_user_id, id)` + `chat_reads(user_id, room_id)`
+- 查我的所有房：`chat_rooms(creator_id)`、`chat_rooms(participant_id)`、`chat_rooms(task_id)`
+- 倒數查詢：`task_status_logs(task_id, created_at)`
 
-#### `cache` - 快取
-```sql
-CREATE TABLE `cache` (
-  `key` varchar(255) NOT NULL,
-  `value` mediumtext NOT NULL,
-  `expiration` int NOT NULL,
-  PRIMARY KEY (`key`)
-);
-```
+---
 
-#### `cache_locks` - 快取鎖
-```sql
-CREATE TABLE `cache_locks` (
-  `key` varchar(255) NOT NULL,
-  `owner` varchar(255) NOT NULL,
-  `expiration` int NOT NULL,
-  PRIMARY KEY (`key`)
-);
-```
+## 7) 遷移清單（按順序執行）
 
-## 外鍵關係
+1. **Applications 標準化**
+   - 修改 `task_applications.status` Enum → `('applied','accepted','rejected')`
+   - 新增 `accepted_flag` 產生欄位 + 唯一鍵 `(task_id, accepted_flag)`
+   - 寫入層：確保「接受某人」時同一交易中自動拒絕其他人（應用層或 DB 觸發器）
 
-### 主要關係
-1. **tasks** → **users** (creator_id)
-2. **task_applications** → **tasks** (task_id)
-3. **task_applications** → **users** (user_id)
-4. **application_questions** → **tasks** (task_id)
-5. **chat_rooms** → **tasks** (task_id)
-6. **chat_rooms** → **users** (creator_id, participant_id)
-7. **chat_messages** → **chat_rooms** (room_id)
-8. **chat_messages** → **users** (from_user_id)
-9. **chat_reads** → **users** (user_id)
-10. **chat_reads** → **chat_rooms** (room_id)
-11. **referral_codes** → **users** (user_id)
-12. **referral_uses** → **referral_codes** (referral_code_id)
-13. **referral_uses** → **users** (used_by_user_id)
-14. **points** → **users** (user_id)
-15. **point_requests** → **users** (user_id)
-16. **reviews** → **tasks** (task_id)
-17. **reviews** → **users** (reviewer_id, reviewee_id)
+2. **新增 `task_status_logs`**（歷史補寫：可由現有任務狀態變更紀錄回填）
 
-## 索引策略
+3. **擴充 `chat_messages.kind`** → 加入 `'image'`
 
-### 主要索引
-- `users.email` - 唯一索引
-- `tasks.creator_id` - 普通索引
-- `tasks.status_id` - 普通索引
-- `task_applications.task_id` - 普通索引
-- `task_applications.user_id` - 普通索引
-- `chat_rooms.task_id` - 普通索引
-- `chat_messages.room_id` - 普通索引
-- `chat_reads.room_id, user_id` - 複合索引
-- `referral_codes.code` - 唯一索引
-- `points.user_id` - 普通索引
+4. **導入 `task_ratings`**（若保留 `reviews`：
+   - 新寫入走 `task_ratings`
+   - 舊資料可選擇回填 `tasker_id`（依 accepted applicant 推斷）
 
-## 資料統計
+5. **索引補齊**（見 §6）
 
-### 當前資料量（截至 2025-08-16）
-- **users**: 約 10+ 筆
-- **tasks**: 約 30+ 筆
-- **task_applications**: 約 100+ 筆
-- **chat_messages**: 約 250+ 筆
-- **chat_rooms**: 約 100+ 筆
-- **chat_reads**: 37 筆（已清理重複資料）
+---
 
-## 注意事項
+## 8) 資料品質與一致性守則
 
-### 1. chat_reads 表已修改 ✅
-`chat_reads` 表已成功添加自增 ID 並清理重複資料：
-- ✅ 已添加自增 ID 欄位作為主鍵
-- ✅ 已清理重複的 user_id, room_id 組合
-- ✅ 保留每個組合的最新記錄
-- ✅ 資料一致性檢查通過
+- **未讀計算**：一律以 `chat_reads.last_read_message_id` 為分界；不逐則寫回。
+- **角色映射視角**：後端回傳 `mapped_status` + `raw_task_status` + `application_status`；前端不自行推導。
+- **單一受雇者**：違反唯一鍵 → 回 `409`，應用層顯示友善訊息。
+- **倒數轉態**：由 worker/cron 負責，**冪等**（重試不會重覆轉點）。
 
-### 2. 字符集統一
-所有表格使用 `utf8mb4` 字符集和 `utf8mb4_unicode_ci` 排序規則，支援完整的 Unicode 字符。
+---
 
-### 3. 時間戳記
-所有表格都包含 `created_at` 和 `updated_at` 時間戳記，確保資料追蹤。
+## 9) 版本維運
+- **備份**：每日
+- **慢查詢**：啟用日誌並定期調優索引
+- **資料清理**：cache/logs 定期清理
+- **Schema 版本標記**：以 migration id / release tag 標註
 
-### 4. 軟刪除
-目前沒有實作軟刪除機制，如需保留歷史資料，建議添加 `deleted_at` 欄位。
+---
 
-## 維護建議
-
-1. **定期備份**: 建議每日進行資料庫備份
-2. **索引優化**: 根據查詢模式定期檢視和優化索引
-3. **資料清理**: 定期清理過期的快取和日誌資料
-4. **效能監控**: 監控慢查詢和資料庫效能指標
+> 本文件與 `chat_module_spec.md` 相互對應。當兩份文件衝突時，以 **To‑Be**（本文件 §2 / §4 / §7）為最終準則。

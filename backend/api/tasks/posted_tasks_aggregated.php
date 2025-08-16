@@ -32,7 +32,7 @@ try {
     }
     
     // 建立查詢條件
-    $whereConditions = ['t.creator_id = ?', 't.status_id NOT IN (7, 8)'];
+    $whereConditions = ['t.creator_id = ?'];
     $params = [(int)$creator_id];
     
     if ($status) {
@@ -72,13 +72,28 @@ try {
             LEFT JOIN task_statuses s ON t.status_id = s.id
             LEFT JOIN users u ON t.creator_id = u.id
             $whereClause
-            ORDER BY t.created_at DESC 
+            ORDER BY t.status_id DESC, t.updated_at DESC 
             LIMIT ? OFFSET ?";
     
     $params[] = $limit;
     $params[] = $offset;
     
+    // 添加除錯資訊
+    error_log("🔍 [Posted Tasks Aggregated] 查詢用戶 ID: $creator_id");
+    error_log("🔍 [Posted Tasks Aggregated] SQL: $sql");
+    error_log("🔍 [Posted Tasks Aggregated] 參數: " . json_encode($params));
+    
     $tasks = $db->fetchAll($sql, $params);
+    
+    error_log("🔍 [Posted Tasks Aggregated] 查詢結果數量: " . count($tasks));
+    
+    // 檢查是否有遺漏的任務
+    $totalTasksCount = $db->fetch("SELECT COUNT(*) as count FROM tasks WHERE creator_id = ?", [(int)$creator_id])['count'];
+    error_log("🔍 [Posted Tasks Aggregated] 資料庫總任務數: $totalTasksCount, API 返回: " . count($tasks));
+    
+    if ($totalTasksCount > count($tasks)) {
+        error_log("⚠️ [Posted Tasks Aggregated] 發現遺漏任務！資料庫: $totalTasksCount, API: " . count($tasks));
+    }
     
     // 為每個任務獲取詳細的應徵者資訊（包含聊天室ID）
     foreach ($tasks as &$task) {
