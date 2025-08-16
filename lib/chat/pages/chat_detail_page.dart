@@ -18,7 +18,8 @@ import 'package:here4help/utils/path_mapper.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'dart:ui';
-import 'package:go_router/go_router.dart';
+// import 'package:go_router/go_router.dart';
+import 'package:here4help/services/notification_service.dart';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, this.data});
@@ -674,6 +675,19 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               messages.map((msg) => Map<String, dynamic>.from(msg)).toList();
           _isLoadingMessages = false;
         });
+        // 標記已讀（讀到列表中的最後一則訊息）
+        try {
+          if (_chatMessages.isNotEmpty) {
+            final lastIdRaw = _chatMessages.last['id'];
+            final lastId = (lastIdRaw is int)
+                ? lastIdRaw
+                : int.tryParse('$lastIdRaw') ?? 0;
+            if (lastId > 0 && _currentRoomId != null) {
+              NotificationCenter().service.markRoomRead(
+                  roomId: _currentRoomId!, upToMessageId: '$lastId');
+            }
+          }
+        } catch (_) {}
         // 在底部則保持自動滾到底
         if (_isAtBottom) {
           _scrollToBottom(delayed: true);
@@ -818,6 +832,19 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   @override
   void dispose() {
+    // 最後一次保險：離開時嘗試標記到目前列表最後一則
+    try {
+      if (_currentRoomId != null && _chatMessages.isNotEmpty) {
+        final lastIdRaw = _chatMessages.last['id'];
+        final lastId =
+            (lastIdRaw is int) ? lastIdRaw : int.tryParse('$lastIdRaw') ?? 0;
+        if (lastId > 0) {
+          NotificationCenter()
+              .service
+              .markRoomRead(roomId: _currentRoomId!, upToMessageId: '$lastId');
+        }
+      }
+    } catch (_) {}
     // 離開 Socket.IO 房間
     if (_currentRoomId != null) {
       _socketService.leaveRoom(_currentRoomId!);
@@ -957,7 +984,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '${averageRating.toStringAsFixed(1)} (${totalRatings} reviews)',
+                              '${averageRating.toStringAsFixed(1)} ($totalRatings reviews)',
                               style: TextStyle(
                                 color: Colors.grey[600],
                                 fontSize: 14,

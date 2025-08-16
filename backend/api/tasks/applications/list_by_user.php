@@ -42,11 +42,24 @@ try {
 
         u.id                 AS creator_id,
         u.name               AS creator_name,
-        u.avatar_url         AS creator_avatar
+        u.avatar_url         AS creator_avatar,
+
+        cr.id                AS chat_room_id,
+        
+        -- 獲取最新聊天訊息片段
+        COALESCE(
+            (SELECT SUBSTRING(cm.message, 1, 100)
+             FROM chat_messages cm 
+             WHERE cm.room_id = cr.id 
+             ORDER BY cm.created_at DESC 
+             LIMIT 1),
+            'No conversation yet'
+        ) AS latest_message_snippet
       FROM task_applications ta
       JOIN tasks t ON t.id = ta.task_id
       LEFT JOIN task_statuses s ON s.id = t.status_id
       LEFT JOIN users u ON u.id = t.creator_id
+      LEFT JOIN chat_rooms cr ON cr.task_id = t.id AND cr.creator_id = t.creator_id AND cr.participant_id = ta.user_id
       WHERE ta.user_id = ?
       ORDER BY ta.created_at DESC
       LIMIT ? OFFSET ?

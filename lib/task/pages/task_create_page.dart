@@ -75,14 +75,26 @@ class _PostFormPageState extends State<TaskCreatePage> {
       // task_date 可能為 yyyy-MM-dd 或完整時間
       final dateStr = (t['task_date'] ?? t['created_at'] ?? '').toString();
       _taskDate = dateStr.isNotEmpty ? DateTime.tryParse(dateStr) : null;
-      _periodStart = null;
-      _periodEnd = null;
+
+      // 預填 start_datetime 和 end_datetime（編輯模式）
+      final startStr = (t['start_datetime'] ?? '').toString();
+      final endStr = (t['end_datetime'] ?? '').toString();
+      _periodStart = startStr.isNotEmpty && startStr != '1970-01-01 00:00:00'
+          ? DateTime.tryParse(startStr)
+          : null;
+      _periodEnd = endStr.isNotEmpty && endStr != '1970-01-01 01:00:00'
+          ? DateTime.tryParse(endStr)
+          : null;
       _applicationQuestions
         ..clear()
-        ..addAll(List<String>.from((t['application_questions'] ?? [])
-            .map((q) => (q is Map && q['application_question'] != null)
+        ..addAll((t['application_questions'] is List
+                ? (t['application_questions'] as List)
+                : const <dynamic>[]) // 保證為 List
+            .map<String>((q) => (q is Map && q['application_question'] != null)
                 ? q['application_question'].toString()
-                : (q?.toString() ?? '')).where((e) => e.isNotEmpty)));
+                : (q?.toString() ?? ''))
+            .where((String e) => e.isNotEmpty)
+            .toList());
       _languageRequirement = (t['language_requirement'] ?? '').toString();
     } else {
       _titleController.text = 'Opening Bank Account (Demo)';
@@ -249,48 +261,82 @@ class _PostFormPageState extends State<TaskCreatePage> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-      },
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 個人資料區塊
-              _buildPersonalInfoSection(),
-              const SizedBox(height: 16),
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: GestureDetector(
+        onTap: () {
+          FocusScope.of(context).unfocus();
+        },
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 個人資料區塊
+                _buildPersonalInfoSection(),
+                const SizedBox(height: 16),
 
-              // 任務基本資訊
-              _buildTaskBasicInfoSection(),
-              const SizedBox(height: 16),
+                // 任務基本資訊
+                _buildTaskBasicInfoSection(),
+                const SizedBox(height: 16),
 
-              // 時間設定
-              _buildTimeSection(),
-              const SizedBox(height: 24),
+                // 時間設定
+                _buildTimeSection(),
+                const SizedBox(height: 24),
 
-              // 申請問題
-              _buildQuestionsSection(),
-              const SizedBox(height: 24),
+                // 申請問題
+                _buildQuestionsSection(),
+                const SizedBox(height: 24),
 
-              // 語言要求
-              _buildLanguageSection(),
-              const SizedBox(height: 24),
+                // 語言要求
+                _buildLanguageSection(),
+                const SizedBox(height: 24),
 
-              // 警告訊息
-              _buildWarningMessage(),
-              const SizedBox(height: 24),
+                // 警告訊息
+                _buildWarningMessage(),
+                const SizedBox(height: 24),
 
-              // 提交按鈕
-              _buildSubmitButton(),
-              const SizedBox(height: 24),
-            ],
+                // 提交按鈕
+                _buildSubmitButton(),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  Future<bool> _onWillPop() async {
+    final shouldLeave = await _showLeaveConfirmDialog();
+    return shouldLeave;
+  }
+
+  Future<bool> _showLeaveConfirmDialog() async {
+    final themeManager =
+        Provider.of<ThemeConfigManager>(context, listen: false);
+    final theme = themeManager.effectiveTheme;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Leave this page?'),
+        content: const Text('Your changes will not be saved.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Stay'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: theme.error),
+            child: const Text('Leave'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   Widget _buildPersonalInfoSection() {
@@ -1742,14 +1788,22 @@ class _PostFormPageState extends State<TaskCreatePage> {
               return _locationLabel.isNotEmpty ? _locationLabel : 'N/A';
             }(),
             'task_date': _taskDate != null
-                ? _taskDate!.toLocal().toString().split(' ')[0]
+                ? DateFormat('yyyy-MM-dd').format(_taskDate!)
                 : 'N/A',
+            // 舊欄位保留（若有使用）
             'periodStart': _periodStart != null
-                ? _periodStart!.toLocal().toString().split(' ')[0]
+                ? DateFormat('yyyy-MM-dd').format(_periodStart!)
                 : 'N/A',
             'periodEnd': _periodEnd != null
-                ? _periodEnd!.toLocal().toString().split(' ')[0]
+                ? DateFormat('yyyy-MM-dd').format(_periodEnd!)
                 : 'N/A',
+            // 新增：與資料表對應的新欄位（含時間）
+            'start_datetime': _periodStart != null
+                ? DateFormat('yyyy-MM-dd HH:mm:ss').format(_periodStart!)
+                : '1970-01-01 00:00:00',
+            'end_datetime': _periodEnd != null
+                ? DateFormat('yyyy-MM-dd HH:mm:ss').format(_periodEnd!)
+                : '1970-01-01 01:00:00',
             'application_question': _applicationQuestions.join(' | '),
             'avatar_url': user?.avatar_url ?? '',
             'language_requirement': _selectedLanguages.join(','),

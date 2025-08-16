@@ -115,6 +115,30 @@ class _ChatListTaskWidgetState extends State<ChatListTaskWidget>
       builder: (context, themeManager, child) {
         // 使用主題配色
         final subtitleColor = themeManager.effectiveTheme.onSecondary;
+        final chatProvider = Provider.of<ChatListProvider?>(context);
+        final bool postedHasUnread = chatProvider?.hasUnreadForTab(0) ?? false;
+        final bool worksHasUnread = chatProvider?.hasUnreadForTab(1) ?? false;
+        Widget buildTabLabel(String text, bool showDot) {
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Text(text),
+              if (showDot)
+                Positioned(
+                  right: -8,
+                  top: -6,
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.error,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        }
 
         return SizedBox(
           width: MediaQuery.of(context).size.width * 0.6, // 只佔 appbar 的 60% 寬度
@@ -137,9 +161,9 @@ class _ChatListTaskWidgetState extends State<ChatListTaskWidget>
               fontSize: 14, // 未選中的 tab 字體較小
               fontWeight: FontWeight.w300,
             ),
-            tabs: const [
-              Tab(text: 'Posted Tasks'),
-              Tab(text: 'My Works'),
+            tabs: [
+              Tab(child: buildTabLabel('Posted Tasks', postedHasUnread)),
+              Tab(child: buildTabLabel('My Works', worksHasUnread)),
             ],
           ),
         );

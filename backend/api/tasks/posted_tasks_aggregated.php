@@ -106,11 +106,16 @@ try {
                 -- 獲取聊天室ID
                 cr.id AS chat_room_id,
                 
-                -- 獲取第一則訊息片段
+                -- 獲取最新聊天訊息片段
                 COALESCE(
+                    (SELECT SUBSTRING(cm.message, 1, 100)
+                     FROM chat_messages cm 
+                     WHERE cm.room_id = cr.id 
+                     ORDER BY cm.created_at DESC 
+                     LIMIT 1),
                     SUBSTRING(ta.cover_letter, 1, 100),
                     'Applied for this task'
-                ) AS first_message_snippet
+                ) AS latest_message_snippet
                 
             FROM task_applications ta
             LEFT JOIN users u ON ta.user_id = u.id
@@ -127,8 +132,8 @@ try {
         
         // 處理訊息片段截斷
         foreach ($applicants as &$applicant) {
-            if (strlen($applicant['first_message_snippet']) > 97) {
-                $applicant['first_message_snippet'] = substr($applicant['first_message_snippet'], 0, 97) . '...';
+            if (isset($applicant['latest_message_snippet']) && strlen($applicant['latest_message_snippet']) > 97) {
+                $applicant['latest_message_snippet'] = substr($applicant['latest_message_snippet'], 0, 97) . '...';
             }
         }
         

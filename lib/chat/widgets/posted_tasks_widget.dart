@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:intl/intl.dart';
@@ -9,6 +10,8 @@ import 'package:here4help/chat/widgets/task_card_components.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/services/theme_config_manager.dart';
+import 'package:here4help/services/notification_service.dart';
+import 'package:here4help/chat/utils/avatar_error_cache.dart';
 
 /// Posted Tasks 分頁組件
 /// 從原 ChatListPage 中抽取的 Posted Tasks 相關功能
@@ -30,17 +33,60 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
   // 手風琴展開狀態管理
   final Set<String> _expandedTaskIds = <String>{};
 
+  // 未讀映射（room_id -> count）
+  Map<String, int> _unreadByRoom = {};
+  StreamSubscription<Map<String, int>>? _unreadSub;
+
+  void _updatePostedTabUnreadFlag() {
+    bool hasUnread = false;
+    for (final appliers in _applicationsByTask.values) {
+      for (final ap in appliers) {
+        final roomId = ap['chat_room_id']?.toString();
+        if (roomId != null && roomId.isNotEmpty) {
+          final cnt = _unreadByRoom[roomId] ?? 0;
+          if (cnt > 0) {
+            hasUnread = true;
+            break;
+          }
+        }
+      }
+      if (hasUnread) break;
+    }
+    try {
+      final provider = context.read<ChatListProvider>();
+      // 只有當狀態真正改變時才更新，避免無限循環
+      if (provider.hasUnreadForTab(0) != hasUnread) {
+        provider.setTabHasUnread(0, hasUnread);
+      }
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
     _pagingController.addPageRequestListener((offset) {
-      _fetchPage(offset);
+      // 若剛發生 provider 事件且當前仍在 build 期，延後一幀避免循環
+      if (context.mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _fetchPage(offset));
+      } else {
+        _fetchPage(offset);
+      }
     });
 
     // 監聽 ChatListProvider 的篩選條件變化（僅針對當前tab）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final chatProvider = context.read<ChatListProvider>();
       chatProvider.addListener(_handleProviderChanges);
+    });
+
+    // 監聽未讀快照
+    _unreadSub = NotificationCenter().byRoomStream.listen((map) {
+      if (!mounted) return;
+      setState(() {
+        _unreadByRoom = Map<String, int>.from(map);
+      });
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _updatePostedTabUnreadFlag());
     });
   }
 
@@ -51,7 +97,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
       final chatProvider = context.read<ChatListProvider>();
       // 只有當前是 Posted Tasks 分頁時才刷新
       if (chatProvider.currentTabIndex == 0) {
-        _pagingController.refresh();
+        // 避免在 build 期間觸發 refresh 造成循環
+        WidgetsBinding.instance
+            .addPostFrameCallback((_) => _pagingController.refresh());
       }
     } catch (e) {
       // Context may not be available
@@ -67,6 +115,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
     } catch (e) {
       // Provider may not be available during dispose
     }
+    _unreadSub?.cancel();
     _pagingController.dispose();
     super.dispose();
   }
@@ -116,6 +165,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
         _applicationsByTask[taskId] = applicants;
         // debugPrint('🔍 [Posted Tasks] 任務 $taskId 有 ${applicants.length} 個應徵者');
       }
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _updatePostedTabUnreadFlag());
 
       // 應用篩選和排序
       final filteredTasks = _filterTasks(result.tasks, chatProvider);
@@ -187,6 +238,20 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
       int comparison = 0;
 
       switch (chatProvider.currentSortBy) {
+        case 'status_order':
+          final soA = (a['sort_order'] as num?)?.toInt() ?? 999;
+          final soB = (b['sort_order'] as num?)?.toInt() ?? 999;
+          if (soA != soB) {
+            comparison = soA.compareTo(soB);
+            break;
+          }
+          // 次序：updated_at DESC
+          final timeA =
+              DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
+          final timeB =
+              DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
+          comparison = timeB.compareTo(timeA);
+          break;
         case 'updated_time':
           final timeA =
               DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
@@ -314,7 +379,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
     // 過濾可見的應徵者
     final visibleAppliers =
         applierChatItems.where((ap) => ap['isHidden'] != true).toList();
-    const unreadCount = 0; // TODO: 實現未讀消息計數
+    // 已改為在卡片右側利用 hasUnread 圓點邏輯與應徵者卡片未讀數字顯示
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -392,21 +457,25 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
                                     overflow: TextOverflow.visible,
                                   ),
                                 ),
-                                // Emoji 狀態列
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (TaskCardUtils.isNewTask(task))
-                                      const Text('🌱',
-                                          style: TextStyle(fontSize: 16)),
-                                    const SizedBox(width: 4),
-                                    if (TaskCardUtils.isPopularTask(
-                                        task, _applicationsByTask))
-                                      const Text('🔥',
-                                          style: TextStyle(fontSize: 16)),
-                                    const SizedBox(width: 4),
-                                  ],
-                                ),
+                                // Emoji 狀態列（popular > new）
+                                Builder(builder: (_) {
+                                  final isPopular = TaskCardUtils.isPopularTask(
+                                      task, _applicationsByTask);
+                                  final isNew = TaskCardUtils.isNewTask(task);
+                                  final String? emoji =
+                                      isPopular ? '🔥' : (isNew ? '🌱' : null);
+                                  return emoji == null
+                                      ? const SizedBox.shrink()
+                                      : Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(emoji,
+                                                style: const TextStyle(
+                                                    fontSize: 16)),
+                                            const SizedBox(width: 4),
+                                          ],
+                                        );
+                                }),
                               ],
                             ),
                             const SizedBox(height: 4),
@@ -443,39 +512,41 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
                         ),
                       ),
 
-                      // 右側：應徵者數量和箭頭
+                      // 右側：未讀圓點（任一應徵者聊天室有未讀即顯示）與箭頭
                       Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          if (unreadCount > 0)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                unreadCount.toString(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          if (unreadCount > 0) const SizedBox(height: 4),
-                          if (visibleAppliers.isNotEmpty)
-                            Text(
-                              '${visibleAppliers.length}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          if (visibleAppliers.isNotEmpty)
-                            const SizedBox(height: 2),
+                          // 任務卡層級：若任一應徵者聊天室存在未讀 → 顯示警示色圓點
+                          Builder(builder: (_) {
+                            final hasUnread = visibleAppliers.any((ap) {
+                              final roomId = ap['chat_room_id']?.toString();
+                              if (roomId == null || roomId.isEmpty)
+                                return false;
+                              final cnt = _unreadByRoom[roomId] ?? 0;
+                              return cnt > 0;
+                            });
+                            // 向 Provider 回報當前分頁是否有未讀（避免 build 期間 setState）
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              try {
+                                context
+                                    .read<ChatListProvider>()
+                                    .setTabHasUnread(0, hasUnread);
+                              } catch (_) {}
+                            });
+
+                            return hasUnread
+                                ? Container(
+                                    width: 10,
+                                    height: 10,
+                                    margin: const EdgeInsets.only(bottom: 6),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Theme.of(context).colorScheme.error,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  )
+                                : const SizedBox(height: 16);
+                          }),
                           AnimatedRotation(
                             turns: isExpanded ? 0.25 : 0.0,
                             duration: const Duration(milliseconds: 200),
@@ -724,6 +795,21 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
     );
   }
 
+  /// 建構帶有錯誤回退的頭像
+  Widget _buildAvatarWithFallback(
+    String? avatarPath,
+    String? name, {
+    double radius = 20,
+    double fontSize = 14,
+  }) {
+    return _AvatarWithFallback(
+      avatarPath: avatarPath,
+      name: name ?? 'Unknown',
+      radius: radius,
+      fontSize: fontSize,
+    );
+  }
+
   Widget _buildApplierCard(
       Map<String, dynamic> applier, String taskId, ColorScheme colorScheme) {
     return Container(
@@ -738,44 +824,72 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
         child: ListTile(
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          leading: CircleAvatar(
-            backgroundColor: TaskCardUtils.getAvatarColor(applier['name']),
-            child: Text(
-              TaskCardUtils.getInitials(applier['name']),
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-            ),
+          leading: _buildAvatarWithFallback(
+            applier['avatar']?.toString(),
+            applier['name'],
+            radius: 20,
+            fontSize: 14,
           ),
-          title: Text(
-            applier['name'] ?? 'Unknown name',
-            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Expanded(
+                child: Text(
+                  applier['name'] ?? 'Unknown name',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w500, fontSize: 14),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 評分與評論數（小字灰色）
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.star, color: Colors.amber[600], size: 12),
+                  const SizedBox(width: 2),
+                  Text(
+                    '${applier['rating'] ?? 0.0}',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                  Text(
+                    '(${applier['reviewsCount'] ?? 0})',
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ],
           ),
           subtitle: Text(
-            applier['sentMessages']?[0] ?? 'No messages',
+            applier['latest_message_snippet'] ??
+                applier['first_message_snippet'] ??
+                'No messages',
             style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.star, color: Colors.amber[600], size: 14),
-                  const SizedBox(width: 2),
-                  Text('${applier['rating'] ?? 0.0}',
-                      style: const TextStyle(fontSize: 12)),
-                ],
+          trailing: // 未讀數字徽章（警示色）
+              Builder(builder: (_) {
+            final roomId = applier['chat_room_id']?.toString();
+            final unread = roomId == null ? 0 : (_unreadByRoom[roomId] ?? 0);
+            if (unread <= 0) return const SizedBox.shrink();
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.error,
+                borderRadius: BorderRadius.circular(10),
               ),
-              Text(
-                '(${applier['reviewsCount'] ?? 0})',
-                style: TextStyle(fontSize: 10, color: Colors.grey[500]),
+              child: Text(
+                unread > 99 ? '99+' : '$unread',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ],
-          ),
+            );
+          }),
           onTap: () {
             final chatRoomId = applier['chat_room_id'];
             if (chatRoomId != null) {
@@ -1035,6 +1149,100 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
           );
         },
         child: const Icon(Icons.keyboard_arrow_up, size: 24),
+      ),
+    );
+  }
+}
+
+/// 帶有錯誤回退的頭像 Widget
+class _AvatarWithFallback extends StatefulWidget {
+  final String? avatarPath;
+  final String name;
+  final double radius;
+  final double fontSize;
+
+  const _AvatarWithFallback({
+    required this.avatarPath,
+    required this.name,
+    required this.radius,
+    required this.fontSize,
+  });
+
+  @override
+  State<_AvatarWithFallback> createState() => _AvatarWithFallbackState();
+}
+
+class _AvatarWithFallbackState extends State<_AvatarWithFallback> {
+  bool _hasError = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarPath = widget.avatarPath;
+
+    // 如果沒有頭像路徑、已發生錯誤，或 URL 在失敗快取中，直接顯示首字母
+    if (avatarPath == null ||
+        avatarPath.isEmpty ||
+        _hasError ||
+        AvatarErrorCache.isFailedUrl(avatarPath)) {
+      return _buildInitialsAvatar();
+    }
+
+    // 如果是相對路徑 (assets)
+    if (avatarPath.startsWith('assets/')) {
+      return CircleAvatar(
+        radius: widget.radius,
+        backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
+        backgroundImage: AssetImage(avatarPath),
+        onBackgroundImageError: (exception, stackTrace) {
+          AvatarErrorCache.addFailedUrl(avatarPath);
+          if (mounted) {
+            setState(() {
+              _hasError = true;
+            });
+          }
+        },
+        child: _hasError ? _buildInitialsText() : null,
+      );
+    }
+
+    // 如果是網路 URL
+    if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
+      return CircleAvatar(
+        radius: widget.radius,
+        backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
+        backgroundImage: NetworkImage(avatarPath),
+        onBackgroundImageError: (exception, stackTrace) {
+          AvatarErrorCache.addFailedUrl(avatarPath);
+          debugPrint('🔴 Avatar load error (cached): $avatarPath');
+          if (mounted) {
+            setState(() {
+              _hasError = true;
+            });
+          }
+        },
+        child: _hasError ? _buildInitialsText() : null,
+      );
+    }
+
+    // 其他格式不支援，顯示首字母
+    return _buildInitialsAvatar();
+  }
+
+  Widget _buildInitialsAvatar() {
+    return CircleAvatar(
+      radius: widget.radius,
+      backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
+      child: _buildInitialsText(),
+    );
+  }
+
+  Widget _buildInitialsText() {
+    return Text(
+      TaskCardUtils.getInitials(widget.name),
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: widget.fontSize,
+        fontWeight: FontWeight.bold,
       ),
     );
   }

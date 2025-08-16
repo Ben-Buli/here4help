@@ -78,6 +78,8 @@ try {
             t.reward_point,
             t.location,
             t.task_date,
+            t.start_datetime,
+            t.end_datetime,
             t.language_requirement,
             t.created_at as task_created_at,
             ts.id as status_id,
@@ -288,6 +290,8 @@ try {
                 'reward_point' => $chatData['reward_point'],
                 'location' => $chatData['location'],
                 'task_date' => $chatData['task_date'],
+                'start_datetime' => $chatData['start_datetime'] ?? null,
+                'end_datetime' => $chatData['end_datetime'] ?? null,
                 'language_requirement' => $chatData['language_requirement'],
                 'created_at' => $chatData['task_created_at'],
                 'status' => [

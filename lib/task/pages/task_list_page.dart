@@ -489,7 +489,7 @@ class _TaskListPageState extends State<TaskListPage> {
         .map((e) =>
             double.tryParse((e['reward_point'] ?? '0').toString()) ?? 0.0)
         .toList();
-    final minReward = 0.0; // 固定最小值為 0
+    const minReward = 0.0; // 固定最小值為 0
     final maxReward =
         rewards.isEmpty ? 10000.0 : rewards.reduce((a, b) => a > b ? a : b);
 

@@ -29,10 +29,13 @@ class ChatListProvider extends ChangeNotifier {
 
   // 排序狀態 - 分頁獨立
   final Map<int, String> _currentSortBy = {
-    0: 'updated_time',
-    1: 'updated_time'
+    0: 'status_order',
+    1: 'status_order'
   };
   final Map<int, bool> _sortAscending = {0: false, 1: false};
+
+  // 分頁未讀提示（小圓點）
+  final Map<int, bool> _tabHasUnread = {0: false, 1: false};
 
   // 載入狀態
   bool _isLoading = true;
@@ -56,6 +59,7 @@ class ChatListProvider extends ChangeNotifier {
   String get currentSortBy =>
       _currentSortBy[_currentTabIndex] ?? 'updated_time';
   bool get sortAscending => _sortAscending[_currentTabIndex] ?? false;
+  bool hasUnreadForTab(int tabIndex) => _tabHasUnread[tabIndex] ?? false;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   ChatCacheManager get cacheManager => _cacheManager;
@@ -68,6 +72,15 @@ class ChatListProvider extends ChangeNotifier {
       searchQuery.isNotEmpty;
 
   bool get taskerFilterEnabled => _currentTabIndex == 1;
+
+  // 最近一次狀態事件（用於避免無限刷新迴圈）
+  String _lastEvent = '';
+  String get lastEvent => _lastEvent;
+
+  void _emit(String event) {
+    _lastEvent = event;
+    notifyListeners();
+  }
 
   /// 初始化 TabController
   void initializeTabController(TickerProvider vsync, {int initialTab = 0}) {
@@ -101,7 +114,7 @@ class ChatListProvider extends ChangeNotifier {
     _instance = this;
 
     _isInitialized = true;
-    notifyListeners();
+    _emit('init');
   }
 
   /// 獲取當前實例（用於外部訪問）
@@ -130,26 +143,26 @@ class ChatListProvider extends ChangeNotifier {
     }
 
     // 不重置篩選條件，每個分頁保持獨立狀態
-    notifyListeners();
+    _emit('tab');
   }
 
   /// 更新搜索查詢
   void updateSearchQuery(String query) {
     if (searchQuery == query) return;
     _searchQueries[_currentTabIndex] = query;
-    notifyListeners();
+    _emit('criteria');
   }
 
   /// 更新位置篩選
   void updateLocationFilter(Set<String> locations) {
     _selectedLocations[_currentTabIndex] = locations;
-    notifyListeners();
+    _emit('criteria');
   }
 
   /// 更新狀態篩選
   void updateStatusFilter(Set<String> statuses) {
     _selectedStatuses[_currentTabIndex] = statuses;
-    notifyListeners();
+    _emit('criteria');
   }
 
   /// 設置排序方式
@@ -163,7 +176,7 @@ class ChatListProvider extends ChangeNotifier {
       _currentSortBy[_currentTabIndex] = sortBy;
       _sortAscending[_currentTabIndex] = true;
     }
-    notifyListeners();
+    _emit('criteria');
   }
 
   /// 重置當前分頁的所有篩選條件
@@ -173,14 +186,21 @@ class ChatListProvider extends ChangeNotifier {
     _selectedStatuses[_currentTabIndex]?.clear();
     _currentSortBy[_currentTabIndex] = 'updated_time';
     _sortAscending[_currentTabIndex] = false;
-    notifyListeners();
+    _emit('criteria');
+  }
+
+  /// 更新某個分頁是否有未讀（供 Posted/MyWorks widget 設定）
+  void setTabHasUnread(int tabIndex, bool value) {
+    if (_tabHasUnread[tabIndex] == value) return;
+    _tabHasUnread[tabIndex] = value;
+    _emit('unread');
   }
 
   /// 更新載入狀態
   void setLoadingState(bool isLoading, [String? errorMessage]) {
     _isLoading = isLoading;
     _errorMessage = errorMessage;
-    notifyListeners();
+    _emit('loading');
   }
 
   /// 使用快取系統初始化數據

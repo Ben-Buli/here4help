@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:intl/intl.dart';
@@ -10,6 +11,8 @@ import 'package:here4help/chat/services/chat_storage_service.dart';
 import 'package:here4help/chat/services/chat_session_manager.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
+import 'package:here4help/services/notification_service.dart';
+import 'package:here4help/chat/utils/avatar_error_cache.dart';
 
 /// My Works 分頁組件
 /// 從原 ChatListPage 中抽取的 My Works 相關功能
@@ -25,17 +28,52 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
   final PagingController<int, Map<String, dynamic>> _pagingController =
       PagingController(firstPageKey: 0);
 
+  Map<String, int> _unreadByRoom = {};
+  StreamSubscription<Map<String, int>>? _unreadSub;
+
+  void _updateMyWorksTabUnreadFlag() {
+    bool hasUnread = false;
+    // 檢查所有未讀訊息映射中是否有大於 0 的計數
+    for (final count in _unreadByRoom.values) {
+      if (count > 0) {
+        hasUnread = true;
+        break;
+      }
+    }
+    try {
+      final provider = context.read<ChatListProvider>();
+      // 只有當狀態真正改變時才更新，避免無限循環
+      if (provider.hasUnreadForTab(1) != hasUnread) {
+        provider.setTabHasUnread(1, hasUnread);
+      }
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
     _pagingController.addPageRequestListener((offset) {
-      _fetchMyWorksPage(offset);
+      if (context.mounted) {
+        WidgetsBinding.instance
+            .addPostFrameCallback((_) => _fetchMyWorksPage(offset));
+      } else {
+        _fetchMyWorksPage(offset);
+      }
     });
 
     // 監聽 ChatListProvider 的篩選條件變化（僅針對當前tab）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final chatProvider = context.read<ChatListProvider>();
       chatProvider.addListener(_handleProviderChanges);
+    });
+
+    _unreadSub = NotificationCenter().byRoomStream.listen((map) {
+      if (!mounted) return;
+      setState(() {
+        _unreadByRoom = Map<String, int>.from(map);
+      });
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _updateMyWorksTabUnreadFlag());
     });
   }
 
@@ -46,7 +84,8 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       final chatProvider = context.read<ChatListProvider>();
       // 只有當前是 My Works 分頁時才刷新
       if (chatProvider.currentTabIndex == 1) {
-        _pagingController.refresh();
+        WidgetsBinding.instance
+            .addPostFrameCallback((_) => _pagingController.refresh());
       }
     } catch (e) {
       // Context may not be available
@@ -62,6 +101,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     } catch (e) {
       // Provider may not be available during dispose
     }
+    _unreadSub?.cancel();
     _pagingController.dispose();
     super.dispose();
   }
@@ -96,6 +136,10 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       } else {
         _pagingController.appendLastPage(slice);
       }
+
+      // 資料載入完成後更新未讀標記
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _updateMyWorksTabUnreadFlag());
     } catch (error) {
       if (mounted) {
         _pagingController.error = error;
@@ -128,6 +172,8 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
         'creator_id': app['creator_id'],
         'creator_name': app['creator_name'],
         'creator_avatar': app['creator_avatar'],
+        'latest_message_snippet': app['latest_message_snippet'],
+        'chat_room_id': app['chat_room_id'],
         'applied_by_me': true,
         'application_id': app['application_id'],
         'application_status': app['application_status'],
@@ -170,6 +216,20 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       int comparison = 0;
 
       switch (chatProvider.currentSortBy) {
+        case 'status_order':
+          final soA = (a['sort_order'] as num?)?.toInt() ?? 999;
+          final soB = (b['sort_order'] as num?)?.toInt() ?? 999;
+          if (soA != soB) {
+            comparison = soA.compareTo(soB);
+            break;
+          }
+          // 次序：updated_at DESC
+          final timeA =
+              DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
+          final timeB =
+              DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
+          comparison = timeB.compareTo(timeA);
+          break;
         case 'updated_time':
           final timeA =
               DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
@@ -251,8 +311,9 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     final progress = progressData['progress'] ?? 0.0;
     final baseColor = progressData['color'] ?? Colors.grey[600]!;
 
-    // 計算未讀訊息數量 (TODO: 實現真實計數)
-    const unreadCount = 0;
+    // 未讀（by_room）
+    final roomId = task['chat_room_id']?.toString() ?? '';
+    final unreadCount = roomId.isEmpty ? 0 : (_unreadByRoom[roomId] ?? 0);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -380,19 +441,25 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
                               ),
                             ),
                             // Emoji 狀態列
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (TaskCardUtils.isNewTask(task))
-                                  const Text('🌱',
-                                      style: TextStyle(fontSize: 16)),
-                                const SizedBox(width: 4),
-                                if (TaskCardUtils.isPopularTask(task, {}))
-                                  const Text('🔥',
-                                      style: TextStyle(fontSize: 16)),
-                                const SizedBox(width: 4),
-                              ],
-                            ),
+                            // Emoji 狀態列（popular > new，與 Posted Tasks 一致）
+                            Builder(builder: (_) {
+                              final isPopular =
+                                  TaskCardUtils.isPopularTask(task, {});
+                              final isNew = TaskCardUtils.isNewTask(task);
+                              final String? emoji =
+                                  isPopular ? '🔥' : (isNew ? '🌱' : null);
+                              return emoji == null
+                                  ? const SizedBox.shrink()
+                                  : Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(emoji,
+                                            style:
+                                                const TextStyle(fontSize: 16)),
+                                        const SizedBox(width: 4),
+                                      ],
+                                    );
+                            }),
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -418,32 +485,29 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
                         // 任務資訊 2x2 格局
                         _buildTaskInfoGrid(task, colorScheme),
+
+                        const SizedBox(height: 8),
+
+                        // 聊天對象與最新訊息
+                        _buildChatPartnerSection(task),
                       ],
                     ),
                   ),
 
-                  // 右側：未讀徽章和箭頭
+                  // 右側：未讀徽章和箭頭（任務卡層級圓點：若 unreadCount>0 顯示）
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (unreadCount > 0)
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                          width: 10,
+                          height: 10,
+                          margin: const EdgeInsets.only(bottom: 6),
                           decoration: BoxDecoration(
-                            color: colorScheme.primary,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            unreadCount.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            color: Theme.of(context).colorScheme.error,
+                            shape: BoxShape.circle,
                           ),
                         ),
-                      const SizedBox(height: 4),
                       Icon(
                         Icons.chevron_right,
                         color: Colors.grey[400],
@@ -670,6 +734,77 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     );
   }
 
+  /// 建構帶有錯誤回退的頭像
+  Widget _buildAvatarWithFallback(
+    String? avatarPath,
+    String? name, {
+    double radius = 16,
+    double fontSize = 12,
+  }) {
+    return _MyWorksAvatarWithFallback(
+      avatarPath: avatarPath,
+      name: name ?? 'Unknown',
+      radius: radius,
+      fontSize: fontSize,
+    );
+  }
+
+  /// 構建聊天對象與最新訊息區塊
+  Widget _buildChatPartnerSection(Map<String, dynamic> task) {
+    final creatorName = task['creator_name'] ?? 'Unknown';
+    final creatorAvatar = task['creator_avatar'];
+    final latestMessage =
+        task['latest_message_snippet'] ?? 'No conversation yet';
+
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          // 創建者頭像
+          _buildAvatarWithFallback(
+            creatorAvatar?.toString(),
+            creatorName,
+            radius: 16,
+            fontSize: 12,
+          ),
+          const SizedBox(width: 8),
+
+          // 對象名稱與最新訊息
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  creatorName,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  latestMessage,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[600],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 建構 Scroll to Top 按鈕
   Widget _buildScrollToTopButton() {
     return Positioned(
@@ -688,6 +823,102 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
           );
         },
         child: const Icon(Icons.keyboard_arrow_up, size: 24),
+      ),
+    );
+  }
+}
+
+/// 帶有錯誤回退的頭像 Widget (MyWorks 版本)
+class _MyWorksAvatarWithFallback extends StatefulWidget {
+  final String? avatarPath;
+  final String name;
+  final double radius;
+  final double fontSize;
+
+  const _MyWorksAvatarWithFallback({
+    required this.avatarPath,
+    required this.name,
+    required this.radius,
+    required this.fontSize,
+  });
+
+  @override
+  State<_MyWorksAvatarWithFallback> createState() =>
+      _MyWorksAvatarWithFallbackState();
+}
+
+class _MyWorksAvatarWithFallbackState
+    extends State<_MyWorksAvatarWithFallback> {
+  bool _hasError = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarPath = widget.avatarPath;
+
+    // 如果沒有頭像路徑、已發生錯誤，或 URL 在失敗快取中，直接顯示首字母
+    if (avatarPath == null ||
+        avatarPath.isEmpty ||
+        _hasError ||
+        AvatarErrorCache.isFailedUrl(avatarPath)) {
+      return _buildInitialsAvatar();
+    }
+
+    // 如果是相對路徑 (assets)
+    if (avatarPath.startsWith('assets/')) {
+      return CircleAvatar(
+        radius: widget.radius,
+        backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
+        backgroundImage: AssetImage(avatarPath),
+        onBackgroundImageError: (exception, stackTrace) {
+          AvatarErrorCache.addFailedUrl(avatarPath);
+          if (mounted) {
+            setState(() {
+              _hasError = true;
+            });
+          }
+        },
+        child: _hasError ? _buildInitialsText() : null,
+      );
+    }
+
+    // 如果是網路 URL
+    if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
+      return CircleAvatar(
+        radius: widget.radius,
+        backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
+        backgroundImage: NetworkImage(avatarPath),
+        onBackgroundImageError: (exception, stackTrace) {
+          AvatarErrorCache.addFailedUrl(avatarPath);
+          debugPrint('🔴 MyWorks Avatar load error (cached): $avatarPath');
+          if (mounted) {
+            setState(() {
+              _hasError = true;
+            });
+          }
+        },
+        child: _hasError ? _buildInitialsText() : null,
+      );
+    }
+
+    // 其他格式不支援，顯示首字母
+    return _buildInitialsAvatar();
+  }
+
+  Widget _buildInitialsAvatar() {
+    return CircleAvatar(
+      radius: widget.radius,
+      backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
+      child: _buildInitialsText(),
+    );
+  }
+
+  Widget _buildInitialsText() {
+    return Text(
+      TaskCardUtils.getInitials(widget.name),
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: widget.fontSize,
+        fontWeight: FontWeight.bold,
       ),
     );
   }

@@ -376,7 +376,7 @@ class _AppScaffoldState extends State<AppScaffold> {
                 label: 'Home',
               ),
               BottomNavigationBarItem(
-                icon: _ChatBadgeIcon(),
+                icon: _ChatBadgeDotIcon(),
                 label: 'Chat',
               ),
               const BottomNavigationBarItem(
@@ -658,12 +658,12 @@ class _BubbleTeaPatternPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _ChatBadgeIcon extends StatefulWidget {
+class _ChatBadgeDotIcon extends StatefulWidget {
   @override
-  State<_ChatBadgeIcon> createState() => _ChatBadgeIconState();
+  State<_ChatBadgeDotIcon> createState() => _ChatBadgeDotIconState();
 }
 
-class _ChatBadgeIconState extends State<_ChatBadgeIcon> {
+class _ChatBadgeDotIconState extends State<_ChatBadgeDotIcon> {
   int _total = 0;
   StreamSubscription<int>? _sub;
 
@@ -691,18 +691,14 @@ class _ChatBadgeIconState extends State<_ChatBadgeIcon> {
         const Icon(Icons.message),
         if (_total > 0)
           Positioned(
-            right: -2,
-            top: -2,
+            right: -1,
+            top: -1,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              width: 10,
+              height: 10,
               decoration: BoxDecoration(
-                color: Colors.redAccent,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-              child: Text(
-                _total > 99 ? '99+' : '$_total',
-                style: const TextStyle(color: Colors.white, fontSize: 10),
+                color: Theme.of(context).colorScheme.error,
+                shape: BoxShape.circle,
               ),
             ),
           ),

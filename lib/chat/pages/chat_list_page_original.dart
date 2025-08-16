@@ -560,7 +560,7 @@ class _ChatListPageState extends State<ChatListPage>
               pagingController.itemList!.isNotEmpty) {
             // 使用 ScrollController 滾動到頂部
             final scrollController = PrimaryScrollController.of(context);
-            scrollController?.animateTo(
+            scrollController.animateTo(
               0,
               duration: const Duration(milliseconds: 500),
               curve: Curves.easeInOut,
@@ -1884,7 +1884,7 @@ class _ChatListPageState extends State<ChatListPage>
     return Column(
       children: [
         // 更新狀態指示器
-        UpdateStatusBanner(),
+        const UpdateStatusBanner(),
 
         // 搜尋欄 + 排序功能
         Padding(
@@ -3293,12 +3293,12 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                     ),
                                   );
                                 },
-                                icon: Icon(
+                                icon: const Icon(
                                   Icons.delete_outline,
                                   size: 16,
                                   color: Colors.red,
                                 ),
-                                label: Text(
+                                label: const Text(
                                   'Delete',
                                   style: TextStyle(
                                     fontSize: 12,
@@ -3306,7 +3306,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                                   ),
                                 ),
                                 style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: Colors.red),
+                                  side: const BorderSide(color: Colors.red),
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 4),
                                 ),

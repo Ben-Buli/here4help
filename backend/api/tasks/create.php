@@ -100,11 +100,13 @@ try {
     $sql = "INSERT INTO tasks (
               id, creator_id, acceptor_id,
               title, description, reward_point, location, task_date,
+              start_datetime, end_datetime,
               status_id, language_requirement, hashtags,
               created_at, updated_at
             ) VALUES (
               ?, ?, ?,
               ?, ?, ?, ?, ?,
+              ?, ?,
               ?, ?, ?,
               NOW(), NOW()
             )";
@@ -118,6 +120,9 @@ try {
         $input['reward_point'] ?? $input['salary'] ?? '0', // 支援舊的 salary 欄位
         $input['location'],
         $input['task_date'],
+        // 新欄位：若未提供則用資料表預設值
+        ($input['start_datetime'] ?? '1970-01-01 00:00:00'),
+        ($input['end_datetime'] ?? '1970-01-01 01:00:00'),
         $statusId,
         $input['language_requirement'],
         $hashtags

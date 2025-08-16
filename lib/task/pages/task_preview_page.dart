@@ -567,6 +567,11 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                               '0'),
                       'location': taskData!['location'] ?? '',
                       'task_date': taskData!['task_date'] ?? '',
+                      // 新欄位：起訖時間（可為預覽頁補上日期時間字串或由 create_page 寫入）
+                      'start_datetime':
+                          taskData!['start_datetime'] ?? '1970-01-01 00:00:00',
+                      'end_datetime':
+                          taskData!['end_datetime'] ?? '1970-01-01 01:00:00',
                       'language_requirement':
                           taskData!['language_requirement'] ?? '',
                       // 僅送必要欄位；建立者用 creator_id（由登入用戶）

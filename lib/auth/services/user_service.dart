@@ -89,6 +89,19 @@ class UserService extends ChangeNotifier {
 
         // 同時更新 SharedPreferences 作為備用
         await _saveUserToPreferences(_currentUser!);
+
+        // 初始化未讀中心（確保 App 冷啟已登入時也會建立連線與快照）
+        try {
+          final svc = SocketNotificationService();
+          await svc.init(userId: _currentUser!.id.toString());
+          await NotificationCenter().use(svc);
+          await svc.refreshSnapshot();
+        } catch (e) {
+          // 降級為 0 佔位
+          final placeholder = NotificationServicePlaceholder();
+          await placeholder.init(userId: 'placeholder');
+          await NotificationCenter().use(placeholder);
+        }
       } else {
         throw Exception('No user data returned from database');
       }
