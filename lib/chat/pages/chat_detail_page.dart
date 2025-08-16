@@ -98,9 +98,18 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   // 建立訊息內容：若包含圖片 URL 則顯示縮圖並可點擊預覽，否則顯示文字
   Widget _buildMessageContent(String text) {
+    if (text.isEmpty) {
+      return const Text('', style: TextStyle(fontSize: 14));
+    }
+    
     final imageUrl = _extractFirstImageUrl(text);
     if (imageUrl == null) {
-      return Text(text);
+      return Text(
+        text,
+        style: const TextStyle(fontSize: 14),
+        softWrap: true,
+        overflow: TextOverflow.visible,
+      );
     }
     // 隱藏 URL/相對路徑，只保留其他說明文字（例如 [Photo] 檔名）
     final httpRe =

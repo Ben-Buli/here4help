@@ -57,8 +57,11 @@ class _SearchFilterWidgetState extends State<SearchFilterWidget> {
               TextField(
                 controller: _searchController,
                 focusNode: _searchFocusNode,
+                textCapitalization: TextCapitalization.sentences, // 允許大寫輸入
+                keyboardType: TextInputType.text, // 確保使用文字鍵盤
                 onChanged: (value) {
-                  chatProvider.updateSearchQuery(value.toLowerCase());
+                  // 保持原始大小寫，讓搜尋邏輯處理大小寫不敏感匹配
+                  chatProvider.updateSearchQuery(value);
                 },
                 onEditingComplete: () {
                   _searchFocusNode.unfocus();

@@ -2,14 +2,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 /// 智能刷新策略 - 遵循聊天系統規格文件標準
-/// 
+///
 /// 實現規格文件的更新策略：
 /// - condition_based: 只有搜尋/篩選/排序變化時刷新
 /// - delayed: addPostFrameCallback 避免 build 重刷
 /// - state_check: 更新前檢查 Provider 狀態是否變動
 class SmartRefreshStrategy {
   static const String _tag = '[SmartRefreshStrategy]';
-  
+
   /// 刷新條件檢查器
   static bool shouldRefresh({
     required bool hasActiveFilters,
@@ -29,20 +29,21 @@ class SmartRefreshStrategy {
       return true;
     }
 
-    // 規格文件標準：只有搜尋/篩選/排序變化時刷新
-    if (hasActiveFilters || searchQuery.isNotEmpty) {
-      debugPrint('✅ $_tag 有 active filters 或搜尋條件，需要刷新');
-      return true;
-    }
-
     // 未讀狀態更新不觸發列表刷新
     if (isUnreadUpdate) {
       debugPrint('🔄 $_tag 僅未讀狀態更新，跳過列表刷新');
       return false;
     }
 
-    debugPrint('❌ $_tag 無刷新條件，跳過');
-    return false;
+    // 任何篩選條件變化都需要刷新（包括清除篩選）
+    if (hasActiveFilters || searchQuery.isNotEmpty) {
+      debugPrint('✅ $_tag 有 active filters 或搜尋條件，需要刷新');
+      return true;
+    }
+
+    // 即使沒有篩選條件，也需要刷新來顯示所有數據
+    debugPrint('✅ $_tag 無篩選條件，刷新顯示所有數據');
+    return true;
   }
 
   /// 延遲刷新執行器 - 避免 build 期間刷新
@@ -61,7 +62,7 @@ class SmartRefreshStrategy {
     String? description,
   }) {
     final hasChanged = oldValue != newValue;
-    
+
     if (description != null) {
       debugPrint('$_tag 狀態變化檢查 [$description]:');
       debugPrint('  - oldValue: $oldValue');
@@ -79,7 +80,7 @@ class SmartRefreshStrategy {
   static bool shouldAllowRefresh(String key) {
     final now = DateTime.now();
     final lastRefresh = _lastRefreshTimes[key];
-    
+
     if (lastRefresh == null) {
       _lastRefreshTimes[key] = now;
       debugPrint('$_tag 首次刷新，允許執行: $key');
@@ -93,7 +94,8 @@ class SmartRefreshStrategy {
       return true;
     }
 
-    debugPrint('$_tag 防抖檢查未通過，跳過刷新: $key (延遲: ${timeDiff.inMilliseconds}ms < ${_debounceDelay.inMilliseconds}ms)');
+    debugPrint(
+        '$_tag 防抖檢查未通過，跳過刷新: $key (延遲: ${timeDiff.inMilliseconds}ms < ${_debounceDelay.inMilliseconds}ms)');
     return false;
   }
 
@@ -148,7 +150,7 @@ class SmartRefreshStrategy {
     String? description,
   }) {
     debugPrint('$_tag 智能未讀狀態更新: $componentKey');
-    
+
     if (!hasStateChanged(
       oldValue: oldState,
       newValue: newState,

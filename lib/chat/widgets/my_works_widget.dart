@@ -34,6 +34,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
   bool _unreadDataLoaded = false; // 新增：追蹤未讀數據是否已載入
 
   void _updateMyWorksTabUnreadFlag() {
+    if (!mounted) return;
     bool hasUnread = false;
     // 檢查所有未讀訊息映射中是否有大於 0 的計數
     for (final count in _unreadByRoom.values) {
@@ -46,7 +47,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     try {
       final provider = context.read<ChatListProvider>();
       final oldState = provider.hasUnreadForTab(1);
-      
+
       // 使用智能刷新策略的狀態更新器
       SmartRefreshStrategy.updateUnreadState(
         componentKey: 'MyWorks-Tab',
@@ -96,8 +97,10 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       if (_unreadDataLoaded) {
         debugPrint('✅ [My Works] 未讀數據已同步完成');
       }
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _updateMyWorksTabUnreadFlag());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _updateMyWorksTabUnreadFlag();
+      });
     });
   }
 
@@ -234,27 +237,69 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     }).toList();
   }
 
-  /// 篩選任務列表
+  /// 正規化搜尋文本 - 與 PostedTasks 一致，移除特殊字符並轉為小寫
+  String _normalizeSearchText(String text) {
+    if (text.isEmpty) return '';
+    final normalized = text
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^\w\s\-\(\)\.\,\:\;\!\?]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return normalized;
+  }
+
+  /// 篩選任務列表（My Works）— 統一搜尋/篩選邏輯
   List<Map<String, dynamic>> _filterTasks(
       List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
+    final rawQuery = chatProvider.searchQuery.trim();
+    final hasSearchQuery = rawQuery.isNotEmpty;
+    final normalizedQuery = _normalizeSearchText(rawQuery);
+
     return tasks.where((task) {
-      final title = (task['title'] ?? '').toString().toLowerCase();
-      final query = chatProvider.searchQuery.toLowerCase();
-
-      // 搜尋篩選
-      final matchQuery = query.isEmpty || title.contains(query);
-
-      // 位置篩選
+      final title = (task['title'] ?? '').toString();
+      final description = (task['description'] ?? '').toString();
+      final latestMessage = (task['latest_message_snippet'] ?? '').toString();
+      final creatorName = (task['creator_name'] ?? '').toString();
       final location = (task['location'] ?? '').toString();
-      final matchLocation = chatProvider.selectedLocations.isEmpty ||
-          chatProvider.selectedLocations.contains(location);
+      final language = (task['language_requirement'] ?? '').toString();
+      final statusDisplay = _displayStatus(task);
+
+      // 統一正規化
+      final nTitle = _normalizeSearchText(title);
+      final nDesc = _normalizeSearchText(description);
+      final nMsg = _normalizeSearchText(latestMessage);
+      final nCreator = _normalizeSearchText(creatorName);
+      final nLoc = _normalizeSearchText(location);
+      final nLang = _normalizeSearchText(language);
+      final nStatus = _normalizeSearchText(statusDisplay);
+
+      // 搜尋：任一可見欄位命中即可
+      bool matchQuery = true;
+      if (hasSearchQuery) {
+        matchQuery = nTitle.contains(normalizedQuery) ||
+            nDesc.contains(normalizedQuery) ||
+            nMsg.contains(normalizedQuery) ||
+            nCreator.contains(normalizedQuery) ||
+            nLoc.contains(normalizedQuery) ||
+            nLang.contains(normalizedQuery) ||
+            nStatus.contains(normalizedQuery);
+      }
+
+      if (!matchQuery) return false;
+
+      // 位置篩選：若有搜尋關鍵字，為了完整搜尋結果，暫時忽略位置篩選
+      bool matchLocation = true;
+      if (!hasSearchQuery) {
+        matchLocation = chatProvider.selectedLocations.isEmpty ||
+            chatProvider.selectedLocations.contains(location);
+      }
+      if (!matchLocation) return false;
 
       // 狀態篩選
-      final status = _displayStatus(task);
       final matchStatus = chatProvider.selectedStatuses.isEmpty ||
-          chatProvider.selectedStatuses.contains(status);
+          chatProvider.selectedStatuses.contains(statusDisplay);
 
-      return matchQuery && matchLocation && matchStatus;
+      return matchStatus;
     }).toList();
   }
 

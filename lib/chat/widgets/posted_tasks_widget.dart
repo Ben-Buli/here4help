@@ -39,7 +39,13 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
   StreamSubscription<Map<String, int>>? _unreadSub;
   bool _unreadDataLoaded = false; // 追蹤未讀數據是否已載入
 
+  // 搜尋狀態追蹤
+  String _lastSearchQuery = '';
+  Set<String> _lastSelectedLocations = {};
+  Set<String> _lastSelectedStatuses = {};
+
   void _updatePostedTabUnreadFlag() {
+    if (!mounted) return;
     bool hasUnread = false;
     for (final appliers in _applicationsByTask.values) {
       for (final ap in appliers) {
@@ -109,8 +115,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
       if (_unreadDataLoaded) {
         debugPrint('✅ [Posted Tasks] 未讀數據已同步完成');
       }
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _updatePostedTabUnreadFlag());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _updatePostedTabUnreadFlag();
+      });
     });
   }
 
@@ -137,19 +145,54 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
       final chatProvider = context.read<ChatListProvider>();
       // 只有當前是 Posted Tasks 分頁時才刷新
       if (chatProvider.currentTabIndex == 0) {
-        // 使用智能刷新策略決策
-        SmartRefreshStrategy.executeSmartRefresh(
-          refreshKey: 'PostedTasks-Provider',
-          refreshCallback: () {
-            debugPrint('✅ [Posted Tasks] 執行智能刷新');
-            _pagingController.refresh();
-          },
-          hasActiveFilters: chatProvider.hasActiveFilters,
-          searchQuery: chatProvider.searchQuery,
-          isUnreadUpdate: true, // 假設這是未讀狀態更新觸發的
-          forceRefresh: false,
-          enableDebounce: true,
-        );
+        final currentSearchQuery = chatProvider.searchQuery;
+        final currentLocations =
+            Set<String>.from(chatProvider.selectedLocations);
+        final currentStatuses = Set<String>.from(chatProvider.selectedStatuses);
+
+        debugPrint('🔄 [Posted Tasks] Provider 變化檢測:');
+        debugPrint('  - 當前搜尋查詢: "$currentSearchQuery"');
+        debugPrint('  - 上次搜尋查詢: "$_lastSearchQuery"');
+        debugPrint('  - 搜尋查詢變化: ${currentSearchQuery != _lastSearchQuery}');
+        debugPrint('  - 有活躍篩選: ${chatProvider.hasActiveFilters}');
+        debugPrint('  - 選中位置: ${currentLocations}');
+        debugPrint('  - 選中狀態: ${currentStatuses}');
+
+        // 檢查是否有實際變化
+        final hasSearchChanged = currentSearchQuery != _lastSearchQuery;
+        final hasLocationChanged =
+            currentLocations.length != _lastSelectedLocations.length ||
+                !currentLocations
+                    .every((loc) => _lastSelectedLocations.contains(loc));
+        final hasStatusChanged =
+            currentStatuses.length != _lastSelectedStatuses.length ||
+                !currentStatuses
+                    .every((status) => _lastSelectedStatuses.contains(status));
+
+        if (hasSearchChanged || hasLocationChanged || hasStatusChanged) {
+          debugPrint('✅ [Posted Tasks] 檢測到篩選條件變化，觸發刷新');
+
+          // 更新追蹤狀態
+          _lastSearchQuery = currentSearchQuery;
+          _lastSelectedLocations = currentLocations;
+          _lastSelectedStatuses = currentStatuses;
+
+          // 使用智能刷新策略決策
+          SmartRefreshStrategy.executeSmartRefresh(
+            refreshKey: 'PostedTasks-Provider',
+            refreshCallback: () {
+              debugPrint('✅ [Posted Tasks] 執行智能刷新');
+              _pagingController.refresh();
+            },
+            hasActiveFilters: chatProvider.hasActiveFilters,
+            searchQuery: currentSearchQuery,
+            isUnreadUpdate: false, // 這是篩選條件變化，不是未讀狀態更新
+            forceRefresh: false,
+            enableDebounce: true,
+          );
+        } else {
+          debugPrint('🔄 [Posted Tasks] 無篩選條件變化，跳過刷新');
+        }
       }
     } catch (e) {
       debugPrint('❌ [Posted Tasks] Provider 變化處理失敗: $e');
@@ -186,10 +229,19 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
 
       // 構建篩選條件
       Map<String, String>? filters;
-      if (chatProvider.selectedLocations.isNotEmpty) {
+
+      // 如果有搜尋關鍵字，暫時移除位置篩選以允許跨位置搜尋
+      final hasSearchQuery = chatProvider.searchQuery.trim().isNotEmpty;
+
+      if (chatProvider.selectedLocations.isNotEmpty && !hasSearchQuery) {
         filters ??= {};
         filters['location'] = chatProvider.selectedLocations.first;
+        debugPrint(
+            '🔍 [Posted Tasks] 應用位置篩選: ${chatProvider.selectedLocations.first}');
+      } else if (hasSearchQuery) {
+        debugPrint('🔍 [Posted Tasks] 有搜尋關鍵字，跳過位置篩選以允許跨位置搜尋');
       }
+
       if (chatProvider.selectedStatuses.isNotEmpty) {
         filters ??= {};
         filters['status'] = chatProvider.selectedStatuses.first;
@@ -222,6 +274,14 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
       final filteredTasks = _filterTasks(result.tasks, chatProvider);
       final sortedTasks = _sortTasks(filteredTasks, chatProvider);
 
+      debugPrint('📊 [Posted Tasks] 分頁處理:');
+      debugPrint('  - 原始任務數: ${result.tasks.length}');
+      debugPrint('  - 篩選後任務數: ${filteredTasks.length}');
+      debugPrint('  - 排序後任務數: ${sortedTasks.length}');
+      debugPrint('  - 當前 offset: $offset');
+      debugPrint('  - 頁面大小: $_pageSize');
+      debugPrint('  - API 返回 hasMore: ${result.hasMore}');
+
       // 修正分頁邏輯 - 統一處理，避免重複卡片
       final hasMoreData = result.hasMore && sortedTasks.length >= _pageSize;
 
@@ -229,22 +289,34 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
         // 計算下一頁的正確 offset
         final nextPageKey = hasMoreData ? offset + _pageSize : null;
 
+        debugPrint(
+            '  - 有數據，hasMoreData: $hasMoreData, nextPageKey: $nextPageKey');
+
         if (nextPageKey != null) {
           _pagingController.appendPage(sortedTasks, nextPageKey);
+          debugPrint('  ✅ 添加分頁數據，下一頁 key: $nextPageKey');
         } else {
           _pagingController.appendLastPage(sortedTasks);
+          debugPrint('  ✅ 添加最後一頁數據');
         }
       } else {
         // 沒有數據時，檢查是否為搜尋/篩選結果
+        debugPrint('  - 沒有數據，檢查篩選條件');
+        debugPrint('    - hasActiveFilters: ${chatProvider.hasActiveFilters}');
+        debugPrint('    - searchQuery: "${chatProvider.searchQuery}"');
+
         if (chatProvider.hasActiveFilters ||
             chatProvider.searchQuery.isNotEmpty) {
           _pagingController.appendLastPage([]);
+          debugPrint('  ✅ 篩選結果為空，顯示空狀態');
         } else if (offset == 0) {
           // 第一頁就沒有數據
           _pagingController.appendLastPage([]);
+          debugPrint('  ✅ 第一頁無數據，顯示空狀態');
         } else {
           // 後續頁面沒有更多數據
           _pagingController.appendLastPage([]);
+          debugPrint('  ✅ 後續頁面無數據，顯示空狀態');
         }
       }
     } catch (error) {
@@ -258,30 +330,99 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
   /// 篩選任務列表
   List<Map<String, dynamic>> _filterTasks(
       List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
-    return tasks.where((task) {
-      final title = (task['title'] ?? '').toString().toLowerCase();
-      final query = chatProvider.searchQuery.toLowerCase();
+    debugPrint('🔍 [Posted Tasks] 開始篩選任務: ${tasks.length} 個任務');
+    debugPrint('  - 搜尋關鍵字: "${chatProvider.searchQuery}"');
+    debugPrint('  - 選中位置: ${chatProvider.selectedLocations}');
+    debugPrint('  - 選中狀態: ${chatProvider.selectedStatuses}');
 
-      // 搜尋篩選
-      final matchQuery = query.isEmpty || title.contains(query);
+    // 調試：顯示所有任務的標題
+    debugPrint('📋 所有任務標題:');
+    for (int i = 0; i < tasks.length; i++) {
+      final task = tasks[i];
+      final title = task['title'] ?? 'NO_TITLE';
+      final id = task['id'] ?? 'NO_ID';
+      debugPrint('  [$i] ID: $id, Title: "$title"');
+    }
+
+    final filteredTasks = tasks.where((task) {
+      // 調試：顯示當前任務的完整數據
+      debugPrint('🔍 檢查任務: ${task['id']}');
+      debugPrint('  - 原始 title: "${task['title']}"');
+      debugPrint('  - 原始 description: "${task['description']}"');
+      debugPrint('  - 所有可用欄位: ${task.keys.toList()}');
+
+      final rawQuery = chatProvider.searchQuery.trim();
+      final hasSearchQuery = rawQuery.isNotEmpty;
+
+      final title = (task['title'] ?? '').toString();
+      final description = (task['description'] ?? '').toString();
+      final location = (task['location'] ?? '').toString();
+      final language = (task['language_requirement'] ?? '').toString();
+      final statusDisplay = _displayStatus(task);
+      final hashtags = (task['hashtags'] is List)
+          ? (task['hashtags'] as List).join(' ')
+          : (task['hashtags'] ?? '').toString();
+
+      // 正規化
+      final normalizedQuery = _normalizeSearchText(rawQuery.toLowerCase());
+      final nTitle = _normalizeSearchText(title);
+      final nDesc = _normalizeSearchText(description);
+      final nLoc = _normalizeSearchText(location);
+      final nLang = _normalizeSearchText(language);
+      final nStatus = _normalizeSearchText(statusDisplay);
+      final nTags = _normalizeSearchText(hashtags);
+
+      // 搜尋：多欄位匹配
+      bool matchQuery = true;
+      if (hasSearchQuery) {
+        matchQuery = nTitle.contains(normalizedQuery) ||
+            nDesc.contains(normalizedQuery) ||
+            nLoc.contains(normalizedQuery) ||
+            nLang.contains(normalizedQuery) ||
+            nStatus.contains(normalizedQuery) ||
+            nTags.contains(normalizedQuery);
+
+        if (!matchQuery) {
+          debugPrint('  ❌ 任務 "${task['title']}" 不符合搜尋條件 (多欄位)');
+          return false;
+        }
+      }
 
       // 位置篩選
-      final location = (task['location'] ?? '').toString();
-      final matchLocation = chatProvider.selectedLocations.isEmpty ||
-          chatProvider.selectedLocations.contains(location);
+      final locationVal = (task['location'] ?? '').toString();
+      // 若有搜尋關鍵字則忽略位置篩選，確保完整搜尋
+      final matchLocation = hasSearchQuery ||
+          chatProvider.selectedLocations.isEmpty ||
+          chatProvider.selectedLocations.contains(locationVal);
+      if (!matchLocation) {
+        debugPrint('  ❌ 任務 "${task['title']}" 位置 "$locationVal" 不符合篩選條件');
+        return false;
+      }
 
       // 狀態篩選
       final status = _displayStatus(task);
       final matchStatus = chatProvider.selectedStatuses.isEmpty ||
           chatProvider.selectedStatuses.contains(status);
+      if (!matchStatus) {
+        debugPrint('  ❌ 任務 "${task['title']}" 狀態 "$status" 不符合篩選條件');
+        return false;
+      }
 
-      return matchQuery && matchLocation && matchStatus;
+      debugPrint('  ✅ 任務 "${task['title']}" 通過所有篩選條件');
+      return true;
     }).toList();
+
+    debugPrint('🔍 [Posted Tasks] 篩選完成: ${filteredTasks.length} 個任務');
+    return filteredTasks;
   }
 
   /// 排序任務列表
   List<Map<String, dynamic>> _sortTasks(
       List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
+    debugPrint('🔄 [Posted Tasks] 開始排序任務: ${tasks.length} 個任務');
+    debugPrint('  - 排序方式: ${chatProvider.currentSortBy}');
+    debugPrint('  - 排序方向: ${chatProvider.sortAscending ? "升序" : "降序"}');
+
     final sortedTasks = List<Map<String, dynamic>>.from(tasks);
 
     sortedTasks.sort((a, b) {
@@ -328,9 +469,21 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
           comparison = 0;
       }
 
-      return chatProvider.sortAscending ? comparison : -comparison;
+      final finalComparison =
+          chatProvider.sortAscending ? comparison : -comparison;
+
+      // 調試排序結果
+      if (finalComparison != 0) {
+        final aTitle = a['title'] ?? 'Unknown';
+        final bTitle = b['title'] ?? 'Unknown';
+        debugPrint(
+            '  🔄 排序: "$aTitle" ${finalComparison > 0 ? ">" : "<"} "$bTitle"');
+      }
+
+      return finalComparison;
     });
 
+    debugPrint('🔄 [Posted Tasks] 排序完成');
     return sortedTasks;
   }
 
@@ -343,13 +496,47 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
     return (codeOrLegacy ?? '').toString();
   }
 
+  /// 正規化搜尋文本 - 移除特殊字符並轉為小寫
+  String _normalizeSearchText(String text) {
+    if (text.isEmpty) return '';
+
+    // 更寬鬆的正規化，保留更多字符
+    final normalized = text
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^\w\s\-\(\)\.\,\:\;\!\?]'), '') // 保留更多標點符號
+        .replaceAll(RegExp(r'\s+'), ' ') // 將多個空格替換為單個空格
+        .trim();
+
+    debugPrint('🔍 正規化搜尋文本: "$text" -> "$normalized"');
+    return normalized;
+  }
+
+  // (removed) 舊的測試搜尋匹配函式已整合至多欄位搜尋邏輯
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: () async {
-        final chatProvider = context.read<ChatListProvider>();
-        await chatProvider.cacheManager.forceRefresh();
-        _pagingController.refresh();
+        debugPrint('🔄 [Posted Tasks] 下拉重新整理開始');
+        try {
+          // 清除快取數據
+          final chatProvider = context.read<ChatListProvider>();
+          await chatProvider.cacheManager.forceRefresh();
+
+          // 清除本地快取
+          _applicationsByTask.clear();
+          _expandedTaskIds.clear();
+
+          // 重新載入未讀數據
+          await _ensureUnreadDataLoaded();
+
+          // 刷新分頁數據
+          _pagingController.refresh();
+
+          debugPrint('✅ [Posted Tasks] 下拉重新整理完成');
+        } catch (e) {
+          debugPrint('❌ [Posted Tasks] 下拉重新整理失敗: $e');
+        }
       },
       child: Stack(
         children: [

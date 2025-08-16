@@ -145,6 +145,20 @@ class TaskService extends ChangeNotifier {
               : [];
           final hasMore = (payload['pagination']?['has_more'] ?? false) == true;
           debugPrint('🔍 [Posted Tasks Aggregated] 成功獲取 ${items.length} 個任務');
+
+          // 調試：顯示前幾個任務的詳細數據
+          for (int i = 0; i < items.length && i < 3; i++) {
+            final task = items[i];
+            debugPrint('📋 任務 [$i] 詳細數據:');
+            debugPrint('  - ID: ${task['id']}');
+            debugPrint('  - Title: "${task['title']}"');
+            debugPrint('  - Description: "${task['description']}"');
+            debugPrint('  - Location: "${task['location']}"');
+            debugPrint('  - Status: "${task['status']}"');
+            debugPrint('  - Status Display: "${task['status_display']}"');
+            debugPrint('  - 所有鍵: ${task.keys.toList()}');
+          }
+
           return (tasks: items, hasMore: hasMore);
         } else {
           debugPrint(
@@ -166,9 +180,9 @@ class TaskService extends ChangeNotifier {
     try {
       final uri = Uri.parse(
           '${AppConfig.apiBaseUrl}/backend/api/tasks/task_edit_data.php?id=$taskId');
-      final resp = await http
-          .get(uri, headers: {'Content-Type': 'application/json'})
-          .timeout(const Duration(seconds: 30));
+      final resp = await http.get(uri, headers: {
+        'Content-Type': 'application/json'
+      }).timeout(const Duration(seconds: 30));
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         if (data['success'] == true) {

@@ -1,0 +1,480 @@
+# Chat Module 工作規格文件（整合版）
+
+Chat 模組需求落地執行規劃（重要）
+
+階段一：文件閱讀 & 重點梳理（重要）
+	•	AI 先完整閱讀規格文件（chat_module_spec.md），尤其是我改動資料庫結構的部分，需要確保現有架構以及未來規劃不會對新的資料表產生衝突。
+	•	梳理出 核心重點（欄位設計、資料流、角色視角、狀態管理、UI 映射邏輯），讓我確保我們雙方理解正確。
+	•	整理成可檢查的 checklist，作為後續專案盤點基準。
+
+⸻
+
+階段二：專案現況檢查（重要）
+
+逐步比對 checklist 與專案現有功能：
+	1.	已完成項目
+	•	有對應功能、且邏輯正確 → 暫不動作。
+	2.	部分完成 / 需調整項目
+	•	有部分功能，但與規格有落差（例如：未讀計算錯誤、角色視角未正確分流）。
+	•	整理成待辦清單 → 待辦事項 A 類。
+	3.	尚未實作項目
+	•	文件有規格，但專案完全沒有功能或資料結構支持。
+	•	整理成待辦清單 → 待辦事項 B 類。
+
+⸻
+
+階段三：執行評估報告（重要）
+
+針對待辦事項逐一評估：
+	•	現有架構檢查
+	•	涉及的資料表（如 tasks, task_applications, chat_rooms, chat_reads）。
+	•	涉及的 API 與 Provider 狀態管理。
+	•	涉及的 Flutter widget/UI 部分（ChatTitleWidget, chat detail 內訊息列表等）。
+	•	解決方案設計
+	•	提供修正方案，避免切掉現有功能造成連鎖反應。
+	•	方案內包含「資料正確性」與「前端渲染順序」的考量。
+	•	可行性判斷
+	•	✅ 完全可行 → 列為立即執行。
+	•	⚠️ 部分可行 → 需先修改依賴結構。
+	•	❌ 不建議執行 → 需討論替代方案。
+
+⸻
+
+階段四：測試與驗證流程（重要）
+
+每個待辦事項修正/新增後 → 必須三層測試：
+	1.	後端測試
+	•	確認 DB 取得資料正確（SQL join/unread count 正確）。
+	•	確認 API 回傳格式符合前端需求。
+	2.	前端測試
+	•	確認資料正確映射到 Provider 狀態。
+	•	確認 UI 元件正確顯示（任務狀態、未讀數、聊天室標題/副標題）。
+	•	確認圖片訊息正確顯示，且支援點擊預覽/下載。
+	3.	異步/同步流程檢查
+	•	確認 API 回應與 Widget rebuild 順序正確。
+	•	確認 setState/Provider update 不會造成 UI race condition（如未讀數錯位）。
+
+⸻
+
+階段五：進度追蹤與版本管控（重要）
+	• 第一次開始執行前先推送一次版本	
+	• 每次完成一個待辦 → 更新 進度追蹤報告。
+	•	每次修正均經過 AI 測試 → 你手動測試 → 雙方確認 OK。
+	•	你同意後 → 報告更新 → 才能推送版本。
+	•	若需版本推送（git push / TestFlight build），先確認所有待辦封閉，並進行回歸測試。
+
+## 🧭 總覽（目標）
+- 建立「聊天室模組」一致的資料契約與畫面行為，確保 Posted Tasks / My Works → /chat/detail 的標題、頭像、訊息、圖片預覽正確，並透過 Socket 支援雙向即時聊天與未讀更新。
+- 行動條（Action Bar）依角色 × 任務狀態清晰映射，避免視角混亂。
+- 評分與評論數統一資料來源（task_ratings）。
+
+
+---
+
+## 0) 共享前置
+
+### 0.1 資料庫異動 
+- 新增 `chat_reads`：`(id, user_id, room_id, last_read_message_id, updated_at, UNIQUE(user_id, room_id))`
+- `tasks.status_id` → 關聯 `task_statuses.id`
+- `task_applications.status`: ENUM('applied','accepted','rejected')
+- 單一受雇者：`task_applications` 加 `accepted_flag`，唯一鍵 `(task_id, accepted_flag)`
+- `task_status_logs`：記錄狀態切換（Pending Confirmation 倒數依此）
+- `task_ratings`：加 `tasker_id`（受評者 = 最終 accepted 應徵者），唯一鍵 `(task_id, rater_id, tasker_id)`
+
+⚠️ （資料庫是我在專案以外的地方操作修改phpMyAdmin，所以專案中對應的資料表、對應資料功能會受到影響，幫我確保專案內的資料庫對照功能有對應更新，或是遇到問題看這邊）
+
+---
+
+### 0.2 狀態映射表（角色視角）
+
+| tasks.status_id | task_statuses | my task_applications.status | Participant 顯示 |
+|-----------------|---------------|-----------------------------|------------------|
+| 1 pending       | applied/pending | pending (等待審核)         |
+| 2 in progress   | accepted       | in progress (進行中)       |
+| 2 in progress   | rejected       | rejected                   |
+| 3 pending conf. | accepted       | pending confirmation (倒數)|
+| 3 pending conf. | rejected       | rejected                   |
+| 4 completed     | accepted       | completed                  |
+| 4 completed     | rejected       | rejected                   |
+| 5 cancelled     | 任意           | cancelled/closed           |
+
+後端回傳：
+- `mapped_status`（直接顯示用）
+- `raw_task_status`, `application_status`（除錯用）
+
+---
+
+### 0.3 七日倒數
+- 來源：`task_status_logs.created_at`（首次進入 pending confirmation）
+- 倒數：`created_at + 7 days`
+- 到期：
+  1. `tasks.status_id → completed`
+  2. `tasks.reward_point` 轉入 `participant_id`
+- 策略：
+  - 後端 cron/worker 每分鐘掃描（冪等）
+  - 前端每次載入動態算剩餘；到期後 socket/task.updated 觸發狀態更新
+
+---
+
+## 1) 模組分層
+```
+/chat
+  - Posted Tasks（我 = creator）
+  - My Works（我 = participant）
+
+/chat/detail?room_id=...
+  - 1v1 聊天頁
+```
+
+---
+
+## 2) 資料契約
+ㄞ
+### 2.1 導航
+- 點卡片 → 僅傳 `room_id`
+- /chat/detail 初始化 → 拉取：
+  - room_summary（task_id, task_title, creator_id, participant_id, counterpart_user, last_read_message_id…）
+  - task_summary（title, description, salary/reward, language, location, task_date, poster）
+
+### 2.2 列表卡片顯示欄位
+- Posted Tasks（應徵者卡片）
+  - applier_name, avatar_url, rating_avg_1dp, review_count, first_message_snippet, chat_room_id
+- My Works（任務卡片）
+  - task_title, poster_name, poster_avatar, last_message_snippet, chat_room_id
+
+---
+
+## 3) /chat/detail 畫面需求
+
+### 3.1 ChatTitleWidget
+- 主標題：`task_title`
+- 副標題：`counterpart_user.name`
+- 點擊 → 彈窗：task_summary（描述、酬勞、語言、地點、日期、發佈者＋評分）
+
+### 3.2 訊息區
+- 頭像：URL → fallback 首字母 → fallback icon
+- 文字訊息：氣泡
+- 圖片訊息：
+  - kind='image'，content=URL
+  - 顯示圖片（不露 URL），可全螢幕預覽、縮放、下載
+- 禁用：completed/closed/cancelled/rejected 狀態下，輸入框/圖片上傳 disabled
+
+---
+
+## 4) 即時性（Socket）
+
+事件：
+- `message.created`：插入訊息
+- `room.read`：更新已讀標記
+- `task.updated`：狀態改變
+
+行為：
+- 進入房間 → 即時標記已讀
+- 退出房間 → 不自動已讀
+- 多裝置同步：1–2 秒內一致
+
+---
+
+## 5) 行動條（Action Bar Matrix）
+
+### 共通規則
+- `mapped_status ∈ {completed, closed, cancelled, rejected}` → 全部輸入 disabled
+- 動作表驅動渲染（避免 if-else）
+
+### A) 按鈕 Catalog
+（例：`accept_applicant`, `pay_and_review`, `confirm_complete`, `report_issue`, `mark_completed`, `block_user`…  
+附：API, 確認文案, 前置條件, socket_expected）
+
+### B) Creator × mapped_status
+- open → accept_applicant, block_user, report_issue
+- in_progress → pay_and_review, report_issue, block_user
+- pending_confirmation → confirm_complete, disagree_complete, report_issue, block_user
+- dispute → report_issue
+- completed → show_paid_info, open_review, block_user
+- rejected/closed/cancelled → block_user, report_issue
+
+### C) Participant × mapped_status
+- open → report_issue, block_user
+- in_progress → mark_completed, report_issue, block_user
+- pending_confirmation → report_issue, block_user
+- dispute → report_issue
+- completed/rejected/closed/cancelled → report_issue, block_user
+
+---
+
+## 6) 評分
+- 卡片/彈窗顯示 ⭐︎avg (count)
+- 平均：`ROUND(AVG(task_ratings.rating),1)`
+- 數量：`COUNT(*)`
+- task_ratings.tasker_id 確保一致性
+
+---
+
+## 7) 後端 API（Server）
+完整清單：
+- `/api/chat/rooms`
+- `/api/chat/rooms/{roomId}/summary`
+- `/api/chat/rooms/{roomId}/messages`
+- `/api/chat/rooms/{roomId}/read`
+- `/api/chat/messages` (文字)
+- `/api/chat/messages/image`
+- `/api/chat/unreads`
+- `/api/tasks/{taskId}/accept`
+- `/api/tasks/{taskId}/complete-request`
+- `/api/tasks/{taskId}/confirm`
+- `/api/tasks/{taskId}/pay`
+- `/api/tasks/{taskId}/disagree`
+- `/api/tasks/{taskId}/report`
+- `/api/tasks/{taskId}/countdown`
+- `/api/ratings/summary`
+- `/api/ratings`
+
+---
+
+## 8) 前端 Flutter（App）
+- /chat 列表 → 呼叫 /api/chat/rooms（搜尋/篩選/排序都交給後端）
+- /chat/detail → room_id → /summary + /messages
+- 行動條 → 表驅動渲染
+- Socket → 訂閱 message.created / room.read / task.updated
+- 倒數 UI → /countdown 或本地計算
+
+---
+
+## 9) QA 驗收清單
+- 兩分頁點卡片 → 正確進 /chat/detail
+- 標題彈窗資訊齊全
+- 圖片訊息 → 正確渲染、可預覽下載
+- Socket → 雙方訊息、已讀同步
+- 行動條 → 狀態正確切換
+- 倒數到期 → 任務自動完成
+- 評分顯示一致
+- Completed/Closed/Canceled → 輸入禁用
+
+---
+
+# ACTION_BAR_CATALOG
+
+# Action Bar Button Catalog
+
+| key | label | api_name | confirm_needed | confirm_text | preconditions | success_effects | socket_expected |
+|---|---|---|---|---|---|---|---|
+| accept_applicant | Accept | `POST /api/tasks/{taskId}/accept` | ✅ | Assign this applicant to the task? | role=creator;房內對象=候選人;尚未有accepted | 行動條切到in_progress;禁用其他候選房 | task.updated |
+| block_user | Block | `POST /api/users/{userId}/block` | ✅ | Block this user from applying to your tasks? | 任一角色;非已封鎖 | 標記房間互動受限 | user.blocked |
+| pay_and_review | Pay | `POST /api/tasks/{taskId}/pay` | ✅x2 | Enter the 6-digit payment code again to confirm. | role=creator; mapped_status=in_progress | 打開Review Dialog;完成後mapped→completed | task.updated |
+| open_review | Reviews | `GET /api/ratings/status?task_id=` | ❌ | — | 任一; mapped=completed | 已評顯示只讀;未評開啟評分 | — |
+| confirm_complete | Confirm | `POST /api/tasks/{taskId}/confirm` | ✅ | Confirm this task is complete and release points? | role=creator; mapped=pending_confirmation | mapped→completed;轉點 | task.updated |
+| disagree_complete | Disagree | `POST /api/tasks/{taskId}/disagree` | ✅ | Disagree that the task is complete? | role=creator; mapped=pending_confirmation;拒絕次數<2 | 記錄拒絕;可能維持/轉dispute | task.updated |
+| report_issue | Report | `POST /api/tasks/{taskId}/report` | ❌ | — | 任一;需填radio原因+10字以上+圖 | 彈出表單送出 | task.reported |
+| mark_completed | Completed | `POST /api/tasks/{taskId}/complete-request` | ✅ | Mark this task as completed? | role=participant; mapped=in_progress | 任務→pending_confirmation;啟動倒數 | task.updated |
+| show_paid_info | Paid | `GET /api/tasks/{taskId}/payment` | ❌ | — | mapped=completed | 顯示付款/轉點時間 | — |
+
+---
+
+# ACTION_BAR_CREATOR
+
+# Creator Action Bar Mapping
+
+| mapped_status | buttons | 輸入區 |
+|---|---|---|
+| open | accept_applicant, block_user, report_issue | 可輸入 |
+| in_progress | pay_and_review, report_issue, block_user | 可輸入 |
+| pending_confirmation | confirm_complete, disagree_complete, report_issue, block_user | 可輸入 |
+| dispute | report_issue | 建議禁用 |
+| completed | show_paid_info, open_review, block_user | 禁用 |
+| rejected | block_user, report_issue | 禁用 |
+| closed / cancelled | report_issue, block_user | 禁用 |
+
+---
+
+# ACTION_BAR_PARTICIPANT
+
+# Participant Action Bar Mapping
+
+| mapped_status | buttons | 輸入區 |
+|---|---|---|
+| open | report_issue, block_user | 可輸入 |
+| in_progress | mark_completed, report_issue, block_user | 可輸入 |
+| pending_confirmation | report_issue, block_user | 可輸入 |
+| dispute | report_issue | 建議禁用 |
+| completed | report_issue, block_user | 禁用 |
+| rejected | report_issue, block_user | 禁用 |
+| closed / cancelled | report_issue, block_user | 禁用 |
+
+---
+
+# 📊 專案現況檢查報告
+
+## ✅ 已完成項目
+
+### 1. 資料庫結構
+- **`chat_reads` 表**：✅ 已存在且結構正確，包含自增 ID
+- **`task_statuses` 表**：✅ 已存在，包含 code、display_name、progress_ratio 等欄位
+- **`tasks.status_id`**：✅ 已正確關聯 `task_statuses.id`
+- **`task_applications.status`**：✅ 已實作 ENUM('applied','accepted','rejected')
+
+### 2. 核心功能
+- **聊天室導航**：✅ 兩分頁點擊卡片能正確導航到 `/chat/detail`
+- **未讀狀態計算**：✅ 已實作基於 `chat_reads.last_read_message_id` 的未讀計算
+- **狀態映射**：✅ 已實作 Creator vs Participant 的角色視角區分
+
+---
+
+## ⚠️ 部分完成 / 需調整項目
+
+### 1. 聊天室標題顯示
+- **問題**：ChatTitleWidget 的標題顯示邏輯與規格不完全一致
+- **現況**：目前顯示任務標題，但缺少對方用戶名作為副標題
+- **規格要求**：主標題(task_title) + 副標題(counterpart_user.name)
+
+### 2. 狀態映射表
+- **問題**：規格中的狀態映射表與實際實作有差異
+- **規格要求**：`tasks.status_id` 與 `task_applications.status` 的組合映射
+- **現況**：目前使用 `client_status_code` 和 `client_status_display` 但邏輯不完全一致
+
+### 3. 七日倒數功能
+- **問題**：規格要求 `task_status_logs` 表記錄狀態切換，但專案中未找到此表
+- **規格要求**：pending_confirmation 狀態下自動倒數 7 天
+- **現況**：前端有倒數 UI 但後端邏輯未完全實作
+
+---
+
+## ❌ 尚未實作項目
+
+### 1. Action Bar 矩陣驅動渲染
+- **規格要求**：依角色×狀態的矩陣驅動 Action Bar 按鈕顯示
+- **現況**：目前使用硬編碼的 if-else 邏輯
+
+### 2. 圖片訊息支援
+- **規格要求**：支援圖片訊息的全螢幕預覽、縮放、下載
+- **現況**：目前只支援文字訊息
+
+### 3. Socket 即時通訊
+- **規格要求**：支援 `message.created`、`room.read`、`task.updated` 事件
+- **現況**：有 Socket 基礎架構但事件處理不完整
+
+### 4. 評分系統統一
+- **規格要求**：使用 `task_ratings.tasker_id` 確保一致性
+- **現況**：評分系統存在但資料來源不一致
+
+---
+
+# 🎯 執行評估報告
+
+## 待辦事項 A 類（部分完成需調整）
+
+### A1. 聊天室標題顯示修正
+- **可行性**：✅ 完全可行
+- **影響範圍**：ChatTitleWidget、聊天室詳情頁面
+- **解決方案**：修改 ChatTitleWidget 顯示邏輯，添加對方用戶名作為副標題
+- **優先級**：高（立即執行）
+
+### A2. 狀態映射邏輯統一
+- **可行性**：✅ 完全可行
+- **影響範圍**：後端 API、前端狀態顯示
+- **解決方案**：統一使用規格中的狀態映射表，確保 `mapped_status` 正確回傳
+- **優先級**：高（立即執行）
+
+### A3. 七日倒數後端邏輯
+- **可行性**：⚠️ 部分可行
+- **影響範圍**：需要新增 `task_status_logs` 表
+- **解決方案**：先建立資料表結構，再實作倒數邏輯
+- **優先級**：中（短期執行）
+
+## 待辦事項 B 類（尚未實作）
+
+### B1. Action Bar 矩陣驅動
+- **可行性**：✅ 完全可行
+- **影響範圍**：聊天室詳情頁面、Action Bar 組件
+- **解決方案**：建立按鈕配置表，實現表驅動渲染
+- **優先級**：中（短期執行）
+
+### B2. 圖片訊息支援
+- **可行性**：✅ 完全可行
+- **影響範圍**：訊息組件、圖片預覽組件
+- **解決方案**：擴展訊息類型支援，添加圖片處理邏輯
+- **優先級**：中（中期執行）
+
+### B3. Socket 事件完善
+- **可行性**：✅ 完全可行
+- **影響範圍**：Socket 服務、事件處理器
+- **解決方案**：完善事件處理邏輯，確保即時同步
+- **優先級**：中（中期執行）
+
+---
+
+# 🧪 測試與驗證流程
+
+## 測試策略
+1. **後端測試**：確認 API 回傳格式符合前端需求
+2. **前端測試**：確認 UI 元件正確顯示和互動
+3. **整合測試**：確認前後端資料流一致
+
+## 驗證重點
+- 聊天室標題顯示正確性
+- 狀態映射邏輯一致性
+- 未讀狀態計算準確性
+- Action Bar 按鈕顯示邏輯
+
+---
+
+# 📈 進度追蹤與版本管控
+
+## 建議執行順序
+1. **立即執行**：A1、A2（聊天室標題和狀態映射）
+2. **短期執行**：A3、B1（七日倒數和 Action Bar）
+3. **中期執行**：B2、B3（圖片訊息和 Socket 完善）
+
+## 版本推送建議
+- 完成 A1、A2 後可進行第一次版本推送
+- 完成 A3、B1 後進行第二次版本推送
+- 完成 B2、B3 後進行最終版本推送
+
+## 進度追蹤表
+
+| 階段 | 待辦事項 | 狀態 | 完成日期 | 測試狀態 | 備註 |
+|------|----------|------|----------|----------|------|
+| 階段一 | 文件閱讀與重點梳理 | ✅ 完成 | 2025-01-18 | - | 已完成 |
+| 階段二 | 專案現況檢查 | ✅ 完成 | 2025-01-18 | - | 已完成 |
+| 階段三 | 執行評估報告 | ✅ 完成 | 2025-01-18 | - | 已完成 |
+| 階段四 | 測試與驗證 | ⏳ 進行中 | - | - | 待開始 |
+| 階段五 | 進度追蹤與版本管控 | ⏳ 進行中 | - | - | 待開始 |
+
+---
+
+# 🚀 下一步行動計劃
+
+## 立即執行（本週內）
+1. **修正聊天室標題顯示**（A1）
+   - 修改 ChatTitleWidget 組件
+   - 添加對方用戶名作為副標題
+   - 測試標題顯示正確性
+
+2. **統一狀態映射邏輯**（A2）
+   - 檢查後端 API 回傳格式
+   - 確保 `mapped_status` 正確計算
+   - 測試狀態顯示一致性
+
+## 短期執行（下週內）
+1. **建立 task_status_logs 表**（A3）
+   - 設計資料表結構
+   - 實作七日倒數後端邏輯
+   - 測試倒數功能正常性
+
+2. **實作 Action Bar 矩陣驅動**（B1）
+   - 建立按鈕配置表
+   - 實現表驅動渲染邏輯
+   - 測試按鈕顯示正確性
+
+## 中期執行（兩週內）
+1. **支援圖片訊息**（B2）
+2. **完善 Socket 事件**（B3）
+
+---
+
+**最後更新**：2025-01-18  
+**更新者**：AI Assistant  
+**下次檢視**：完成 A1、A2 後
+
+
+
+---
