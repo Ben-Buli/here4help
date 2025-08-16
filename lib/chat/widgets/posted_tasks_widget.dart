@@ -58,7 +58,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
     try {
       final provider = context.read<ChatListProvider>();
       final oldState = provider.hasUnreadForTab(0);
-      
+
       // 使用智能刷新策略的狀態更新器
       SmartRefreshStrategy.updateUnreadState(
         componentKey: 'PostedTasks-Tab',

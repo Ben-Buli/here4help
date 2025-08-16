@@ -22,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once '../../config/database.php';
 require_once '../../utils/Response.php';
+require_once '../../utils/ChatSecurity.php';
 
 function validateToken($token) {
     try {
@@ -54,26 +55,28 @@ try {
         Response::error('Invalid JSON input', 400);
     }
 
-    $room_id = $input['room_id'] ?? null;
-    $up_to_message_id = $input['up_to_message_id'] ?? null; // 可選，預設為最新
+    $room_id = ChatSecurity::sanitizeInput($input['room_id'] ?? null, 'string');
+    $up_to_message_id = isset($input['up_to_message_id']) ? 
+        ChatSecurity::sanitizeInput($input['up_to_message_id'], 'int') : null;
 
     if (!$room_id) {
         Response::error('room_id is required', 400);
+    }
+
+    // 檢查聊天室是否存在
+    if (!ChatSecurity::roomExists($room_id)) {
+        ChatSecurity::logSecurityEvent('mark_read_nonexistent_room', $user_id, ['room_id' => $room_id]);
+        Response::error('Room not found', 404);
     }
 
     $db = Database::getInstance();
     $db->beginTransaction();
     
     try {
-        // 1. 權限驗證：確保用戶為該房間參與者
-        $room_check_sql = "
-            SELECT id, creator_id, participant_id, task_id 
-            FROM chat_rooms 
-            WHERE id = ? AND (creator_id = ? OR participant_id = ?)
-        ";
-        $room_info = $db->query($room_check_sql, [$room_id, $user_id, $user_id])->fetch();
-        
+        // 1. 權限驗證：使用統一安全性驗證
+        $room_info = ChatSecurity::verifyRoomParticipant($user_id, $room_id);
         if (!$room_info) {
+            ChatSecurity::logSecurityEvent('mark_read_access_denied', $user_id, ['room_id' => $room_id]);
             throw new Exception('Room not found or access denied');
         }
         

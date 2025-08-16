@@ -22,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once '../../config/database.php';
 require_once '../../utils/Response.php';
+require_once '../../utils/ChatSecurity.php';
 
 function validateToken($token) {
     try {
@@ -48,13 +49,14 @@ try {
     if (!$payload) throw new Exception('Invalid or expired token');
     $user_id = (int)$payload['user_id'];
     
-    // 解析參數
-    $scope = $_GET['scope'] ?? 'all';
+    // 解析和驗證參數
+    $scope = ChatSecurity::sanitizeInput($_GET['scope'] ?? 'all', 'string');
     $with_unread = isset($_GET['with_unread']) && $_GET['with_unread'] === '1';
-    $limit = max(1, min(100, (int)($_GET['limit'] ?? 20)));
-    $offset = max(0, (int)($_GET['offset'] ?? 0));
+    $limit = max(1, min(100, ChatSecurity::sanitizeInput($_GET['limit'] ?? 20, 'int')));
+    $offset = max(0, ChatSecurity::sanitizeInput($_GET['offset'] ?? 0, 'int'));
     
-    if (!in_array($scope, ['posted', 'myworks', 'all'])) {
+    if (!ChatSecurity::canAccessScope($user_id, $scope)) {
+        ChatSecurity::logSecurityEvent('invalid_scope_access', $user_id, ['scope' => $scope, 'endpoint' => 'rooms']);
         Response::error('Invalid scope. Must be one of: posted, myworks, all', 400);
     }
 

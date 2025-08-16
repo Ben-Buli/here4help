@@ -13,6 +13,7 @@ import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/chat/utils/avatar_error_cache.dart';
+import 'package:here4help/chat/services/smart_refresh_strategy.dart';
 
 /// My Works 分頁組件
 /// 從原 ChatListPage 中抽取的 My Works 相關功能
@@ -44,13 +45,19 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
     try {
       final provider = context.read<ChatListProvider>();
-      // 只有當狀態真正改變時才更新，避免無限循環
-      if (provider.hasUnreadForTab(1) != hasUnread) {
-        debugPrint('🔄 [My Works] 更新 Tab 未讀狀態: $hasUnread');
-        provider.setTabHasUnread(1, hasUnread);
-      } else {
-        debugPrint('🔄 [My Works] Tab 未讀狀態未改變，跳過更新: $hasUnread');
-      }
+      final oldState = provider.hasUnreadForTab(1);
+      
+      // 使用智能刷新策略的狀態更新器
+      SmartRefreshStrategy.updateUnreadState(
+        componentKey: 'MyWorks-Tab',
+        oldState: oldState,
+        newState: hasUnread,
+        updateCallback: () {
+          debugPrint('✅ [My Works] 更新 Tab 未讀狀態: $hasUnread');
+          provider.setTabHasUnread(1, hasUnread);
+        },
+        description: 'My Works Tab 未讀狀態',
+      );
     } catch (e) {
       debugPrint('❌ [My Works] 更新 Tab 未讀狀態失敗: $e');
     }
@@ -85,6 +92,10 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
         _unreadByRoom = Map<String, int>.from(map);
         _unreadDataLoaded = true; // 標記未讀數據已載入
       });
+      // 使用 _unreadDataLoaded 確保數據完整性
+      if (_unreadDataLoaded) {
+        debugPrint('✅ [My Works] 未讀數據已同步完成');
+      }
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _updateMyWorksTabUnreadFlag());
     });
@@ -113,18 +124,19 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       final chatProvider = context.read<ChatListProvider>();
       // 只有當前是 My Works 分頁時才刷新
       if (chatProvider.currentTabIndex == 1) {
-        // 避免在 build 期間觸發 refresh 造成循環
-        // 同時避免因未讀狀態更新而觸發的循環刷新
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          // 只有在真正需要刷新時才刷新（篩選條件變化，而不是未讀狀態變化）
-          if (chatProvider.hasActiveFilters ||
-              chatProvider.searchQuery.isNotEmpty) {
-            debugPrint('🔄 [My Works] 篩選條件變化，觸發刷新');
+        // 使用智能刷新策略決策
+        SmartRefreshStrategy.executeSmartRefresh(
+          refreshKey: 'MyWorks-Provider',
+          refreshCallback: () {
+            debugPrint('✅ [My Works] 執行智能刷新');
             _pagingController.refresh();
-          } else {
-            debugPrint('🔄 [My Works] 未讀狀態變化，跳過刷新');
-          }
-        });
+          },
+          hasActiveFilters: chatProvider.hasActiveFilters,
+          searchQuery: chatProvider.searchQuery,
+          isUnreadUpdate: true, // 假設這是未讀狀態更新觸發的
+          forceRefresh: false,
+          enableDebounce: true,
+        );
       }
     } catch (e) {
       debugPrint('❌ [My Works] Provider 變化處理失敗: $e');
