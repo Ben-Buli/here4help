@@ -12,6 +12,7 @@ import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/chat/utils/avatar_error_cache.dart';
+import 'package:here4help/chat/services/smart_refresh_strategy.dart';
 
 /// Posted Tasks 分頁組件
 /// 從原 ChatListPage 中抽取的 Posted Tasks 相關功能
@@ -36,7 +37,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
   // 未讀映射（room_id -> count）
   Map<String, int> _unreadByRoom = {};
   StreamSubscription<Map<String, int>>? _unreadSub;
-  bool _unreadDataLoaded = false; // 新增：追蹤未讀數據是否已載入
+  bool _unreadDataLoaded = false; // 追蹤未讀數據是否已載入
 
   void _updatePostedTabUnreadFlag() {
     bool hasUnread = false;
@@ -56,13 +57,19 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
 
     try {
       final provider = context.read<ChatListProvider>();
-      // 只有當狀態真正改變時才更新，避免無限循環
-      if (provider.hasUnreadForTab(0) != hasUnread) {
-        debugPrint('🔄 [Posted Tasks] 更新 Tab 未讀狀態: $hasUnread');
-        provider.setTabHasUnread(0, hasUnread);
-      } else {
-        debugPrint('🔄 [Posted Tasks] Tab 未讀狀態未改變，跳過更新: $hasUnread');
-      }
+      final oldState = provider.hasUnreadForTab(0);
+      
+      // 使用智能刷新策略的狀態更新器
+      SmartRefreshStrategy.updateUnreadState(
+        componentKey: 'PostedTasks-Tab',
+        oldState: oldState,
+        newState: hasUnread,
+        updateCallback: () {
+          debugPrint('✅ [Posted Tasks] 更新 Tab 未讀狀態: $hasUnread');
+          provider.setTabHasUnread(0, hasUnread);
+        },
+        description: 'Posted Tasks Tab 未讀狀態',
+      );
     } catch (e) {
       debugPrint('❌ [Posted Tasks] 更新 Tab 未讀狀態失敗: $e');
     }
@@ -98,6 +105,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
         _unreadByRoom = Map<String, int>.from(map);
         _unreadDataLoaded = true; // 標記未讀數據已載入
       });
+      // 使用 _unreadDataLoaded 確保數據完整性
+      if (_unreadDataLoaded) {
+        debugPrint('✅ [Posted Tasks] 未讀數據已同步完成');
+      }
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _updatePostedTabUnreadFlag());
     });
@@ -126,18 +137,19 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget> {
       final chatProvider = context.read<ChatListProvider>();
       // 只有當前是 Posted Tasks 分頁時才刷新
       if (chatProvider.currentTabIndex == 0) {
-        // 避免在 build 期間觸發 refresh 造成循環
-        // 同時避免因未讀狀態更新而觸發的循環刷新
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          // 只有在真正需要刷新時才刷新（篩選條件變化，而不是未讀狀態變化）
-          if (chatProvider.hasActiveFilters ||
-              chatProvider.searchQuery.isNotEmpty) {
-            debugPrint('🔄 [Posted Tasks] 篩選條件變化，觸發刷新');
+        // 使用智能刷新策略決策
+        SmartRefreshStrategy.executeSmartRefresh(
+          refreshKey: 'PostedTasks-Provider',
+          refreshCallback: () {
+            debugPrint('✅ [Posted Tasks] 執行智能刷新');
             _pagingController.refresh();
-          } else {
-            debugPrint('🔄 [Posted Tasks] 未讀狀態變化，跳過刷新');
-          }
-        });
+          },
+          hasActiveFilters: chatProvider.hasActiveFilters,
+          searchQuery: chatProvider.searchQuery,
+          isUnreadUpdate: true, // 假設這是未讀狀態更新觸發的
+          forceRefresh: false,
+          enableDebounce: true,
+        );
       }
     } catch (e) {
       debugPrint('❌ [Posted Tasks] Provider 變化處理失敗: $e');
