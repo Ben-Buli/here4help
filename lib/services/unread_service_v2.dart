@@ -64,28 +64,30 @@ class UnreadServiceV2 {
         Map<String, int> postedRooms,
         Map<String, int> myWorksRooms,
         Map<String, int> allRooms,
-        Map<String, dynamic> consistency_check,
+        Map<String, dynamic> consistencyCheck,
       })> getAllUnreadData() async {
     try {
       debugPrint('$_tag 批量獲取所有未讀數據');
       final data = await UnifiedChatApiService.getAllUnreadData();
-      
+
       final allRooms = (data['by_room'] as Map<String, dynamic>? ?? {})
           .map((k, v) => MapEntry(k, v as int));
       final postedData = data['posted'] as Map<String, dynamic>? ?? {};
       final myWorksData = data['myworks'] as Map<String, dynamic>? ?? {};
-      
+
       final postedRooms = (postedData['by_room'] as Map<String, dynamic>? ?? {})
           .map((k, v) => MapEntry(k, v as int));
-      final myWorksRooms = (myWorksData['by_room'] as Map<String, dynamic>? ?? {})
-          .map((k, v) => MapEntry(k, v as int));
+      final myWorksRooms =
+          (myWorksData['by_room'] as Map<String, dynamic>? ?? {})
+              .map((k, v) => MapEntry(k, v as int));
 
       return (
         total: data['total_unread'] as int? ?? 0,
         postedRooms: postedRooms,
         myWorksRooms: myWorksRooms,
         allRooms: allRooms,
-        consistency_check: data['consistency_check'] as Map<String, dynamic>? ?? {},
+        consistencyCheck:
+            data['consistency_check'] as Map<String, dynamic>? ?? {},
       );
     } catch (e) {
       debugPrint('❌ $_tag 批量獲取未讀數據失敗: $e');

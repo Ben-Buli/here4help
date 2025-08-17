@@ -11,48 +11,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // 引入資料庫配置
 require_once '../../config/database.php';
+require_once '../../utils/TokenValidator.php';
+require_once '../../utils/JWTManager.php';
 
-// 簡單的 token 驗證函數（使用 base64 編碼的 JSON）
-function validateToken($token) {
-    try {
-        error_log("Debug: Validating token = " . $token);
-        
-        // 嘗試 base64 解碼
-        $decoded = base64_decode($token);
-        if ($decoded === false) {
-            error_log("Debug: Failed to base64 decode token");
-            return null;
-        }
-        
-        error_log("Debug: Decoded token = " . $decoded);
-        
-        $payload = json_decode($decoded, true);
-        if (!$payload) {
-            error_log("Debug: Failed to JSON decode payload");
-            return null;
-        }
-        
-        error_log("Debug: Decoded payload = " . print_r($payload, true));
-        
-        // 檢查必要欄位
-        if (!isset($payload['user_id']) || !isset($payload['exp'])) {
-            error_log("Debug: Missing required fields in payload");
-            return null;
-        }
-        
-        // 檢查是否過期
-        if ($payload['exp'] < time()) {
-            error_log("Debug: Token expired");
-            return null;
-        }
-        
-        error_log("Debug: Token validation successful - user_id = " . $payload['user_id']);
-        return $payload;
-    } catch (Exception $e) {
-        error_log("Debug: Token validation exception = " . $e->getMessage());
-        return null;
-    }
-}
 
 try {
     $db = Database::getInstance();
@@ -113,7 +74,7 @@ try {
     
     $token = $matches[1];
     error_log("Debug: Extracted token: " . substr($token, 0, 20) . "...");
-    $payload = validateToken($token);
+    $payload = JWTManager::validateToken($token);
     
     if (!$payload) {
         throw new Exception('Invalid or expired token');

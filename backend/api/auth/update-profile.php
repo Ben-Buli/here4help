@@ -5,6 +5,8 @@ header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
 require_once '../../config/database.php';
+require_once '../../utils/TokenValidator.php';
+require_once '../../utils/JWTManager.php';
 require_once '../../utils/Response.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {

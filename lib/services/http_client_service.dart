@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:here4help/auth/services/auth_service.dart';
-import 'package:here4help/config/app_config.dart';
 
 /// 全域 HTTP Client 服務
 /// 統一管理所有 HTTP 請求，自動添加 Authorization 頭

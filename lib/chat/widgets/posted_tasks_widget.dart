@@ -222,8 +222,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           debugPrint('  - 上次搜尋查詢: "$_lastSearchQuery"');
           debugPrint('  - 搜尋查詢變化: ${currentSearchQuery != _lastSearchQuery}');
           debugPrint('  - 有活躍篩選: ${chatProvider.hasActiveFilters}');
-          debugPrint('  - 選中位置: ${currentLocations}');
-          debugPrint('  - 選中狀態: ${currentStatuses}');
+          debugPrint('  - 選中位置: $currentLocations');
+          debugPrint('  - 選中狀態: $currentStatuses');
         }
 
         // 檢查是否有實際變化
@@ -971,8 +971,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                           Builder(builder: (_) {
                             final hasUnread = visibleAppliers.any((ap) {
                               final roomId = ap['chat_room_id']?.toString();
-                              if (roomId == null || roomId.isEmpty)
+                              if (roomId == null || roomId.isEmpty) {
                                 return false;
+                              }
                               final cnt = _unreadByRoom[roomId] ?? 0;
                               return cnt > 0;
                             });

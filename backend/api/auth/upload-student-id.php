@@ -1,5 +1,7 @@
 <?php
 require_once '../../config/database.php';
+require_once '../../utils/TokenValidator.php';
+require_once '../../utils/JWTManager.php';
 require_once '../../utils/Response.php';
 require_once '../../utils/JWT.php';
 

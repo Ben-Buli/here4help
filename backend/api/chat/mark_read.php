@@ -21,19 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 require_once '../../config/database.php';
+require_once '../../utils/TokenValidator.php';
 require_once '../../utils/Response.php';
 require_once '../../utils/ChatSecurity.php';
 
-function validateToken($token) {
-    try {
-        $decoded = base64_decode($token);
-        if ($decoded === false) return null;
-        $payload = json_decode($decoded, true);
-        if (!$payload || !isset($payload['user_id']) || !isset($payload['exp'])) return null;
-        if ($payload['exp'] < time()) return null;
-        return $payload;
-    } catch (Exception $e) { return null; }
-}
+
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -45,9 +37,9 @@ try {
     if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
         throw new Exception('Authorization header required');
     }
-    $payload = validateToken($m[1]);
-    if (!$payload) throw new Exception('Invalid or expired token');
-    $user_id = (int)$payload['user_id'];
+    $user_id = TokenValidator::validateAuthHeader($auth_header);
+    if (!$user_id) { throw new Exception('Invalid or expired token'); }
+    $user_id = (int)$user_id;
 
     // 解析請求參數
     $input = json_decode(file_get_contents('php://input'), true);

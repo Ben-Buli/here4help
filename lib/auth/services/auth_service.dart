@@ -14,13 +14,19 @@ class AuthService {
     try {
       print('🔍 測試網路連線...');
       final response = await http
-          .get(
+          .post(
             Uri.parse('${AppConfig.apiBaseUrl}/backend/api/auth/login.php'),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(
+                {'email': 'test@example.com', 'password': 'test123'}),
           )
           .timeout(const Duration(seconds: 10));
 
       print('📡 連線測試狀態碼: ${response.statusCode}');
-      return response.statusCode == 405; // 405 表示方法不允許，但連線正常
+      // 任何回應都表示連線正常，包括認證失敗
+      return response.statusCode >= 200 && response.statusCode < 600;
     } catch (e) {
       print('❌ 連線測試失敗: $e');
       return false;

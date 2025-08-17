@@ -6,6 +6,7 @@
  */
 
 require_once '../../config/database.php';
+require_once '../../utils/TokenValidator.php';
 require_once '../../utils/Response.php';
 
 // 設定 CORS 標頭

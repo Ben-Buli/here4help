@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 /// 智能刷新策略 - 遵循聊天系統規格文件標準

@@ -18,6 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 // 引入資料庫配置
 require_once '../../config/database.php';
+require_once '../../utils/TokenValidator.php';
+require_once '../../utils/JWTManager.php';
 
 try {
     // 獲取 POST 資料
@@ -59,7 +61,7 @@ try {
         throw new Exception('Invalid email or password');
     }
     
-    // 生成 base64 編碼的 JSON Token
+    // 生成 JWT Token
     $payload = [
         'user_id' => $user['id'],
         'email' => $user['email'],
@@ -68,15 +70,12 @@ try {
         'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
     ];
     
-    // 使用 base64 編碼 JSON 數據
-    $token = base64_encode(json_encode($payload));
-    
-    // 驗證生成的 token 格式
-    $decoded = base64_decode($token);
-    $decodedPayload = json_decode($decoded, true);
-    
-    if (!$decodedPayload || !isset($decodedPayload['user_id'])) {
-        throw new Exception('Token generation failed');
+    try {
+        $token = JWTManager::generateToken($payload);
+        error_log("JWT token generated successfully for user: " . $user['id']);
+    } catch (Exception $e) {
+        error_log("JWT token generation failed: " . $e->getMessage());
+        throw new Exception('Token generation failed: ' . $e->getMessage());
     }
     
     // 更新最後更新時間（因為沒有 last_login 欄位）

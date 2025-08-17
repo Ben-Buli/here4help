@@ -93,7 +93,7 @@ class TaskAppBarTitle extends StatelessWidget {
                       ),
                       child: Text(
                         statusDisplay,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 10,
                           color: Colors.white,
                           fontWeight: FontWeight.w500,

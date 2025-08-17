@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:here4help/constants/task_status.dart';
-import 'package:here4help/constants/theme_schemes.dart';
 
 /// 共享的任務卡片組件
 /// 可以在 Posted Tasks 和 My Works 兩個分頁中重用
@@ -82,7 +81,7 @@ class TaskCardWidget extends StatelessWidget {
                     ),
                     child: Text(
                       statusDisplay,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -270,8 +269,9 @@ class TaskCardWidget extends StatelessWidget {
 
   /// 構建應徵者信息區域
   Widget _buildApplicantsSection() {
-    if (applicants == null || applicants!.isEmpty)
+    if (applicants == null || applicants!.isEmpty) {
       return const SizedBox.shrink();
+    }
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),

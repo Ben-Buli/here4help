@@ -8,14 +8,11 @@ import 'package:here4help/task/services/task_service.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 // 移除硬編碼的聊天室模型 import
 import 'package:intl/intl.dart';
-import 'package:here4help/chat/services/chat_storage_service.dart';
-import 'package:here4help/chat/services/chat_session_manager.dart';
 import 'package:here4help/chat/services/chat_service.dart';
 import 'package:here4help/chat/services/chat_cache_manager.dart';
 import 'package:here4help/chat/widgets/update_status_indicator.dart';
 import 'package:here4help/constants/task_status.dart';
 import 'package:here4help/services/notification_service.dart';
-import 'package:here4help/services/data_preload_service.dart';
 import 'package:provider/provider.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:shared_preferences/shared_preferences.dart';

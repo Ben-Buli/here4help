@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/chat/providers/chat_list_provider.dart';
-import 'package:here4help/constants/theme_schemes.dart';
 
 /// 共享的搜尋篩選組件
 /// 可以在 Posted Tasks 和 My Works 兩個分頁中重用

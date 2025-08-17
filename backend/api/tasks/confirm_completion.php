@@ -7,6 +7,7 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 
 require_once '../../config/database.php';
+require_once '../../utils/TokenValidator.php';
 require_once '../../utils/Response.php';
 
 try {

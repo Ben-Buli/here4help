@@ -7,18 +7,9 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 
 require_once '../../config/database.php';
+require_once '../../utils/TokenValidator.php';
 require_once '../../utils/Response.php';
 
-function validateToken($token) {
-  try {
-    $decoded = base64_decode($token);
-    if ($decoded === false) return null;
-    $payload = json_decode($decoded, true);
-    if (!$payload || !isset($payload['user_id']) || !isset($payload['exp'])) return null;
-    if ($payload['exp'] < time()) return null;
-    return $payload;
-  } catch (Exception $e) { return null; }
-}
 
 try {
   if ($_SERVER['REQUEST_METHOD'] !== 'GET' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -30,9 +21,9 @@ try {
   if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
     throw new Exception('Authorization header required');
   }
-  $payload = validateToken($m[1]);
-  if (!$payload) throw new Exception('Invalid or expired token');
-  $user_id = (int)$payload['user_id'];
+  $user_id = TokenValidator::validateAuthHeader($auth_header);
+  if (!$user_id) { throw new Exception('Invalid or expired token'); }
+  $user_id = (int)$user_id;
 
   $db = Database::getInstance();
   

@@ -1,6 +1,7 @@
 <?php
 require_once '../../config/env_loader.php';
 require_once '../../config/database.php';
+require_once '../../utils/TokenValidator.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
