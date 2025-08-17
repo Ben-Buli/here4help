@@ -43,11 +43,16 @@ class SocketService {
       final socketUrl = AppConfig.socketUrl;
 
       _socket = io.io(socketUrl, <String, dynamic>{
-        'transports': ['websocket'],
+        'transports': <String>['websocket'], // 明確指定為 List<String>
         'autoConnect': false,
-        'query': {
+        'query': <String, String>{
+          // 明確指定為 Map<String, String>
           'token': token,
         },
+        'forceNew': true,
+        'reconnection': true,
+        'reconnectionAttempts': 5,
+        'reconnectionDelay': 1000,
       });
 
       // 連接事件
@@ -92,7 +97,12 @@ class SocketService {
     _socket!.on('message', (data) {
       debugPrint('📨 Received message: $data');
       if (onMessageReceived != null) {
-        onMessageReceived!(Map<String, dynamic>.from(data));
+        try {
+          final messageData = Map<String, dynamic>.from(data as Map);
+          onMessageReceived!(messageData);
+        } catch (e) {
+          debugPrint('❌ Error parsing message data: $e');
+        }
       }
     });
 
@@ -100,14 +110,24 @@ class SocketService {
     _socket!.on('unread_total', (data) {
       // debugPrint('🔔 Unread total updated: $data');
       if (onUnreadUpdate != null) {
-        onUnreadUpdate!(Map<String, dynamic>.from(data));
+        try {
+          final unreadData = Map<String, dynamic>.from(data as Map);
+          onUnreadUpdate!(unreadData);
+        } catch (e) {
+          debugPrint('❌ Error parsing unread_total data: $e');
+        }
       }
     });
 
     _socket!.on('unread_by_room', (data) {
       // debugPrint('🔔 Unread by room updated: $data');
       if (onUnreadUpdate != null) {
-        onUnreadUpdate!(Map<String, dynamic>.from(data));
+        try {
+          final unreadData = Map<String, dynamic>.from(data as Map);
+          onUnreadUpdate!(unreadData);
+        } catch (e) {
+          debugPrint('❌ Error parsing unread_by_room data: $e');
+        }
       }
     });
 
@@ -115,7 +135,12 @@ class SocketService {
     _socket!.on('typing', (data) {
       debugPrint('⌨️ Typing update: $data');
       if (onTypingUpdate != null) {
-        onTypingUpdate!(Map<String, dynamic>.from(data));
+        try {
+          final typingData = Map<String, dynamic>.from(data as Map);
+          onTypingUpdate!(typingData);
+        } catch (e) {
+          debugPrint('❌ Error parsing typing data: $e');
+        }
       }
     });
   }
@@ -129,7 +154,7 @@ class SocketService {
       return;
     }
 
-    _socket!.emit('join_room', {'roomId': roomId});
+    _socket!.emit('join_room', <String, String>{'roomId': roomId});
     debugPrint('🏠 Joined room: $roomId');
   }
 
@@ -139,7 +164,7 @@ class SocketService {
       return;
     }
 
-    _socket!.emit('leave_room', {'roomId': roomId});
+    _socket!.emit('leave_room', <String, String>{'roomId': roomId});
     debugPrint('🚪 Left room: $roomId');
   }
 
@@ -155,12 +180,18 @@ class SocketService {
       return;
     }
 
-    final data = {
+    final data = <String, dynamic>{
       'roomId': roomId,
       'text': text,
-      'messageId': messageId,
-      'toUserIds': toUserIds,
     };
+
+    if (messageId != null) {
+      data['messageId'] = messageId;
+    }
+
+    if (toUserIds != null) {
+      data['toUserIds'] = toUserIds;
+    }
 
     _socket!.emit('send_message', data);
     debugPrint('💬 Sent message to room $roomId: $text');
@@ -172,7 +203,7 @@ class SocketService {
       return;
     }
 
-    _socket!.emit('read_room', {'roomId': roomId});
+    _socket!.emit('read_room', <String, String>{'roomId': roomId});
     debugPrint('✅ Marked room $roomId as read');
   }
 
@@ -185,7 +216,7 @@ class SocketService {
       return;
     }
 
-    _socket!.emit('typing', {
+    _socket!.emit('typing', <String, dynamic>{
       'roomId': roomId,
       'isTyping': isTyping,
     });

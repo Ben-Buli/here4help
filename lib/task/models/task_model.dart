@@ -48,7 +48,7 @@ class ApplicationQuestionModel {
 class TaskModel {
   final String id;
   final String? creatorName;
-  final String? acceptorId;
+  final String? participantId;
   final String title;
   final String description;
   final String rewardPoint;
@@ -67,7 +67,7 @@ class TaskModel {
   TaskModel({
     required this.id,
     this.creatorName,
-    this.acceptorId,
+    this.participantId,
     required this.title,
     required this.description,
     required this.rewardPoint,
@@ -88,7 +88,7 @@ class TaskModel {
     return TaskModel(
       id: map['id'] ?? '',
       creatorName: map['creator_name'],
-      acceptorId: map['acceptor_id'],
+      participantId: map['participant_id'],
       title: map['title'] ?? '',
       description: map['description'] ?? '',
       rewardPoint:
@@ -111,7 +111,7 @@ class TaskModel {
     return {
       'id': id,
       'creator_name': creatorName,
-      'acceptor_id': acceptorId,
+      'participant_id': participantId,
       'title': title,
       'description': description,
       'reward_point': rewardPoint,

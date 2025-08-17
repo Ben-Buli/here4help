@@ -28,7 +28,7 @@ try {
     // 允許更新的欄位
     $updatable = [
         'title', 'description', 'reward_point', 'location', 'task_date', 'language_requirement',
-        'hashtags', 'creator_id', 'acceptor_id', 'status_id', 'status_code'
+        'hashtags', 'creator_id', 'participant_id', 'status_id', 'status_code'
     ];
 
     $set = [];
@@ -53,7 +53,7 @@ try {
             switch ($field) {
                 case 'status_id':
                 case 'creator_id':
-                case 'acceptor_id':
+                case 'participant_id':
                     // 實際設定在下方以確保狀態處理一致
                     break;
                 default:

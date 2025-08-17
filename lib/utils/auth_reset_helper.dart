@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../auth/services/auth_service.dart';
 
 /// 用於重置認證狀態的輔助工具
@@ -74,17 +75,132 @@ class AuthResetHelper {
       debugPrint('🔍 當前 token 長度: ${token.length}');
       debugPrint(
           '🔍 Token 前 20 字元: ${token.substring(0, token.length > 20 ? 20 : token.length)}');
-
-      // 檢查是否為 JWT 格式 (通常以 eyJ 開頭)
-      if (token.startsWith('eyJ')) {
-        debugPrint('⚠️ 檢測到 JWT 格式的 token！');
-        debugPrint('⚠️ 但後端期望 base64 編碼的 JSON 格式');
-        debugPrint('💡 建議清除此 token 並重新登入');
-      } else {
-        debugPrint('✅ Token 格式看起來正確（非 JWT）');
-      }
     } catch (e) {
       debugPrint('❌ 檢查 token 失敗: $e');
+    }
+  }
+
+  /// 驗證 JWT 結構
+  static void _validateJWTStructure(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length == 3) {
+        debugPrint('✅ JWT 結構正確：3 個部分');
+
+        // 檢查 header 部分
+        try {
+          final header = parts[0];
+          final decodedHeader = _base64UrlDecode(header);
+          debugPrint('🔍 JWT Header: $decodedHeader');
+        } catch (e) {
+          debugPrint('⚠️ JWT Header 解碼失敗: $e');
+        }
+
+        // 檢查 payload 部分（不顯示敏感信息）
+        try {
+          final payload = parts[1];
+          final decodedPayload = _base64UrlDecode(payload);
+          debugPrint('🔍 JWT Payload 長度: ${decodedPayload.length} 字元');
+        } catch (e) {
+          debugPrint('⚠️ JWT Payload 解碼失敗: $e');
+        }
+
+        // 檢查 signature 部分
+        final signature = parts[2];
+        debugPrint('🔍 JWT Signature 長度: ${signature.length} 字元');
+      } else {
+        debugPrint('⚠️ JWT 結構不正確：${parts.length} 個部分（期望 3 個）');
+      }
+    } catch (e) {
+      debugPrint('❌ JWT 結構驗證失敗: $e');
+    }
+  }
+
+  /// Base64 URL 解碼（JWT 使用）
+  static String _base64UrlDecode(String input) {
+    // 替換 URL 安全字符
+    String normalized = input.replaceAll('-', '+').replaceAll('_', '/');
+
+    // 添加填充
+    while (normalized.length % 4 != 0) {
+      normalized += '=';
+    }
+
+    // Base64 解碼
+    final bytes = base64Decode(normalized);
+    return utf8.decode(bytes);
+  }
+
+  /// 檢查 JWT Token 是否即將過期
+  static Future<bool> isJWTTokenExpiringSoon() async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null || !token.startsWith('eyJ')) {
+        return false; // 不是 JWT 或沒有 token
+      }
+
+      final parts = token.split('.');
+      if (parts.length != 3) {
+        return false; // 不是有效的 JWT
+      }
+
+      try {
+        final payload = parts[1];
+        final decodedPayload = _base64UrlDecode(payload);
+        final payloadData = jsonDecode(decodedPayload);
+
+        final exp = payloadData['exp'];
+        if (exp == null) {
+          return false; // 沒有過期時間
+        }
+
+        final expirationTime = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+        final now = DateTime.now();
+        final timeUntilExpiry = expirationTime.difference(now);
+
+        // 如果 30 分鐘內過期，認為即將過期
+        return timeUntilExpiry.inMinutes <= 30;
+      } catch (e) {
+        debugPrint('❌ 檢查 JWT 過期時間失敗: $e');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('❌ 檢查 JWT Token 狀態失敗: $e');
+      return false;
+    }
+  }
+
+  /// 獲取 JWT Token 的過期時間
+  static Future<DateTime?> getJWTTokenExpiration() async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null || !token.startsWith('eyJ')) {
+        return null; // 不是 JWT 或沒有 token
+      }
+
+      final parts = token.split('.');
+      if (parts.length != 3) {
+        return null; // 不是有效的 JWT
+      }
+
+      try {
+        final payload = parts[1];
+        final decodedPayload = _base64UrlDecode(payload);
+        final payloadData = jsonDecode(decodedPayload);
+
+        final exp = payloadData['exp'];
+        if (exp == null) {
+          return null; // 沒有過期時間
+        }
+
+        return DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+      } catch (e) {
+        debugPrint('❌ 獲取 JWT 過期時間失敗: $e');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('❌ 獲取 JWT Token 過期時間失敗: $e');
+      return null;
     }
   }
 }

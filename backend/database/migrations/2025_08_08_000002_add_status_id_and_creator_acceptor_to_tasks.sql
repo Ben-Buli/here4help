@@ -1,8 +1,8 @@
--- Add status_id, creator_id, acceptor_id (nullable initially)
+-- Add status_id, creator_id, participant_id (nullable initially)
 ALTER TABLE tasks
   ADD COLUMN status_id INT NULL AFTER status,
   ADD COLUMN creator_id BIGINT NULL AFTER creator_name,
-  ADD COLUMN acceptor_id BIGINT NULL AFTER creator_id;
+  ADD COLUMN participant_id BIGINT NULL AFTER creator_id;
 
 -- Backfill status_id from status string if possible
 UPDATE tasks t
@@ -20,5 +20,5 @@ WHERE t.status IS NOT NULL AND t.status <> '';
 ALTER TABLE tasks
   ADD CONSTRAINT fk_tasks_status FOREIGN KEY (status_id) REFERENCES task_statuses(id),
   ADD CONSTRAINT fk_tasks_creator FOREIGN KEY (creator_id) REFERENCES users(id),
-  ADD CONSTRAINT fk_tasks_acceptor FOREIGN KEY (acceptor_id) REFERENCES users(id);
+  ADD CONSTRAINT fk_tasks_acceptor FOREIGN KEY (participant_id) REFERENCES users(id);
 

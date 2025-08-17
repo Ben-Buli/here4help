@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_config.dart';
 
 class TaskService extends ChangeNotifier {
@@ -127,9 +128,25 @@ class TaskService extends ChangeNotifier {
           .replace(queryParameters: query);
 
       debugPrint('🔍 [Posted Tasks Aggregated] API URL: $uri');
-      final resp = await http.get(uri, headers: {
-        'Content-Type': 'application/json'
-      }).timeout(const Duration(seconds: 30));
+
+      // 獲取認證 token
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+        debugPrint('🔐 [Posted Tasks Aggregated] 使用認證 token');
+      } else {
+        debugPrint('⚠️ [Posted Tasks Aggregated] 沒有認證 token');
+      }
+
+      final resp = await http
+          .get(uri, headers: headers)
+          .timeout(const Duration(seconds: 30));
 
       debugPrint(
           '🔍 [Posted Tasks Aggregated] Response Status: ${resp.statusCode}');

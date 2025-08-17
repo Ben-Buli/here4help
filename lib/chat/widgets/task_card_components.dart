@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:here4help/constants/task_status.dart';
 
+// task_card_components.dart 已棄用，請使用 task_card_components_backup.dart 替代
 /// 任務卡片相關的共用組件和工具函數
 /// 從原始 ChatListPage 中提取的 UI 組件
 

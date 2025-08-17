@@ -95,11 +95,11 @@ try {
 
     // 建立者/接案者
     $creatorId = !empty($input['creator_id']) ? (int)$input['creator_id'] : null;
-    $acceptorId = !empty($input['acceptor_id']) ? (int)$input['acceptor_id'] : null;
+    $participantId = !empty($input['participant_id']) ? (int)$input['participant_id'] : null;
 
     // 插入任務資料（僅以 status_id 表示狀態，不再寫入舊欄位 status）
     $sql = "INSERT INTO tasks (
-              id, creator_id, acceptor_id,
+              id, creator_id, participant_id,
               title, description, reward_point, location, task_date,
               start_datetime, end_datetime,
               status_id, language_requirement, hashtags,
@@ -115,7 +115,7 @@ try {
     $params = [
         $taskId,
         $creatorId,
-        $acceptorId,
+        $participantId,
         $input['title'],
         $input['description'],
         $input['reward_point'] ?? $input['salary'] ?? '0', // 支援舊的 salary 欄位

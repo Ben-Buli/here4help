@@ -25,28 +25,119 @@ class MyWorksWidget extends StatefulWidget {
 }
 
 class _MyWorksWidgetState extends State<MyWorksWidget> {
+  // -------- Safe extractors & normalizers --------
+  T _as<T>(Object? v, T fallback) {
+    if (v is T) return v;
+    try {
+      if (v == null) return fallback;
+      if (T == String) return v.toString().trim() as T;
+      if (T == int) return int.tryParse(v.toString()) as T? ?? fallback;
+      if (T == double) return double.tryParse(v.toString()) as T? ?? fallback;
+      if (T == bool) {
+        final s = v.toString().toLowerCase();
+        if (s == 'true' || s == '1') return true as T;
+        if (s == 'false' || s == '0') return false as T;
+        return fallback;
+      }
+    } catch (_) {}
+    return fallback;
+  }
+
+  DateTime _parseDateOrNow(Object? v) {
+    if (v == null) return DateTime.now();
+    final s = v.toString().trim();
+    try {
+      return DateTime.parse(s);
+    } catch (_) {
+      return DateTime.now();
+    }
+  }
+
+  String _asDateStr(Object? v) {
+    try {
+      return _parseDateOrNow(v).toIso8601String();
+    } catch (_) {
+      return DateTime.now().toIso8601String();
+    }
+  }
+
+  String _normStatus(Object? code, Object? display) {
+    final raw = (display ?? code ?? '').toString().trim();
+    if (raw.isEmpty) return '';
+    final s = raw.toLowerCase();
+    const aliases = <String, String>{
+      'open': 'Open',
+      'in progress': 'In Progress',
+      'pending confirmation': 'Pending Confirmation',
+      'completed': 'Completed',
+      'dispute': 'Dispute',
+      'applying (tasker)': 'Applying (Tasker)',
+      'in progress (tasker)': 'In Progress (Tasker)',
+      'completed (tasker)': 'Completed (Tasker)',
+      'rejected': 'Rejected',
+      'rejected (tasker)': 'Rejected (Tasker)',
+      'cancelled': 'Cancelled',
+      'canceled': 'Cancelled',
+    };
+    return aliases[s] ?? raw;
+  }
+
   static const int _pageSize = 10;
   final PagingController<int, Map<String, dynamic>> _pagingController =
       PagingController(firstPageKey: 0);
 
-  Map<String, int> _unreadByRoom = {};
   StreamSubscription<Map<String, int>>? _unreadSub;
-  bool _unreadDataLoaded = false; // 新增：追蹤未讀數據是否已載入
+
+  /// 檢查並按需載入數據
+  void _checkAndLoadIfNeeded() {
+    if (!mounted) return;
+
+    final chatProvider = context.read<ChatListProvider>();
+
+    // 檢查 Provider 是否已初始化
+    if (!chatProvider.isInitialized) {
+      debugPrint('⏳ [My Works] Provider 尚未初始化，跳過載入檢查');
+      return;
+    }
+
+    // 檢查當前是否為 My Works 分頁且可見
+    if (chatProvider.isMyWorksTab) {
+      debugPrint('🔍 [My Works] 當前為 My Works 分頁，檢查載入狀態');
+      debugPrint(
+          '  - 分頁載入狀態: ${chatProvider.isTabLoading(ChatListProvider.TAB_MY_WORKS)}');
+      debugPrint(
+          '  - 分頁載入完成: ${chatProvider.isTabLoaded(ChatListProvider.TAB_MY_WORKS)}');
+      debugPrint(
+          '  - 分頁錯誤: ${chatProvider.getTabError(ChatListProvider.TAB_MY_WORKS)}');
+
+      // 如果分頁尚未載入且不在載入中，觸發載入
+      if (!chatProvider.isTabLoaded(ChatListProvider.TAB_MY_WORKS) &&
+          !chatProvider.isTabLoading(ChatListProvider.TAB_MY_WORKS)) {
+        debugPrint('🚀 [My Works] 觸發分頁數據載入');
+        chatProvider.checkAndTriggerTabLoad(ChatListProvider.TAB_MY_WORKS);
+      } else {
+        debugPrint('✅ [My Works] 分頁已載入或正在載入中');
+      }
+    } else {
+      debugPrint('⏸️ [My Works] 當前不是 My Works 分頁，跳過載入');
+    }
+  }
 
   void _updateMyWorksTabUnreadFlag() {
     if (!mounted) return;
     bool hasUnread = false;
-    // 檢查所有未讀訊息映射中是否有大於 0 的計數
-    for (final count in _unreadByRoom.values) {
-      if (count > 0) {
-        hasUnread = true;
-        break;
-      }
-    }
 
     try {
       final provider = context.read<ChatListProvider>();
-      final oldState = provider.hasUnreadForTab(1);
+      // 檢查所有未讀訊息映射中是否有大於 0 的計數
+      for (final count in provider.unreadByRoom.values) {
+        if (count > 0) {
+          hasUnread = true;
+          break;
+        }
+      }
+
+      final oldState = provider.hasUnreadForTab(ChatListProvider.TAB_MY_WORKS);
 
       // 使用智能刷新策略的狀態更新器
       SmartRefreshStrategy.updateUnreadState(
@@ -55,7 +146,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
         newState: hasUnread,
         updateCallback: () {
           debugPrint('✅ [My Works] 更新 Tab 未讀狀態: $hasUnread');
-          provider.setTabHasUnread(1, hasUnread);
+          provider.setTabHasUnread(ChatListProvider.TAB_MY_WORKS, hasUnread);
         },
         description: 'My Works Tab 未讀狀態',
       );
@@ -82,21 +173,31 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
     // 監聽 ChatListProvider 的篩選條件變化（僅針對當前tab）
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
       final chatProvider = context.read<ChatListProvider>();
       chatProvider.addListener(_handleProviderChanges);
+
+      // 檢查並按需載入數據
+      _checkAndLoadIfNeeded();
     });
 
     _unreadSub = NotificationCenter().byRoomStream.listen((map) {
       if (!mounted) return;
       debugPrint('🔍 [My Works] 收到未讀數據更新: ${map.length} 個房間');
-      setState(() {
-        _unreadByRoom = Map<String, int>.from(map);
-        _unreadDataLoaded = true; // 標記未讀數據已載入
+
+      // 更新 Provider 中的未讀數據
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        try {
+          final provider = context.read<ChatListProvider>();
+          provider.updateUnreadByRoom(map);
+          debugPrint('✅ [My Works] 未讀數據已同步完成');
+        } catch (e) {
+          debugPrint('❌ [My Works] 更新未讀數據失敗: $e');
+        }
       });
-      // 使用 _unreadDataLoaded 確保數據完整性
-      if (_unreadDataLoaded) {
-        debugPrint('✅ [My Works] 未讀數據已同步完成');
-      }
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _updateMyWorksTabUnreadFlag();
@@ -126,7 +227,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     try {
       final chatProvider = context.read<ChatListProvider>();
       // 只有當前是 My Works 分頁時才刷新
-      if (chatProvider.currentTabIndex == 1) {
+      if (chatProvider.isMyWorksTab) {
         // 使用智能刷新策略決策
         SmartRefreshStrategy.executeSmartRefresh(
           refreshKey: 'MyWorks-Provider',
@@ -155,7 +256,11 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     } catch (e) {
       // Provider may not be available during dispose
     }
+
+    // 取消未讀數據訂閱
     _unreadSub?.cancel();
+    _unreadSub = null;
+
     _pagingController.dispose();
     super.dispose();
   }
@@ -173,10 +278,26 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
       if (currentUserId != null) {
         debugPrint('🔍 [My Works] 開始載入用戶應徵資料...');
-        await taskService.loadMyApplications(currentUserId);
-        debugPrint('🔍 [My Works] 應徵資料載入完成');
+
+        // 檢查快取數據
+        if (chatProvider.isCacheReadyForTab(ChatListProvider.TAB_MY_WORKS)) {
+          debugPrint('✅ [My Works] 使用快取數據');
+          // 從快取載入 My Works 數據
+          final cachedData = chatProvider.cacheManager.myWorksCache;
+          debugPrint('📋 [My Works] 快取數據: ${cachedData.length} 個應徵記錄');
+
+          // 將快取數據載入到 TaskService 的 myApplications
+          if (cachedData.isNotEmpty) {
+            debugPrint('✅ [My Works] 快取數據已載入，將在 _composeMyWorks 中使用');
+          }
+        } else {
+          debugPrint('📡 [My Works] 調用 API 載入應徵資料...');
+          await taskService.loadMyApplications(currentUserId);
+          debugPrint('🔍 [My Works] 應徵資料載入完成');
+        }
       } else {
         debugPrint('❌ [My Works] 當前用戶 ID 為空');
+        _pagingController.appendLastPage([]);
         return;
       }
 
@@ -211,8 +332,10 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       }
 
       // 資料載入完成後更新未讀標記
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _updateMyWorksTabUnreadFlag());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _updateMyWorksTabUnreadFlag();
+      });
 
       debugPrint('✅ [My Works] _fetchMyWorksPage 完成');
     } catch (error) {
@@ -223,16 +346,32 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     }
   }
 
-  /// 整理 My Works 清單：直接使用 API 返回的應徵數據
+  /// 整理 My Works 清單：優先使用 ChatListProvider 快取，回退到 TaskService
   List<Map<String, dynamic>> _composeMyWorks(
       TaskService service, int? currentUserId) {
-    final apps = service.myApplications;
+    // 優先使用 ChatListProvider 中的 My Works 數據
+    final chatProvider = context.read<ChatListProvider>();
+    List<Map<String, dynamic>> apps = [];
+
+    if (chatProvider.myWorksApplications.isNotEmpty) {
+      apps = List<Map<String, dynamic>>.from(chatProvider.myWorksApplications);
+      debugPrint('✅ [My Works] 使用 ChatListProvider 快取: ${apps.length} 個應徵記錄');
+    } else if (chatProvider.isCacheReadyForTab(ChatListProvider.TAB_MY_WORKS)) {
+      apps = List<Map<String, dynamic>>.from(
+          chatProvider.cacheManager.myWorksCache);
+      debugPrint('✅ [My Works] 使用 ChatCacheManager 快取: ${apps.length} 個應徵記錄');
+    } else {
+      apps = service.myApplications;
+      debugPrint('📡 [My Works] 使用 TaskService API 數據: ${apps.length} 個應徵記錄');
+    }
 
     // 添加詳細的除錯資訊
     debugPrint('🔍 [My Works] _composeMyWorks 開始');
     debugPrint('🔍 [My Works] currentUserId: $currentUserId');
-    debugPrint('🔍 [My Works] service.myApplications 長度: ${apps.length}');
-    debugPrint('🔍 [My Works] service.myApplications 內容: $apps');
+    debugPrint(
+        '🔍 [My Works] 數據來源: ${chatProvider.isCacheReadyForTab(ChatListProvider.TAB_MY_WORKS) ? "快取" : "API"}');
+    debugPrint('🔍 [My Works] 應徵記錄長度: ${apps.length}');
+    debugPrint('🔍 [My Works] 應徵記錄內容: $apps');
 
     // 如果沒有應徵數據，返回空列表
     if (apps.isEmpty) {
@@ -240,31 +379,41 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       return [];
     }
 
-    // 直接使用 API 返回的應徵數據，轉換為任務格式
-    final result = apps.map((app) {
-      debugPrint('🔍 [My Works] 處理應徵記錄: ${app['id']}');
-      debugPrint('🔍 [My Works] 應徵記錄內容: $app');
+    final result = apps.map((raw) {
+      // 確保是可變 Map 並統一鍵值型別
+      final Map<String, dynamic> app = Map<String, dynamic>.from(raw);
+
+      final statusCodeRaw =
+          app['client_status_code'] ?? app['status_code'] ?? app['status'];
+      final statusDispRaw = app['client_status_display'] ??
+          app['status_display'] ??
+          app['display_status'];
 
       return {
-        'id': app['id'],
-        'title': app['title'],
-        'description': app['description'],
-        'reward_point': app['reward_point'],
-        'location': app['location'],
-        'task_date': app['task_date'],
-        'language_requirement': app['language_requirement'],
-        'status_code': app['client_status_code'] ?? app['status_code'],
-        'status_display': app['client_status_display'] ?? app['status_display'],
-        'creator_id': app['creator_id'],
-        'creator_name': app['creator_name'],
-        'creator_avatar': app['creator_avatar'],
-        'latest_message_snippet': app['latest_message_snippet'],
-        'chat_room_id': app['chat_room_id'],
+        'id': _as<String>(app['id'], ''), // application_id
+        'task_id': _as<String>(app['task_id'], ''), // 任務 UUID
+        'title': _as<String>(app['title'], 'Untitled Task'),
+        'description': _as<String>(app['description'], ''),
+        'reward_point': _as<double>(app['reward_point'], 0.0),
+        'location': _as<String>(app['location'], ''),
+        'task_date': _asDateStr(app['task_date']),
+        'language_requirement': _as<String>(app['language_requirement'], ''),
+        'status_code': _as<String>(statusCodeRaw, ''),
+        'status_display': _normStatus(statusCodeRaw, statusDispRaw),
+        'creator_id': _as<int>(app['creator_id'], 0), // 若為 UUID 改成 _as<String>
+        'creator_name': _as<String>(app['creator_name'], 'Unknown'),
+        'creator_avatar': _as<String>(app['creator_avatar'], ''),
+        'latest_message_snippet':
+            _as<String>(app['latest_message_snippet'], 'No conversation yet'),
+        'chat_room_id': _as<String>(app['chat_room_id'], ''),
         'applied_by_me': true,
-        'application_id': app['application_id'],
-        'application_status': app['application_status'],
-        'application_created_at': app['application_created_at'],
-        'application_updated_at': app['application_updated_at'],
+        'application_id': _as<String>(app['application_id'], ''),
+        'application_status': _as<String>(app['application_status'], ''),
+        'application_created_at': _asDateStr(app['application_created_at']),
+        'application_updated_at': _asDateStr(app['application_updated_at']),
+        // 供排序用的輔助欄位（避免 parse 失敗）
+        'updated_at':
+            _asDateStr(app['application_updated_at'] ?? app['updated_at']),
       };
     }).toList();
 
@@ -448,14 +597,25 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     final colorScheme = Theme.of(context).colorScheme;
     final displayStatus = TaskCardUtils.displayStatus(task);
     final progressData = TaskCardUtils.getProgressData(displayStatus);
-    final progress = progressData['progress'] ?? 0.0;
-    final baseColor = progressData['color'] ?? Colors.grey[600]!;
+    final progress = (progressData['progress'] is num)
+        ? (progressData['progress'] as num).toDouble()
+        : 0.0;
+    final baseColor = (progressData['color'] is Color)
+        ? progressData['color'] as Color
+        : (Colors.grey[600]!);
 
     // 未讀（by_room）
-    final roomId = task['chat_room_id']?.toString() ?? '';
-    final unreadCount = roomId.isEmpty ? 0 : (_unreadByRoom[roomId] ?? 0);
+    final roomId = (task['chat_room_id'] ?? '').toString();
+    final provider = context.read<ChatListProvider>();
+    int unreadCount = 0;
+    try {
+      unreadCount = roomId.isEmpty ? 0 : provider.unreadForRoom(roomId);
+    } catch (_) {
+      unreadCount = 0;
+    }
 
     return Card(
+      key: ValueKey('myworks-task-$roomId'), // My Works 任務卡片綁定 room id
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -469,7 +629,9 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
               // 實現導航到聊天室
               final userService = context.read<UserService>();
               final currentUserId = userService.currentUser?.id;
-              final taskId = task['id']?.toString() ?? '';
+
+              // 獲取正確的 task_id（不是 application_id）
+              final taskId = task['task_id']?.toString() ?? '';
               final creatorId = (task['creator_id'] is int)
                   ? task['creator_id']
                   : int.tryParse('${task['creator_id']}') ?? 0;
@@ -477,28 +639,53 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
                   ? currentUserId
                   : int.tryParse('$currentUserId') ?? 0;
 
+              debugPrint('🔍 [My Works] 進入聊天室參數檢查:');
+              debugPrint('  - task_id: $taskId');
+              debugPrint('  - creator_id: $creatorId');
+              debugPrint('  - participant_id: $participantId');
+              debugPrint('  - 現有 chat_room_id: ${task['chat_room_id']}');
+
               if (taskId.isEmpty || creatorId <= 0 || participantId <= 0) {
-                debugPrint('❌ [My Works] ensure_room 參數不足');
+                debugPrint(
+                    '❌ [My Works] ensure_room 參數不足．\ntaskId: $taskId, \ncreatorId: $creatorId, \nparticipantId: $participantId');
                 return;
               }
 
               try {
-                final chatService = ChatService();
-                final roomResult = await chatService.ensureRoom(
-                  taskId: taskId,
-                  creatorId: creatorId,
-                  participantId: participantId,
-                  type: 'application',
-                );
-                final roomData = roomResult['room'] ?? {};
-                final String realRoomId = roomData['id']?.toString() ?? '';
-                if (realRoomId.isEmpty) {
-                  debugPrint('❌ [My Works] ensure_room 未取得 room_id');
-                  return;
+                String realRoomId = '';
+
+                // 檢查是否已經有現成的 chat_room_id
+                if (task['chat_room_id'] != null &&
+                    task['chat_room_id'].toString().isNotEmpty) {
+                  realRoomId = task['chat_room_id'].toString();
+                  debugPrint('✅ [My Works] 使用現有的 chat_room_id: $realRoomId');
+                } else {
+                  // 沒有現成的 chat_room_id，需要調用 ensure_room 創建
+                  debugPrint(
+                      '📡 [My Works] 沒有現成的 chat_room_id，調用 ensure_room 創建');
+
+                  final chatService = ChatService();
+                  final roomResult = await chatService.ensureRoom(
+                    taskId: taskId,
+                    creatorId: creatorId,
+                    participantId: participantId,
+                    type: 'application',
+                  );
+
+                  final roomData = roomResult['room'] ?? {};
+                  realRoomId = roomData['id']?.toString() ?? '';
+
+                  if (realRoomId.isEmpty) {
+                    debugPrint('❌ [My Works] ensure_room 未取得 room_id');
+                    return;
+                  }
+
+                  debugPrint('✅ [My Works] ensure_room 成功創建聊天室: $realRoomId');
                 }
 
                 // 載入聊天室詳細數據
                 debugPrint('🔍 [My Works] 載入聊天室數據，room_id: $realRoomId');
+                final chatService = ChatService();
                 final chatData =
                     await chatService.getChatDetailData(roomId: realRoomId);
 
@@ -524,7 +711,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
                 debugPrint('🔍 [My Works] 準備導航到聊天室，room_id: $realRoomId');
                 context.go('/chat/detail?room_id=$realRoomId');
               } catch (e) {
-                debugPrint('❌ [My Works] ensure_room 失敗: $e');
+                debugPrint('❌ [My Works] 進入聊天室失敗: $e');
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('無法進入聊天室: $e')),
@@ -638,16 +825,31 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      if (unreadCount > 0)
-                        Container(
-                          width: 10,
-                          height: 10,
-                          margin: const EdgeInsets.only(bottom: 6),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.error,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
+                      Selector<ChatListProvider, int>(
+                        selector: (context, provider) {
+                          final roomId =
+                              (task['chat_room_id'] ?? '').toString();
+                          if (roomId.isEmpty) return 0;
+                          try {
+                            return provider.unreadForRoom(roomId);
+                          } catch (_) {
+                            return 0;
+                          }
+                        },
+                        builder: (context, unreadCount, child) {
+                          return unreadCount > 0
+                              ? Container(
+                                  width: 10,
+                                  height: 10,
+                                  margin: const EdgeInsets.only(bottom: 6),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).colorScheme.error,
+                                    shape: BoxShape.circle,
+                                  ),
+                                )
+                              : const SizedBox(height: 16);
+                        },
+                      ),
                       Icon(
                         Icons.chevron_right,
                         color: Colors.grey[400],
@@ -716,10 +918,8 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
                               size: 12, color: Colors.grey[500]),
                           const SizedBox(width: 2),
                           Text(
-                            DateFormat('MM/dd').format(
-                              DateTime.parse(task['task_date'] ??
-                                  DateTime.now().toString()),
-                            ),
+                            DateFormat('MM/dd')
+                                .format(_parseDateOrNow(task['task_date'])),
                             style: TextStyle(
                                 fontSize: 11, color: Colors.grey[500]),
                           ),

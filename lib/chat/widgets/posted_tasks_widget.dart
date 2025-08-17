@@ -32,19 +32,58 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
   List<Map<String, dynamic>> _filteredTasks = []; // 新增：篩選後的任務
   List<Map<String, dynamic>> _sortedTasks = []; // 新增：排序後的任務
 
+  /// 臨時偵錯方法 - 用於追蹤 widget 生命週期
+  void _guard(String tag) {
+    assert(() {
+      debugPrint('🧪 GUARD $tag | mounted=$mounted');
+      return true;
+    }());
+  }
+
+  /// 檢查並按需載入數據
+  void _checkAndLoadIfNeeded() {
+    if (!mounted) return;
+
+    final chatProvider = context.read<ChatListProvider>();
+
+    // 檢查 Provider 是否已初始化
+    if (!chatProvider.isInitialized) {
+      debugPrint('⏳ [Posted Tasks] Provider 尚未初始化，跳過載入檢查');
+      return;
+    }
+
+    // 檢查當前是否為 Posted Tasks 分頁且可見
+    if (chatProvider.isPostedTasksTab) {
+      debugPrint('🔍 [Posted Tasks] 當前為 Posted Tasks 分頁，檢查載入狀態');
+      debugPrint(
+          '  - 分頁載入狀態: ${chatProvider.isTabLoading(ChatListProvider.TAB_POSTED_TASKS)}');
+      debugPrint(
+          '  - 分頁載入完成: ${chatProvider.isTabLoaded(ChatListProvider.TAB_POSTED_TASKS)}');
+      debugPrint(
+          '  - 分頁錯誤: ${chatProvider.getTabError(ChatListProvider.TAB_POSTED_TASKS)}');
+
+      // 如果分頁尚未載入且不在載入中，觸發載入
+      if (!chatProvider.isTabLoaded(ChatListProvider.TAB_POSTED_TASKS) &&
+          !chatProvider.isTabLoading(ChatListProvider.TAB_POSTED_TASKS)) {
+        debugPrint('🚀 [Posted Tasks] 觸發分頁數據載入');
+        chatProvider.checkAndTriggerTabLoad(ChatListProvider.TAB_POSTED_TASKS);
+      } else {
+        debugPrint('✅ [Posted Tasks] 分頁已載入或正在載入中');
+      }
+    } else {
+      debugPrint('⏸️ [Posted Tasks] 當前不是 Posted Tasks 分頁，跳過載入');
+    }
+  }
+
   // 應徵者數據
   final Map<String, List<Map<String, dynamic>>> _applicationsByTask = {};
 
-  // 載入狀態
-  bool _isLoading = true;
-  String? _error;
+  // 載入狀態（已棄用，改用 Provider 的分頁狀態）
+  // bool _isLoading = true;
+  // String? _error;
 
   // 展開狀態
   final Set<String> _expandedTaskIds = {};
-
-  // 未讀數據
-  Map<String, int> _unreadByRoom = {};
-  bool _unreadDataLoaded = false;
 
   // 篩選條件追蹤
   String _lastSearchQuery = '';
@@ -63,11 +102,13 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     try {
       // 計算當前未讀狀態
       bool hasUnread = false;
+      final provider = context.read<ChatListProvider>();
+
       for (final appliers in _applicationsByTask.values) {
         for (final ap in appliers) {
           final roomId = ap['chat_room_id']?.toString();
           if (roomId != null && roomId.isNotEmpty) {
-            final cnt = _unreadByRoom[roomId] ?? 0;
+            final cnt = provider.unreadForRoom(roomId);
             if (cnt > 0) {
               hasUnread = true;
               break;
@@ -77,9 +118,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         if (hasUnread) break;
       }
 
-      // 獲取 Provider 實例
-      final provider = context.read<ChatListProvider>();
-      final oldState = provider.hasUnreadForTab(0);
+      final oldState =
+          provider.hasUnreadForTab(ChatListProvider.TAB_POSTED_TASKS);
 
       // 只有狀態真正改變時才更新
       if (oldState != hasUnread) {
@@ -89,8 +129,13 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
         // 使用 addPostFrameCallback 避免在 build 過程中調用
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            provider.setTabHasUnread(0, hasUnread);
+          _guard('postFrame');
+          if (!mounted) return;
+          try {
+            provider.setTabHasUnread(
+                ChatListProvider.TAB_POSTED_TASKS, hasUnread);
+          } catch (e) {
+            debugPrint('❌ [Posted Tasks] 設置未讀狀態失敗: $e');
           }
         });
       } else {
@@ -112,15 +157,62 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
     // 延遲載入數據，避免在 initState 中直接調用
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _fetchAllTasks();
+      if (!mounted) return;
+
+      // 檢查 Provider 是否已初始化
+      final chatProvider = context.read<ChatListProvider>();
+      if (chatProvider.isInitialized) {
+        debugPrint('✅ [Posted Tasks] Provider 已初始化，檢查分頁狀態');
+        _checkAndLoadIfNeeded();
+      } else {
+        debugPrint('⏳ [Posted Tasks] Provider 未初始化，等待初始化完成');
+        // 等待 Provider 初始化完成
+        chatProvider.addListener(() {
+          if (!mounted) return;
+          if (chatProvider.isInitialized) {
+            debugPrint('✅ [Posted Tasks] Provider 初始化完成，檢查分頁狀態');
+            _checkAndLoadIfNeeded();
+            // 移除一次性監聽器
+            chatProvider.removeListener(() {});
+          }
+        });
       }
     });
 
-    // 監聽 ChatListProvider 的篩選條件變化（僅針對當前tab）
+    // 監聽快取載入完成事件
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      final chatProvider = context.read<ChatListProvider>();
+      chatProvider.addListener(() {
+        if (!mounted) return;
+        if (chatProvider.lastEvent == 'cache_loaded') {
+          debugPrint('📡 [Posted Tasks] 收到快取載入完成事件，重新載入數據');
+          _fetchAllTasks();
+        }
+        // 新增：監聽分頁載入完成事件（tab_loaded_0），載入任務清單
+        if (chatProvider.lastEvent == 'tab_loaded_0') {
+          debugPrint('📡 [Posted Tasks] 分頁載入完成 (tab_loaded_0)，載入任務清單');
+          _fetchAllTasks();
+        }
+      });
+    });
+
+    // 監聽 ChatListProvider 的篩選條件變化和其他事件
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
       final chatProvider = context.read<ChatListProvider>();
       chatProvider.addListener(_handleProviderChanges);
+
+      // 監聽快取載入完成事件
+      chatProvider.addListener(() {
+        if (!mounted) return;
+        if (chatProvider.lastEvent == 'cache_loaded') {
+          debugPrint('📡 [Posted Tasks] 收到快取載入完成事件，重新載入數據');
+          _fetchAllTasks();
+        }
+      });
     });
   }
 
@@ -129,22 +221,30 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     try {
       // 監聽未讀數據變化
       _unreadSub = NotificationCenter().byRoomStream.listen((unreadData) {
-        if (mounted && _unreadDataLoaded) {
-          if (kDebugMode && verboseSearchLog) {
-            debugPrint('📡 [Posted Tasks] 收到未讀數據更新: ${unreadData.length} 個房間');
-          }
+        _guard('unreadStream');
+        if (!mounted) return;
 
-          setState(() {
-            _unreadByRoom = unreadData;
-          });
-
-          // 延遲更新未讀標記，避免頻繁觸發
-          Future.delayed(const Duration(milliseconds: 100), () {
-            if (mounted) {
-              _updatePostedTabUnreadFlag();
-            }
-          });
+        if (kDebugMode && verboseSearchLog) {
+          debugPrint('📡 [Posted Tasks] 收到未讀數據更新: ${unreadData.length} 個房間');
         }
+
+        // 更新 Provider 中的未讀數據
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          try {
+            final provider = context.read<ChatListProvider>();
+            provider.updateUnreadByRoom(unreadData);
+          } catch (e) {
+            debugPrint('❌ [Posted Tasks] 更新未讀數據失敗: $e');
+          }
+        });
+
+        // 延遲更新未讀標記，避免頻繁觸發
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _guard('delayed');
+          if (!mounted) return;
+          _updatePostedTabUnreadFlag();
+        });
       });
     } catch (e) {
       debugPrint('❌ [Posted Tasks] 設置未讀監聽器失敗: $e');
@@ -154,7 +254,24 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
   /// 載入應徵者數據
   Future<void> _loadApplicantsData() async {
     try {
-      // 直接從聚合API獲取應徵者數據
+      debugPrint('🔍 [Posted Tasks] 開始載入應徵者數據，總任務數: ${_allTasks.length}');
+
+      // 優先使用 ChatListProvider 中的應徵者數據
+      final chatProvider = context.read<ChatListProvider>();
+      if (chatProvider.applicationsByTask.isNotEmpty) {
+        debugPrint('✅ [Posted Tasks] 使用 ChatListProvider 中的應徵者數據');
+        _applicationsByTask.clear();
+        _applicationsByTask.addAll(chatProvider.applicationsByTask);
+
+        debugPrint('📊 [Posted Tasks] 應徵者數據統計:');
+        for (final entry in _applicationsByTask.entries) {
+          debugPrint('  - 任務 ${entry.key}: ${entry.value.length} 個應徵者');
+        }
+        return;
+      }
+
+      // 如果 ChatListProvider 中沒有數據，從任務數據中提取
+      debugPrint('🔄 [Posted Tasks] 從任務數據中提取應徵者信息');
       for (final task in _allTasks) {
         final taskId = task['id'].toString();
         final applicantsRaw = task['applicants'] ?? [];
@@ -168,6 +285,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               '🔍 [Posted Tasks] 任務 $taskId 有 ${applicants.length} 個應徵者');
         }
       }
+
+      debugPrint(
+          '📄 [Posted Tasks] 應徵者資料載入完成: ${_applicationsByTask.length} 個任務有應徵者');
     } catch (e) {
       debugPrint('❌ [Posted Tasks] 載入應徵者數據失敗: $e');
     }
@@ -175,8 +295,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
   /// 確保未讀數據已載入
   Future<void> _ensureUnreadDataLoaded() async {
-    if (_unreadDataLoaded) return;
-
     try {
       if (kDebugMode && verboseSearchLog) {
         debugPrint('🔄 [Posted Tasks] 開始載入未讀數據...');
@@ -190,10 +308,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           await NotificationCenter().service.observeUnreadByRoom().first;
 
       if (mounted) {
-        setState(() {
-          _unreadByRoom = unreadData;
-          _unreadDataLoaded = true;
-        });
+        // 更新 Provider 中的未讀數據
+        final provider = context.read<ChatListProvider>();
+        provider.updateUnreadByRoom(unreadData);
 
         if (kDebugMode && verboseSearchLog) {
           debugPrint('✅ [Posted Tasks] 未讀數據載入完成: ${unreadData.length} 個房間');
@@ -210,7 +327,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     try {
       final chatProvider = context.read<ChatListProvider>();
       // 只有當前是 Posted Tasks 分頁時才刷新
-      if (chatProvider.currentTabIndex == 0) {
+      if (chatProvider.isPostedTasksTab) {
         final currentSearchQuery = chatProvider.searchQuery;
         final currentLocations =
             Set<String>.from(chatProvider.selectedLocations);
@@ -254,21 +371,11 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
             }
             _applyFiltersAndSort();
           } else {
-            // 其他篩選條件變化，使用智能刷新策略
-            SmartRefreshStrategy.executeSmartRefresh(
-              refreshKey: 'PostedTasks-Provider',
-              refreshCallback: () {
-                if (kDebugMode && verboseSearchLog) {
-                  debugPrint('✅ [Posted Tasks] 執行智能刷新');
-                }
-                _fetchAllTasks();
-              },
-              hasActiveFilters: chatProvider.hasActiveFilters,
-              searchQuery: currentSearchQuery,
-              isUnreadUpdate: false,
-              forceRefresh: false,
-              enableDebounce: true,
-            );
+            // 其他篩選條件變化：僅前端重算（不觸發 API）
+            if (kDebugMode && verboseSearchLog) {
+              debugPrint('✅ [Posted Tasks] 僅前端重算篩選/排序（不觸發 API）');
+            }
+            _applyFiltersAndSort();
           }
         } else {
           if (kDebugMode && verboseSearchLog) {
@@ -318,7 +425,11 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     } catch (e) {
       // Provider may not be available during dispose
     }
+
+    // 取消未讀數據訂閱
     _unreadSub?.cancel();
+    _unreadSub = null;
+
     super.dispose();
   }
 
@@ -327,25 +438,103 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     if (!mounted) return;
 
     try {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
+      debugPrint('🔄 [Posted Tasks] 開始載入所有任務...');
+
+      // 不再需要設置本地狀態，UI 已綁定到 Provider 的分頁狀態
 
       // 確保未讀數據已載入
       await _ensureUnreadDataLoaded();
+      if (!mounted) return;
 
-      debugPrint('🔄 [Posted Tasks] 開始載入所有任務...');
+      // 優先使用 ChatListProvider 已載入的數據
+      final chatProvider = context.read<ChatListProvider>();
+
+      // 檢查快取數據是否可用
+      bool hasValidCache = chatProvider.cacheManager.isCacheValid &&
+          chatProvider.cacheManager.postedTasksCache.isNotEmpty;
+
+      debugPrint('🔍 [Posted Tasks] 快取檢查:');
+      debugPrint('  - 快取有效: ${chatProvider.cacheManager.isCacheValid}');
+      debugPrint(
+          '  - 快取任務數: ${chatProvider.cacheManager.postedTasksCache.length}');
+      debugPrint('  - 快取可用: $hasValidCache');
+
+      if (hasValidCache) {
+        debugPrint('✅ [Posted Tasks] 使用 ChatListProvider 快取數據');
+
+        // 從快取載入任務數據
+        _allTasks = List<Map<String, dynamic>>.from(
+            chatProvider.cacheManager.postedTasksCache);
+
+        // 載入應徵者數據
+        await _loadApplicantsData();
+        if (!mounted) return;
+
+        // 應用篩選和排序
+        final filteredTasks = _filterTasks(_allTasks, chatProvider);
+        final sortedTasks = _sortTasks(filteredTasks, chatProvider);
+
+        // 更新狀態變數
+        _filteredTasks = filteredTasks;
+        _sortedTasks = sortedTasks;
+
+        debugPrint('📊 [Posted Tasks] 快取數據處理:');
+        debugPrint('  - 快取任務數: ${_allTasks.length}');
+        debugPrint('  - 篩選後任務數: ${filteredTasks.length}');
+        debugPrint('  - 排序後任務數: ${sortedTasks.length}');
+
+        // 更新未讀標記
+        _updatePostedTabUnreadFlag();
+
+        // 不再需要設置本地狀態，UI 已綁定到 Provider 的分頁狀態
+
+        return;
+      }
+
+      // 如果快取無效，調用 API 載入數據
+      debugPrint('📡 [Posted Tasks] 快取無效，調用 API 載入數據...');
+
+      try {
+        final taskService = TaskService();
+        final result = await taskService.fetchPostedTasksAggregated(
+          limit: 1000,
+          offset: 0,
+          creatorId: '2', // TODO: 從用戶服務獲取當前用戶ID
+        );
+
+        if (result.tasks.isNotEmpty) {
+          _allTasks = result.tasks;
+          await _loadApplicantsData();
+
+          final filteredTasks = _filterTasks(_allTasks, chatProvider);
+          final sortedTasks = _sortTasks(filteredTasks, chatProvider);
+
+          _filteredTasks = filteredTasks;
+          _sortedTasks = sortedTasks;
+
+          debugPrint('✅ [Posted Tasks] API 數據載入成功: ${result.tasks.length} 個任務');
+        } else {
+          debugPrint('⚠️ [Posted Tasks] API 返回空數據');
+        }
+      } catch (e) {
+        debugPrint('❌ [Posted Tasks] API 載入失敗: $e');
+        // 不再設置本地錯誤狀態，錯誤狀態由 Provider 管理
+      } finally {
+        // 不再需要設置本地狀態，UI 已綁定到 Provider 的分頁狀態
+      }
+
+      debugPrint('📡 [Posted Tasks] 快取無效，調用 API 載入數據...');
 
       // 使用 TaskService 載入任務
       final taskService = TaskService();
       final userService = context.read<UserService>();
       final currentUserId = userService.currentUser?.id;
 
+      debugPrint('🔍 [Posted Tasks] 檢查用戶狀態: currentUserId = $currentUserId');
+
       if (currentUserId == null) {
-        setState(() {
-          _error = 'No user logged in';
-        });
+        debugPrint('❌ [Posted Tasks] 用戶未登入');
+        // 不再設置本地錯誤狀態，錯誤狀態由 Provider 管理
         return;
       }
 
@@ -357,6 +546,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
       if (!mounted) return;
 
+      debugPrint(
+          '📥 [Posted Tasks] API 回應: tasks.length = ${result.tasks.length}, hasMore = ${result.hasMore}');
+
       if (result.tasks.isNotEmpty) {
         debugPrint('✅ [Posted Tasks] 成功載入 ${result.tasks.length} 個任務');
 
@@ -365,9 +557,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
         // 載入應徵者數據
         await _loadApplicantsData();
+        if (!mounted) return;
 
         // 應用篩選和排序
-        final chatProvider = context.read<ChatListProvider>();
         final filteredTasks = _filterTasks(_allTasks, chatProvider);
         final sortedTasks = _sortTasks(filteredTasks, chatProvider);
 
@@ -375,46 +567,29 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         _filteredTasks = filteredTasks;
         _sortedTasks = sortedTasks;
 
-        debugPrint('📊 [Posted Tasks] 分頁處理:');
+        debugPrint('📊 [Posted Tasks] API 數據處理:');
         debugPrint('  - 原始任務數: ${_allTasks.length}');
         debugPrint('  - 篩選後任務數: ${filteredTasks.length}');
         debugPrint('  - 排序後任務數: ${sortedTasks.length}');
-        debugPrint('  - 當前 offset: 0');
-        debugPrint('  - 頁面大小: 1000');
-        debugPrint('  - API 返回 hasMore: ${result.hasMore}');
 
-        // 更新未讀標記（延遲執行，避免頻繁觸發）
-        Future.delayed(const Duration(milliseconds: 200), () {
-          if (mounted) {
-            _updatePostedTabUnreadFlag();
-          }
-        });
+        // 更新未讀標記
+        _updatePostedTabUnreadFlag();
 
-        // 強制觸發 rebuild
+        // 觸發 UI 更新
         if (mounted) {
-          setState(() {
-            // 觸發 UI 更新
-          });
+          setState(() {});
         }
       } else {
-        debugPrint('❌ [Posted Tasks] 載入任務失敗: 沒有任務數據');
-        setState(() {
-          _error = '沒有任務數據';
-        });
+        debugPrint('⚠️ [Posted Tasks] 沒有任務數據，可能是新用戶或任務已被刪除');
+        // 不再設置本地錯誤狀態，錯誤狀態由 Provider 管理
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('❌ [Posted Tasks] 載入任務異常: $e');
-      if (mounted) {
-        setState(() {
-          _error = '載入失敗: $e';
-        });
-      }
+      debugPrint('📋 [Posted Tasks] 堆疊追蹤: $stackTrace');
+
+      // 不再設置本地錯誤狀態，錯誤狀態由 Provider 管理
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      // 不再需要設置本地狀態，UI 已綁定到 Provider 的分頁狀態
     }
   }
 
@@ -676,8 +851,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           onRefresh: () async {
             debugPrint('🔄 [Posted Tasks] 下拉重新整理開始');
             try {
-              // 清除快取數據
-              await chatProvider.cacheManager.forceRefresh();
+              // 使用新的分頁級別刷新方法
+              await chatProvider.refreshTab(ChatListProvider.TAB_POSTED_TASKS);
 
               // 清除本地快取
               _allTasks.clear();
@@ -687,9 +862,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               // 重新載入未讀數據
               await _ensureUnreadDataLoaded();
 
-              // 刷新分頁數據
-              _fetchAllTasks();
-
               debugPrint('✅ [Posted Tasks] 下拉重新整理完成');
             } catch (e) {
               debugPrint('❌ [Posted Tasks] 下拉重新整理失敗: $e');
@@ -698,9 +870,11 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           child: Stack(
             children: [
               // 使用 ListView 顯示篩選和排序後的任務
-              if (_isLoading)
+              if (chatProvider.isTabLoading(ChatListProvider.TAB_POSTED_TASKS))
                 const Center(child: CircularProgressIndicator())
-              else if (_error != null)
+              else if (chatProvider
+                      .getTabError(ChatListProvider.TAB_POSTED_TASKS) !=
+                  null)
                 Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -708,11 +882,13 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                       Icon(Icons.error_outline,
                           size: 64, color: Colors.red[300]),
                       const SizedBox(height: 16),
-                      Text('Error: $_error',
+                      Text(
+                          'Error: ${chatProvider.getTabError(ChatListProvider.TAB_POSTED_TASKS)}',
                           style: const TextStyle(color: Colors.red)),
                       const SizedBox(height: 16),
                       ElevatedButton(
-                        onPressed: _fetchAllTasks,
+                        onPressed: () => chatProvider.checkAndTriggerTabLoad(
+                            ChatListProvider.TAB_POSTED_TASKS),
                         child: const Text('Retry'),
                       ),
                     ],
@@ -833,6 +1009,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     // 已改為在卡片右側利用 hasUnread 圓點邏輯與應徵者卡片未讀數字顯示
 
     return Card(
+      key: ValueKey('posted-task-$taskId'), // 明確標識為 Posted Tasks 的任務卡片
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -968,37 +1145,41 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           // 任務卡層級：若任一應徵者聊天室存在未讀 → 顯示警示色圓點
-                          Builder(builder: (_) {
-                            final hasUnread = visibleAppliers.any((ap) {
-                              final roomId = ap['chat_room_id']?.toString();
-                              if (roomId == null || roomId.isEmpty) {
-                                return false;
-                              }
-                              final cnt = _unreadByRoom[roomId] ?? 0;
-                              return cnt > 0;
-                            });
-                            // 向 Provider 回報當前分頁是否有未讀（避免 build 期間 setState）
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              try {
-                                context
-                                    .read<ChatListProvider>()
-                                    .setTabHasUnread(0, hasUnread);
-                              } catch (_) {}
-                            });
+                          Selector<ChatListProvider, bool>(
+                            selector: (context, provider) {
+                              return visibleAppliers.any((ap) {
+                                final roomId = ap['chat_room_id']?.toString();
+                                if (roomId == null || roomId.isEmpty)
+                                  return false;
+                                return provider.unreadForRoom(roomId) > 0;
+                              });
+                            },
+                            builder: (context, hasUnread, child) {
+                              // 向 Provider 回報當前分頁是否有未讀（避免 build 期間 setState）
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                try {
+                                  context
+                                      .read<ChatListProvider>()
+                                      .setTabHasUnread(
+                                          ChatListProvider.TAB_POSTED_TASKS,
+                                          hasUnread);
+                                } catch (_) {}
+                              });
 
-                            return hasUnread
-                                ? Container(
-                                    width: 10,
-                                    height: 10,
-                                    margin: const EdgeInsets.only(bottom: 6),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          Theme.of(context).colorScheme.error,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  )
-                                : const SizedBox(height: 16);
-                          }),
+                              return hasUnread
+                                  ? Container(
+                                      width: 10,
+                                      height: 10,
+                                      margin: const EdgeInsets.only(bottom: 6),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Theme.of(context).colorScheme.error,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    )
+                                  : const SizedBox(height: 16);
+                            },
+                          ),
                           AnimatedRotation(
                             turns: isExpanded ? 0.25 : 0.0,
                             duration: const Duration(milliseconds: 200),
@@ -1264,9 +1445,12 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
   Widget _buildApplierCard(
       Map<String, dynamic> applier, String taskId, ColorScheme colorScheme) {
+    final roomId = applier['chat_room_id']?.toString() ?? '';
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Card(
+        key: ValueKey('posted-applicant-$roomId'), // 應徵者卡片綁定 room id
         elevation: 0,
         color: Colors.white,
         shape: RoundedRectangleBorder(
@@ -1322,26 +1506,31 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
             overflow: TextOverflow.ellipsis,
           ),
           trailing: // 未讀數字徽章（警示色）
-              Builder(builder: (_) {
-            final roomId = applier['chat_room_id']?.toString();
-            final unread = roomId == null ? 0 : (_unreadByRoom[roomId] ?? 0);
-            if (unread <= 0) return const SizedBox.shrink();
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.error,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                unread > 99 ? '99+' : '$unread',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+              Selector<ChatListProvider, int>(
+            selector: (context, provider) {
+              final roomId = applier['chat_room_id']?.toString();
+              return roomId == null ? 0 : provider.unreadForRoom(roomId);
+            },
+            builder: (context, unread, child) {
+              if (unread <= 0) return const SizedBox.shrink();
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.error,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ),
-            );
-          }),
+                child: Text(
+                  unread > 99 ? '99+' : '$unread',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              );
+            },
+          ),
           onTap: () {
             final chatRoomId = applier['chat_room_id'];
             if (chatRoomId != null) {

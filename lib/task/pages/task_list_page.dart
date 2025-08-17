@@ -729,204 +729,219 @@ class _TaskListPageState extends State<TaskListPage> {
           builder: (context, themeManager, child) {
             final theme = themeManager.effectiveTheme;
             return Dialog(
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+              backgroundColor: Colors.transparent,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20)),
-              backgroundColor: theme.surface,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: 500,
-                  maxHeight: MediaQuery.of(context).size.height * 0.8,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[50], // 整體灰白色背景
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Center(
-                          child: Text(
-                            task['title'] ?? 'Task Details',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                              color: theme.onSurface,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 標題區塊（主題色背景）
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: theme.primary,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
+                        ),
+                      ),
+                      child: Text(
+                        task['title'] ?? 'Task Details',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                    // 內容
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Task Description',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.onSurface)),
+                            Text(task['description'] ?? 'No description.',
+                                style: TextStyle(color: theme.onSurface)),
+                            const SizedBox(height: 12),
+                            Text('Application Question',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: theme.onSurface)),
+                            ...((task['application_question'] ?? '')
+                                .toString()
+                                .split('|')
+                                .where((q) => q.trim().isNotEmpty)
+                                .toList()
+                                .asMap()
+                                .entries
+                                .map((entry) => Text(
+                                    '${entry.key + 1}. ${entry.value.trim()}',
+                                    style: TextStyle(color: theme.onSurface)))
+                                .toList()),
+                            if ((task['application_question'] ?? '')
+                                .toString()
+                                .trim()
+                                .isEmpty)
+                              Text('No questions.',
+                                  style: TextStyle(color: theme.onSurface)),
+                            const SizedBox(height: 12),
+                            Text.rich(TextSpan(
+                              children: [
+                                TextSpan(
+                                    text: 'Reward: \n',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.onSurface)),
+                                TextSpan(
+                                    text:
+                                        '💰 ${task['reward_point'] ?? task['salary'] ?? "0"}',
+                                    style: TextStyle(color: theme.onSurface)),
+                              ],
+                            )),
+                            const SizedBox(height: 8),
+                            Text.rich(TextSpan(
+                              children: [
+                                TextSpan(
+                                    text: 'Request Language: \n',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.onSurface)),
+                                TextSpan(
+                                    text: (task['language_requirement'] ?? '-')
+                                        .toString(),
+                                    style: TextStyle(color: theme.onSurface)),
+                              ],
+                            )),
+                            const SizedBox(height: 8),
+                            Text.rich(TextSpan(
+                              children: [
+                                TextSpan(
+                                    text: 'Location: \n',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.onSurface)),
+                                TextSpan(
+                                    text: task['location'] ?? '-',
+                                    style: TextStyle(color: theme.onSurface)),
+                              ],
+                            )),
+                            const SizedBox(height: 8),
+                            Text.rich(TextSpan(
+                              children: [
+                                TextSpan(
+                                    text: 'Task Date: \n',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.onSurface)),
+                                TextSpan(
+                                    text: task['task_date'] ?? '-',
+                                    style: TextStyle(color: theme.onSurface)),
+                              ],
+                            )),
+                            const SizedBox(height: 8),
+                            Text.rich(TextSpan(
+                              children: [
+                                TextSpan(
+                                    text: 'Posted by: \n',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.onSurface)),
+                                TextSpan(
+                                    text:
+                                        'UserName: ${task['creator_name'] ?? 'N/A'}${isOwner ? ' (You)' : ''}\n',
+                                    style: TextStyle(color: theme.onSurface)),
+                                TextSpan(
+                                    text: 'Rating: ⭐️ 4.7 (18 reviews)',
+                                    style: TextStyle(color: theme.onSurface)),
+                              ],
+                            )),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // 底部按鈕
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          OutlinedButton(
+                            onPressed: () {
+                              debugPrint('CLOSE button pressed');
+                              if (Navigator.canPop(dialogContext)) {
+                                Navigator.pop(dialogContext);
+                              }
+                            },
+                            child: const Text('CLOSE'),
+                          ),
+                          ElevatedButton(
+                            onPressed: canApply
+                                ? () async {
+                                    final userService =
+                                        Provider.of<UserService>(context,
+                                            listen: false);
+                                    await userService.ensureUserLoaded();
+                                    final userId = userService.currentUser?.id;
+                                    if (userId == null) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content:
+                                                Text('User not logged in.')),
+                                      );
+                                      return;
+                                    }
+                                    debugPrint(
+                                        'APPLY button pressed for userId: $userId');
+                                    final data = {
+                                      'userId': userId,
+                                      'taskId': task['id'],
+                                    };
+                                    debugPrint(
+                                        'Navigating to TaskApplyPage with data: $data');
+                                    if (task['id'] != null) {
+                                      if (Navigator.canPop(dialogContext)) {
+                                        Navigator.pop(dialogContext);
+                                      }
+                                      context.push('/task/apply', extra: data);
+                                    } else {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                              'Task ID not found. Please check.'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                : null,
+                            child: Text(
+                              isOwner
+                                  ? 'POSTED BY YOU'
+                                  : (alreadyApplied ? 'APPLIED' : 'APPLY NOW'),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text('Task Description',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: theme.onSurface)),
-                        Text(task['description'] ?? 'No description.',
-                            style: TextStyle(color: theme.onSurface)),
-                        const SizedBox(height: 12),
-                        Text('Application Question',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: theme.onSurface)),
-                        ...((task['application_question'] ?? '')
-                            .toString()
-                            .split('|')
-                            .where((q) => q.trim().isNotEmpty)
-                            .toList()
-                            .asMap()
-                            .entries
-                            .map((entry) => Text(
-                                '${entry.key + 1}. ${entry.value.trim()}',
-                                style: TextStyle(color: theme.onSurface)))
-                            .toList()),
-                        if ((task['application_question'] ?? '')
-                            .toString()
-                            .trim()
-                            .isEmpty)
-                          Text('No questions.',
-                              style: TextStyle(color: theme.onSurface)),
-                        const SizedBox(height: 12),
-                        Text.rich(TextSpan(
-                          children: [
-                            TextSpan(
-                                text: 'Reward: \n',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.onSurface)),
-                            TextSpan(
-                                text:
-                                    '💰 ${task['reward_point'] ?? task['salary'] ?? "0"}',
-                                style: TextStyle(color: theme.onSurface)),
-                          ],
-                        )),
-                        const SizedBox(height: 8),
-                        Text.rich(TextSpan(
-                          children: [
-                            TextSpan(
-                                text: 'Request Language: \n',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.onSurface)),
-                            TextSpan(
-                                text: taskPrimaryLanguage,
-                                style: TextStyle(color: theme.onSurface)),
-                          ],
-                        )),
-                        const SizedBox(height: 8),
-                        Text.rich(TextSpan(
-                          children: [
-                            TextSpan(
-                                text: 'Location: \n',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.onSurface)),
-                            TextSpan(
-                                text: task['location'] ?? '-',
-                                style: TextStyle(color: theme.onSurface)),
-                          ],
-                        )),
-                        const SizedBox(height: 8),
-                        Text.rich(TextSpan(
-                          children: [
-                            TextSpan(
-                                text: 'Task Date: \n',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.onSurface)),
-                            TextSpan(
-                                text: task['task_date'] ?? '-',
-                                style: TextStyle(color: theme.onSurface)),
-                          ],
-                        )),
-                        const SizedBox(height: 8),
-                        Text.rich(TextSpan(
-                          children: [
-                            TextSpan(
-                                text: 'Posted by: \n',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.onSurface)),
-                            TextSpan(
-                                text:
-                                    'UserName: ${task['creator_name'] ?? 'N/A'}${isOwner ? ' (You)' : ''}\n',
-                                style: TextStyle(color: theme.onSurface)),
-                            TextSpan(
-                                text: 'Rating: ⭐️ 4.7 (18 reviews)',
-                                style: TextStyle(color: theme.onSurface)),
-                          ],
-                        )),
-                        const SizedBox(height: 24),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            OutlinedButton(
-                              onPressed: () {
-                                debugPrint('CLOSE button pressed');
-                                if (Navigator.canPop(dialogContext)) {
-                                  Navigator.pop(dialogContext);
-                                }
-                              },
-                              child: const Text('CLOSE'),
-                            ),
-                            ElevatedButton(
-                              onPressed: canApply
-                                  ? () async {
-                                      final userService =
-                                          Provider.of<UserService>(context,
-                                              listen: false);
-                                      await userService.ensureUserLoaded();
-
-                                      final userId =
-                                          userService.currentUser?.id;
-
-                                      if (userId == null) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                              content:
-                                                  Text('User not logged in.')),
-                                        );
-                                        return;
-                                      }
-
-                                      debugPrint(
-                                          'APPLY button pressed for userId: $userId');
-                                      final data = {
-                                        'userId': userId,
-                                        'taskId': task['id'],
-                                      };
-
-                                      debugPrint(
-                                          'Navigating to TaskApplyPage with data: $data');
-
-                                      if (task['id'] != null) {
-                                        if (Navigator.canPop(dialogContext)) {
-                                          Navigator.pop(dialogContext);
-                                        }
-                                        context.push('/task/apply',
-                                            extra: data);
-                                      } else {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                                'Task ID not found. Please check.'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  : null,
-                              child: Text(
-                                isOwner
-                                    ? 'POSTED BY YOU'
-                                    : (alreadyApplied
-                                        ? 'APPLIED'
-                                        : 'APPLY NOW'),
-                              ),
-                            ),
-                          ],
-                        )
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
             );
@@ -1075,6 +1090,8 @@ class _TaskListPageState extends State<TaskListPage> {
                                 children: [
                                   // 任務標題和操作按鈕
                                   Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
@@ -1090,27 +1107,30 @@ class _TaskListPageState extends State<TaskListPage> {
                                         ),
                                       ),
                                       const SizedBox(width: 8),
-                                      // 操作按鈕區域 - 只保留三個點選單
-                                      PopupMenuButton<String>(
-                                        icon: const Icon(Icons.more_vert,
-                                            size: 20),
-                                        onSelected: (value) {
-                                          if (value == 'report') {
-                                            _showReportDialog(task);
-                                          }
-                                        },
-                                        itemBuilder: (context) => [
-                                          const PopupMenuItem(
-                                            value: 'report',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.flag_outlined),
-                                                SizedBox(width: 8),
-                                                Text('Report'),
-                                              ],
+                                      Align(
+                                        alignment: Alignment.topRight,
+                                        child: PopupMenuButton<String>(
+                                          padding: EdgeInsets.zero,
+                                          icon: const Icon(Icons.more_vert,
+                                              size: 20),
+                                          onSelected: (value) {
+                                            if (value == 'report') {
+                                              _showReportDialog(task);
+                                            }
+                                          },
+                                          itemBuilder: (context) => const [
+                                            PopupMenuItem(
+                                              value: 'report',
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.flag_outlined),
+                                                  SizedBox(width: 8),
+                                                  Text('Report'),
+                                                ],
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),

@@ -11,40 +11,66 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 try {
     $db = Database::getInstance();
 
+    // 參數驗證和轉型
     $userId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
     if ($userId <= 0) {
-        Response::validationError(['user_id' => 'user_id is required']);
+        Response::validationError(['user_id' => 'user_id is required and must be positive']);
     }
 
     $limit = (int)($_GET['limit'] ?? 50);
     $offset = (int)($_GET['offset'] ?? 0);
 
+    // 檢查必要的表是否存在
+    try {
+        $db->query("SELECT 1 FROM task_applications LIMIT 1");
+        $db->query("SELECT 1 FROM tasks LIMIT 1");
+        $db->query("SELECT 1 FROM task_statuses LIMIT 1");
+        $db->query("SELECT 1 FROM users LIMIT 1");
+    } catch (Exception $e) {
+        error_log("list_by_user.php table check failed: " . $e->getMessage());
+        Response::error('Database table not found: ' . $e->getMessage(), 500);
+    }
+
+    // 根據規格文件更新的 SQL 查詢
+    // - 使用 participant_id 而不是 participant_id
+    // - 確保 status 欄位使用正確的 ENUM 值
     $sql = "
       SELECT
         ta.id                AS application_id,
         ta.status            AS application_status,
+        ta.cover_letter,
         ta.created_at        AS application_created_at,
         ta.updated_at        AS application_updated_at,
 
-        t.id,
+        t.id                 AS task_id,
         t.title,
         t.description,
         t.location,
         t.reward_point,
         t.status_id,
-        t.created_at,
-        t.updated_at,
+        t.participant_id,    -- 根據規格：acceptor_id → participant_id
+        t.created_at         AS task_created_at,
+        t.updated_at         AS task_updated_at,
         
         s.code               AS status_code,
         s.display_name       AS status_display,
 
-        CASE WHEN t.acceptor_id IS NOT NULL AND t.acceptor_id <> ta.user_id
+        -- 根據規格：使用 task_applications.status ENUM('applied','accepted','rejected','pending','completed','cancelled','dispute')
+        CASE WHEN ta.status = 'accepted'
+             THEN 'accepted_tasker'
+             WHEN ta.status = 'rejected'
              THEN 'rejected_tasker'
+             WHEN ta.status = 'applied'
+             THEN 'applied_tasker'
              ELSE s.code
         END AS client_status_code,
 
-        CASE WHEN t.acceptor_id IS NOT NULL AND t.acceptor_id <> ta.user_id
-             THEN 'Rejected (Tasker)'
+        CASE WHEN ta.status = 'accepted'
+             THEN 'In Progress (Tasker)' // 顯示進行中
+             WHEN ta.status = 'rejected'
+             THEN 'Rejected' // 顯示被拒絕
+             WHEN ta.status = 'applied'
+             THEN 'Open' // 顯示應徵中
              ELSE s.display_name
         END AS client_status_display,
 
@@ -78,13 +104,20 @@ try {
       LIMIT ? OFFSET ?
     ";
 
+    // 執行查詢
     $rows = $db->fetchAll($sql, [$userId, $limit, $offset]);
-    $taskIds = array_map(fn($r) => $r['id'], $rows);
+    
+    // 確保 rows 是陣列
+    if (!is_array($rows)) {
+        $rows = [];
+    }
+
+    // 提取任務 ID
+    $taskIds = array_map(fn($r) => $r['task_id'], $rows);
 
     // 添加除錯資訊
     error_log("🔍 [My Works API] 查詢用戶 ID: $userId");
     error_log("🔍 [My Works API] 查詢結果數量: " . count($rows));
-    error_log("🔍 [My Works API] SQL: $sql");
     error_log("🔍 [My Works API] 參數: " . json_encode([$userId, $limit, $offset]));
 
     Response::success([
@@ -94,12 +127,30 @@ try {
       'debug_info' => [
         'user_id' => $userId,
         'result_count' => count($rows),
-        'sql' => $sql,
-        'parameters' => [$userId, $limit, $offset]
+        'parameters' => [$userId, $limit, $offset],
+        'database_schema' => 'updated_to_participant_id' // 標記已更新到新架構
       ]
     ], 'My applications retrieved');
-} catch (Exception $e) {
-    Response::error('Server error: ' . $e->getMessage(), 500);
+
+} catch (Throwable $e) {
+    // 使用 Throwable 捕獲所有錯誤，包括 Fatal errors
+    error_log("list_by_user.php error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
+    
+    // 返回結構化錯誤而不是 500
+    Response::success([
+      'applications' => [],
+      'task_ids' => [],
+      'pagination' => [ 'limit' => $limit ?? 50, 'offset' => $offset ?? 0 ],
+      'error' => 'db_error',
+      'message' => $e->getMessage(),
+      'debug_info' => [
+        'user_id' => $userId ?? 0,
+        'error_type' => get_class($e),
+        'error_file' => $e->getFile(),
+        'error_line' => $e->getLine(),
+        'database_schema' => 'updated_to_participant_id'
+      ]
+    ], 'Error occurred while retrieving applications');
 }
 ?>
 

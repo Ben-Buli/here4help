@@ -73,7 +73,7 @@ try {
             LEFT JOIN task_statuses s ON t.status_id = s.id
             LEFT JOIN users u ON t.creator_id = u.id
             $whereClause
-            ORDER BY t.status_id DESC, t.updated_at DESC 
+            ORDER BY COALESCE(t.status_id, 9999) ASC, t.updated_at DESC, t.id ASC
             LIMIT ? OFFSET ?";
     
     $params[] = $limit;

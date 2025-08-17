@@ -96,7 +96,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
 
     // 設置預設值
     taskData!['id'] = UniqueKey().toString();
-    taskData!['acceptor_id'] = '';
+    taskData!['participant_id'] = '';
     taskData!['status'] = 'Open'; // 預設狀態為 Open
     taskData!['creator_confirmed'] = '0';
     taskData!['acceptor_confirmed'] = '0';

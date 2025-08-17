@@ -2,11 +2,12 @@
 
 Chat 模組需求落地執行規劃（重要）
 
-重要開發原則：
+# 重要開發原則：
 1. 有新增或修改的檔案、功能或是資料邏輯處理，幫我備注說明
 2. 你測試完之後都需要等待我手動測試之後同意再往下一步
 3. 版本推送需要等我主動提出
 4. UI元件文案使用英文、debugPrint/註解使用中文說明
+5. `app_scaffold.dart` 統一管理所有路由的appbar(and title), bottom navbar, back arrow（返回上一頁），所以其他page.dart或頁面檔案不要重複建立scaffold()、appbar 
 
 階段一：文件閱讀 & 重點梳理（重要）
 	•	AI 先完整閱讀規格文件（chat_module_spec.md），尤其是我改動資料庫結構的部分，需要確保現有架構以及未來規劃不會對新的資料表產生衝突。
@@ -80,13 +81,14 @@ Chat 模組需求落地執行規劃（重要）
 ## 0) 共享前置
 
 ### 0.1 資料庫異動 
+--  task_applications.status ENUM('applied','accepted','rejected','pending','completed','cancelled','dispute')
+- `tasks`: `accpetor_id` 更正名稱為 `participant_id`
 - 新增 `chat_reads`：`(id, user_id, room_id, last_read_message_id, updated_at, UNIQUE(user_id, room_id))`
 - `tasks.status_id` → 關聯 `task_statuses.id`
 - `task_applications.status`: ENUM('applied','accepted','rejected')
-- 單一受雇者：`task_applications` 加 `accepted_flag`，唯一鍵 `(task_id, accepted_flag)`
-- `task_status_logs`：記錄狀態切換（Pending Confirmation 倒數依此）
-- `task_ratings`：加 `tasker_id`（受評者 = 最終 accepted 應徵者），唯一鍵 `(task_id, rater_id, tasker_id)`
-
+- 單一受雇者：`task_applications` `，唯一鍵 `(task_id)`
+- `task_status_logs`：記錄狀態切換（Pending Confirmation 七日到數功能依此：created_at，當`task_status_logs.new_status`）
+- `task_ratings`：加 `tasker_id`（受評者等同於任務應徵後被接受的任務執行者 = Select `task_applications.id` WHERE`tasks_applications.status` = 'accpeted'），唯一鍵 `(task_id, rater_id, tasker_id)`，`rater_id` = `tasks.creator_id`
 ⚠️ （資料庫是我在專案以外的地方操作修改phpMyAdmin，所以專案中對應的資料表、對應資料功能會受到影響，幫我確保專案內的資料庫對照功能有對應更新，或是遇到問題看這邊）
 
 ---

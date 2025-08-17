@@ -15,6 +15,8 @@ import 'package:here4help/auth/services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
 
+//task_card_components.dart 已棄用，請使用 task_card_components_backup.dart 替代
+
 class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
 
@@ -108,7 +110,7 @@ class _ChatListPageState extends State<ChatListPage>
       if (userId == null) return 0;
       isMyWorkTask(Map<String, dynamic> t) {
         final acceptorIsMe =
-            (t['acceptor_id']?.toString() ?? '') == userId.toString();
+            (t['participant_id']?.toString() ?? '') == userId.toString();
         final appliedByMe = t['applied_by_me'] == true;
         return acceptorIsMe || appliedByMe;
       }
@@ -1825,7 +1827,7 @@ class _ChatListPageState extends State<ChatListPage>
         task['status_id'] = result['status_id'];
         task['status_code'] = result['status_code'];
         task['status_display'] = result['status_display'];
-        task['acceptor_id'] = userId;
+        task['participant_id'] = userId;
 
         // 更新應徵者狀態
         applierChatItem['application_status'] = 'accepted';

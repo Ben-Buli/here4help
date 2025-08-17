@@ -199,6 +199,10 @@ class SocketNotificationService implements NotificationService {
   @override
   Future<void> init({required String userId}) async {
     _disposed2 = false;
+
+    // Socket.IO 連接已更新到 3.1.2 版本，重新啟用
+    print('🔧 [NotificationService] Socket.IO 連接重新啟用，版本 3.1.2');
+
     final token = await _getToken();
     _socket = io.io(
         AppConfig.socketUrl,
@@ -213,17 +217,20 @@ class SocketNotificationService implements NotificationService {
       refreshSnapshot();
       _statusController.add(ConnectionStatus.connected);
     });
-    _socket?.on('unread_total', (data) {
-      final total = (data is Map && data['total'] is num)
+    _socket?.on('unread_total', (dynamic data) {
+      final total = (data is Map<String, dynamic> && data['total'] is num)
           ? (data['total'] as num).toInt()
           : 0;
       _totalUnread = total;
       _emitAll();
     });
-    _socket?.on('unread_by_room', (data) {
-      if (data is Map && data['by_room'] is Map) {
-        final raw = Map<String, dynamic>.from(data['by_room']);
-        _unreadByRoom = raw.map((k, v) => MapEntry(k, (v as num).toInt()));
+    _socket?.on('unread_by_room', (dynamic data) {
+      if (data is Map<String, dynamic> &&
+          data['by_room'] is Map<String, dynamic>) {
+        final raw =
+            Map<String, dynamic>.from(data['by_room'] as Map<String, dynamic>);
+        _unreadByRoom =
+            raw.map((String k, dynamic v) => MapEntry(k, (v as num).toInt()));
         _emitAll();
       }
     });
@@ -264,6 +271,7 @@ class SocketNotificationService implements NotificationService {
       {required String roomId, required String upToMessageId}) async {
     _socket
         ?.emit('read_room', {'roomId': roomId, 'upToMessageId': upToMessageId});
+
     // 同步到後端 DB
     try {
       final token = await _getToken();

@@ -33,14 +33,14 @@ try {
 
     try {
         // 1. 驗證任務歸屬與狀態
-        $task = $db->fetch("SELECT id, creator_id, acceptor_id, status_id FROM tasks WHERE id = ?", [$taskId]);
+        $task = $db->fetch("SELECT id, creator_id, participant_id, status_id FROM tasks WHERE id = ?", [$taskId]);
         if (!$task) {
             throw new Exception('Task not found');
         }
         if ((int)$task['creator_id'] !== $posterId) {
             throw new Exception('Only task creator can approve applications');
         }
-        if ($task['acceptor_id'] !== null) {
+        if ($task['participant_id'] !== null) {
             throw new Exception('Task already has an assigned tasker');
         }
 
@@ -54,7 +54,7 @@ try {
         }
 
         // 3. 指派任務執行者
-        $stmt = $conn->prepare("UPDATE tasks SET acceptor_id = ?, status_id = (SELECT id FROM task_statuses WHERE code = 'in_progress' LIMIT 1), updated_at = NOW() WHERE id = ?");
+        $stmt = $conn->prepare("UPDATE tasks SET participant_id = ?, status_id = (SELECT id FROM task_statuses WHERE code = 'in_progress' LIMIT 1), updated_at = NOW() WHERE id = ?");
         $stmt->execute([$userId, $taskId]);
 
         // 4. 標記該應徵為 accepted
@@ -73,7 +73,7 @@ try {
                    u.name AS acceptor_name
             FROM tasks t
             LEFT JOIN task_statuses s ON t.status_id = s.id
-            LEFT JOIN users u ON t.acceptor_id = u.id
+            LEFT JOIN users u ON t.participant_id = u.id
             WHERE t.id = ?", [$taskId]);
 
         Response::success($updatedTask, 'Application approved successfully');

@@ -1200,57 +1200,6 @@ class _ChatListPageState extends State<ChatListPage>
     );
   }
 
-  // Deprecated: 目前未使用，若需狀態徽章樣式可再啟用
-  Color _getStatusChipColor(String status, String type) {
-    // Convert database status to display status if needed
-    final displayStatus = TaskStatus.getDisplayStatus(status);
-
-    // Only return text color, ignore background.
-    switch (displayStatus) {
-      case 'Open':
-        return Colors.blue[800]!;
-      case 'In Progress':
-        return Colors.orange[800]!;
-      case 'Dispute':
-        return Colors.red[800]!;
-      case 'Pending Confirmation':
-        return Colors.purple[800]!;
-      case 'Completed':
-        return Colors.grey[800]!;
-      case 'Applying (Tasker)':
-        return Colors.blue[800]!;
-      case 'In Progress (Tasker)':
-        return Colors.orange[800]!;
-      default:
-        return Colors.grey[800]!;
-    }
-  }
-
-  // Deprecated: 目前未使用
-  // Color _getStatusChipBorderColor(String status) {
-  //   // Convert database status to display status if needed
-  //   final displayStatus = TaskStatus.getDisplayStatus(status);
-
-  //   switch (displayStatus) {
-  //     case 'Open':
-  //       return Colors.blue[100]!;
-  //     case 'In Progress':
-  //       return Colors.orange[100]!;
-  //     case 'Dispute':
-  //       return Colors.red[100]!;
-  //     case 'Pending Confirmation':
-  //       return Colors.purple[100]!;
-  //     case 'Completed':
-  //       return Colors.grey[100]!;
-  //     case 'Applying (Tasker)':
-  //       return Colors.blue[100]!;
-  //     case 'In Progress (Tasker)':
-  //       return Colors.orange[100]!;
-  //     default:
-  //       return Colors.grey[100]!;
-  //   }
-  // }
-
   bool _isCountdownStatus(String status) {
     // Convert database status to display status if needed
     final displayStatus = TaskStatus.getDisplayStatus(status);
@@ -1259,101 +1208,43 @@ class _ChatListPageState extends State<ChatListPage>
         displayStatus == TaskStatus.statusString['pending_confirmation_tasker'];
   }
 
-  /// 根據狀態返回進度值和顏色
+  /// 根據狀態返回進度值和顏色 (使用標準化字典)
   Map<String, dynamic> _getProgressData(String status) {
     // Convert database status to display status if needed
     final displayStatus = TaskStatus.statusString[status] ?? status;
 
     const int colorRates = 200;
-    switch (displayStatus) {
-      case 'Open':
-        return {'progress': 0.0, 'color': Colors.blue[colorRates]!};
-      case 'In Progress':
-        return {'progress': 0.25, 'color': Colors.orange[colorRates]!};
-      case 'Pending Confirmation':
-        return {'progress': 0.5, 'color': Colors.purple[colorRates]!};
-      case 'Completed':
-        return {'progress': 1.0, 'color': Colors.lightGreen[colorRates]!};
-      case 'Dispute':
-        return {'progress': 0.75, 'color': Colors.brown[colorRates]!};
-      case 'Applying (Tasker)':
-        return {'progress': 0.0, 'color': Colors.lightGreenAccent[colorRates]!};
-      case 'In Progress (Tasker)':
-        return {'progress': 0.25, 'color': Colors.orange[colorRates]!};
-      case 'Completed (Tasker)':
-        return {'progress': 1.0, 'color': Colors.green[colorRates]!};
-      case 'Rejected (Tasker)':
-        return {'progress': 1.0, 'color': Colors.blueGrey[colorRates]!};
-      default:
-        return {
-          'progress': null,
-          'color': Colors.lightBlue[colorRates]!
-        }; // 其他狀態
-    }
-  }
 
-  // Deprecated: 目前未使用（保留作為未來進度條樣式的範本）
-  Widget _taskCardWithProgressBar(Map<String, dynamic> task) {
-    final String displayStatus = _displayStatus(task);
-    final progressData = _getProgressData(displayStatus);
-    final progress = progressData['progress'];
-    final color = progressData['color'] ??
-        Colors.grey[600]!; // ignore: unused_local_variable
+    // 標準化：去除前後空格 & 全部小寫
+    final normalized = displayStatus.trim().toLowerCase();
 
-    return InkWell(
-      onTap: () => _showTaskInfoDialog(task),
-      borderRadius: BorderRadius.circular(12),
-      child: Card(
-        clipBehavior: Clip.hardEdge,
-        margin: const EdgeInsets.only(bottom: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        elevation: 4,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 8),
-              if (progress != null) ...[
-                // 進度條
-                SizedBox(
-                  height: 30, // 確保容器高度足夠
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      LinearProgressIndicator(
-                        value: _getProgressData(displayStatus)['progress'],
-                        backgroundColor: Colors.grey[300],
-                        color: _getProgressData(displayStatus)['color'],
-                        minHeight: 20,
-                      ),
-                      Text(
-                        _getProgressLabel(displayStatus),
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ] else ...[
-                // 顯示 Label 或 Chip
-                Chip(
-                  label: Text(displayStatus),
-                  backgroundColor: Colors.transparent,
-                  labelStyle: const TextStyle(color: Colors.red),
-                  side: const BorderSide(color: Colors.red),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+    // 狀態對應表 (已標準化成小寫)
+    final Map<String, Map<String, dynamic>> statusMap = {
+      'open': {'progress': 0.0, 'color': Colors.blue[colorRates]!},
+      'in progress': {'progress': 0.25, 'color': Colors.orange[colorRates]!},
+      'pending confirmation': {
+        'progress': 0.5,
+        'color': Colors.purple[colorRates]!
+      },
+      'completed': {'progress': 1.0, 'color': Colors.lightGreen[colorRates]!},
+      'dispute': {'progress': 0.75, 'color': Colors.brown[colorRates]!},
+      'applying': {
+        // participant view
+        'progress': 0.0,
+        'color': Colors.lightGreenAccent[colorRates]!
+      },
+      'rejected': {
+        // participant view
+        'progress': 1.0,
+        'color': Colors.blueGrey[colorRates]!
+      },
+      'cancelled': {'progress': 1.0, 'color': Colors.blueGrey[colorRates]!},
+    };
+
+    // 回傳對應資料，若無匹配 → 回傳 default
+    return statusMap[normalized] ??
+        {'progress': null, 'color': const Color.fromARGB(255, 97, 134, 151)};
+  } // Deprecated: 目前未使用（保留作為未來進度條樣式的範本）
 
   Widget _taskCardWithapplierChatItems(
       Map<String, dynamic> task, List<Map<String, dynamic>> applierChatItems) {
@@ -2017,101 +1908,6 @@ class _ChatListPageState extends State<ChatListPage>
     );
   }
 
-  Widget _buildTaskList(bool taskerEnabled) {
-    final taskService = TaskService();
-    // currentUserId 僅在下方分支條件中使用
-    final currentUserId = context
-        .read<UserService>()
-        .currentUser
-        ?.id; // ignore: unused_local_variable
-    if (taskerEnabled && currentUserId != null) {
-      // 確保載入我的應徵
-      taskService.loadMyApplications(currentUserId);
-    }
-    final statusOrder = {
-      'Open': 0,
-      'In Progress': 1,
-      'Pending Confirmation': 2,
-      'Dispute': 3,
-      'Completed': 4,
-      'Rejected': 7,
-    };
-    final tasks = taskerEnabled
-        ? _composeMyWorks(taskService, currentUserId)
-        : taskService.tasks;
-    tasks.sort((a, b) {
-      // Convert database status to display status for sorting
-      final displayStatusA =
-          (a['status_display'] ?? a['status']) as String? ?? '';
-      final displayStatusB =
-          (b['status_display'] ?? b['status']) as String? ?? '';
-
-      final statusA = statusOrder[displayStatusA] ?? 99;
-      final statusB = statusOrder[displayStatusB] ?? 99;
-      if (statusA != statusB) {
-        return statusA.compareTo(statusB);
-      }
-      return (DateTime.parse(b['task_date']))
-          .compareTo(DateTime.parse(a['task_date']));
-    });
-    final filteredTasks = tasks.where((task) {
-      final title = (task['title'] ?? '').toString().toLowerCase();
-      final location = (task['location'] ?? '').toString();
-      // final hashtags = (task['hashtags'] as List<dynamic>? ?? [])
-      //     .map((h) => h.toString())
-      //     .toList();
-      final status = _displayStatus(task);
-      final query = searchQuery.toLowerCase();
-      final matchQuery = query.isEmpty || title.contains(query);
-      final matchLocation =
-          selectedLocations.isEmpty || selectedLocations.contains(location);
-      final matchStatus =
-          selectedStatuses.isEmpty || selectedStatuses.contains(status);
-      // My Works：接受者是我，或我有應徵紀錄
-      final isMyWork = taskerEnabled
-          ? ((task['acceptor_id']?.toString() == currentUserId?.toString()) ||
-              (task['applied_by_me'] == true))
-          : (task['creator_id']?.toString() != currentUserId?.toString());
-      final matchTasker = taskerEnabled ? isMyWork : !isMyWork;
-      return matchQuery && matchLocation && matchStatus && matchTasker;
-    }).toList();
-    return SlidableAutoCloseBehavior(
-      child: ListView(
-        padding: const EdgeInsets.all(12),
-        children: filteredTasks.map((task) {
-          final taskId = task['id'].toString();
-
-          // 判斷是否為 Posted Tasks 模式
-          final isPostedTasksTab = _tabController.index == 0;
-          final userService = context.read<UserService>();
-          final currentUserId = userService.currentUser?.id;
-          final isMyTask = currentUserId != null &&
-              (task['creator_id'] == currentUserId ||
-                  task['creator_id']?.toString() == currentUserId.toString());
-
-          List<Map<String, dynamic>> applierChatItems;
-
-          if (isPostedTasksTab && isMyTask) {
-            // Posted Tasks: 使用真實應徵者資料
-            final applications = _applicationsByTask[taskId] ?? [];
-            applierChatItems =
-                _convertApplicationsToApplierChatItems(applications);
-          } else {
-            // My Works 或非我的任務: 不使用硬編碼數據，使用空列表
-            applierChatItems = [];
-          }
-
-          // My Works 分頁使用特殊的聊天室列表設計
-          if (taskerEnabled) {
-            return _buildMyWorksChatRoomItem(task, applierChatItems);
-          } else {
-            return _taskCardWithapplierChatItems(task, applierChatItems);
-          }
-        }).toList(),
-      ),
-    );
-  }
-
   // Posted Tasks 分頁 + 保留原卡 UI
   Widget _buildPostedTasksPaged() {
     return Stack(
@@ -2294,7 +2090,7 @@ class _ChatListPageState extends State<ChatListPage>
         task['status_id'] = result['status_id'];
         task['status_code'] = result['status_code'];
         task['status_display'] = result['status_display'];
-        task['acceptor_id'] = userId;
+        task['participant_id'] = userId;
 
         // 更新應徵者狀態
         applierChatItem['application_status'] = 'accepted';
@@ -2506,7 +2302,7 @@ class _ChatListPageState extends State<ChatListPage>
 
   //       return {
   //         'id': task['participant_id']?.toString() ??
-  //             task['acceptor_id']?.toString(),
+  //             task['participant_id']?.toString(),
   //         'name': name,
   //         'avatar': avatar ?? '',
   //       };
@@ -3507,7 +3303,8 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                       : int.tryParse('$currentUserId') ?? 0;
 
                   if (taskId.isEmpty || creatorId <= 0 || participantId <= 0) {
-                    debugPrint('❌ [My Works] ensure_room 參數不足');
+                    debugPrint(
+                        '❌ [ChatListPage] ensure_room 參數不足．\ntaskId: $taskId, \ncreatorId: $creatorId, \nparticipantId: $participantId');
                     return;
                   }
 
@@ -3521,7 +3318,8 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                   final roomData = roomResult['room'] ?? {};
                   final String realRoomId = roomData['id']?.toString() ?? '';
                   if (realRoomId.isEmpty) {
-                    debugPrint('❌ [My Works] ensure_room 未取得 room_id');
+                    debugPrint(
+                        '❌ [ChatListPage][My Works] ensure_room 未取得 room_id');
                     return;
                   }
 
@@ -3529,7 +3327,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
                   debugPrint('🔍 [My Works] 準備導航到聊天室，room_id: $realRoomId');
                   context.go('/chat/detail?room_id=$realRoomId');
                 } catch (e) {
-                  debugPrint('❌ [My Works] ensure_room 失敗: $e');
+                  debugPrint('❌ [ChatListPage][My Works] ensure_room 失敗: $e');
                 }
               }
             },
@@ -3869,7 +3667,7 @@ extension _ChatListPageStateApplierEndActions on _ChatListPageState {
 
         return {
           'id': task['participant_id']?.toString() ??
-              task['acceptor_id']?.toString(),
+              task['participant_id']?.toString(),
           'name': name,
           'avatar': avatar ?? '',
         };
