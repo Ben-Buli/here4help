@@ -27,12 +27,11 @@ try {
         $db->query("SELECT 1 FROM task_statuses LIMIT 1");
         $db->query("SELECT 1 FROM users LIMIT 1");
     } catch (Exception $e) {
-        error_log("list_by_user.php table check failed: " . $e->getMessage());
+        error_log("my_work_applications.php table check failed: " . $e->getMessage());
         Response::error('Database table not found: ' . $e->getMessage(), 500);
     }
 
     // 根據規格文件更新的 SQL 查詢
-    // - 使用 participant_id 而不是 participant_id
     // - 確保 status 欄位使用正確的 ENUM 值
     $sql = "
       SELECT
@@ -49,11 +48,13 @@ try {
         t.reward_point,
         t.status_id,
         t.participant_id,    -- 根據規格：acceptor_id → participant_id
+        t.language_requirement,
+        t.start_datetime     AS task_date,
         t.created_at         AS task_created_at,
         t.updated_at         AS task_updated_at,
         
-        s.code               AS status_code,
-        s.display_name       AS status_display,
+        s.code               AS raw_status_code,
+        s.display_name       AS raw_status_display,
 
         -- 根據規格：使用 task_applications.status ENUM('applied','accepted','rejected','pending','completed','cancelled','dispute')
         CASE WHEN ta.status = 'accepted'
@@ -63,16 +64,16 @@ try {
              WHEN ta.status = 'applied'
              THEN 'applied_tasker'
              ELSE s.code
-        END AS client_status_code,
+        END AS status_code,
 
         CASE WHEN ta.status = 'accepted'
-             THEN 'In Progress (Tasker)' // 顯示進行中
+             THEN 'In Progress' -- 顯示進行中
              WHEN ta.status = 'rejected'
-             THEN 'Rejected' // 顯示被拒絕
+             THEN 'Rejected' -- 顯示被拒絕
              WHEN ta.status = 'applied'
-             THEN 'Open' // 顯示應徵中
+             THEN 'Open' -- 顯示應徵中
              ELSE s.display_name
-        END AS client_status_display,
+        END AS status_display,
 
         u.id                 AS creator_id,
         u.name               AS creator_name,
@@ -119,6 +120,23 @@ try {
     error_log("🔍 [My Works API] 查詢用戶 ID: $userId");
     error_log("🔍 [My Works API] 查詢結果數量: " . count($rows));
     error_log("🔍 [My Works API] 參數: " . json_encode([$userId, $limit, $offset]));
+    
+    // 添加詳細的欄位調試資訊
+    if (!empty($rows)) {
+        $sampleRow = $rows[0];
+        error_log("🔍 [My Works API] 樣本資料欄位:");
+        error_log("  - application_id: " . ($sampleRow['application_id'] ?? 'NULL'));
+        error_log("  - application_status: " . ($sampleRow['application_status'] ?? 'NULL'));
+        error_log("  - task_id: " . ($sampleRow['task_id'] ?? 'NULL'));
+        error_log("  - title: " . ($sampleRow['title'] ?? 'NULL'));
+        error_log("  - raw_status_code: " . ($sampleRow['raw_status_code'] ?? 'NULL'));
+        error_log("  - raw_status_display: " . ($sampleRow['raw_status_display'] ?? 'NULL'));
+        error_log("  - status_code: " . ($sampleRow['status_code'] ?? 'NULL'));
+        error_log("  - status_display: " . ($sampleRow['status_display'] ?? 'NULL'));
+        error_log("  - creator_id: " . ($sampleRow['creator_id'] ?? 'NULL'));
+        error_log("  - creator_name: " . ($sampleRow['creator_name'] ?? 'NULL'));
+        error_log("  - chat_room_id: " . ($sampleRow['chat_room_id'] ?? 'NULL'));
+    }
 
     Response::success([
       'applications' => $rows,
@@ -134,7 +152,7 @@ try {
 
 } catch (Throwable $e) {
     // 使用 Throwable 捕獲所有錯誤，包括 Fatal errors
-    error_log("list_by_user.php error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
+            error_log("my_work_applications.php error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
     
     // 返回結構化錯誤而不是 500
     Response::success([

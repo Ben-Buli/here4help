@@ -11,6 +11,7 @@ const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
 const mysql = require('mysql2/promise');
+const jwt = require('jsonwebtoken');
 
 const PORT = process.env.PORT || 3001;
 
@@ -55,6 +56,27 @@ async function initDatabase() {
   }
 }
 
+// 驗證 JWT Token
+function validateJWT(token) {
+  try {
+    // 從環境變數獲取 JWT_SECRET
+    require('dotenv').config({ path: '../../.env' });
+    const secret = process.env.JWT_SECRET;
+    
+    if (!secret) {
+      console.error('JWT_SECRET not configured');
+      return null;
+    }
+    
+    const payload = jwt.verify(token, secret);
+    if (!payload.user_id) return null;
+    return payload; // { user_id, email, name, ... }
+  } catch (e) {
+    console.error('JWT validation failed:', e.message);
+    return null;
+  }
+}
+
 function validateTokenBase64(token) {
   try {
     const decoded = Buffer.from(token, 'base64').toString('utf8');
@@ -65,6 +87,26 @@ function validateTokenBase64(token) {
   } catch (e) {
     return null;
   }
+}
+
+// 統一的 token 驗證函數
+function validateToken(token) {
+  // 首先嘗試 JWT 驗證
+  let payload = validateJWT(token);
+  if (payload) {
+    console.log('✅ JWT token validated successfully');
+    return payload;
+  }
+  
+  // 如果 JWT 失敗，嘗試 base64 驗證（向後兼容）
+  payload = validateTokenBase64(token);
+  if (payload) {
+    console.log('✅ Base64 token validated successfully (legacy)');
+    return payload;
+  }
+  
+  console.log('❌ Token validation failed for both JWT and Base64');
+  return null;
 }
 
 function getUserRoom(userId) {
@@ -167,7 +209,7 @@ initDatabase();
 io.use((socket, next) => {
   const { token } = socket.handshake.query || {};
   if (!token) return next(new Error('Unauthorized: token missing'));
-  const payload = validateTokenBase64(String(token));
+  const payload = validateToken(String(token));
   if (!payload) return next(new Error('Unauthorized: invalid token'));
   socket.user = { id: String(payload.user_id) };
   return next();

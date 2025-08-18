@@ -2,6 +2,112 @@
 
 Chat 模組需求落地執行規劃（重要）
 
+# 📁 檔案名稱修改記錄（2025-01-18）
+
+## 🔄 已完成的檔案重命名
+
+### 1. 核心 API 檔案重命名
+| 舊檔案名稱 | 新檔案名稱 | 功能說明 | 使用場景 |
+|------------|------------|----------|----------|
+| `list_by_user.php` | backend/api/tasks/applications/`my_work_applications.php` | 獲取當前用戶的應徵記錄 | My Works 分頁顯示用戶應徵的任務 |
+| `list_by_task.php` | backend/api/tasks/applications/`task_applicants.php` | 獲取特定任務的應徵者列表 | 任務詳情頁面顯示應徵者 |
+| `posted_tasks_aggregated.php` | backend/api/tasks/applications/ `posted_task_applications.php` | 獲取用戶發布的任務及應徵者聚合資料 | Posted Tasks 分頁顯示用戶發布的任務 |
+
+### 2. 前端配置更新
+- **檔案**：`lib/config/app_config.dart`
+- **更新內容**：
+  ```dart
+  // 舊配置
+  static String get applicationsListByUserUrl
+  static String get applicationsListByTaskUrl
+  
+  // 新配置
+  static String get myWorkApplicationsUrl
+  static String get taskApplicantsUrl
+  static String get postedTaskApplicationsUrl
+  ```
+
+### 3. 前端引用更新
+- **檔案**：`lib/task/services/task_service.dart`
+  - 更新 `loadMyApplications()` 方法中的 API 引用
+  - 更新 `loadApplicationsByTask()` 方法中的 API 引用
+- **檔案**：`lib/chat/pages/chat_detail_page.dart`
+  - 更新 `_getApplicationData()` 方法中的 API 引用
+
+### 4. 後端錯誤日誌更新
+- **檔案**：`backend/api/tasks/applications/my_work_applications.php`
+  - 更新錯誤日誌中的檔案名稱引用
+- **檔案**：`backend/api/tasks/applications/task_applicants.php`
+  - 更新錯誤日誌中的檔案名稱引用
+
+### 5. 環境配置結構說明
+- **檔案**：`.env`（項目根目錄）
+- **用途**：存儲敏感配置信息，不提交到版本控制
+- **配置結構**：
+  ```env
+  # JWT 認證配置（最重要）
+  JWT_SECRET=here4help_jwt_secret_key_2025_development
+  JWT_EXPIRY=604800
+  
+  # 資料庫配置（MAMP 開發環境）
+  DB_HOST=localhost
+  DB_PORT=8889
+  DB_NAME=hero4helpdemofhs_hero4help
+  DB_USERNAME=root
+  DB_PASSWORD=root
+  DB_CHARSET=utf8mb4
+  
+  # 生產環境資料庫配置
+  PROD_DB_HOST=localhost
+  PROD_DB_PORT=3306
+  PROD_DB_NAME=your_production_database
+  PROD_DB_USERNAME=your_production_username
+  PROD_DB_PASSWORD=your_production_password
+  
+  # Socket.IO 服務器配置
+  SOCKET_PORT=3001
+  SOCKET_HOST=localhost
+  
+  # 應用 URL 配置
+  DEV_BASE_URL=http://localhost:8888/here4help/backend/api
+  PROD_BASE_URL=https://your-domain.com/api
+  
+  # 文件上傳配置
+  UPLOAD_MAX_SIZE=10485760
+  UPLOAD_ALLOWED_TYPES=jpg,jpeg,png,gif,pdf,doc,docx
+  
+  # 環境標識
+  APP_ENV=development
+  APP_DEBUG=true
+  
+  # 郵件配置（可選）
+  MAIL_HOST=smtp.gmail.com
+  MAIL_PORT=587
+  MAIL_USERNAME=your_email@gmail.com
+  MAIL_PASSWORD=your_email_password
+  
+  # 第三方 API 配置（可選）
+  GOOGLE_CLIENT_ID=your_google_client_id
+  GOOGLE_CLIENT_SECRET=your_google_client_secret
+  ```
+
+### 3. 功能對應關係
+```
+/chat 頁面分頁結構：
+├── Posted Tasks（我發布的任務）
+│   └── 資料來源：posted_tasks_aggregated.php
+│       └── 顯示：任務卡片 + 應徵者卡片
+└── My Works（我應徵的任務）
+    └── 資料來源：my_work_applications.php
+        └── 顯示：任務卡片 + 發布者資訊
+```
+
+### 4. 保留的檔案說明
+- **`task_applicants.php`**：用於其他功能（如任務詳情頁面），不屬於聊天室模組
+- **`posted_tasks_aggregated.php`**：專門為聊天室模組設計，提供聚合資料
+
+---
+
 # 重要開發原則：
 1. 有新增或修改的檔案、功能或是資料邏輯處理，幫我備注說明
 2. 你測試完之後都需要等待我手動測試之後同意再往下一步
@@ -237,6 +343,13 @@ Chat 模組需求落地執行規劃（重要）
 - `/api/ratings/summary`
 - `/api/ratings`
 
+### 7.1 聊天室模組專用 API
+- **`/api/tasks/applications/my_work_applications.php`**：獲取當前用戶的應徵記錄（My Works 分頁）
+- **`/api/tasks/posted_tasks_aggregated.php`**：獲取用戶發布的任務及應徵者聚合資料（Posted Tasks 分頁）
+
+### 7.2 其他功能 API
+- **`/api/tasks/applications/task_applicants.php`**：獲取特定任務的應徵者列表（任務詳情頁面）
+
 ---
 
 ## 8) 前端 Flutter（App）
@@ -451,6 +564,18 @@ Chat 模組需求落地執行規劃（重要）
 
 # 🚀 下一步行動計劃
 
+## ✅ 已完成項目（2025-01-18）
+1. **檔案名稱重命名與功能整理**
+   - 後端 API 檔案重命名完成
+   - 前端配置更新完成
+   - 功能對應關係已記錄到規格文件
+
+2. **環境配置與認證修復**
+   - .env 文件已創建並配置
+   - JWT_SECRET 已設置
+   - 環境變數載入驗證完成
+   - JWT 認證功能已修復
+
 ## 立即執行（本週內）
 1. **修正聊天室標題顯示**（A1）
    - 修改 ChatTitleWidget 組件
@@ -548,7 +673,21 @@ Chat 模組需求落地執行規劃（重要）
 | 階段二 | 專案現況檢查 | ✅ 完成 | 2025-01-18 | - | 已完成 |
 | 階段三 | 執行評估報告 | ✅ 完成 | 2025-01-18 | - | 已完成 |
 | 階段四 | 測試與驗證 | ⏳ 進行中 | - | 🔍 問題診斷完成 | 發現 2 個關鍵問題 |
+| 階段四.1 | Posted 分頁資料流動分析 | ✅ 完成 | 2025-01-18 | - | 已完成邏輯分析 |
+| 階段四.2 | 數據結構驗證 | ⏳ 進行中 | - | 🔍 待驗證 | 需要確認 API 返回結構 |
+| 階段四.3 | My Works 分頁驗證 | ⏳ 待開始 | - | - | 使用相同調試方法 |
 | 階段五 | 進度追蹤與版本管控 | ⏳ 進行中 | - | - | 待開始 |
+
+### 📁 檔案重命名完成狀態
+| 項目 | 狀態 | 完成日期 | 備註 |
+|------|------|----------|------|
+| 後端 API 檔案重命名 | ✅ 完成 | 2025-01-18 | 已重命名為更清晰的命名 |
+| 前端配置更新 | ✅ 完成 | 2025-01-18 | AppConfig.dart 已更新 |
+| 前端引用更新 | ✅ 完成 | 2025-01-18 | TaskService 和 ChatDetailPage 已更新 |
+| 後端錯誤日誌更新 | ✅ 完成 | 2025-01-18 | 錯誤日誌中的檔案名稱已更新 |
+| 功能對應關係整理 | ✅ 完成 | 2025-01-18 | 規格文件已記錄 |
+| 檔案重新創建 | ✅ 完成 | 2025-01-18 | posted_task_applications.php 已重新創建 |
+| 環境配置設置 | ✅ 完成 | 2025-01-18 | .env 文件已創建並配置 JWT_SECRET |
 
 ---
 
@@ -577,6 +716,164 @@ Chat 模組需求落地執行規劃（重要）
 
 **問題診斷完成時間**：2025-01-18  
 **下次更新**：完成 A1.3、A1.4 修正後，補充解決狀態和具體做法
+
+---
+
+# 🔍 Posted 分頁資料流動邏輯分析報告
+
+## 📊 資料流動架構圖
+
+```
+Posted Tasks Widget 初始化
+        ↓
+_checkAndLoadIfNeeded() 檢查載入狀態
+        ↓
+_fetchAllTasks() 從 API 獲取任務數據
+        ↓
+TaskService.fetchPostedTasksAggregated() 調用後端 API
+        ↓
+更新 _allTasks 本地狀態
+        ↓
+_loadApplicantsData() 載入應徵者數據
+        ↓
+_applyFiltersAndSort() 應用篩選和排序
+        ↓
+更新 _filteredTasks 和 _sortedTasks
+        ↓
+UI 渲染：ListView.builder 顯示任務卡片
+```
+
+## 🔧 關鍵方法與職責
+
+### **1. `_checkAndLoadIfNeeded()` - 載入觸發器**
+- **職責**：檢查 Provider 狀態，決定是否需要載入數據
+- **觸發條件**：
+  - Provider 已初始化
+  - 當前為 Posted Tasks 分頁
+  - 分頁尚未載入或本地任務數據為空
+- **執行邏輯**：
+  ```dart
+  if (!chatProvider.isTabLoaded(0) && !chatProvider.isTabLoading(0)) {
+    chatProvider.checkAndTriggerTabLoad(0);  // 觸發 Provider 載入
+    _fetchAllTasks();                        // 直接載入任務數據
+  }
+  ```
+
+### **2. `_fetchAllTasks()` - 核心數據載入器**
+- **職責**：從 API 獲取任務數據並更新本地狀態
+- **API 調用**：`TaskService().fetchPostedTasksAggregated()`
+- **參數**：`creatorId`（當前用戶 ID）
+- **返回結構**：`{tasks: List<Map>, hasMore: bool}`
+- **狀態更新**：
+  ```dart
+  setState(() {
+    _allTasks.clear();
+    _allTasks.addAll(result.tasks);
+  });
+  ```
+
+### **3. `_loadApplicantsData()` - 應徵者數據載入器**
+- **職責**：載入每個任務對應的應徵者數據
+- **數據來源**：優先使用 `ChatListProvider.applicationsByTask`
+- **備用方案**：從任務數據中提取 `applicants` 欄位
+- **數據結構**：`Map<String, List<Map>>`（taskId → 應徵者列表）
+
+### **4. `_applyFiltersAndSort()` - 數據處理器**
+- **職責**：應用搜尋篩選和排序邏輯
+- **篩選邏輯**：`_filterTasks()` 處理搜尋、位置、狀態篩選
+- **排序邏輯**：`_sortTasks()` 處理相關性、時間、狀態排序
+- **狀態更新**：
+  ```dart
+  setState(() {
+    _filteredTasks = filteredTasks;
+    _sortedTasks = sortedTasks;
+  });
+  ```
+
+## 🚨 發現的關鍵問題
+
+### **問題 1：資料載入依賴關係複雜**
+- **現況**：`_fetchAllTasks()` 只在事件監聽器中被調用
+- **問題**：依賴 Provider 事件可能導致數據載入延遲或失敗
+- **解決方案**：在 `_checkAndLoadIfNeeded()` 中直接調用 `_fetchAllTasks()`
+
+### **問題 2：應徵者數據對接不完整**
+- **現況**：應徵者數據依賴 `ChatListProvider.applicationsByTask`
+- **問題**：如果 Provider 中沒有數據，備用方案可能不完整
+- **需要確認**：API 返回的 `applicants` 欄位結構是否完整
+
+### **問題 3：狀態同步不一致**
+- **現況**：本地狀態（`_allTasks`）與 Provider 狀態可能不同步
+- **問題**：可能導致 UI 顯示與實際數據不一致
+- **解決方案**：確保本地狀態更新後通知 Provider
+
+## 📋 下一步驗證計劃
+
+### **階段 1：Posted 分頁數據結構驗證**
+1. **確認 API 返回結構**：
+   - 檢查 `posted_tasks_aggregated.php` 返回的任務數據完整性
+   - 驗證 `applicants` 欄位包含所有必要資訊
+   - 確認 `creatorId` 篩選邏輯正確
+
+2. **驗證應徵者數據對接**：
+   - 檢查應徵者卡片的資料來源
+   - 確認頭像、評分、評論數等欄位正確顯示
+   - 驗證聊天室 ID 的正確性
+
+### **階段 2：My Works 分頁數據驗證**
+1. **使用相同的調試方法**：
+   - 在 `my_works_widget.dart` 中添加類似的調試日誌
+   - 追蹤 `_fetchMyWorksData()` 的執行流程
+   - 確認 `TaskService.loadMyApplications()` 的數據返回
+
+2. **檢查數據對接點**：
+   - 驗證 `task_applications` 表的查詢邏輯
+   - 確認用戶應徵記錄的完整性
+   - 檢查任務卡片與應徵者數據的關聯
+
+### **階段 3：數據一致性驗證**
+1. **前後端數據對比**：
+   - 比較 API 返回的原始數據與前端顯示的數據
+   - 確認篩選和排序邏輯的正確性
+   - 驗證未讀狀態計算的準確性
+
+2. **狀態同步檢查**：
+   - 確認 Provider 狀態與本地狀態的一致性
+   - 驗證 UI 更新與數據變化的同步性
+   - 檢查事件監聽器的觸發時機
+
+## 🔍 調試日誌關鍵點
+
+### **已添加的調試日誌**
+- `build()` 方法：顯示所有關鍵數據長度
+- `_fetchAllTasks()`：追蹤 API 調用和數據更新
+- `_applyFiltersAndSort()`：監控篩選和排序過程
+- `_filterTasks()` 和 `_sortTasks()`：詳細的處理邏輯
+
+### **需要監控的關鍵指標**
+- `_allTasks.length`：原始任務數量
+- `_filteredTasks.length`：篩選後任務數量
+- `_sortedTasks.length`：排序後任務數量
+- `_applicationsByTask.length`：應徵者數據數量
+
+## 📊 更新後的進度追蹤表
+
+| 階段 | 待辦事項 | 狀態 | 完成日期 | 測試狀態 | 備註 |
+|------|----------|------|----------|----------|------|
+| 階段一 | 文件閱讀與重點梳理 | ✅ 完成 | 2025-01-18 | - | 已完成 |
+| 階段二 | 專案現況檢查 | ✅ 完成 | 2025-01-18 | - | 已完成 |
+| 階段三 | 執行評估報告 | ✅ 完成 | 2025-01-18 | - | 已完成 |
+| 階段四 | 測試與驗證 | ⏳ 進行中 | - | 🔍 問題診斷完成 | 發現 2 個關鍵問題 |
+| 階段四.1 | Posted 分頁資料流動分析 | ✅ 完成 | 2025-01-18 | - | 已完成邏輯分析 |
+| 階段四.2 | 數據結構驗證 | ⏳ 進行中 | - | 🔍 待驗證 | 需要確認 API 返回結構 |
+| 階段四.3 | My Works 分頁驗證 | ⏳ 待開始 | - | - | 使用相同調試方法 |
+| 階段五 | 進度追蹤與版本管控 | ⏳ 進行中 | - | - | 待開始 |
+
+---
+
+**最後更新**：2025-01-18  
+**更新者**：AI Assistant  
+**下次檢視**：完成數據結構驗證後，進行 My Works 分頁驗證
 
 
 

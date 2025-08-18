@@ -153,7 +153,7 @@ class AuthService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success']) {
-        debugPrint('✅ getProfile 成功: ${data['data']}');
+        debugPrint('✅ getProfile 成功: ${data['data']['id']}');
         return data['data'];
       } else {
         debugPrint('❌ getProfile 失敗: ${data['message']}');

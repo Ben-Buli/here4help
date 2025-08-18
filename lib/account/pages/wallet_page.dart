@@ -76,7 +76,7 @@ class _WalletPageState extends State<WalletPage> {
                   TextField(
                     controller: accountController,
                     decoration: const InputDecoration(
-                      labelText: '您的銀行帳號末五碼',
+                      labelText: 'Your Payment Account Last 5 Digits',
                       border: OutlineInputBorder(),
                       hintText: '12345',
                     ),
@@ -87,9 +87,9 @@ class _WalletPageState extends State<WalletPage> {
                   TextField(
                     controller: amountController,
                     decoration: const InputDecoration(
-                      labelText: '匯款金額 (點數)',
+                      labelText: 'Topup Amount (Points)',
                       border: OutlineInputBorder(),
-                      hintText: '100',
+                      hintText: 'Enter Amount..',
                     ),
                     keyboardType: TextInputType.number,
                   ),
@@ -97,9 +97,9 @@ class _WalletPageState extends State<WalletPage> {
                   TextField(
                     controller: noteController,
                     decoration: const InputDecoration(
-                      labelText: '備註 (選填)',
+                      labelText: 'Note (Optional)',
                       border: OutlineInputBorder(),
-                      hintText: '匯款用途說明',
+                      hintText: 'Topup Purpose',
                     ),
                     maxLines: 2,
                   ),
@@ -108,7 +108,7 @@ class _WalletPageState extends State<WalletPage> {
               actions: [
                 TextButton(
                   onPressed: isSubmitting ? null : () => Navigator.pop(context),
-                  child: const Text('取消'),
+                  child: const Text('Cancel'),
                 ),
                 ElevatedButton(
                   onPressed: isSubmitting
@@ -117,7 +117,9 @@ class _WalletPageState extends State<WalletPage> {
                           if (accountController.text.trim().length != 5 ||
                               amountController.text.trim().isEmpty) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('請填寫正確的帳號末五碼和金額')),
+                              const SnackBar(
+                                  content: Text(
+                                      'Please fill in the correct account last 5 digits and amount')),
                             );
                             return;
                           }
@@ -135,7 +137,8 @@ class _WalletPageState extends State<WalletPage> {
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('點數儲值申請已提交，等待管理員審核'),
+                                  content: Text(
+                                      'Topup request submitted, waiting for admin approval'),
                                   backgroundColor: Colors.green,
                                 ),
                               );
@@ -143,7 +146,8 @@ class _WalletPageState extends State<WalletPage> {
                           } catch (e) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('提交失敗: $e')),
+                                SnackBar(
+                                    content: Text('Submission failed: $e')),
                               );
                             }
                           } finally {
@@ -156,7 +160,7 @@ class _WalletPageState extends State<WalletPage> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('提交申請'),
+                      : const Text('Submit Request'),
                 ),
               ],
             );
@@ -191,7 +195,7 @@ class _WalletPageState extends State<WalletPage> {
     final responseData = json.decode(response.body);
 
     if (response.statusCode != 200 || responseData['success'] != true) {
-      throw Exception(responseData['message'] ?? '未知錯誤');
+      throw Exception(responseData['message'] ?? 'Unknown error');
     }
   }
 
@@ -202,17 +206,17 @@ class _WalletPageState extends State<WalletPage> {
       children: [
         Text(
           'Hello, $userName',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF2563EB),
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFF2563EB),
+            color: Theme.of(context).colorScheme.primary,
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
@@ -224,19 +228,21 @@ class _WalletPageState extends State<WalletPage> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.account_balance_wallet,
-                  color: Colors.white, size: 36),
+              Icon(Icons.account_balance_wallet,
+                  color: Theme.of(context).colorScheme.onPrimary, size: 36),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Wallet',
-                        style: TextStyle(color: Colors.white, fontSize: 16)),
+                    Text('Wallet',
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            fontSize: 16)),
                     Text(
                       '$points',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary,
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                       ),
@@ -244,9 +250,11 @@ class _WalletPageState extends State<WalletPage> {
                   ],
                 ),
               ),
-              const Text(
+              Text(
                 'Points',
-                style: TextStyle(color: Colors.white, fontSize: 18),
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    fontSize: 18),
               ),
             ],
           ),
@@ -261,14 +269,15 @@ class _WalletPageState extends State<WalletPage> {
           child: Column(
             children: [
               ListTile(
-                leading: const Icon(Icons.add_circle_outline,
-                    color: AppColors.primary),
+                leading: Icon(Icons.add_circle_outline,
+                    color: Theme.of(context).colorScheme.primary),
                 title: const Text('Add Points'),
                 onTap: _showAddPointsDialog,
               ),
               const Divider(height: 1),
               ListTile(
-                leading: const Icon(Icons.percent, color: AppColors.primary),
+                leading: Icon(Icons.percent,
+                    color: Theme.of(context).colorScheme.primary),
                 title: const Text('Coupons'),
                 onTap: () {
                   // TODO: 跳轉到優惠券頁面
@@ -276,8 +285,8 @@ class _WalletPageState extends State<WalletPage> {
               ),
               const Divider(height: 1),
               ListTile(
-                leading:
-                    const Icon(Icons.info_outline, color: AppColors.primary),
+                leading: Icon(Icons.info_outline,
+                    color: Theme.of(context).colorScheme.primary),
                 title: const Text('Points Policies'),
                 onTap: () {
                   // TODO: 跳轉到積分政策頁面

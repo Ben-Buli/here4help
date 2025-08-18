@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_config.dart';
+import '../../auth/services/auth_service.dart';
 
 class TaskService extends ChangeNotifier {
   static final TaskService _instance = TaskService._internal();
@@ -124,7 +125,7 @@ class TaskService extends ChangeNotifier {
       }
 
       final uri = Uri.parse(
-              '${AppConfig.apiBaseUrl}/backend/api/tasks/posted_tasks_aggregated.php')
+              '${AppConfig.apiBaseUrl}/backend/api/tasks/applications/posted_task_applications.php')
           .replace(queryParameters: query);
 
       debugPrint('🔍 [Posted Tasks Aggregated] API URL: $uri');
@@ -139,9 +140,12 @@ class TaskService extends ChangeNotifier {
 
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
-        debugPrint('🔐 [Posted Tasks Aggregated] 使用認證 token');
+        debugPrint(
+            '🔐 [Posted Tasks Aggregated] 使用認證 token: ${token.substring(0, 20)}...');
+        debugPrint('🔐 [Posted Tasks Aggregated] 完整 headers: $headers');
       } else {
         debugPrint('⚠️ [Posted Tasks Aggregated] 沒有認證 token');
+        debugPrint('⚠️ [Posted Tasks Aggregated] token 值: $token');
       }
 
       final resp = await http
@@ -166,14 +170,14 @@ class TaskService extends ChangeNotifier {
           // 調試：顯示前幾個任務的詳細數據
           for (int i = 0; i < items.length && i < 3; i++) {
             final task = items[i];
-            debugPrint('📋 任務 [$i] 詳細數據:');
+            // debugPrint('📋 任務 [$i] 詳細數據:');
             debugPrint('  - ID: ${task['id']}');
-            debugPrint('  - Title: "${task['title']}"');
-            debugPrint('  - Description: "${task['description']}"');
-            debugPrint('  - Location: "${task['location']}"');
-            debugPrint('  - Status: "${task['status']}"');
-            debugPrint('  - Status Display: "${task['status_display']}"');
-            debugPrint('  - 所有鍵: ${task.keys.toList()}');
+            // debugPrint('  - Title: "${task['title']}"');
+            // debugPrint('  - Description: "${task['description']}"');
+            // debugPrint('  - Location: "${task['location']}"');
+            // debugPrint('  - Status: "${task['status']}"');
+            // debugPrint('  - Status Display: "${task['status_display']}"');
+            // debugPrint('  - 所有鍵: ${task.keys.toList()}');
           }
 
           return (tasks: items, hasMore: hasMore);
@@ -375,30 +379,72 @@ class TaskService extends ChangeNotifier {
     }
   }
 
-  /// 載入我投遞的任務（同時提供 client_status_* 欄位）
-  Future<void> loadMyApplications(int userId) async {
+  /// 載入用戶的應徵記錄
+  Future<void> loadMyApplications(int? userId) async {
+    if (userId == null) return;
+
     try {
+      // 獲取認證 token
+      final token = await AuthService.getToken();
+      if (token == null) {
+        debugPrint('❌ TaskService loadMyApplications: 沒有認證 token');
+        return;
+      }
+
+      debugPrint('🔍 TaskService loadMyApplications: 開始載入用戶 $userId 的應徵記錄');
+      debugPrint(
+          '🔍 API URL: ${AppConfig.myWorkApplicationsUrl}?user_id=$userId');
+
       final response = await http.get(
-        Uri.parse('${AppConfig.applicationsListByUserUrl}?user_id=$userId'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('${AppConfig.myWorkApplicationsUrl}?user_id=$userId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
       ).timeout(const Duration(seconds: 30));
+      debugPrint(
+          '🔍 TaskService loadMyApplications: HTTP 狀態碼: ${response.statusCode}');
+      debugPrint('🔍 TaskService loadMyApplications: 回應內容: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        debugPrint('🔍 TaskService loadMyApplications: 解析後的資料: $data');
+
         if (data['success'] == true) {
           final payload = data['data'];
           List<Map<String, dynamic>> apps = [];
+
           if (payload is List) {
             apps = List<Map<String, dynamic>>.from(payload);
+            debugPrint(
+                '🔍 TaskService loadMyApplications: 從 data 陣列獲取 ${apps.length} 個應徵記錄');
           } else if (payload is Map && payload['applications'] is List) {
             apps = List<Map<String, dynamic>>.from(payload['applications']);
+            debugPrint(
+                '🔍 TaskService loadMyApplications: 從 data.applications 陣列獲取 ${apps.length} 個應徵記錄');
           } else if (data['applications'] is List) {
             apps = List<Map<String, dynamic>>.from(data['applications']);
+            debugPrint(
+                '🔍 TaskService loadMyApplications: 從 applications 陣列獲取 ${apps.length} 個應徵記錄');
+          } else {
+            debugPrint(
+                '⚠️ TaskService loadMyApplications: 無法識別的資料結構: $payload');
           }
+
           _myApplications
             ..clear()
             ..addAll(apps);
+
+          debugPrint(
+              '✅ TaskService loadMyApplications: 成功載入 ${_myApplications.length} 個應徵記錄');
           notifyListeners();
+        } else {
+          debugPrint(
+              '❌ TaskService loadMyApplications: API 返回失敗: ${data['message']}');
         }
+      } else {
+        debugPrint(
+            '❌ TaskService loadMyApplications: HTTP 錯誤 ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       debugPrint('TaskService loadMyApplications error: $e');
@@ -759,7 +805,7 @@ class TaskService extends ChangeNotifier {
       String taskId) async {
     try {
       final response = await http.get(
-        Uri.parse('${AppConfig.applicationsListByTaskUrl}?task_id=$taskId'),
+        Uri.parse('${AppConfig.taskApplicantsUrl}?task_id=$taskId'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 30));
       if (response.statusCode == 200) {

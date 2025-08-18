@@ -69,7 +69,7 @@ try {
             
             if ($result) {
                 if ($check['name'] === 'tasks.participant_id 已移除') {
-                    echo "<p>❌ 問題：acceptor_id 欄位仍然存在</p>\n";
+                    echo "<p>❌ 問題：participant_id 欄位仍然存在</p>\n";
                     $results[] = ['name' => $check['name'], 'status' => 'FAIL', 'critical' => $check['critical']];
                 } else {
                     echo "<p>✅ 通過：{$check['expected']}</p>\n";
@@ -77,7 +77,7 @@ try {
                 }
             } else {
                 if ($check['name'] === 'tasks.participant_id 已移除') {
-                    echo "<p>✅ 通過：acceptor_id 欄位已移除</p>\n";
+                    echo "<p>✅ 通過：participant_id 欄位已移除</p>\n";
                     $results[] = ['name' => $check['name'], 'status' => 'PASS', 'critical' => $check['critical']];
                 } else {
                     echo "<p>❌ 失敗：{$check['expected']}</p>\n";

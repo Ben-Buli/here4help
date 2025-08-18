@@ -5,9 +5,13 @@
  * 專為 Posted Tasks 分頁設計的聚合數據API
  */
 
-require_once '../../config/database.php';
-require_once '../../utils/TokenValidator.php';
-require_once '../../utils/Response.php';
+require_once '../../../config/env_loader.php';
+require_once '../../../config/database.php';
+require_once '../../../utils/Response.php';
+require_once '../../../utils/JWTManager.php';
+
+// 確保環境變數已載入
+EnvLoader::load();
 
 // 設定 CORS 標頭
 Response::setCorsHeaders();
@@ -18,6 +22,52 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 try {
+    // 驗證 JWT token
+    $headers = getallheaders();
+    error_log("🔍 [posted_task_applications.php] 收到的所有 headers: " . json_encode($headers));
+    
+    // 嘗試多種方式獲取 Authorization header
+    $authHeader = $headers['Authorization'] ?? 
+                  $headers['authorization'] ?? 
+                  $_SERVER['HTTP_AUTHORIZATION'] ?? 
+                  $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? 
+                  '';
+    
+    // 如果還是沒有，嘗試從 HTTP 頭中直接讀取
+    if (empty($authHeader)) {
+        // 從 HTTP 頭中直接讀取 Authorization
+        $httpHeaders = apache_request_headers();
+        if (function_exists('apache_request_headers')) {
+            $authHeader = $httpHeaders['Authorization'] ?? $httpHeaders['authorization'] ?? '';
+        }
+        
+        // 如果還是沒有，嘗試從 $_SERVER 中查找
+        if (empty($authHeader)) {
+            foreach ($_SERVER as $key => $value) {
+                if (strpos($key, 'HTTP_') === 0) {
+                    error_log("🔍 [posted_task_applications.php] $_SERVER[$key] = $value");
+                }
+            }
+        }
+    }
+    
+    error_log("🔍 [posted_task_applications.php] Authorization header: '$authHeader'");
+    
+    if (empty($authHeader) || !str_starts_with($authHeader, 'Bearer ')) {
+        error_log("❌ [posted_task_applications.php] Authorization header 無效或缺失");
+        Response::error('Authorization header required', 401);
+    }
+    
+    $token = substr($authHeader, 7);
+    $decoded = JWTManager::validateToken($token);
+    
+    if (!$decoded || !isset($decoded['user_id'])) {
+        Response::error('Invalid token', 401);
+    }
+    
+    $currentUserId = (int)$decoded['user_id'];
+    error_log("🔍 [posted_task_applications.php] 當前用戶 ID: $currentUserId");
+
     $db = Database::getInstance();
     
     // 獲取查詢參數
@@ -28,8 +78,9 @@ try {
     $limit = (int)($_GET['limit'] ?? 20);
     $offset = (int)($_GET['offset'] ?? 0);
     
-    if (!$creator_id) {
-        Response::validationError(['creator_id' => 'creator_id is required']);
+    // Posted Tasks 需要指定 creator_id
+    if (!$creator_id || $creator_id === '') {
+        Response::validationError(['creator_id' => 'creator_id is required for Posted Tasks']);
     }
     
     // 建立查詢條件
@@ -56,7 +107,7 @@ try {
         $params[] = $language;
     }
     
-    $whereClause = 'WHERE ' . implode(' AND ', $whereConditions);
+    $whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
     
     // 簡化查詢：先確保基本任務數據能取得
     $sql = "SELECT 
@@ -89,7 +140,10 @@ try {
     error_log("🔍 [Posted Tasks Aggregated] 查詢結果數量: " . count($tasks));
     
     // 檢查是否有遺漏的任務
-    $totalTasksCount = $db->fetch("SELECT COUNT(*) as count FROM tasks WHERE creator_id = ?", [(int)$creator_id])['count'];
+    $totalCountSql = "SELECT COUNT(*) as count FROM tasks WHERE creator_id = ?";
+    $totalCountParams = [(int)$creator_id];
+    
+    $totalTasksCount = $db->fetch($totalCountSql, $totalCountParams)['count'];
     error_log("🔍 [Posted Tasks Aggregated] 資料庫總任務數: $totalTasksCount, API 返回: " . count($tasks));
     
     if ($totalTasksCount > count($tasks)) {
@@ -100,7 +154,7 @@ try {
     foreach ($tasks as &$task) {
         $taskId = $task['id'];
         
-        // 簡化應徵者查詢：移除評分統計以確保基本功能
+        // 完整的應徵者查詢：包含真實評分統計
         $applicantsSql = "
             SELECT 
                 ta.id AS application_id,
@@ -115,9 +169,32 @@ try {
                 u.avatar_url AS applier_avatar,
                 u.email AS applier_email,
                 
-                -- 暫時使用預設評分值
-                4.0 AS avg_rating,
-                0 AS review_count,
+                -- 根據實際 task_ratings 表結構計算評分
+                COALESCE(
+                    (SELECT ROUND(AVG(tr.rating), 1)
+                     FROM task_ratings tr 
+                     WHERE tr.tasker_id = ta.user_id
+                     AND tr.task_id IN (
+                         SELECT ta2.task_id 
+                         FROM task_applications ta2 
+                         WHERE ta2.user_id = ta.user_id 
+                         AND ta2.status = 'accepted'
+                     )),
+                    4.0
+                ) AS avg_rating,
+                
+                COALESCE(
+                    (SELECT COUNT(*)
+                     FROM task_ratings tr 
+                     WHERE tr.tasker_id = ta.user_id
+                     AND tr.task_id IN (
+                         SELECT ta2.task_id 
+                         FROM task_applications ta2 
+                         WHERE ta2.user_id = ta.user_id 
+                         AND ta2.status = 'accepted'
+                     )),
+                    0
+                ) AS review_count,
                 
                 -- 獲取聊天室ID
                 cr.id AS chat_room_id,
@@ -144,7 +221,9 @@ try {
             ORDER BY ta.created_at DESC
         ";
         
-        $applicants = $db->fetchAll($applicantsSql, [$creator_id, $taskId]);
+        // 使用任務的實際 creator_id 或傳入的 creator_id
+        $chatRoomCreatorId = $creator_id && $creator_id !== '' ? $creator_id : $task['creator_id'];
+        $applicants = $db->fetchAll($applicantsSql, [$chatRoomCreatorId, $taskId]);
         
         // 處理訊息片段截斷
         foreach ($applicants as &$applicant) {

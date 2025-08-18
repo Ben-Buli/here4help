@@ -45,7 +45,7 @@ class TaskStatus {
   }) {
     // 預設狀態
     String defaultStatus = 'Unknown';
-    
+
     try {
       switch (taskStatusId) {
         case 1: // pending
@@ -69,7 +69,7 @@ class TaskStatus {
             }
           }
           break;
-          
+
         case 2: // in_progress
           if (userRole == 'creator') {
             defaultStatus = 'In Progress';
@@ -87,7 +87,7 @@ class TaskStatus {
             }
           }
           break;
-          
+
         case 3: // pending_confirmation
           if (userRole == 'creator') {
             defaultStatus = 'Pending Confirmation';
@@ -105,7 +105,7 @@ class TaskStatus {
             }
           }
           break;
-          
+
         case 4: // completed
           if (userRole == 'creator') {
             defaultStatus = 'Completed';
@@ -123,11 +123,11 @@ class TaskStatus {
             }
           }
           break;
-          
+
         case 5: // cancelled
           defaultStatus = 'Cancelled';
           break;
-          
+
         default:
           defaultStatus = 'Unknown';
       }
@@ -135,7 +135,7 @@ class TaskStatus {
       debugPrint('❌ 狀態映射錯誤: $e');
       defaultStatus = 'Unknown';
     }
-    
+
     return defaultStatus;
   }
 
@@ -197,7 +197,7 @@ class TaskStatus {
       applicationStatus: applicationStatus,
       userRole: userRole,
     );
-    
+
     return getProgressData(mappedStatus);
   }
 
@@ -221,7 +221,7 @@ class TaskStatus {
       'Rejected': 9,
       'Cancelled': 10,
     };
-    
+
     return priorityMap[status] ?? 999;
   }
 }

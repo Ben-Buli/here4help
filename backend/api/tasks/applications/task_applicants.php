@@ -103,7 +103,7 @@ try {
     
 } catch (Exception $e) {
     // 記錄錯誤到日誌
-    error_log("list_by_task.php error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
+            error_log("task_applicants.php error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
     
     Response::error('Server error: ' . $e->getMessage(), 500);
 }

@@ -203,49 +203,88 @@ class SocketNotificationService implements NotificationService {
     // Socket.IO 連接已更新到 3.1.2 版本，重新啟用
     print('🔧 [NotificationService] Socket.IO 連接重新啟用，版本 3.1.2');
 
-    final token = await _getToken();
-    _socket = io.io(
-        AppConfig.socketUrl,
-        io.OptionBuilder()
-            .setTransports(['websocket'])
-            .setQuery({'token': token})
-            .enableAutoConnect()
-            .build());
+    try {
+      final token = await _getToken();
+      _socket = io.io(
+          AppConfig.socketUrl,
+          io.OptionBuilder()
+              .setTransports(['websocket'])
+              .setQuery({'token': token})
+              .enableAutoConnect()
+              .setTimeout(10000) // 10秒超時
+              .build());
 
-    _socket?.on('connect', (_) {
-      // request snapshot via REST
-      refreshSnapshot();
-      _statusController.add(ConnectionStatus.connected);
-    });
-    _socket?.on('unread_total', (dynamic data) {
-      final total = (data is Map<String, dynamic> && data['total'] is num)
-          ? (data['total'] as num).toInt()
-          : 0;
-      _totalUnread = total;
-      _emitAll();
-    });
-    _socket?.on('unread_by_room', (dynamic data) {
-      if (data is Map<String, dynamic> &&
-          data['by_room'] is Map<String, dynamic>) {
-        final raw =
-            Map<String, dynamic>.from(data['by_room'] as Map<String, dynamic>);
-        _unreadByRoom =
-            raw.map((String k, dynamic v) => MapEntry(k, (v as num).toInt()));
+      // 設置連接超時處理
+      Timer(const Duration(seconds: 10), () {
+        if (_socket?.connected != true) {
+          print('⚠️ [NotificationService] Socket.IO 連接超時，標記為錯誤狀態');
+          _safeAdd2<ConnectionStatus>(
+              _statusController, ConnectionStatus.error);
+        }
+      });
+
+      _socket?.on('connect', (_) {
+        print('✅ [NotificationService] Socket.IO 連接成功');
+        // request snapshot via REST
+        refreshSnapshot();
+        _safeAdd2<ConnectionStatus>(
+            _statusController, ConnectionStatus.connected);
+      });
+
+      _socket?.on('unread_total', (dynamic data) {
+        final total = (data is Map<String, dynamic> && data['total'] is num)
+            ? (data['total'] as num).toInt()
+            : 0;
+        _totalUnread = total;
         _emitAll();
-      }
-    });
-    _socket?.on('disconnect', (_) {
-      _statusController.add(ConnectionStatus.disconnected);
-    });
-    _socket?.on('connect_error', (_) {
-      _statusController.add(ConnectionStatus.error);
-    });
-    _socket?.on('reconnect_attempt', (_) {
-      _statusController.add(ConnectionStatus.reconnecting);
-    });
-    _socket?.on('reconnect', (_) {
-      _statusController.add(ConnectionStatus.connected);
-    });
+      });
+
+      _socket?.on('unread_by_room', (dynamic data) {
+        if (data is Map<String, dynamic> &&
+            data['by_room'] is Map<String, dynamic>) {
+          final raw = Map<String, dynamic>.from(
+              data['by_room'] as Map<String, dynamic>);
+          _unreadByRoom =
+              raw.map((String k, dynamic v) => MapEntry(k, (v as num).toInt()));
+          _emitAll();
+        }
+      });
+
+      _socket?.on('disconnect', (_) {
+        print('🔌 [NotificationService] Socket.IO 連接斷開');
+        _safeAdd2<ConnectionStatus>(
+            _statusController, ConnectionStatus.disconnected);
+      });
+
+      _socket?.on('connect_error', (error) {
+        print('❌ [NotificationService] Socket.IO 連接錯誤: $error');
+        _safeAdd2<ConnectionStatus>(_statusController, ConnectionStatus.error);
+      });
+
+      _socket?.on('reconnect_attempt', (attempt) {
+        print('🔄 [NotificationService] Socket.IO 重連嘗試: $attempt');
+        _safeAdd2<ConnectionStatus>(
+            _statusController, ConnectionStatus.reconnecting);
+      });
+
+      _socket?.on('reconnect', (_) {
+        print('✅ [NotificationService] Socket.IO 重連成功');
+        _safeAdd2<ConnectionStatus>(
+            _statusController, ConnectionStatus.connected);
+      });
+
+      // 初始化完成後立即發送初始狀態
+      _emitAll();
+      _safeAdd2<ConnectionStatus>(
+          _statusController, ConnectionStatus.disconnected);
+
+      print('✅ [NotificationService] Socket.IO 服務初始化完成');
+    } catch (e) {
+      print('❌ [NotificationService] Socket.IO 初始化失敗: $e');
+      _safeAdd2<ConnectionStatus>(_statusController, ConnectionStatus.error);
+      // 即使失敗也要發送初始狀態
+      _emitAll();
+    }
   }
 
   @override
@@ -406,7 +445,7 @@ class NotificationCenter {
 
   /// 等待未讀數據載入完成
   Future<void> waitForUnreadData(
-      {Duration timeout = const Duration(seconds: 10)}) async {
+      {Duration timeout = const Duration(seconds: 5)}) async {
     if (_isInitialized && _service is! NotificationServicePlaceholder) {
       print('✅ NotificationCenter 已初始化，直接返回');
       return;
@@ -417,7 +456,12 @@ class NotificationCenter {
 
     while (!_isInitialized || _service is NotificationServicePlaceholder) {
       if (DateTime.now().difference(startTime) > timeout) {
-        print('⚠️ NotificationCenter 初始化超時，使用佔位服務');
+        print('⚠️ NotificationCenter 初始化超時 (${timeout.inSeconds}秒)，使用佔位服務');
+        // 強制使用佔位服務
+        if (_service is NotificationServicePlaceholder) {
+          _isInitialized = true;
+          print('✅ 強制標記為已初始化，使用佔位服務');
+        }
         break;
       }
       await Future.delayed(const Duration(milliseconds: 100));

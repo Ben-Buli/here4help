@@ -22,11 +22,14 @@ class EnvironmentConfig {
   /// 圖片基礎 URL
   static String get imageBaseUrl {
     if (isDevelopment) {
-      return 'http://localhost:8888/here4help';
+      return const String.fromEnvironment('IMAGE_BASE_URL_DEV',
+          defaultValue: 'http://localhost:8888/here4help');
     } else if (isProduction) {
-      return 'https://hero4help.demofhs.com';
+      return const String.fromEnvironment('IMAGE_BASE_URL_PROD',
+          defaultValue: 'https://hero4help.demofhs.com');
     } else {
-      return 'http://localhost:8888/here4help'; // 測試環境預設
+      return const String.fromEnvironment('IMAGE_BASE_URL_DEV',
+          defaultValue: 'http://localhost:8888/here4help');
     }
   }
 

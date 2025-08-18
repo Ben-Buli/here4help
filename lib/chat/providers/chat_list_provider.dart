@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:here4help/auth/services/user_service.dart' show UserService;
 import 'package:here4help/chat/services/chat_cache_manager.dart';
 import 'package:here4help/task/services/task_service.dart';
 
@@ -458,29 +459,33 @@ class ChatListProvider extends ChangeNotifier {
   }
 
   /// 檢查並觸發分頁的首次載入
-  void checkAndTriggerTabLoad(int tabIndex) {
+  void checkAndTriggerTabLoad([int? tabIndex]) {
+    // 如果沒有指定 tabIndex，預設為當前分頁或 0
+    final targetTabIndex = tabIndex ?? _currentTabIndex;
+
     // 確保 Provider 已初始化
     if (!_isInitialized) {
-      debugPrint('⚠️ [ChatListProvider] Provider 尚未初始化，跳過分頁 $tabIndex 載入');
+      debugPrint(
+          '⚠️ [ChatListProvider] Provider 尚未初始化，跳過分頁 $targetTabIndex 載入');
       return;
     }
 
     // 確保分頁索引有效
-    if (tabIndex < 0 || tabIndex >= 2) {
-      debugPrint('❌ [ChatListProvider] 無效的分頁索引: $tabIndex');
+    if (targetTabIndex < 0 || targetTabIndex >= 2) {
+      debugPrint('❌ [ChatListProvider] 無效的分頁索引: $targetTabIndex');
       return;
     }
 
-    if (!isTabLoaded(tabIndex) && !isTabLoading(tabIndex)) {
-      debugPrint('🚀 [ChatListProvider] 分頁 $tabIndex 首次載入，觸發數據載入');
-      _loadTabData(tabIndex);
+    if (!isTabLoaded(targetTabIndex) && !isTabLoading(targetTabIndex)) {
+      debugPrint('🚀 [ChatListProvider] 分頁 $targetTabIndex 首次載入，觸發數據載入');
+      _loadTabData(targetTabIndex);
     } else {
-      debugPrint('✅ [ChatListProvider] 分頁 $tabIndex 已載入或正在載入中');
+      debugPrint('✅ [ChatListProvider] 分頁 $targetTabIndex 已載入或正在載入中');
     }
   }
 
   /// 檢查並觸發分頁的首次載入（內部使用）
-  void _checkAndTriggerTabLoad(int tabIndex) {
+  void _checkAndTriggerTabLoad([int? tabIndex]) {
     checkAndTriggerTabLoad(tabIndex);
   }
 
@@ -1063,12 +1068,37 @@ class ChatListProvider extends ChangeNotifier {
   Future<void> _loadMyWorksData() async {
     try {
       final taskService = TaskService();
-      final currentUserId = 2; // TODO: 從用戶服務獲取當前用戶ID
+
+      // 創建 UserService 實例並等待初始化
+      final userService = UserService();
+
+      // 等待用戶服務初始化完成
+      int retryCount = 0;
+      const maxRetries = 3;
+
+      while (userService.currentUser?.id == null && retryCount < maxRetries) {
+        debugPrint('🔄 等待用戶服務初始化，嘗試 $retryCount/$maxRetries');
+        await Future.delayed(const Duration(milliseconds: 500));
+        retryCount++;
+      }
+
+      final currentUserId = userService.currentUser?.id;
 
       debugPrint('🔍 開始載入 My Works 資料，用戶 ID: $currentUserId');
 
+      // 檢查用戶 ID 是否有效
+      if (currentUserId == null) {
+        debugPrint('❌ 用戶服務初始化失敗，用戶 ID 仍為 null');
+        throw Exception('用戶未登入或 ID 無效，請檢查登入狀態');
+      }
+
       // 調用 API 載入用戶的應徵記錄
+      debugPrint(
+          '🔍 [ChatListProvider] 開始調用 TaskService.loadMyApplications($currentUserId)');
       await taskService.loadMyApplications(currentUserId);
+      debugPrint('🔍 [ChatListProvider] TaskService.loadMyApplications 完成');
+      debugPrint(
+          '🔍 [ChatListProvider] TaskService.myApplications 長度: ${taskService.myApplications.length}');
 
       // 將數據載入到本地快取
       _myWorksApplications.clear();
@@ -1083,7 +1113,7 @@ class ChatListProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('❌ 載入 My Works 資料失敗: $e');
-      throw e; // 重新拋出異常，讓上層處理
+      rethrow; // 重新拋出異常，讓上層處理
     }
   }
 

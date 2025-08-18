@@ -33,12 +33,13 @@ class AccountPage extends StatelessWidget {
               return ListTile(
                 leading: Icon(
                   item['icon'],
-                  color: isLogout ? Colors.red : null,
+                  color: isLogout ? Theme.of(context).colorScheme.error : null,
                 ),
                 title: Text(
                   item['title'],
                   style: TextStyle(
-                    color: isLogout ? Colors.red : null,
+                    color:
+                        isLogout ? Theme.of(context).colorScheme.error : null,
                     fontWeight: isLogout ? FontWeight.bold : null,
                   ),
                 ),
@@ -58,8 +59,10 @@ class AccountPage extends StatelessWidget {
                           ),
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
+                              backgroundColor:
+                                  Theme.of(context).colorScheme.error,
+                              foregroundColor:
+                                  Theme.of(context).colorScheme.onError,
                             ),
                             onPressed: () => Navigator.pop(context, true),
                             child: const Text('Log Out'),

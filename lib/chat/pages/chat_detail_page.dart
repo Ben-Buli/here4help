@@ -18,7 +18,6 @@ import 'package:here4help/utils/path_mapper.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'dart:ui';
-// import 'package:go_router/go_router.dart';
 import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/chat/services/chat_storage_service.dart';
 
@@ -899,7 +898,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       String taskId, int applicantId) async {
     try {
       final response = await http.get(
-        Uri.parse('${AppConfig.applicationsListByTaskUrl}?task_id=$taskId'),
+        Uri.parse('${AppConfig.taskApplicantsUrl}?task_id=$taskId'),
         headers: {'Content-Type': 'application/json'},
       );
 

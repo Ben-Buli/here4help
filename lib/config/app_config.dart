@@ -60,12 +60,16 @@ class AppConfig {
   }
 
   // Applications
-  static String get applicationsListByUserUrl {
-    return '$apiBaseUrl/backend/api/tasks/applications/list_by_user.php';
+  static String get myWorkApplicationsUrl {
+    return '$apiBaseUrl/backend/api/tasks/applications/my_work_applications.php';
   }
 
-  static String get applicationsListByTaskUrl {
-    return '$apiBaseUrl/backend/api/tasks/applications/list_by_task.php';
+  static String get taskApplicantsUrl {
+    return '$apiBaseUrl/backend/api/tasks/applications/task_applicants.php';
+  }
+
+  static String get postedTaskApplicationsUrl {
+    return '$apiBaseUrl/backend/api/tasks/applications/posted_task_applications.php';
   }
 
   static String get applicationApplyUrl {

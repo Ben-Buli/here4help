@@ -5,9 +5,13 @@
  * 回傳：room 基本資訊、task 基本資訊、user_role、chat_partner_info
  */
 
+require_once '../../config/env_loader.php';
 require_once '../../config/database.php';
 require_once '../../utils/TokenValidator.php';
 require_once '../../utils/Response.php';
+
+// 確保環境變數已載入
+EnvLoader::load();
 
 // CORS
 Response::setCorsHeaders();
@@ -20,11 +24,26 @@ try {
   $db = Database::getInstance();
 
   // 解析授權
-  $auth = TokenValidator::validateAuthHeader();
-  if (!$auth['valid'] || !isset($auth['data']['user_id'])) {
-    Response::error('Unauthorized', 401);
+  $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? 
+                $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? 
+                '';
+  
+  if (empty($authHeader)) {
+    // 嘗試從其他來源獲取
+    $headers = getallheaders();
+    $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
   }
-  $user_id = (int)$auth['data']['user_id'];
+  
+  if (empty($authHeader)) {
+    Response::error('Authorization header required', 401);
+  }
+  
+  $user_id = TokenValidator::validateAuthHeader($authHeader);
+  if ($user_id === false) {
+    Response::error('Invalid token', 401);
+  }
+  
+  $user_id = (int)$user_id;
 
   // 檢查參數
   $room_id = isset($_GET['room_id']) ? trim((string)$_GET['room_id']) : '';
