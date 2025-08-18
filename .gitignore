@@ -236,3 +236,20 @@ Thumbs.db
 
 # Project cleanup files
 tests/archived/
+
+# 包含敏感資訊的檔案（OAuth 憑證、配置等）
+docs/優先執行/第三方登入整合執行步驟.md
+docs/優先執行/Facebook_登入配置指南.md
+docs/優先執行/Facebook_Android_SDK_配置檢查清單.md
+docs/優先執行/Facebook_密鑰雜湊配置指南.md
+docs/優先執行/ngrok_Facebook_登入配置指南.md
+docs/優先執行/環境配置整合說明.md
+docs/優先執行/除錯完成報告.md
+
+# 敏感配置檔案
+backend/config/env.local
+backend/config/env.production
+backend/config/env.development
+backend/config/env.staging
+backend/config/env.test
+backend/config/database.php

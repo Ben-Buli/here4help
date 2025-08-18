@@ -112,7 +112,7 @@ Chat 模組需求落地執行規劃（重要）
 1. 有新增或修改的檔案、功能或是資料邏輯處理，幫我備注說明
 2. 你測試完之後都需要等待我手動測試之後同意再往下一步
 3. 版本推送需要等我主動提出
-4. UI元件文案使用英文、debugPrint/註解使用中文說明
+4. UI元件文案使用英文、debugPrint/註解使用中文說明 
 5. `app_scaffold.dart` 統一管理所有路由的appbar(and title), bottom navbar, back arrow（返回上一頁），所以其他page.dart或頁面檔案不要重複建立scaffold()、appbar 
 
 階段一：文件閱讀 & 重點梳理（重要）
