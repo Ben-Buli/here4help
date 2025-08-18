@@ -8,6 +8,7 @@ import 'package:here4help/task/services/language_service.dart';
 import 'package:pinput/pinput.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:here4help/config/app_config.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -32,6 +33,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       TextEditingController();
   final TextEditingController confirmPaymentPasswordController =
       TextEditingController();
+  final TextEditingController schoolController = TextEditingController();
+  final TextEditingController referralCodeController = TextEditingController();
 
   String selectedGender = 'Male';
   bool isPermanentAddress = false;
@@ -40,25 +43,30 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   bool showConfirmPassword = false;
   bool showPaymentPassword = false;
   bool showConfirmPaymentPassword = false;
+  bool isVerifyingReferralCode = false;
+  String? referralCodeStatus; // 'valid', 'invalid', 'not_found'
 
   // 性別選項
   final List<String> genderOptions = [
     'Male',
     'Female',
-    'Yellow_white_purple',
+    'Non-binary',
     'Genderfluid',
     'Agender',
     'Bigender',
     'Genderqueer',
     'Two-spirit',
-    'Prefer not to say',
-    'Other'
+    'Other',
+    'Prefer not to disclose'
   ];
 
   // 語言選項
   List<Map<String, dynamic>> languageOptions = [];
-
   List<String> selectedLanguages = ['en'];
+
+  // 大學選項
+  List<Map<String, dynamic>> universityOptions = [];
+  String? selectedUniversityId;
 
   @override
   void initState() {
@@ -67,6 +75,34 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     _loadExistingData();
     _loadPrefilledData();
     _loadLanguages();
+    _loadUniversities();
+    _loadThirdPartyData(); // 新增：載入第三方登入資料
+  }
+
+  // 新增：載入第三方登入資料
+  Future<void> _loadThirdPartyData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final provider = prefs.getString('signup_provider');
+
+    if (provider != null && provider.isNotEmpty) {
+      setState(() {
+        // 預填第三方登入提供的資料
+        fullNameController.text = prefs.getString('signup_full_name') ?? '';
+        nicknameController.text = prefs.getString('signup_nickname') ?? '';
+        emailController.text = prefs.getString('signup_email') ?? '';
+
+        // 如果有頭像 URL，可以顯示
+        final avatarUrl = prefs.getString('signup_avatar_url');
+        if (avatarUrl != null && avatarUrl.isNotEmpty) {
+          // 這裡可以設定頭像顯示
+        }
+      });
+
+      // 清除第三方登入暫存資料
+      await prefs.remove('signup_provider');
+      await prefs.remove('signup_provider_user_id');
+      await prefs.remove('signup_avatar_url');
+    }
   }
 
   Future<void> _loadLanguages() async {
@@ -85,6 +121,116 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
           {'code': 'ko', 'name': 'Korean', 'native': '한국어'},
         ];
       });
+    }
+  }
+
+  // 新增：載入大學列表
+  Future<void> _loadUniversities() async {
+    try {
+      final response = await http.get(
+        Uri.parse(AppConfig.universitiesListUrl),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] && data['data'] != null) {
+          final universities = List<Map<String, dynamic>>.from(data['data']);
+          // 過濾掉無效的大學資料
+          final validUniversities = universities
+              .where((university) =>
+                  university['id'] != null &&
+                  university['abbr'] != null &&
+                  university['en_name'] != null)
+              .toList();
+
+          setState(() {
+            universityOptions = validUniversities;
+          });
+
+          if (validUniversities.isEmpty) {
+            print('警告：沒有找到有效的大學資料');
+          }
+        } else {
+          print('載入大學列表失敗：API 回應格式錯誤');
+        }
+      } else {
+        print('載入大學列表失敗：HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      print('載入大學列表失敗: $e');
+      // 設置預設的大學選項作為 fallback
+      setState(() {
+        universityOptions = [];
+      });
+    }
+  }
+
+  // 新增：驗證推薦碼
+  Future<void> _verifyReferralCode() async {
+    final referralCode = referralCodeController.text.trim();
+    if (referralCode.isEmpty) {
+      setState(() {
+        referralCodeStatus = 'invalid';
+      });
+      return;
+    }
+
+    setState(() {
+      isVerifyingReferralCode = true;
+      referralCodeStatus = null;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse(AppConfig.verifyReferralCodeUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'referral_code': referralCode}),
+      );
+
+      final data = jsonDecode(response.body);
+
+      setState(() {
+        if (data['success']) {
+          referralCodeStatus = 'valid';
+        } else {
+          referralCodeStatus = 'invalid';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        referralCodeStatus = 'not_found';
+      });
+    } finally {
+      setState(() {
+        isVerifyingReferralCode = false;
+      });
+    }
+  }
+
+  // 新增：獲取推薦碼狀態的顏色
+  Color _getReferralCodeStatusColor() {
+    switch (referralCodeStatus) {
+      case 'valid':
+        return Theme.of(context).colorScheme.secondary; // 通過時用系統色
+      case 'invalid':
+      case 'not_found':
+        return Theme.of(context).colorScheme.error; // 錯誤用系統錯誤色
+      default:
+        return Theme.of(context).disabledColor; // 其他用系統預設 disabled 色
+    }
+  }
+
+  // 新增：獲取推薦碼狀態的文字
+  String _getReferralCodeStatusText() {
+    switch (referralCodeStatus) {
+      case 'valid':
+        return 'Referral code is valid';
+      case 'invalid':
+        return 'Referral code is invalid or does not exist';
+      case 'not_found':
+        return 'Referral code is invalid or does not exist';
+      default:
+        return 'Referral code is invalid or does not exist';
     }
   }
 
@@ -187,7 +333,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             TextFormField(
               controller: fullNameController,
               decoration: const InputDecoration(
-                labelText: 'Full Name (as shown on ID)',
+                labelText: 'Your Name',
                 border: OutlineInputBorder(),
                 helperText:
                     'Enter your complete name as it appears on your official documents',
@@ -285,75 +431,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 16),
 
-            // Country
-            TextFormField(
-              controller: countryController,
-              decoration: const InputDecoration(
-                labelText: 'Country',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your country';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Primary Languages
-            const Text('Primary Languages',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.secondary),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Column(
-                children: [
-                  // 已選擇的語言標籤
-                  if (selectedLanguages.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: selectedLanguages.map((langCode) {
-                          final lang = languageOptions.firstWhere(
-                            (lang) => lang['code'] == langCode,
-                            orElse: () =>
-                                {'code': '', 'name': '', 'native': ''},
-                          );
-                          return Chip(
-                            label: Text(
-                                lang['native'] ?? lang['name'] ?? langCode),
-                            onDeleted: () {
-                              setState(() {
-                                selectedLanguages.remove(langCode);
-                              });
-                            },
-                            backgroundColor: AppColors.primary,
-                            labelStyle: const TextStyle(color: Colors.white),
-                            deleteIconColor: Colors.white,
-                          );
-                        }).toList(),
-                      ),
-                    ),
-
-                  // 語言選擇按鈕
-                  if (selectedLanguages.length < 4)
-                    ListTile(
-                      leading: const Icon(Icons.add),
-                      title: const Text('Add Language'),
-                      onTap: _showLanguageSelector,
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Address
+            // Address (moved here)
             Row(
               children: [
                 Expanded(
@@ -372,13 +450,13 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Permanent Address Radio Button
+                // Permanent Address Checkbox
                 Column(
                   children: [
-                    const Text('Permanent', style: TextStyle(fontSize: 12)),
-                    Radio<bool>(
-                      value: true,
-                      groupValue: isPermanentAddress,
+                    const Text('Permanent Address?',
+                        style: TextStyle(fontSize: 8)),
+                    Checkbox(
+                      value: isPermanentAddress,
                       onChanged: (value) {
                         setState(() {
                           isPermanentAddress = value!;
@@ -388,6 +466,467 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                   ],
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+
+            // School Selection - 新增
+            // const Text('School',
+            //     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: selectedUniversityId,
+              decoration: InputDecoration(
+                labelText: 'School *',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12.0, vertical: 12.0),
+              ),
+              hint: Text(
+                'Select your school',
+                style: TextStyle(
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                  fontSize: 16.0,
+                ),
+              ),
+              isExpanded: true,
+              menuMaxHeight: 300.0,
+              dropdownColor: Theme.of(context).colorScheme.surface,
+              icon: Icon(
+                Icons.arrow_drop_down,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              style: TextStyle(
+                fontSize: 13.0,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              selectedItemBuilder: (context) {
+                final widgets = <Widget>[
+                  ...universityOptions
+                      .where((u) =>
+                          u['id'] != null &&
+                          u['abbr'] != null &&
+                          u['en_name'] != null)
+                      .map((u) {
+                    final abbr = u['abbr'] ?? '';
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                      child: Text(
+                        abbr,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 12.0,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                    child: Text(
+                      'Other School',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 16.0,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ];
+                return widgets;
+              },
+              items: [
+                // 大學選項（無 placeholder 項，改由 hint 顯示）
+                ...universityOptions
+                    .where((university) =>
+                        university['id'] != null &&
+                        university['abbr'] != null &&
+                        university['en_name'] != null)
+                    .map((university) {
+                  final displayName = university['abbr'] ?? '';
+                  final enName = university['en_name'] ?? '';
+                  return DropdownMenuItem<String>(
+                    value: university['id'].toString(),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 6.0, horizontal: 12.0),
+                      margin: const EdgeInsets.only(bottom: 3.0),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          left: BorderSide(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 2.0,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(
+                            displayName,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14.0,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(width: 8.0),
+                          Text(
+                            '/',
+                            style: TextStyle(
+                              fontSize: 12.0,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.6),
+                            ),
+                          ),
+                          const SizedBox(width: 8.0),
+                          Expanded(
+                            child: Text(
+                              enName,
+                              style: TextStyle(
+                                fontSize: 12.0,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withOpacity(0.6),
+                                fontStyle: FontStyle.italic,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+                // Other School 選項
+                DropdownMenuItem<String>(
+                  value: 'other',
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 8.0, horizontal: 12.0),
+                    margin: const EdgeInsets.only(bottom: 5.0),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        left: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2.0,
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      'Other School',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16.0,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                ),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  selectedUniversityId = value;
+                  if (value != 'other') {
+                    schoolController.clear();
+                  }
+                });
+              },
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please select your school';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // 如果選擇 Other School，顯示輸入欄位
+            if (selectedUniversityId == 'other') ...[
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: schoolController,
+                decoration: InputDecoration(
+                  labelText: 'School Name *',
+                  hintText: 'Enter your school name',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16.0, vertical: 12.0),
+                  prefixIcon: Icon(
+                    Icons.school,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                style: TextStyle(
+                  fontSize: 16.0,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter your school name';
+                  }
+                  return null;
+                },
+              ),
+            ],
+
+            // Referral Code - 新增
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: referralCodeController,
+                    decoration: InputDecoration(
+                      labelText: 'Referral Code',
+                      hintText: 'Enter referral code (optional)',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 12.0),
+                      prefixIcon: Icon(
+                        Icons.card_giftcard,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      suffixIcon: referralCodeStatus != null
+                          ? Icon(
+                              referralCodeStatus == 'valid'
+                                  ? Icons.check_circle
+                                  : Icons.error,
+                              color: _getReferralCodeStatusColor(),
+                            )
+                          : null,
+                    ),
+                    style: TextStyle(
+                      fontSize: 16.0,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                    onChanged: (value) {
+                      if (value.isEmpty) {
+                        setState(() {
+                          referralCodeStatus = null;
+                        });
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  height: 56.0, // 與輸入欄位高度一致
+                  child: ElevatedButton(
+                    onPressed:
+                        isVerifyingReferralCode ? null : _verifyReferralCode,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 12.0),
+                    ),
+                    child: isVerifyingReferralCode
+                        ? SizedBox(
+                            width: 20.0,
+                            height: 20.0,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.0,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Theme.of(context).colorScheme.onPrimary,
+                              ),
+                            ),
+                          )
+                        : const Text('Verify'),
+                  ),
+                ),
+              ],
+            ),
+            // 推薦碼狀態提示
+            if (referralCodeStatus != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    referralCodeStatus == 'valid'
+                        ? Icons.check_circle
+                        : Icons.error,
+                    size: 16.0,
+                    color: _getReferralCodeStatusColor(),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _getReferralCodeStatusText(),
+                      style: TextStyle(
+                        fontSize: 14.0,
+                        color: _getReferralCodeStatusColor(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 16),
+
+            // Primary Languages
+            Text(
+              'Primary Languages *',
+              style: TextStyle(
+                fontSize: 16.0,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                  width: 1.0,
+                ),
+                borderRadius: BorderRadius.circular(8.0),
+                color: Theme.of(context).colorScheme.surface,
+              ),
+              child: Column(
+                children: [
+                  // 已選擇的語言標籤
+                  if (selectedLanguages.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Wrap(
+                        spacing: 8.0,
+                        runSpacing: 8.0,
+                        children: selectedLanguages.map((langCode) {
+                          final lang = languageOptions.firstWhere(
+                            (lang) => lang['code'] == langCode,
+                            orElse: () =>
+                                {'code': '', 'name': '', 'native': ''},
+                          );
+                          return Container(
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary,
+                              borderRadius: BorderRadius.circular(20.0),
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.primary,
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(20.0),
+                                onTap: () {
+                                  setState(() {
+                                    selectedLanguages.remove(langCode);
+                                  });
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12.0,
+                                    vertical: 8.0,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        lang['native'] ??
+                                            lang['name'] ??
+                                            langCode,
+                                        style: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onPrimary,
+                                          fontSize: 14.0,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6.0),
+                                      Icon(
+                                        Icons.close,
+                                        size: 16.0,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onPrimary,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+
+                  // 語言選擇按鈕
+                  if (selectedLanguages.length < 4)
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(
+                            color: selectedLanguages.isNotEmpty
+                                ? Theme.of(context)
+                                    .colorScheme
+                                    .outline
+                                    .withOpacity(0.2)
+                                : Colors.transparent,
+                            width: 1.0,
+                          ),
+                        ),
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.add_circle_outline,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 24.0,
+                        ),
+                        title: Text(
+                          'Add Language',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 16.0,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Select up to 4 languages',
+                          style: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.6),
+                            fontSize: 14.0,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.arrow_forward_ios,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 16.0,
+                        ),
+                        onTap: _showLanguageSelector,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 8.0,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
 
@@ -553,8 +1092,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
               },
               validator: (v) {
                 final t = (v ?? '').trim();
-                if (t.isEmpty) return 'Please confirm payment password';
-                if (t.length != 6) return 'Must be 6 digits';
+                if (t.isEmpty) return 'Must be 6 digits';
                 if (t != paymentPasswordController.text) {
                   return 'Payment passwords do not match';
                 }
@@ -570,8 +1108,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
               child: ElevatedButton(
                 onPressed: isLoading ? null : _handleSubmit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.onPrimary,
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: isLoading
@@ -597,7 +1135,16 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Select Languages'),
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              surfaceTintColor: Theme.of(context).colorScheme.surfaceTint,
+              title: Text(
+                'Select Languages',
+                style: TextStyle(
+                  fontSize: 18.0,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
               content: SizedBox(
                 width: double.maxFinite,
                 height: 400,
@@ -605,15 +1152,85 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                   children: [
                     // 搜尋框
                     TextField(
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Search languages',
-                        prefixIcon: Icon(Icons.search),
-                        border: OutlineInputBorder(),
+                        hintText: 'Type to search...',
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: BorderSide(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .outline
+                                .withOpacity(0.3),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 2.0,
+                          ),
+                        ),
+                        filled: true,
+                        fillColor: Theme.of(context).colorScheme.surface,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 12.0,
+                        ),
+                      ),
+                      style: TextStyle(
+                        fontSize: 16.0,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                       onChanged: (value) {
                         setDialogState(() {});
                       },
                     ),
+                    const SizedBox(height: 16),
+                    // 已選擇的語言提示
+                    if (selectedLanguages.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(12.0),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primaryContainer
+                              .withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(8.0),
+                          border: Border.all(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withOpacity(0.2),
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: Theme.of(context).colorScheme.primary,
+                              size: 20.0,
+                            ),
+                            const SizedBox(width: 8.0),
+                            Expanded(
+                              child: Text(
+                                'Selected: ${selectedLanguages.length}/4 languages',
+                                style: TextStyle(
+                                  fontSize: 14.0,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     const SizedBox(height: 16),
                     // 語言列表
                     Expanded(
@@ -624,20 +1241,66 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                           final isSelected =
                               selectedLanguages.contains(lang['code']);
 
-                          return CheckboxListTile(
-                            title: Text(lang['native'] ?? lang['name'] ?? ''),
-                            subtitle: Text(lang['name'] ?? ''),
-                            value: isSelected,
-                            onChanged: (bool? value) {
-                              setDialogState(() {
-                                if (value == true &&
-                                    selectedLanguages.length < 4) {
-                                  selectedLanguages.add(lang['code']!);
-                                } else if (value == false) {
-                                  selectedLanguages.remove(lang['code']!);
-                                }
-                              });
-                            },
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 4.0),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? Theme.of(context)
+                                      .colorScheme
+                                      .primaryContainer
+                                      .withOpacity(0.3)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8.0),
+                              border: Border.all(
+                                color: isSelected
+                                    ? Theme.of(context)
+                                        .colorScheme
+                                        .primary
+                                        .withOpacity(0.3)
+                                    : Colors.transparent,
+                                width: 1.0,
+                              ),
+                            ),
+                            child: CheckboxListTile(
+                              title: Text(
+                                lang['native'] ?? lang['name'] ?? '',
+                                style: TextStyle(
+                                  fontSize: 16.0,
+                                  fontWeight: FontWeight.w500,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                              subtitle: Text(
+                                lang['name'] ?? '',
+                                style: TextStyle(
+                                  fontSize: 14.0,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.7),
+                                ),
+                              ),
+                              value: isSelected,
+                              onChanged: (bool? value) {
+                                setDialogState(() {
+                                  if (value == true &&
+                                      selectedLanguages.length < 4) {
+                                    selectedLanguages.add(lang['code']!);
+                                  } else if (value == false) {
+                                    selectedLanguages.remove(lang['code']!);
+                                  }
+                                });
+                              },
+                              activeColor:
+                                  Theme.of(context).colorScheme.primary,
+                              checkColor:
+                                  Theme.of(context).colorScheme.onPrimary,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 8.0,
+                              ),
+                            ),
                           );
                         },
                       ),
@@ -648,13 +1311,26 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.6),
+                  ),
                   child: const Text('Cancel'),
                 ),
-                TextButton(
+                ElevatedButton(
                   onPressed: () {
                     setState(() {});
                     Navigator.of(context).pop();
                   },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
                   child: const Text('OK'),
                 ),
               ],
@@ -712,9 +1388,22 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
 
   Future<bool> _createUserAccount() async {
     try {
+      // 準備學校資訊
+      String? schoolName;
+      if (selectedUniversityId == 'other') {
+        schoolName = schoolController.text;
+      } else if (selectedUniversityId != null) {
+        final university = universityOptions.firstWhere(
+          (u) => u['id'].toString() == selectedUniversityId,
+          orElse: () => {},
+        );
+        if (university.isNotEmpty) {
+          '${university['abbr']} - ${university['en_name']} - ${university['zh_name']}';
+        }
+      }
+
       final response = await http.post(
-        Uri.parse(
-            'http://localhost:8888/here4help/backend/api/auth/register.php'),
+        Uri.parse(AppConfig.registerUrl),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -731,6 +1420,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
           'payment_password': paymentPasswordController.text,
           'is_permanent_address': isPermanentAddress,
           'primary_language': selectedLanguages.join(','),
+          'school': schoolName,
+          'referral_code': referralCodeController.text.trim(),
         }),
       );
 
