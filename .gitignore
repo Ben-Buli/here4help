@@ -108,6 +108,8 @@ docs/TODO_LIST.md
 .env.local
 .env.development
 .env.production
+.env.staging
+.env.test
 
 # IDE specific
 .vscode/settings.json
@@ -191,6 +193,22 @@ web/.firebase/
 
 # Environment variables (added in v1.2.3)
 .env
+.env.local
+.env.development
+.env.production
+.env.staging
+.env.test
+
+# Backend environment files
+backend/config/env.local
+backend/config/env.production
+backend/config/env.development
+backend/config/env.staging
+backend/config/env.test
+
+# Database configuration with sensitive data
+backend/config/database.php
+admin/includes/config.php
 
 # Test files (cleaned up in v1.2.4)
 test_*.html
