@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
@@ -12,7 +11,6 @@ import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/chat/utils/avatar_error_cache.dart';
-import 'package:here4help/chat/services/smart_refresh_strategy.dart';
 import 'package:flutter/foundation.dart';
 
 const bool verboseSearchLog = false; // 控制搜尋相關的詳細日誌
@@ -29,7 +27,7 @@ class PostedTasksWidget extends StatefulWidget {
 class _PostedTasksWidgetState extends State<PostedTasksWidget>
     with AutomaticKeepAliveClientMixin {
   // 任務數據
-  List<Map<String, dynamic>> _allTasks = [];
+  final List<Map<String, dynamic>> _allTasks = [];
   List<Map<String, dynamic>> _filteredTasks = []; // 新增：篩選後的任務
   List<Map<String, dynamic>> _sortedTasks = []; // 新增：排序後的任務
 
@@ -177,10 +175,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               return;
             }
 
-            if (safeProvider != null) {
-              safeProvider.setTabHasUnread(
-                  ChatListProvider.TAB_POSTED_TASKS, hasUnread);
-            }
+            safeProvider.setTabHasUnread(
+                ChatListProvider.TAB_POSTED_TASKS, hasUnread);
           } catch (e) {
             debugPrint('❌ [Posted Tasks] 設置未讀狀態失敗: $e');
           }
@@ -216,8 +212,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         return;
       }
 
-      if (chatProvider == null) return;
-
       if (chatProvider.isInitialized) {
         debugPrint('✅ [Posted Tasks] Provider 已初始化，檢查分頁狀態');
         _checkAndLoadIfNeeded();
@@ -249,8 +243,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         return;
       }
 
-      if (chatProvider == null) return;
-
       chatProvider.addListener(() {
         if (!mounted) return;
         if (chatProvider?.lastEvent == 'cache_loaded') {
@@ -277,8 +269,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
             '⚠️ [Posted Tasks][_setupUnreadListener()] 無法獲取 ChatListProvider，跳過事件監聽');
         return;
       }
-
-      if (chatProvider == null) return;
 
       chatProvider.addListener(_handleProviderChanges);
 
@@ -318,9 +308,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               return;
             }
 
-            if (provider != null) {
-              provider.updateUnreadByRoom(unreadData);
-            }
+            provider.updateUnreadByRoom(unreadData);
           } catch (e) {
             debugPrint('❌ [Posted Tasks] 更新未讀數據失敗: $e');
           }
@@ -436,12 +424,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           return;
         }
 
-        if (provider != null) {
-          provider.updateUnreadByRoom(unreadData);
+        provider.updateUnreadByRoom(unreadData);
 
-          if (kDebugMode && verboseSearchLog) {
-            debugPrint('✅ [Posted Tasks] 未讀數據載入完成: ${unreadData.length} 個房間');
-          }
+        if (kDebugMode && verboseSearchLog) {
+          debugPrint('✅ [Posted Tasks] 未讀數據載入完成: ${unreadData.length} 個房間');
         }
       }
     } catch (e) {
@@ -461,8 +447,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
             '⚠️ [Posted Tasks][_handleProviderChanges()] 無法獲取 ChatListProvider，跳過變化處理');
         return;
       }
-
-      if (chatProvider == null) return;
 
       // 只有當前是 Posted Tasks 分頁時才刷新
       if (chatProvider.isPostedTasksTab) {
@@ -543,8 +527,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         return;
       }
 
-      if (chatProvider == null) return;
-
       // 應用篩選
       final filteredTasks = _filterTasks(_allTasks, chatProvider);
       debugPrint('🔍 [Posted Tasks] [_applyFiltersAndSort()] 篩選完成:');
@@ -605,8 +587,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         return;
       }
 
-      if (chatProvider == null) return;
-
       // 安全地獲取 UserService
       UserService? userService;
       try {
@@ -616,8 +596,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
             '⚠️ [Posted Tasks][_fetchAllTasks()] 無法獲取 UserService，跳過任務獲取');
         return;
       }
-
-      if (userService == null) return;
 
       final currentUserId = userService.currentUser?.id;
       // debugPrint(

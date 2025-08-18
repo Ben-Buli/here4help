@@ -100,11 +100,11 @@ try {
             'email' => $user['email'],
             'phone' => $user['phone'],
             'nickname' => $user['nickname'],
-            'google_id' => $user['google_id'],
+            'google_id' => null, // 已棄用，設為 null
             'avatar_url' => $user['avatar_url'] ?? '', // 確保avatar_url不為null
             'points' => (int)$user['points'],
             'status' => $user['status'],
-            'provider' => $user['provider'],
+            'provider' => null, // 傳統登入，provider 為 null
             'created_at' => $user['created_at'],
             'updated_at' => $user['updated_at'],
             'referral_code' => $user['referral_code'],
@@ -159,11 +159,11 @@ try {
             'email' => $user['email'],
             'phone' => $user['phone'],
             'nickname' => $user['nickname'],
-            'google_id' => $user['google_id'],
+            'google_id' => null, // 已棄用，設為 null
             'avatar_url' => $user['avatar_url'],
             'points' => (int)$user['points'],
             'status' => $user['status'],
-            'provider' => $user['provider'],
+            'provider' => null, // 傳統登入，provider 為 null
             'created_at' => $user['created_at'],
             'updated_at' => $user['updated_at'],
             'referral_code' => $user['referral_code'],

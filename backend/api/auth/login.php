@@ -94,7 +94,8 @@ try {
         'avatar_url' => $user['avatar_url'] ?? '',
         'points' => (int)($user['points'] ?? 0),
         'status' => $user['status'],
-        'provider' => $user['provider'],
+        'provider' => null, // 傳統登入，provider 為 null
+        'google_id' => null, // 已棄用，設為 null
         'created_at' => $user['created_at'],
         'updated_at' => $user['updated_at'],
         'referral_code' => $user['referral_code'] ?? '',

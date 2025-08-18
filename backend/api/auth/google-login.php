@@ -18,8 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 // 引入資料庫配置
 require_once '../../config/database.php';
-require_once '../../utils/TokenValidator.php';
 require_once '../../utils/JWTManager.php';
+require_once '../../utils/Response.php';
 
 try {
     // 獲取 POST 資料
@@ -29,57 +29,97 @@ try {
         throw new Exception('Invalid JSON input');
     }
     
-    $google_id = $input['google_id'] ?? '';
+    $googleId = $input['google_id'] ?? '';
     $email = trim($input['email'] ?? '');
     $name = trim($input['name'] ?? '');
-    $avatar_url = $input['avatar_url'] ?? '';
+    $avatarUrl = $input['avatar_url'] ?? '';
+    $accessToken = $input['access_token'] ?? '';
+    $idToken = $input['id_token'] ?? '';
     
     // 驗證輸入
-    if (empty($google_id) || empty($email) || empty($name)) {
-        throw new Exception('Google ID, email and name are required');
-    }
-    
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        throw new Exception('Invalid email format');
+    if (empty($googleId) || empty($name)) {
+        throw new Exception('Google ID and name are required');
     }
     
     // 建立資料庫連線
     $db = Database::getInstance();
     
-    // 檢查用戶是否已存在
+    // 檢查是否已存在對應的 user_identity
     $stmt = $db->query(
-        "SELECT * FROM users WHERE google_id = ? OR email = ?",
-        [$google_id, $email]
+        "SELECT ui.*, u.* FROM user_identities ui 
+         INNER JOIN users u ON ui.user_id = u.id 
+         WHERE ui.provider = 'google' AND ui.provider_user_id = ?",
+        [$googleId]
     );
     
-    $user = $stmt->fetch();
+    $existingIdentity = $stmt->fetch();
     
-    if ($user) {
-        // 用戶已存在，更新 Google ID 如果沒有
-        if (empty($user['google_id'])) {
-            $db->query(
-                "UPDATE users SET google_id = ? WHERE id = ?",
-                [$google_id, $user['id']]
-            );
-        }
-        
-            // 更新最後更新時間（因為沒有 last_login 欄位）
-    $db->query(
-        "UPDATE users SET updated_at = NOW() WHERE id = ?",
-        [$user['id']]
-    );
-    } else {
-        // 建立新用戶
+    if ($existingIdentity) {
+        // 現有用戶，更新最後登入時間
         $db->query(
-            "INSERT INTO users (google_id, email, name, avatar_url, is_verified, status, created_at) VALUES (?, ?, ?, ?, 1, 'active', NOW())",
-            [$google_id, $email, $name, $avatar_url]
+            "UPDATE users SET updated_at = NOW() WHERE id = ?",
+            [$existingIdentity['user_id']]
         );
         
-        $user_id = $db->lastInsertId();
+        // 更新 user_identity 的 access_token
+        $db->query(
+            "UPDATE user_identities SET 
+             access_token = ?, 
+             updated_at = NOW() 
+             WHERE id = ?",
+            [$accessToken, $existingIdentity['id']]
+        );
+        
+        $user = $existingIdentity;
+        $isNewUser = false;
+    } else {
+        // 檢查 email 是否已存在於 users 表
+        if (!empty($email)) {
+            $stmt = $db->query(
+                "SELECT * FROM users WHERE email = ?",
+                [$email]
+            );
+            
+            $existingUser = $stmt->fetch();
+            
+            if ($existingUser) {
+                // Email 已存在，需要綁定到現有帳號
+                // 這裡可以實現帳號綁定流程，或要求用戶先登入現有帳號
+                throw new Exception('Email already exists. Please login with your existing account to bind this provider.');
+            }
+        }
+        
+        // 新用戶，建立 users 記錄
+        $db->query(
+            "INSERT INTO users (
+                name, email, avatar_url, status, created_at, updated_at
+            ) VALUES (?, ?, ?, 'active', NOW(), NOW())",
+            [$name, $email, $avatarUrl]
+        );
+        
+        $userId = $db->lastInsertId();
+        
+        // 建立 user_identity 記錄
+        $db->query(
+            "INSERT INTO user_identities (
+                user_id, provider, provider_user_id, email, name, avatar_url, 
+                access_token, raw_profile, created_at, updated_at
+            ) VALUES (?, 'google', ?, ?, ?, ?, ?, ?, NOW(), NOW())",
+            [
+                $userId, 
+                $googleId, 
+                $email, 
+                $name, 
+                $avatarUrl, 
+                $accessToken,
+                json_encode($input) // 儲存原始資料
+            ]
+        );
         
         // 重新查詢用戶資料
-        $stmt = $db->query("SELECT * FROM users WHERE id = ?", [$user_id]);
+        $stmt = $db->query("SELECT * FROM users WHERE id = ?", [$userId]);
         $user = $stmt->fetch();
+        $isNewUser = true;
     }
     
     // 生成 JWT Token
@@ -106,16 +146,17 @@ try {
         'email' => $user['email'],
         'phone' => $user['phone'] ?? '',
         'nickname' => $user['nickname'] ?? '',
-        'google_id' => $user['google_id'] ?? '',
         'avatar_url' => $user['avatar_url'] ?? '',
         'points' => (int)($user['points'] ?? 0),
         'status' => $user['status'],
-        'provider' => $user['provider'],
+        'provider' => 'google',
         'created_at' => $user['created_at'],
         'updated_at' => $user['updated_at'],
         'referral_code' => $user['referral_code'] ?? '',
         'primary_language' => $user['primary_language'] ?? 'English',
-        'permission' => (int)($user['permission'] ?? 0)
+        'permission' => (int)($user['permission'] ?? 0),
+        'is_new_user' => $isNewUser,
+        'provider_user_id' => $googleId
     ];
     
     echo json_encode([
@@ -134,3 +175,4 @@ try {
         'message' => $e->getMessage()
     ]);
 }
+?>

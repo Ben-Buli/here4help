@@ -7,6 +7,24 @@
 class EnvLoader {
     private static $loaded = false;
     private static $vars = [];
+    private static $instance = null;
+
+    /**
+     * 獲取單例實例
+     */
+    public static function getInstance() {
+        if (self::$instance === null) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+
+    /**
+     * 私有建構函數
+     */
+    private function __construct() {
+        // 私有建構函數，防止外部實例化
+    }
 
     /**
      * 載入 .env 檔案

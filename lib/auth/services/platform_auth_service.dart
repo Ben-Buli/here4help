@@ -34,17 +34,18 @@ class PlatformAuthService {
   // Web 版 Google 登入
   Future<Map<String, dynamic>?> _signInWithGoogleWeb() async {
     try {
-      // Web 版使用 OAuth 2.0 流程
-      // 需要整合 Google OAuth 2.0 JavaScript SDK
+      // 暫時使用模擬資料進行測試
+      // TODO: 整合 Google OAuth 2.0 JavaScript SDK
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final userData = {
         'provider': 'google',
         'platform': 'web',
-        'google_id': '', // 從 JavaScript SDK 獲取
-        'name': '', // 從 JavaScript SDK 獲取
-        'email': '', // 從 JavaScript SDK 獲取
-        'avatar_url': '', // 從 JavaScript SDK 獲取
-        'access_token': '', // 從 JavaScript SDK 獲取
-        'id_token': '', // 從 JavaScript SDK 獲取
+        'google_id': 'web_google_user_$timestamp', // 模擬 Google ID
+        'name': 'Web Google User $timestamp', // 模擬用戶名
+        'email': 'webuser_google_$timestamp@example.com', // 模擬郵箱
+        'avatar_url': 'https://example.com/avatar.jpg', // 模擬頭像
+        'access_token': 'mock_access_token_$timestamp', // 模擬 access token
+        'id_token': 'mock_id_token_$timestamp', // 模擬 ID token
       };
 
       return await _sendUserDataToBackend(userData);
@@ -104,16 +105,17 @@ class PlatformAuthService {
   // Web 版 Facebook 登入
   Future<Map<String, dynamic>?> _signInWithFacebookWeb() async {
     try {
-      // Web 版 Facebook 登入實現
-      // 需要整合 Facebook JavaScript SDK
+      // 暫時使用模擬資料進行測試
+      // TODO: 整合 Facebook JavaScript SDK
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final userData = {
         'provider': 'facebook',
         'platform': 'web',
-        'facebook_id': '', // 從 JavaScript SDK 獲取
-        'name': '', // 從 JavaScript SDK 獲取
-        'email': '', // 從 JavaScript SDK 獲取
-        'avatar_url': '', // 從 JavaScript SDK 獲取
-        'access_token': '', // 從 JavaScript SDK 獲取
+        'facebook_id': 'web_facebook_user_$timestamp', // 模擬 Facebook ID
+        'name': 'Web Facebook User $timestamp', // 模擬用戶名
+        'email': 'webuser_facebook_$timestamp@example.com', // 模擬郵箱
+        'avatar_url': 'https://example.com/avatar.jpg', // 模擬頭像
+        'access_token': 'mock_access_token_$timestamp', // 模擬 access token
       };
 
       return await _sendUserDataToBackend(userData);
@@ -126,16 +128,17 @@ class PlatformAuthService {
   // 移動版 Facebook 登入
   Future<Map<String, dynamic>?> _signInWithFacebookMobile() async {
     try {
-      // 移動版 Facebook 登入實現
-      // 需要整合 flutter_facebook_auth 套件
+      // 暫時使用模擬資料進行測試
+      // TODO: 整合 flutter_facebook_auth 套件
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final userData = {
         'provider': 'facebook',
         'platform': isIOS ? 'ios' : 'android',
-        'facebook_id': '', // 從 flutter_facebook_auth 獲取
-        'name': '', // 從 flutter_facebook_auth 獲取
-        'email': '', // 從 flutter_facebook_auth 獲取
-        'avatar_url': '', // 從 flutter_facebook_auth 獲取
-        'access_token': '', // 從 flutter_facebook_auth 獲取
+        'facebook_id': 'mobile_facebook_user_$timestamp', // 模擬 Facebook ID
+        'name': 'Mobile Facebook User $timestamp', // 模擬用戶名
+        'email': 'mobileuser_facebook_$timestamp@example.com', // 模擬郵箱
+        'avatar_url': 'https://example.com/avatar.jpg', // 模擬頭像
+        'access_token': 'mock_access_token_$timestamp', // 模擬 access token
       };
 
       return await _sendUserDataToBackend(userData);
@@ -165,15 +168,16 @@ class PlatformAuthService {
   // Web 版 Apple 登入
   Future<Map<String, dynamic>?> _signInWithAppleWeb() async {
     try {
-      // Web 版 Apple 登入實現
-      // 需要整合 Apple Sign-In JavaScript
+      // 暫時使用模擬資料進行測試
+      // TODO: 整合 Apple Sign-In JavaScript
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final userData = {
         'provider': 'apple',
         'platform': 'web',
-        'apple_id': '', // 從 JavaScript SDK 獲取
-        'name': '', // 從 JavaScript SDK 獲取
-        'email': '', // 從 JavaScript SDK 獲取
-        'identity_token': '', // 從 JavaScript SDK 獲取
+        'apple_id': 'web_apple_user_$timestamp', // 模擬 Apple ID
+        'name': 'Web Apple User $timestamp', // 模擬用戶名
+        'email': 'webuser_apple_$timestamp@example.com', // 模擬郵箱
+        'identity_token': 'mock_identity_token_$timestamp', // 模擬 identity token
       };
 
       return await _sendUserDataToBackend(userData);
@@ -186,15 +190,16 @@ class PlatformAuthService {
   // iOS 版 Apple 登入
   Future<Map<String, dynamic>?> _signInWithAppleIOS() async {
     try {
-      // iOS 版 Apple 登入實現
-      // 需要整合 sign_in_with_apple 套件
+      // 暫時使用模擬資料進行測試
+      // TODO: 整合 sign_in_with_apple 套件
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final userData = {
         'provider': 'apple',
         'platform': 'ios',
-        'apple_id': '', // 從 sign_in_with_apple 獲取
-        'name': '', // 從 sign_in_with_apple 獲取
-        'email': '', // 從 sign_in_with_apple 獲取
-        'identity_token': '', // 從 sign_in_with_apple 獲取
+        'apple_id': 'ios_apple_user_$timestamp', // 模擬 Apple ID
+        'name': 'iOS Apple User $timestamp', // 模擬用戶名
+        'email': 'iosuser_apple_$timestamp@example.com', // 模擬郵箱
+        'identity_token': 'mock_identity_token_$timestamp', // 模擬 identity token
       };
 
       return await _sendUserDataToBackend(userData);

@@ -15,6 +15,19 @@ const jwt = require('jsonwebtoken');
 
 const PORT = process.env.PORT || 3001;
 
+// Load environment variables once at startup
+require('dotenv').config({ path: '../../.env' });
+
+// Get JWT secret once
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  console.error('❌ JWT_SECRET not configured in environment variables');
+  process.exit(1);
+}
+
+console.log('✅ JWT_SECRET loaded successfully');
+
 const app = express();
 app.use(cors());
 
@@ -59,16 +72,12 @@ async function initDatabase() {
 // 驗證 JWT Token
 function validateJWT(token) {
   try {
-    // 從環境變數獲取 JWT_SECRET
-    require('dotenv').config({ path: '../../.env' });
-    const secret = process.env.JWT_SECRET;
-    
-    if (!secret) {
+    if (!JWT_SECRET) {
       console.error('JWT_SECRET not configured');
       return null;
     }
     
-    const payload = jwt.verify(token, secret);
+    const payload = jwt.verify(token, JWT_SECRET);
     if (!payload.user_id) return null;
     return payload; // { user_id, email, name, ... }
   } catch (e) {
@@ -367,4 +376,3 @@ process.on('SIGTERM', () => {
     console.log('Process terminated');
   });
 });
-

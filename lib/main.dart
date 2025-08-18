@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:here4help/router/app_router.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/services/theme_config_manager.dart';
+import 'package:here4help/config/environment_config.dart';
 
 class Here4HelpApp extends StatelessWidget {
   const Here4HelpApp({super.key});
@@ -14,7 +15,7 @@ class Here4HelpApp extends StatelessWidget {
       builder: (context, themeManager, child) {
         return MaterialApp.router(
           routerConfig: appRouter,
-          debugShowCheckedModeBanner: false,
+          debugShowCheckedModeBanner: EnvironmentConfig.debugMode,
           title: 'Here4Help',
           theme: themeManager.themeData,
         );
@@ -23,7 +24,16 @@ class Here4HelpApp extends StatelessWidget {
   }
 }
 
-void main() {
+void main() async {
+  // 確保 Flutter 綁定初始化
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 初始化環境配置
+  await EnvironmentConfig.initialize();
+
+  // 打印環境信息
+  EnvironmentConfig.printEnvironmentInfo();
+
   runApp(
     MultiProvider(
       providers: [

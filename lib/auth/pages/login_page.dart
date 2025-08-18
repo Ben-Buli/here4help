@@ -182,41 +182,49 @@ class _LoginPageState extends State<LoginPage> {
       final userData = await _platformAuthService.signInWithGoogle();
 
       if (userData != null) {
-        // 儲存用戶資料到本地
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-            'auth_token', 'Bearer ${userData['token'] ?? ''}');
-        await prefs.setString('user_email', userData['email'] ?? '');
-        await prefs.setInt('user_permission', userData['permission'] ?? 0);
-        await prefs.setString('user_name', userData['name'] ?? '');
-        await prefs.setInt('user_points', userData['points'] ?? 0);
-        await prefs.setString('user_avatarUrl', userData['avatar_url'] ?? '');
-        await prefs.setString(
-            'user_primaryLang', userData['primary_language'] ?? '');
+        // 檢查是否為新用戶，如果是則導向註冊頁面
+        if (userData['is_new_user'] == true) {
+          // 將 Google 資料傳遞到註冊頁面
+          await _saveGoogleDataForSignup(userData);
+          context.go('/signup/oauth');
+        } else {
+          // 現有用戶，儲存用戶資料到本地
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(
+              'auth_token', 'Bearer ${userData['token'] ?? ''}');
+          await prefs.setString('user_email', userData['email'] ?? '');
+          await prefs.setInt('user_permission', userData['permission'] ?? 0);
+          await prefs.setString('user_name', userData['name'] ?? '');
+          await prefs.setInt('user_points', userData['points'] ?? 0);
+          await prefs.setString('user_avatarUrl', userData['avatar_url'] ?? '');
+          await prefs.setString(
+              'user_primaryLang', userData['primary_language'] ?? '');
 
-        // 更新 Provider
-        Provider.of<UserService>(context, listen: false).setUser(UserModel(
-          id: userData['id'],
-          name: userData['name'],
-          nickname: userData['nickname'] ?? userData['name'],
-          email: userData['email'],
-          phone: userData['phone'] ?? '',
-          points: userData['points'] ?? 0,
-          avatar_url: userData['avatar_url'] ?? '',
-          status: userData['status'] ?? 'active',
-          provider: userData['provider'] ?? 'email',
-          created_at: userData['created_at'] ?? '',
-          updated_at: userData['updated_at'] ?? '',
-          referral_code: userData['referral_code'],
-          google_id: userData['google_id'],
-          primary_language: userData['primary_language'] ?? 'English',
-          permission_level: userData['permission'] ?? 0,
-        ));
+          // 更新 Provider
+          Provider.of<UserService>(context, listen: false).setUser(UserModel(
+            id: userData['id'],
+            name: userData['name'],
+            nickname: userData['nickname'] ?? userData['name'],
+            email: userData['email'],
+            phone: userData['phone'] ?? '',
+            points: userData['points'] ?? 0,
+            avatar_url: userData['avatar_url'] ?? '',
+            status: userData['status'] ?? 'active',
+            provider: userData['provider'] ?? 'google',
+            created_at: userData['created_at'] ?? '',
+            updated_at: userData['updated_at'] ?? '',
+            referral_code: userData['referral_code'],
+            google_id: userData['google_id'],
+            primary_language: userData['primary_language'] ?? 'English',
+            permission_level: userData['permission'] ?? 0,
+          ));
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google Login Success: ${userData['email']}')),
-        );
-        context.go('/home');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Google Login Success: ${userData['email']}')),
+          );
+          context.go('/home');
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -234,6 +242,18 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // 新增：儲存 Google 資料到註冊頁面
+  Future<void> _saveGoogleDataForSignup(Map<String, dynamic> userData) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('signup_full_name', userData['name'] ?? '');
+    await prefs.setString('signup_nickname', userData['name'] ?? '');
+    await prefs.setString('signup_email', userData['email'] ?? '');
+    await prefs.setString('signup_avatar_url', userData['avatar_url'] ?? '');
+    await prefs.setString('signup_provider', 'google');
+    await prefs.setString(
+        'signup_provider_user_id', userData['provider_user_id'] ?? '');
+  }
+
   // 跨平台 Facebook 登入處理
   Future<void> _handleFacebookLogin() async {
     setState(() {
@@ -244,42 +264,50 @@ class _LoginPageState extends State<LoginPage> {
       final userData = await _platformAuthService.signInWithFacebook();
 
       if (userData != null) {
-        // 儲存用戶資料到本地
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-            'auth_token', 'Bearer ${userData['token'] ?? ''}');
-        await prefs.setString('user_email', userData['email'] ?? '');
-        await prefs.setInt('user_permission', userData['permission'] ?? 0);
-        await prefs.setString('user_name', userData['name'] ?? '');
-        await prefs.setInt('user_points', userData['points'] ?? 0);
-        await prefs.setString('user_avatarUrl', userData['avatar_url'] ?? '');
-        await prefs.setString(
-            'user_primaryLang', userData['primary_language'] ?? '');
+        // 檢查是否為新用戶，如果是則導向註冊頁面
+        if (userData['is_new_user'] == true) {
+          // 將 Facebook 資料傳遞到註冊頁面
+          await _saveFacebookDataForSignup(userData);
+          context.go('/signup/oauth');
+        } else {
+          // 現有用戶，儲存用戶資料到本地
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(
+              'auth_token', 'Bearer ${userData['token'] ?? ''}');
+          await prefs.setString('user_email', userData['email'] ?? '');
+          await prefs.setInt('user_permission', userData['permission'] ?? 0);
+          await prefs.setString('user_name', userData['name'] ?? '');
+          await prefs.setInt('user_points', userData['points'] ?? 0);
+          await prefs.setString('user_avatarUrl', userData['avatar_url'] ?? '');
+          await prefs.setString(
+              'user_primaryLang', userData['primary_language'] ?? '');
 
-        // 更新 Provider
-        Provider.of<UserService>(context, listen: false).setUser(UserModel(
-          id: userData['id'],
-          name: userData['name'],
-          nickname: userData['nickname'] ?? userData['name'],
-          email: userData['email'],
-          phone: userData['phone'] ?? '',
-          points: userData['points'] ?? 0,
-          avatar_url: userData['avatar_url'] ?? '',
-          status: userData['status'] ?? 'active',
-          provider: userData['provider'] ?? 'email',
-          created_at: userData['created_at'] ?? '',
-          updated_at: userData['updated_at'] ?? '',
-          referral_code: userData['referral_code'],
-          google_id: userData['google_id'],
-          primary_language: userData['primary_language'] ?? 'English',
-          permission_level: userData['permission'] ?? 0,
-        ));
+          // 更新 Provider
+          Provider.of<UserService>(context, listen: false).setUser(UserModel(
+            id: userData['id'],
+            name: userData['name'],
+            nickname: userData['nickname'] ?? userData['name'],
+            email: userData['email'],
+            phone: userData['phone'] ?? '',
+            points: userData['points'] ?? 0,
+            avatar_url: userData['avatar_url'] ?? '',
+            status: userData['status'] ?? 'active',
+            provider: userData['provider'] ?? 'facebook',
+            created_at: userData['created_at'] ?? '',
+            updated_at: userData['updated_at'] ?? '',
+            referral_code: userData['referral_code'],
+            google_id: userData['google_id'],
+            primary_language: userData['primary_language'] ?? 'English',
+            permission_level: userData['permission'] ?? 0,
+          ));
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Facebook Login Success: ${userData['email']}')),
-        );
-        context.go('/home');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    'Facebook Login Success: ${userData['email'] ?? userData['name']}')),
+          );
+          context.go('/home');
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -297,6 +325,18 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  // 新增：儲存 Facebook 資料到註冊頁面
+  Future<void> _saveFacebookDataForSignup(Map<String, dynamic> userData) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('signup_full_name', userData['name'] ?? '');
+    await prefs.setString('signup_nickname', userData['name'] ?? '');
+    await prefs.setString('signup_email', userData['email'] ?? '');
+    await prefs.setString('signup_avatar_url', userData['avatar_url'] ?? '');
+    await prefs.setString('signup_provider', 'facebook');
+    await prefs.setString(
+        'signup_provider_user_id', userData['provider_user_id'] ?? '');
+  }
+
   // 跨平台 Apple 登入處理
   Future<void> _handleAppleLogin() async {
     setState(() {
@@ -307,41 +347,50 @@ class _LoginPageState extends State<LoginPage> {
       final userData = await _platformAuthService.signInWithApple();
 
       if (userData != null) {
-        // 儲存用戶資料到本地
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(
-            'auth_token', 'Bearer ${userData['token'] ?? ''}');
-        await prefs.setString('user_email', userData['email'] ?? '');
-        await prefs.setInt('user_permission', userData['permission'] ?? 0);
-        await prefs.setString('user_name', userData['name'] ?? '');
-        await prefs.setInt('user_points', userData['points'] ?? 0);
-        await prefs.setString('user_avatarUrl', userData['avatar_url'] ?? '');
-        await prefs.setString(
-            'user_primaryLang', userData['primary_language'] ?? '');
+        // 檢查是否為新用戶，如果是則導向註冊頁面
+        if (userData['is_new_user'] == true) {
+          // 將 Apple 資料傳遞到註冊頁面
+          await _saveAppleDataForSignup(userData);
+          context.go('/signup/oauth');
+        } else {
+          // 現有用戶，儲存用戶資料到本地
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(
+              'auth_token', 'Bearer ${userData['token'] ?? ''}');
+          await prefs.setString('user_email', userData['email'] ?? '');
+          await prefs.setInt('user_permission', userData['permission'] ?? 0);
+          await prefs.setString('user_name', userData['name'] ?? '');
+          await prefs.setInt('user_points', userData['points'] ?? 0);
+          await prefs.setString('user_avatarUrl', userData['avatar_url'] ?? '');
+          await prefs.setString(
+              'user_primaryLang', userData['primary_language'] ?? '');
 
-        // 更新 Provider
-        Provider.of<UserService>(context, listen: false).setUser(UserModel(
-          id: userData['id'],
-          name: userData['name'],
-          nickname: userData['nickname'] ?? userData['name'],
-          email: userData['email'],
-          phone: userData['phone'] ?? '',
-          points: userData['points'] ?? 0,
-          avatar_url: userData['avatar_url'] ?? '',
-          status: userData['status'] ?? 'active',
-          provider: userData['provider'] ?? 'email',
-          created_at: userData['created_at'] ?? '',
-          updated_at: userData['updated_at'] ?? '',
-          referral_code: userData['referral_code'],
-          google_id: userData['google_id'],
-          primary_language: userData['primary_language'] ?? 'English',
-          permission_level: userData['permission'] ?? 0,
-        ));
+          // 更新 Provider
+          Provider.of<UserService>(context, listen: false).setUser(UserModel(
+            id: userData['id'],
+            name: userData['name'],
+            nickname: userData['nickname'] ?? userData['name'],
+            email: userData['email'],
+            phone: userData['phone'] ?? '',
+            points: userData['points'] ?? 0,
+            avatar_url: userData['avatar_url'] ?? '',
+            status: userData['status'] ?? 'active',
+            provider: userData['provider'] ?? 'apple',
+            created_at: userData['created_at'] ?? '',
+            updated_at: userData['updated_at'] ?? '',
+            referral_code: userData['referral_code'],
+            google_id: userData['google_id'],
+            primary_language: userData['primary_language'] ?? 'English',
+            permission_level: userData['permission'] ?? 0,
+          ));
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Apple Login Success: ${userData['email']}')),
-        );
-        context.go('/home');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    'Apple Login Success: ${userData['email'] ?? userData['name']}')),
+          );
+          context.go('/home');
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Apple Login Failed, Please Try Again')),
@@ -356,6 +405,18 @@ class _LoginPageState extends State<LoginPage> {
         isLoading = false;
       });
     }
+  }
+
+  // 新增：儲存 Apple 資料到註冊頁面
+  Future<void> _saveAppleDataForSignup(Map<String, dynamic> userData) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('signup_full_name', userData['name'] ?? '');
+    await prefs.setString('signup_nickname', userData['name'] ?? '');
+    await prefs.setString('signup_email', userData['email'] ?? '');
+    await prefs.setString('signup_avatar_url', userData['avatar_url'] ?? '');
+    await prefs.setString('signup_provider', 'apple');
+    await prefs.setString(
+        'signup_provider_user_id', userData['provider_user_id'] ?? '');
   }
 
   @override

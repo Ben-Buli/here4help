@@ -102,11 +102,6 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       return;
     }
 
-    if (chatProvider == null) {
-      debugPrint('⚠️ [My Works] _checkAndLoadIfNeeded ChatListProvider 為空');
-      return;
-    }
-
     // 檢查 Provider 是否已初始化
     if (!chatProvider.isInitialized) {
       debugPrint('⏳ [My Works] Provider 尚未初始化，跳過載入檢查');
@@ -143,10 +138,6 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     try {
       // 使用 try-catch 包裝 context.read 調用
       final provider = context.read<ChatListProvider>();
-      if (provider == null) {
-        debugPrint('⚠️ [My Works] Provider 為空，跳過未讀狀態更新');
-        return;
-      }
 
       // 檢查所有未讀訊息映射中是否有大於 0 的計數
       for (final count in provider.unreadByRoom.values) {
@@ -209,12 +200,10 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
       try {
         final chatProvider = context.read<ChatListProvider>();
-        if (chatProvider != null) {
-          chatProvider.addListener(_handleProviderChanges);
+        chatProvider.addListener(_handleProviderChanges);
 
-          // 檢查並按需載入數據
-          _checkAndLoadIfNeeded();
-        }
+        // 檢查並按需載入數據
+        _checkAndLoadIfNeeded();
       } catch (e) {
         debugPrint('❌ [My Works] initState 中設置 Provider listener 失敗: $e');
       }
@@ -240,12 +229,8 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
             return;
           }
 
-          if (safeProvider != null) {
-            safeProvider.updateUnreadByRoom(map);
-            debugPrint('✅ [My Works] 未讀數據已同步完成');
-          } else {
-            debugPrint('⚠️ [My Works] Provider 為空，跳過未讀數據更新');
-          }
+          safeProvider.updateUnreadByRoom(map);
+          debugPrint('✅ [My Works] 未讀數據已同步完成');
         } catch (e) {
           debugPrint('❌ [My Works] 更新未讀數據失敗: $e');
         }
@@ -279,10 +264,6 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
     try {
       final chatProvider = context.read<ChatListProvider>();
-      if (chatProvider == null) {
-        debugPrint('⚠️ [My Works] Provider 為空，跳過變化處理');
-        return;
-      }
 
       // 只有當前是 My Works 分頁時才刷新
       if (chatProvider.isMyWorksTab) {
@@ -316,9 +297,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     try {
       if (mounted) {
         final chatProvider = context.read<ChatListProvider>();
-        if (chatProvider != null) {
-          chatProvider.removeListener(_handleProviderChanges);
-        }
+        chatProvider.removeListener(_handleProviderChanges);
       }
     } catch (e) {
       // Provider may not be available during dispose
@@ -346,11 +325,6 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
         userService = context.read<UserService>();
       } catch (e) {
         debugPrint('⚠️ [My Works] 無法獲取 Provider: $e');
-        return;
-      }
-
-      if (chatProvider == null || userService == null) {
-        debugPrint('❌ [My Works] Provider 為空，無法繼續');
         return;
       }
 
@@ -535,13 +509,6 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       // 如果無法獲取 Provider，直接使用 TaskService 數據
       final apps = service.myApplications;
       debugPrint('📡 [My Works] 使用 TaskService 數據作為備用: ${apps.length} 個應徵記錄');
-      return _processApplicationsFromService(apps);
-    }
-
-    if (chatProvider == null) {
-      debugPrint(
-          '⚠️ [My Works] _composeMyWorks ChatListProvider 為空，使用 TaskService 數據');
-      final apps = service.myApplications;
       return _processApplicationsFromService(apps);
     }
 

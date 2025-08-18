@@ -143,6 +143,7 @@ ALTER TABLE `chat_messages`
 
 > 下列為 **最終一致版本** 的主要表 DDL（可直接對照、或用於初始化測試環境）。
 
+
 ### 4.1 使用者
 ```sql
 CREATE TABLE `users` (
@@ -158,6 +159,56 @@ CREATE TABLE `users` (
   `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+> user_identities：用於管理第三方登入相關資訊
+```sql
+-- user_identities 資料結構
+
+CREATE TABLE `user_identities` (
+  `id` bigint UNSIGNED NOT NULL,
+  `user_id` bigint UNSIGNED NOT NULL,
+  `provider` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '第三方登入提供者：google, facebook, apple',
+  `provider_user_id` varchar(191) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '第三方平台的用戶ID',
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '第三方平台提供的email（Apple首次可得，後續可能無）',
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '第三方平台提供的姓名',
+  `avatar_url` text COLLATE utf8mb4_unicode_ci COMMENT '第三方平台提供的頭像URL',
+  `access_token` text COLLATE utf8mb4_unicode_ci COMMENT '存取權杖（僅在需要代呼叫API時保存）',
+  `refresh_token` text COLLATE utf8mb4_unicode_ci COMMENT '重新整理權杖',
+  `token_expires_at` datetime DEFAULT NULL COMMENT '權杖過期時間',
+  `raw_profile` json DEFAULT NULL COMMENT '原始回應資料備查',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- 已傾印資料表的索引
+--
+
+--
+-- 資料表索引 `user_identities`
+--
+ALTER TABLE `user_identities`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_provider_uid` (`provider`,`provider_user_id`),
+  ADD KEY `idx_user_provider` (`user_id`,`provider`),
+  ADD KEY `idx_provider_user_id` (`provider_user_id`),
+  ADD KEY `idx_email` (`email`);
+
+--
+-- 在傾印的資料表使用自動遞增(AUTO_INCREMENT)
+--
+-- 使用資料表自動遞增(AUTO_INCREMENT) `user_identities`
+--
+ALTER TABLE `user_identities`
+  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT;
+
+-- 已傾印資料表的限制式
+--
+-- 資料表的限制式 `user_identities`
+--
+ALTER TABLE `user_identities`
+  ADD CONSTRAINT `fk_user_identities_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+COMMIT;
 ```
 
 ### 4.2 任務

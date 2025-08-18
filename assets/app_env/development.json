@@ -1,0 +1,21 @@
+{
+  "environment": "development",
+  "public": {
+    "api_base_url": "http://localhost:8888/here4help",
+    "socket_url": "http://localhost:3001",
+    "image_base_url": "http://localhost:8888/here4help",
+    "google_client_id": "your_google_client_id_here",
+    "facebook_app_id": "your_facebook_app_id_here",
+    "apple_service_id": "com.example.here4help.login"
+  },
+  "app": {
+    "debug_mode": true,
+    "log_level": "debug",
+    "features": {
+      "third_party_auth": true,
+      "chat": true,
+      "tasks": true,
+      "payments": false
+    }
+  }
+}

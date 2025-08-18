@@ -43,14 +43,14 @@ class _ProfilePageState extends State<ProfilePage> {
   final List<String> genderOptions = [
     'Male',
     'Female',
-    'Yellow_white_purple',
+    'Non-binary',
     'Genderfluid',
     'Agender',
     'Bigender',
     'Genderqueer',
     'Two-spirit',
-    'Prefer not to say',
-    'Other'
+    'Other',
+    'Prefer not to disclose'
   ];
 
   // 大學列表

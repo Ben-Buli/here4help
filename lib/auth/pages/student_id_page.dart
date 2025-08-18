@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:here4help/constants/app_colors.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:here4help/constants/app_colors.dart';
+import 'package:here4help/config/app_config.dart';
 
 class StudentIdPage extends StatefulWidget {
   const StudentIdPage({super.key});
@@ -342,8 +343,7 @@ class _StudentIdPageState extends State<StudentIdPage> {
       // Create multipart request
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse(
-            'http://localhost:8888/here4help/backend/api/auth/upload-student-id.php'),
+        Uri.parse(AppConfig.uploadStudentIdUrl),
       );
 
       // Add text fields

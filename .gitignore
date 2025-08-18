@@ -111,6 +111,19 @@ docs/TODO_LIST.md
 .env.staging
 .env.test
 
+# Flutter environment configs (keep examples, ignore actual configs)
+app_env/*.json
+app_env/*.txt
+!app_env/*.example.json
+!app_env/*.example.txt
+
+# Scripts (keep examples, ignore actual scripts)
+scripts/*.sh
+!scripts/*.example.sh
+
+# direnv
+.envrc
+
 # IDE specific
 .vscode/settings.json
 .vscode/launch.json

@@ -1,15 +1,11 @@
+import 'environment_config.dart';
+
 class AppConfig {
-  // 環境設定
-  static const bool isDevelopment = true; // 開發時設為 true，正式環境設為 false
+  // API 基礎 URL - 從環境配置獲取
+  static String get apiBaseUrl => EnvironmentConfig.apiBaseUrl;
 
-  // API 基礎 URL
-  static const String devApiBaseUrl = 'http://localhost:8888/here4help';
-  static const String prodApiBaseUrl = 'https://hero4help.demofhs.com';
-
-  // 獲取當前環境的 API 基礎 URL
-  static String get apiBaseUrl {
-    return isDevelopment ? devApiBaseUrl : prodApiBaseUrl;
-  }
+  // Socket 伺服器 URL - 從環境配置獲取
+  static String get socketUrl => EnvironmentConfig.socketUrl;
 
   // Google 登入 API 端點
   static String get googleLoginUrl {
@@ -84,10 +80,55 @@ class AppConfig {
     return '$apiBaseUrl/backend/api/tasks/applications/reject.php';
   }
 
-  // Socket Gateway
-  static String get devSocketUrl => 'http://localhost:3001';
-  static String get prodSocketUrl => 'https://hero4help.demofhs.com:3001';
-  static String get socketUrl => isDevelopment ? devSocketUrl : prodSocketUrl;
+  // 任務完成相關 API
+  static String get taskConfirmCompletionUrl {
+    return '$apiBaseUrl/backend/api/tasks/confirm_completion.php';
+  }
+
+  static String get taskDisagreeCompletionUrl {
+    return '$apiBaseUrl/backend/api/tasks/disagree_completion.php';
+  }
+
+  static String get taskPayAndReviewUrl {
+    return '$apiBaseUrl/backend/api/tasks/pay_and_review.php';
+  }
+
+  // 任務評價相關 API
+  static String get taskReviewsSubmitUrl {
+    return '$apiBaseUrl/backend/api/tasks/reviews/submit.php';
+  }
+
+  static String get taskReviewsGetUrl {
+    return '$apiBaseUrl/backend/api/tasks/reviews/get.php';
+  }
+
+  // 聊天相關 API
+  static String get chatUploadAttachmentUrl {
+    return '$apiBaseUrl/backend/api/chat/upload_attachment.php';
+  }
+
+  static String get chatReportUrl {
+    return '$apiBaseUrl/backend/api/chat/report.php';
+  }
+
+  static String get chatBlockUserUrl {
+    return '$apiBaseUrl/backend/api/chat/block_user.php';
+  }
+
+  // 大學列表 API
+  static String get universitiesListUrl {
+    return '$apiBaseUrl/backend/api/universities/list.php';
+  }
+
+  // 推薦碼驗證 API
+  static String get verifyReferralCodeUrl {
+    return '$apiBaseUrl/backend/api/auth/verify-referral-code.php';
+  }
+
+  // 學生證上傳 API
+  static String get uploadStudentIdUrl {
+    return '$apiBaseUrl/backend/api/auth/upload-student-id.php';
+  }
 
   // Chat APIs (MVP)
   static String get unreadByTasksUrl =>
@@ -98,23 +139,4 @@ class AppConfig {
       '$apiBaseUrl/backend/api/chat/read_room_v2.php';
   static String get ensureRoomUrl =>
       '$apiBaseUrl/backend/api/chat/ensure_room.php';
-  static String get chatUploadAttachmentUrl =>
-      '$apiBaseUrl/backend/api/chat/upload_attachment.php';
-
-  // Chat - Reports & Blocks
-  static String get chatReportUrl => '$apiBaseUrl/backend/api/chat/report.php';
-  static String get chatBlockUserUrl =>
-      '$apiBaseUrl/backend/api/chat/block_user.php';
-
-  // Tasks - Completion & Reviews & Payment
-  static String get taskConfirmCompletionUrl =>
-      '$apiBaseUrl/backend/api/tasks/confirm_completion.php';
-  static String get taskDisagreeCompletionUrl =>
-      '$apiBaseUrl/backend/api/tasks/disagree_completion.php';
-  static String get taskPayAndReviewUrl =>
-      '$apiBaseUrl/backend/api/tasks/pay_and_review.php';
-  static String get taskReviewsSubmitUrl =>
-      '$apiBaseUrl/backend/api/tasks/reviews_submit.php';
-  static String get taskReviewsGetUrl =>
-      '$apiBaseUrl/backend/api/tasks/reviews_get.php';
 }
