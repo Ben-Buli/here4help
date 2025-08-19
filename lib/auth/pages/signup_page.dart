@@ -36,29 +36,45 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   final TextEditingController schoolController = TextEditingController();
   final TextEditingController referralCodeController = TextEditingController();
 
-  String selectedGender = 'Male';
+  final genderParams = {
+    'Male': 'Male',
+    'Female': 'Female',
+    'Non-binary': 'Non-binary',
+    'Genderfluid': 'Genderfluid',
+    'Agender': 'Agender',
+    'Bigender': 'Bigender',
+    'Genderqueer': 'Genderqueer',
+    'Two-spirit': 'Two-spirit',
+    'Other': 'Other',
+    'Prefer not to disclose': 'Prefer not to disclose',
+  };
+  // 性別選項
+  late final List<String> genderOptions = genderParams.keys.toList();
+
+  // 以下為表單狀態
+  late String selectedGender;
   bool isPermanentAddress = false;
   bool isLoading = false;
   bool showPassword = false;
   bool showConfirmPassword = false;
+
+  @override
+  void initState() {
+    super.initState();
+    selectedGender =
+        genderParams['Prefer not to disclose'] ?? 'Prefer not to disclose';
+    WidgetsBinding.instance.addObserver(this);
+    _loadExistingData();
+    _loadPrefilledData();
+    _loadLanguages();
+    _loadUniversities();
+    _loadThirdPartyData(); // 新增：載入第三方登入資料
+  }
+
   bool showPaymentPassword = false;
   bool showConfirmPaymentPassword = false;
   bool isVerifyingReferralCode = false;
   String? referralCodeStatus; // 'valid', 'invalid', 'not_found'
-
-  // 性別選項
-  final List<String> genderOptions = [
-    'Male',
-    'Female',
-    'Non-binary',
-    'Genderfluid',
-    'Agender',
-    'Bigender',
-    'Genderqueer',
-    'Two-spirit',
-    'Other',
-    'Prefer not to disclose'
-  ];
 
   // 語言選項
   List<Map<String, dynamic>> languageOptions = [];
@@ -68,16 +84,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   List<Map<String, dynamic>> universityOptions = [];
   String? selectedUniversityId;
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _loadExistingData();
-    _loadPrefilledData();
-    _loadLanguages();
-    _loadUniversities();
-    _loadThirdPartyData(); // 新增：載入第三方登入資料
-  }
+
 
   // 新增：載入第三方登入資料
   Future<void> _loadThirdPartyData() async {
@@ -254,7 +261,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     setState(() {
       fullNameController.text = prefs.getString('signup_full_name') ?? '';
       nicknameController.text = prefs.getString('signup_nickname') ?? '';
-      selectedGender = prefs.getString('signup_gender') ?? 'Male';
+      selectedGender =
+          prefs.getString('signup_gender') ?? 'Prefer not to disclose';
       emailController.text = prefs.getString('signup_email') ?? '';
       phoneController.text = prefs.getString('signup_phone') ?? '';
       countryController.text = prefs.getString('signup_country') ?? '';
@@ -420,16 +428,57 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
               decoration: const InputDecoration(
                 labelText: 'Phone number',
                 border: OutlineInputBorder(),
+                helperText: 'Taiwan format: 09xxxxxxxx or +8869xxxxxxxx',
               ),
               keyboardType: TextInputType.phone,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
+              ],
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your phone number';
+                }
+                if (!RegExp(r'^(09\d{8}|\+8869\d{8})$').hasMatch(value)) {
+                  return 'Invalid Taiwan mobile format';
                 }
                 return null;
               },
             ),
             const SizedBox(height: 16),
+
+            // Date of Birth (moved here, renamed to Birthday)
+            TextFormField(
+              controller: dateOfBirthController,
+              decoration: const InputDecoration(
+                labelText: 'Birthday',
+                hintText: 'YYYY/MM/DD',
+                border: OutlineInputBorder(),
+              ),
+              readOnly: true,
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime.now()
+                      .subtract(const Duration(days: 6570)), // 18 years ago
+                  firstDate: DateTime.now()
+                      .subtract(const Duration(days: 36500)), // 100 years ago
+                  lastDate: DateTime.now(),
+                );
+                if (date != null) {
+                  setState(() {
+                    dateOfBirthController.text =
+                        '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+                  });
+                }
+              },
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please select your date of birth';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 32),
 
             // Address (moved here)
             Row(
@@ -716,12 +765,29 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                       fontSize: 16.0,
                       color: Theme.of(context).colorScheme.onSurface,
                     ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                      LengthLimitingTextInputFormatter(12),
+                    ],
                     onChanged: (value) {
+                      final upper = value.toUpperCase();
+                      if (referralCodeController.text != upper) {
+                        referralCodeController.value =
+                            referralCodeController.value.copyWith(
+                          text: upper,
+                          selection:
+                              TextSelection.collapsed(offset: upper.length),
+                        );
+                      }
                       if (value.isEmpty) {
                         setState(() {
                           referralCodeStatus = null;
                         });
                       }
+                    },
+                    validator: (value) {
+                      // Referral code is optional
+                      return null;
                     },
                   ),
                 ),
@@ -796,11 +862,11 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             Container(
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                  color: Theme.of(context).colorScheme.outline.withOpacity(0.4),
                   width: 1.0,
                 ),
-                borderRadius: BorderRadius.circular(8.0),
-                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(12.0),
+                color: Colors.transparent,
               ),
               child: Column(
                 children: [
@@ -875,53 +941,36 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
 
                   // 語言選擇按鈕
                   if (selectedLanguages.length < 4)
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          top: BorderSide(
-                            color: selectedLanguages.isNotEmpty
-                                ? Theme.of(context)
-                                    .colorScheme
-                                    .outline
-                                    .withOpacity(0.2)
-                                : Colors.transparent,
-                            width: 1.0,
-                          ),
-                        ),
-                      ),
-                      child: ListTile(
-                        leading: Icon(
-                          Icons.add_circle_outline,
-                          color: Theme.of(context).colorScheme.primary,
-                          size: 24.0,
-                        ),
-                        title: Text(
-                          'Add Language',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 16.0,
-                          ),
-                        ),
-                        subtitle: Text(
-                          'Select up to 4 languages',
-                          style: TextStyle(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withOpacity(0.6),
-                            fontSize: 14.0,
-                          ),
-                        ),
-                        trailing: Icon(
-                          Icons.arrow_forward_ios,
-                          color: Theme.of(context).colorScheme.primary,
-                          size: 16.0,
-                        ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: GestureDetector(
                         onTap: _showLanguageSelector,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16.0,
-                          vertical: 8.0,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.add_circle_outline,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 24.0,
+                              ),
+                              const SizedBox(width: 8.0),
+                              Text(
+                                'Add Language',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16.0,
+                                ),
+                              ),
+                              const Spacer(),
+                              Icon(
+                                Icons.chevron_right,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 24.0,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -1017,90 +1066,72 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 16),
 
-            // Date of Birth
-            TextFormField(
-              controller: dateOfBirthController,
-              decoration: const InputDecoration(
-                labelText: 'Date of Birth',
-                hintText: 'YYYY/MM/DD',
-                border: OutlineInputBorder(),
-              ),
-              readOnly: true,
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now()
-                      .subtract(const Duration(days: 6570)), // 18 years ago
-                  firstDate: DateTime.now()
-                      .subtract(const Duration(days: 36500)), // 100 years ago
-                  lastDate: DateTime.now(),
-                );
-                if (date != null) {
-                  setState(() {
-                    dateOfBirthController.text =
-                        '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
-                  });
-                }
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please select your date of birth';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 32),
-
             // Divider
             const Divider(thickness: 2, color: AppColors.secondary),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
-            // Payment Password Section
-            const Text(
-              'Payment Security',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            // Payment Security Section (wrapped in Container)
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              color: Theme.of(context).colorScheme.surface,
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 1.5,
+                ),
+                borderRadius: BorderRadius.circular(12.0),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Payment Security',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  // Payment Password (6 boxes)
+                  const Text('Payment Password'),
+                  const SizedBox(height: 8),
+                  _buildPinputField(
+                    controller: paymentPasswordController,
+                    helperText: 'This will be used for payment verification',
+                    validator: (v) {
+                      final t = (v ?? '').trim();
+                      if (t.isEmpty) return 'Please enter payment password';
+                      if (t.length != 6)
+                        return 'Payment password must be 6 digits';
+                      if (!RegExp(r'^\d{6}$').hasMatch(t)) return 'Digits only';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  // Confirm Payment Password (6 boxes)
+                  const Text('Confirm Payment Password'),
+                  const SizedBox(height: 8),
+                  _buildPinputField(
+                    controller: confirmPaymentPasswordController,
+                    onChanged: (t) {
+                      // 及時驗證與第一次是否一致（6 碼時才比對）
+                      if (t.length == 6 &&
+                          t != paymentPasswordController.text) {
+                        // 觸發一次重建以顯示 validator 的錯誤（若有包在 Form 中）
+                        if (mounted) setState(() {});
+                      }
+                    },
+                    validator: (v) {
+                      final t = (v ?? '').trim();
+                      if (t.isEmpty) return 'Must be 6 digits';
+                      if (t != paymentPasswordController.text) {
+                        return 'Payment passwords do not match';
+                      }
+                      return null;
+                    },
+                    helperText: 'Must match the password above',
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-
-            // Payment Password (6 boxes)
-            const Text('Payment Password'),
-            const SizedBox(height: 8),
-            _buildPinputField(
-              controller: paymentPasswordController,
-              helperText: 'This will be used for payment verification',
-              validator: (v) {
-                final t = (v ?? '').trim();
-                if (t.isEmpty) return 'Please enter payment password';
-                if (t.length != 6) return 'Payment password must be 6 digits';
-                if (!RegExp(r'^\d{6}$').hasMatch(t)) return 'Digits only';
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Confirm Payment Password (6 boxes)
-            const Text('Confirm Payment Password'),
-            const SizedBox(height: 8),
-            _buildPinputField(
-              controller: confirmPaymentPasswordController,
-              onChanged: (t) {
-                // 及時驗證與第一次是否一致（6 碼時才比對）
-                if (t.length == 6 && t != paymentPasswordController.text) {
-                  // 觸發一次重建以顯示 validator 的錯誤（若有包在 Form 中）
-                  if (mounted) setState(() {});
-                }
-              },
-              validator: (v) {
-                final t = (v ?? '').trim();
-                if (t.isEmpty) return 'Must be 6 digits';
-                if (t != paymentPasswordController.text) {
-                  return 'Payment passwords do not match';
-                }
-                return null;
-              },
-              helperText: 'Must match the password above',
-            ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
             // Submit Button
             SizedBox(
@@ -1342,6 +1373,13 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   }
 
   void _handleSubmit() async {
+    // Ensure at least one language is selected
+    if (selectedLanguages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one language')),
+      );
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
       return;
     }
