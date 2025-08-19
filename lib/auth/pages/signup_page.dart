@@ -84,8 +84,6 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   List<Map<String, dynamic>> universityOptions = [];
   String? selectedUniversityId;
 
-
-
   // 新增：載入第三方登入資料
   Future<void> _loadThirdPartyData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -1073,8 +1071,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             // Payment Security Section (wrapped in Container)
             Container(
               padding: const EdgeInsets.all(16.0),
-              color: Theme.of(context).colorScheme.surface,
               decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
                 border: Border.all(
                   color: Theme.of(context).colorScheme.primary,
                   width: 1.5,
