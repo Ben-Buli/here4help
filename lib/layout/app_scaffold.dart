@@ -11,6 +11,23 @@ import 'dart:ui';
 import 'dart:math';
 import 'package:here4help/services/scroll_event_bus.dart';
 
+// 新增：導覽列項目資料結構
+class NavigationItem {
+  final IconData icon;
+  final String label;
+  final String route;
+  final bool requiresPreload;
+  final Widget? customIcon;
+
+  const NavigationItem({
+    required this.icon,
+    required this.label,
+    required this.route,
+    this.requiresPreload = false,
+    this.customIcon,
+  });
+}
+
 class AppScaffold extends StatefulWidget {
   const AppScaffold({
     super.key,
@@ -46,6 +63,35 @@ class _AppScaffoldState extends State<AppScaffold> {
     '/task/apply',
     '/chat/detail',
   };
+
+  // 新增：統一的導覽列項目配置
+  static const List<NavigationItem> _navigationItems = [
+    NavigationItem(
+      icon: Icons.home,
+      label: 'Home',
+      route: '/home',
+      requiresPreload: true,
+    ),
+    NavigationItem(
+      icon: Icons.search,
+      label: 'Tasks',
+      route: '/task',
+      requiresPreload: true,
+    ),
+    NavigationItem(
+      icon: Icons.message,
+      label: 'Chat',
+      route: '/chat',
+      requiresPreload: true,
+      customIcon: null, // 將在 build 時動態創建 _ChatBadgeDotIcon
+    ),
+    NavigationItem(
+      icon: Icons.person,
+      label: 'Account',
+      route: '/account',
+      requiresPreload: false,
+    ),
+  ];
 
   @override
   void didChangeDependencies() {
@@ -326,64 +372,35 @@ class _AppScaffoldState extends State<AppScaffold> {
               final current = _getCurrentIndex(context);
               if (index == current) {
                 // 同頁：發送滾頂事件
-                final route = switch (index) {
-                  0 => '/task/create',
-                  1 => '/task',
-                  2 => '/home',
-                  3 => '/chat',
-                  4 => '/account',
-                  _ => '/home',
-                };
+                final route = _navigationItems[index].route;
                 ScrollEventBus().emit(route);
                 return;
               }
 
               // 預載入目標頁面的數據
               final preloadService = DataPreloadService();
+              final targetItem = _navigationItems[index];
 
-              switch (index) {
-                case 0:
-                  context.go('/task/create');
-                  break;
-                case 1:
-                  preloadService.preloadForRoute('/task');
-                  context.go('/task');
-                  break;
-                case 2:
-                  preloadService.preloadForRoute('/home');
-                  context.go('/home');
-                  break;
-                case 3:
-                  preloadService.preloadForRoute('/chat');
-                  context.go('/chat');
-                  break;
-                case 4:
-                  context.go('/account');
-                  break;
+              if (targetItem.requiresPreload) {
+                preloadService.preloadForRoute(targetItem.route);
               }
+
+              context.go(targetItem.route);
             },
-            items: [
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.add_box_outlined),
-                label: 'Post',
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.search),
-                label: 'Tasks',
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.home),
-                label: 'Home',
-              ),
-              BottomNavigationBarItem(
-                icon: _ChatBadgeDotIcon(),
-                label: 'Chat',
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.person),
-                label: 'Account',
-              ),
-            ],
+            items: _navigationItems.map((item) {
+              // 特殊處理 Chat 項目的圖標
+              if (item.route == '/chat') {
+                return BottomNavigationBarItem(
+                  icon: _ChatBadgeDotIcon(),
+                  label: item.label,
+                );
+              }
+
+              return BottomNavigationBarItem(
+                icon: Icon(item.icon),
+                label: item.label,
+              );
+            }).toList(),
           ),
         ),
       ),
@@ -399,12 +416,17 @@ class _AppScaffoldState extends State<AppScaffold> {
 
   int _getCurrentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.toString();
-    if (location.startsWith('/task/create')) return 0;
-    if (location.startsWith('/task')) return 1;
-    if (location.startsWith('/home')) return 2;
-    if (location.startsWith('/chat')) return 3;
-    if (location.startsWith('/account')) return 4;
-    return 2; // 預設 Home
+
+    // 優先檢查更長的路徑，避免 /task 匹配到 /task/create
+    for (int i = 0; i < _navigationItems.length; i++) {
+      final item = _navigationItems[i];
+      if (location.startsWith(item.route)) {
+        return i;
+      }
+    }
+
+    // 如果沒有匹配到任何路由，返回 Home 頁面
+    return 2; // Home 頁面的索引
   }
 
   bool _canGoBack() {

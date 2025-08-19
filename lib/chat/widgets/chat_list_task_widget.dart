@@ -162,8 +162,8 @@ class _ChatListTaskWidgetState extends State<ChatListTaskWidget>
               fontWeight: FontWeight.w300,
             ),
             tabs: [
-              Tab(child: buildTabLabel('Posted Tasks', postedHasUnread)),
-              Tab(child: buildTabLabel('My Works', worksHasUnread)),
+              Tab(child: buildTabLabel('Post', postedHasUnread)),
+              Tab(child: buildTabLabel('Expolore', worksHasUnread)),
             ],
           ),
         );

@@ -57,6 +57,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   bool isLoading = false;
   bool showPassword = false;
   bool showConfirmPassword = false;
+  bool showPaymentPins = false;
 
   @override
   void initState() {
@@ -79,6 +80,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   // 語言選項
   List<Map<String, dynamic>> languageOptions = [];
   List<String> selectedLanguages = ['en'];
+  bool languagesError = false;
 
   // 大學選項
   List<Map<String, dynamic>> universityOptions = [];
@@ -115,6 +117,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       final langs = await LanguageService.getLanguages();
       setState(() {
         languageOptions = langs;
+        // Optionally clear language error if languages loaded and selectedLanguages is not empty
+        if (selectedLanguages.isNotEmpty) languagesError = false;
       });
     } catch (e) {
       // 如果無法載入語言列表，使用預設列表
@@ -125,6 +129,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
           {'code': 'ja', 'name': 'Japanese', 'native': '日本語'},
           {'code': 'ko', 'name': 'Korean', 'native': '한국어'},
         ];
+        if (selectedLanguages.isNotEmpty) languagesError = false;
       });
     }
   }
@@ -338,9 +343,13 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             // Full Name
             TextFormField(
               controller: fullNameController,
-              decoration: const InputDecoration(
-                labelText: 'Your Name',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.person,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                labelText: 'Your Name *',
+                border: const OutlineInputBorder(),
                 helperText:
                     'Enter your complete name as it appears on your official documents',
               ),
@@ -356,9 +365,13 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             // Nickname
             TextFormField(
               controller: nicknameController,
-              decoration: const InputDecoration(
-                labelText: 'Nickname (preferred name)',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.alternate_email,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                labelText: 'Nickname',
+                border: const OutlineInputBorder(),
                 helperText: 'Enter the name you prefer to be called (optional)',
               ),
               validator: (value) {
@@ -369,15 +382,18 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             const SizedBox(height: 16),
 
             // Gender Selection
-            const Text('Gender',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: selectedGender,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: 'Gender *',
+                prefixIcon: Icon(
+                  Icons.star,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                border: const OutlineInputBorder(),
                 contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               items: genderOptions.map((String gender) {
                 return DropdownMenuItem<String>(
@@ -402,11 +418,15 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             // Email
             TextFormField(
               controller: emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                border: OutlineInputBorder(),
-              ),
               keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.alternate_email,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                labelText: 'Email *',
+                border: const OutlineInputBorder(),
+              ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your email';
@@ -423,12 +443,16 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             // Phone Number
             TextFormField(
               controller: phoneController,
-              decoration: const InputDecoration(
-                labelText: 'Phone number',
-                border: OutlineInputBorder(),
-                helperText: 'Taiwan format: 09xxxxxxxx or +8869xxxxxxxx',
-              ),
               keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.phone,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                labelText: 'Phone number *',
+                border: const OutlineInputBorder(),
+                hintText: 'Taiwan format: 09xxxxxxxx or +8869xxxxxxxx',
+              ),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
               ],
@@ -447,10 +471,15 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             // Date of Birth (moved here, renamed to Birthday)
             TextFormField(
               controller: dateOfBirthController,
-              decoration: const InputDecoration(
+              keyboardType: TextInputType.datetime,
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.calendar_month,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 labelText: 'Birthday',
                 hintText: 'YYYY/MM/DD',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
               readOnly: true,
               onTap: () async {
@@ -484,9 +513,13 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                 Expanded(
                   child: TextFormField(
                     controller: addressController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(
+                        Icons.location_on,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                       labelText: 'Address',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -524,6 +557,10 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
               value: selectedUniversityId,
               decoration: InputDecoration(
                 labelText: 'School *',
+                prefixIcon: Icon(
+                  Icons.school,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8.0),
                 ),
@@ -820,6 +857,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                 ),
               ],
             ),
+
             // 推薦碼狀態提示
             if (referralCodeStatus != null) ...[
               const SizedBox(height: 8),
@@ -851,7 +889,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             Text(
               'Primary Languages *',
               style: TextStyle(
-                fontSize: 16.0,
+                fontSize: 14.0,
                 fontWeight: FontWeight.w600,
                 color: Theme.of(context).colorScheme.onSurface,
               ),
@@ -859,12 +897,14 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
                 border: Border.all(
-                  color: Theme.of(context).colorScheme.outline.withOpacity(0.4),
+                  color: languagesError
+                      ? Theme.of(context).colorScheme.error
+                      : Theme.of(context).colorScheme.outline.withOpacity(0.4),
                   width: 1.0,
                 ),
                 borderRadius: BorderRadius.circular(12.0),
-                color: Colors.transparent,
               ),
               child: Column(
                 children: [
@@ -897,6 +937,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                                 onTap: () {
                                   setState(() {
                                     selectedLanguages.remove(langCode);
+                                    languagesError = false;
                                   });
                                 },
                                 child: Padding(
@@ -975,104 +1016,32 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-
-            // Password
-            TextFormField(
-              controller: passwordController,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                border: const OutlineInputBorder(),
-                helperText: 'At least 6 characters, letters and numbers only',
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    showPassword ? Icons.visibility : Icons.visibility_off,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      showPassword = !showPassword;
-                    });
-                  },
+            if (languagesError) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Please select at least one language',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontSize: 12,
                 ),
               ),
-              obscureText: !showPassword,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-              ],
-              onChanged: (value) {
-                // 即時檢查確認密碼
-                if (confirmPasswordController.text.isNotEmpty) {
-                  setState(() {});
-                }
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a password';
-                }
-                if (value.length < 6) {
-                  return 'Password must be at least 6 characters';
-                }
-                if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(value)) {
-                  return 'Password can only contain letters and numbers';
-                }
-                return null;
-              },
-            ),
+              const SizedBox(height: 10),
+            ],
             const SizedBox(height: 16),
 
-            // Confirm Password
-            TextFormField(
-              controller: confirmPasswordController,
-              decoration: InputDecoration(
-                labelText: 'Confirm Password',
-                border: const OutlineInputBorder(),
-                helperText: confirmPasswordController.text.isNotEmpty &&
-                        confirmPasswordController.text !=
-                            passwordController.text
-                    ? 'Passwords do not match'
-                    : null,
-                helperMaxLines: 1,
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    showConfirmPassword
-                        ? Icons.visibility
-                        : Icons.visibility_off,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      showConfirmPassword = !showConfirmPassword;
-                    });
-                  },
-                ),
-              ),
-              obscureText: !showConfirmPassword,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-              ],
-              onChanged: (value) {
-                setState(() {});
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please confirm your password';
-                }
-                if (value != passwordController.text) {
-                  return 'Passwords do not match';
-                }
-                return null;
-              },
+            // 分隔線
+            Divider(
+              thickness: 2,
+              color: Theme.of(context).colorScheme.secondary,
             ),
-            const SizedBox(height: 16),
-
-            // Divider
-            const Divider(thickness: 2, color: AppColors.secondary),
             const SizedBox(height: 24),
-
-            // Payment Security Section (wrapped in Container)
+            // Account Password Section (wrapped like Payment Security)
             Container(
               padding: const EdgeInsets.all(16.0),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
+                color: Theme.of(context).colorScheme.surface.withValues(
+                      alpha: 0.5,
+                    ),
                 border: Border.all(
                   color: Theme.of(context).colorScheme.primary,
                   width: 1.5,
@@ -1082,17 +1051,161 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Payment Security',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Account Password *',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: (showPassword || showConfirmPassword)
+                            ? 'Hide passwords'
+                            : 'Show passwords',
+                        icon: Icon(
+                          (showPassword || showConfirmPassword)
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            final next = !(showPassword || showConfirmPassword);
+                            showPassword = next;
+                            showConfirmPassword = next;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: passwordController,
+                    decoration: InputDecoration(
+                      labelText: 'Password *',
+                      prefixIcon: Icon(
+                        Icons.lock_outline,
+                        color: Theme.of(context).colorScheme.primary.withValues(
+                              alpha: 0.5,
+                            ),
+                      ),
+                      border: const OutlineInputBorder(),
+                      hintText: 'At least 6 characters, a-z, A-Z, 0-9',
+                    ),
+                    obscureText: !showPassword,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+                    ],
+                    onChanged: (value) {
+                      if (confirmPasswordController.text.isNotEmpty) {
+                        setState(() {});
+                      }
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a password';
+                      }
+                      if (value.length < 6) {
+                        return 'Password must be at least 6 characters';
+                      }
+                      if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(value)) {
+                        return 'Password can only contain letters and numbers';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: confirmPasswordController,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm Password again *',
+                      prefixIcon: Icon(
+                        Icons.lock,
+                        color: Theme.of(context).colorScheme.primary.withValues(
+                              alpha: 0.5,
+                            ),
+                      ),
+                      border: const OutlineInputBorder(),
+                      hintText: 'Confirm your password again',
+                      helperText: confirmPasswordController.text !=
+                              passwordController.text
+                          ? 'Passwords do not match'
+                          : null,
+                      helperMaxLines: 1,
+                    ),
+                    obscureText: !showConfirmPassword,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+                    ],
+                    onChanged: (value) {
+                      setState(() {});
+                    },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please confirm your password';
+                      }
+                      if (value != passwordController.text) {
+                        return 'Passwords do not match';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Payment Security Section (wrapped in Container)
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface.withValues(
+                      alpha: 0.5,
+                    ),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 1.5,
+                ),
+                borderRadius: BorderRadius.circular(12.0),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Payment Security',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        tooltip: showPaymentPins
+                            ? 'Hide payment code'
+                            : 'Show payment code',
+                        icon: Icon(
+                          showPaymentPins
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        onPressed: () => setState(() {
+                          showPaymentPins = !showPaymentPins;
+                        }),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   // Payment Password (6 boxes)
-                  const Text('Payment Password'),
+                  const Text('Password *'),
                   const SizedBox(height: 8),
                   _buildPinputField(
                     controller: paymentPasswordController,
-                    helperText: 'This will be used for payment verification',
+                    // helperText: 'This will be used for payment verification',
                     validator: (v) {
                       final t = (v ?? '').trim();
                       if (t.isEmpty) return 'Please enter payment password';
@@ -1101,13 +1214,20 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                       if (!RegExp(r'^\d{6}$').hasMatch(t)) return 'Digits only';
                       return null;
                     },
+                    obscure: !showPaymentPins,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
                   ),
                   const SizedBox(height: 16),
                   // Confirm Payment Password (6 boxes)
-                  const Text('Confirm Payment Password'),
+                  const Text('Confirm Password *'),
                   const SizedBox(height: 8),
                   _buildPinputField(
                     controller: confirmPaymentPasswordController,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
                     onChanged: (t) {
                       // 及時驗證與第一次是否一致（6 碼時才比對）
                       if (t.length == 6 &&
@@ -1124,7 +1244,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                       }
                       return null;
                     },
-                    helperText: 'Must match the password above',
+                    // helperText: 'Must match the password above',
+                    obscure: !showPaymentPins,
                   ),
                 ],
               ),
@@ -1320,6 +1441,9 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                                     selectedLanguages.remove(lang['code']!);
                                   }
                                 });
+                                setState(() {
+                                  languagesError = false;
+                                });
                               },
                               activeColor:
                                   Theme.of(context).colorScheme.primary,
@@ -1350,7 +1474,9 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    setState(() {});
+                    setState(() {
+                      languagesError = false;
+                    });
                     Navigator.of(context).pop();
                   },
                   style: ElevatedButton.styleFrom(
@@ -1373,10 +1499,14 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   void _handleSubmit() async {
     // Ensure at least one language is selected
     if (selectedLanguages.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one language')),
-      );
+      setState(() {
+        languagesError = true;
+      });
       return;
+    } else {
+      setState(() {
+        languagesError = false;
+      });
     }
     if (!_formKey.currentState!.validate()) {
       return;
@@ -1491,6 +1621,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     String? Function(String?)? validator,
     void Function(String)? onChanged,
     String? helperText,
+    bool obscure = true,
+    required List<TextInputFormatter> inputFormatters,
   }) {
     final defaultPinTheme = PinTheme(
       width: 45,
@@ -1518,6 +1650,13 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       ),
     );
 
+    final errorPinTheme = defaultPinTheme.copyWith(
+      decoration: defaultPinTheme.decoration!.copyWith(
+        border:
+            Border.all(color: Theme.of(context).colorScheme.error, width: 2),
+      ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1527,11 +1666,12 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
           defaultPinTheme: defaultPinTheme,
           focusedPinTheme: focusedPinTheme,
           submittedPinTheme: submittedPinTheme,
+          errorPinTheme: errorPinTheme,
           validator: validator,
           onChanged: onChanged,
           keyboardType: TextInputType.number,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          obscureText: true,
+          obscureText: obscure,
           autofocus: false,
           pinputAutovalidateMode: PinputAutovalidateMode.onSubmit,
         ),

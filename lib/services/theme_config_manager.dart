@@ -282,6 +282,38 @@ class ThemeConfigManager extends ChangeNotifier {
   ///
   /// 返回主題組名稱。
   String _getThemeGroup(ThemeScheme theme) {
+    // 直接使用主題的 category 屬性進行分類
+    switch (theme.category.toLowerCase()) {
+      case 'morandi':
+        return 'Morandi';
+      case 'ocean':
+        return 'Ocean';
+      case 'taiwan':
+        return 'Taiwan';
+      case 'business':
+        return 'Business';
+      case 'emotions':
+        return 'Emotions';
+      case 'glassmorphism':
+        return 'Glassmorphism';
+      case 'experimental':
+        return 'Experimental';
+      default:
+        // 如果 category 不在預期範圍內，回退到基於名稱的邏輯
+        return _getThemeGroupByName(theme);
+    }
+  }
+
+  /// 基於名稱的備用分類邏輯（向後兼容）
+  ///
+  /// 當主題的 category 屬性不在預期範圍內時，使用此方法作為備用。
+  /// 這個方法保持原有的基於名稱的模式匹配邏輯。
+  ///
+  /// 參數：
+  /// - [theme]: 要分類的主題
+  ///
+  /// 返回主題組名稱。
+  String _getThemeGroupByName(ThemeScheme theme) {
     // 移除 _dark 後綴來判斷原始主題類型
     String baseName = theme.name.replaceAll('_dark', '');
 
@@ -468,11 +500,15 @@ class ThemeConfigManager extends ChangeNotifier {
 
   /// 獲取主題風格
   ///
-  /// 根據主題名稱判斷主題所屬的風格類型：
+  /// 優先使用主題的 category 屬性來判斷風格類型，
+  /// 如果 category 不在預期範圍內，則回退到基於名稱的邏輯。
+  ///
+  /// 風格類型：
   /// - `morandi`: 莫蘭迪風格主題
   /// - `ocean`: 海洋風格主題
   /// - `glassmorphism`: 毛玻璃風格主題
   /// - `business`: 商業風格主題
+  /// - `emotions`: 情感表達主題
   /// - `default`: 默認風格主題
   ///
   /// 參數：
@@ -480,6 +516,38 @@ class ThemeConfigManager extends ChangeNotifier {
   ///
   /// 返回主題風格字符串。
   String _getThemeStyle(ThemeScheme theme) {
+    // 優先使用 category 屬性
+    switch (theme.category.toLowerCase()) {
+      case 'morandi':
+        return 'morandi';
+      case 'ocean':
+        return 'ocean';
+      case 'glassmorphism':
+        return 'glassmorphism';
+      case 'business':
+        return 'business';
+      case 'emotions':
+        return 'emotions';
+      case 'taiwan':
+        return 'taiwan';
+      case 'experimental':
+        return 'experimental';
+      default:
+        // 如果 category 不在預期範圍內，回退到基於名稱的邏輯
+        return _getThemeStyleByName(theme);
+    }
+  }
+
+  /// 基於名稱的備用風格判斷邏輯（向後兼容）
+  ///
+  /// 當主題的 category 屬性不在預期範圍內時，使用此方法作為備用。
+  /// 這個方法保持原有的基於名稱的模式匹配邏輯。
+  ///
+  /// 參數：
+  /// - [theme]: 要檢查的主題
+  ///
+  /// 返回主題風格字符串。
+  String _getThemeStyleByName(ThemeScheme theme) {
     if (theme.name.startsWith('morandi_')) {
       return 'morandi';
     } else if (theme.name.contains('ocean') || theme.name.contains('beach')) {
@@ -489,6 +557,13 @@ class ThemeConfigManager extends ChangeNotifier {
       return 'glassmorphism';
     } else if (theme.name.contains('business') || theme.name.contains('meta')) {
       return 'business';
+    } else if (theme.name.contains('rainbow_pride') ||
+        theme.name.contains('blue_pink') ||
+        theme.name.contains('pink_theme') ||
+        theme.name.contains('yellow_white_purple') ||
+        theme.name.contains('bear_gay_flat') ||
+        theme.name.contains('pride_s_curve')) {
+      return 'emotions';
     } else {
       return 'default';
     }
@@ -554,6 +629,12 @@ class ThemeConfigManager extends ChangeNotifier {
         }
         // 其他商業主題使用主題主要色
         return theme.primary;
+      case 'emotions':
+        // Emotions 主題使用深色文字以確保可讀性
+        return const Color(0xFF2D3748); // 深灰文字
+      case 'taiwan':
+        // Taiwan 主題使用白色文字（在深色背景上）
+        return Colors.white;
       default:
         // Sandy 主題使用白色文字
         if (theme.name == 'sandy_footprints' ||
@@ -622,6 +703,16 @@ class ThemeConfigManager extends ChangeNotifier {
           Colors.white.withValues(alpha: 1), // 白色半透明
           Colors.white.withValues(alpha: 0.2), // 更透明的白色
         ];
+      case 'taiwan':
+        // Taiwan 主題使用主題主要色漸層
+        return [
+          theme.primary.withValues(alpha: 0.9),
+          theme.secondary.withValues(alpha: 0.7),
+        ];
+      case 'emotions':
+        // Emotions 分類：AppBar 與 BottomNav 一致（交由 AppScaffold 用 navigationBarBackground 顏色渲染）
+        // 這裡回傳空陣列代表不使用漸層
+        return [];
       default:
         // Beach 主題使用碧綠色背景
         if (theme.name == 'beach_sunset' || theme.name == 'beach_sunset_dark') {
@@ -630,15 +721,7 @@ class ThemeConfigManager extends ChangeNotifier {
             const Color(0xFF26C6DA).withValues(alpha: 0.8), // 淺碧綠色
           ];
         }
-        // Emotions 分類：AppBar 與 BottomNav 一致（交由 AppScaffold 用 navigationBarBackground 顏色渲染）
-        // 這裡回傳空陣列代表不使用漸層
-        if (theme.name.contains('rainbow_pride') ||
-            theme.name.contains('bluePink') ||
-            theme.name.contains('pink_theme') ||
-            theme.name.contains('yellow_white_purple') ||
-            theme.name.contains('bear_gay_flat')) {
-          return [];
-        }
+        // 其他主題使用主題主要色和次要色漸層
         return [
           theme.primary.withValues(alpha: 0.8),
           theme.secondary.withValues(alpha: 0.6),
@@ -676,15 +759,12 @@ class ThemeConfigManager extends ChangeNotifier {
         return Colors.white; // Glassmorphism 主題使用純白色，不透明
       case 'business':
         return Colors.white.withValues(alpha: 0.3); // Business 主題使用半透明白色
-      default:
+      case 'taiwan':
+        return theme.primary.withValues(alpha: 0.3); // Taiwan 主題使用主要色半透明
+      case 'emotions':
         // Emotions 類主題：白色液態玻璃
-        if (theme.name.contains('rainbow_pride') ||
-            theme.name.contains('bluePink') ||
-            theme.name.contains('pink_theme') ||
-            theme.name.contains('yellow_white_purple') ||
-            theme.name.contains('bear_gay_flat')) {
-          return Colors.white.withValues(alpha: 0.3);
-        }
+        return Colors.white.withValues(alpha: 0.3);
+      default:
         // Beach 主題使用碧綠色半透明背景
         if (theme.name == 'beach_sunset' || theme.name == 'beach_sunset_dark') {
           return const Color(0xFF00BCD4).withValues(alpha: 0.3); // 碧綠色半透明
@@ -944,7 +1024,7 @@ class ThemePreset {
       themes: (json['themes'] as List)
           .map((name) => ThemeScheme.getByName(name))
           .toList(),
-      icon: IconData(json['icon'], fontFamily: 'MaterialIcons'),
+      icon: IconData(json['icon'] as int, fontFamily: 'MaterialIcons'),
     );
   }
 

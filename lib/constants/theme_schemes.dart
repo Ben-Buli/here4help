@@ -5,6 +5,7 @@ import 'dart:ui';
 class ThemeScheme {
   final String name;
   final String displayName;
+  final String category;
   final Color primary;
   final Color secondary;
   final Color accent;
@@ -49,6 +50,9 @@ class ThemeScheme {
   const ThemeScheme({
     required this.name,
     required this.displayName,
+    required this.category,
+
+    /// ENUM(main, business, morandi, Ocean, emotions)
     required this.primary,
     required this.secondary,
     required this.accent,
@@ -90,6 +94,7 @@ class ThemeScheme {
   static const ThemeScheme mainStyle = ThemeScheme(
     name: 'main_style',
     displayName: 'Main Style - Glassmorphism Purple',
+    category: 'business',
     primary: Color(0xFF8B5CF6), // 主要紫色
     secondary: Color(0xFF7C3AED), // 深紫色
     accent: Color(0xFFA78BFA), // 淺紫色
@@ -124,6 +129,7 @@ class ThemeScheme {
   static const ThemeScheme metaBusinessStyle = ThemeScheme(
     name: 'meta_business_style',
     displayName: 'Meta Business Style',
+    category: 'business',
     primary: Color(0xFF8B5CF6), // 淡紫色 (主要色)
     secondary: Color(0xFFA78BFA), // 淺紫色 (次要色)
     accent: Color(0xFF7C3AED), // 深紫色 (強調色)
@@ -167,6 +173,7 @@ class ThemeScheme {
   static const ThemeScheme businessGradient = ThemeScheme(
     name: 'business_gradient',
     displayName: 'Rainbow',
+    category: 'business',
     primary: Color(0xFF6366F1), // 靛藍色 (主要色)
     secondary: Color(0xFF8B5CF6), // 紫色 (次要色)
     accent: Color(0xFFEC4899), // 粉紅色 (強調色)
@@ -213,6 +220,7 @@ class ThemeScheme {
   static const ThemeScheme morandiBlue = ThemeScheme(
     name: 'morandi_blue',
     displayName: 'Morandi Blue',
+    category: 'morandi',
     primary: Color(0xFF6B7A85), // 調整為更深的藍灰色，適合作為背景
     secondary: Color(0xFF9BA8B4),
     accent: Color(0xFFB8C5D1),
@@ -247,6 +255,7 @@ class ThemeScheme {
   static const ThemeScheme morandiGreen = ThemeScheme(
     name: 'morandi_green',
     displayName: 'Morandi Green - Matcha',
+    category: 'morandi',
     primary: Color(0xFF6A8A6A), // 調整為更深的抹茶綠，適合作為背景
     secondary: Color(0xFF9BB09B), // 淺抹茶綠
     accent: Color(0xFFB8C5B8), // 極淺抹茶綠
@@ -281,6 +290,7 @@ class ThemeScheme {
   static const ThemeScheme morandiPurple = ThemeScheme(
     name: 'morandi_purple',
     displayName: 'Morandi Purple',
+    category: 'morandi',
     primary: Color(0xFF8B7A85), // 調整為更深的紫色，適合作為背景
     secondary: Color(0xFFB4A8B4),
     accent: Color(0xFFD1C5D1),
@@ -315,6 +325,7 @@ class ThemeScheme {
   static const ThemeScheme morandiPink = ThemeScheme(
     name: 'morandi_pink',
     displayName: 'Morandi Pink',
+    category: 'morandi',
     primary: Color(0xFFA55566), // 調整為更深的粉色，適合作為背景
     secondary: Color(0xFFC5A8B4),
     accent: Color(0xFFD1C5D1),
@@ -349,6 +360,7 @@ class ThemeScheme {
   static const ThemeScheme morandiOrange = ThemeScheme(
     name: 'morandi_orange',
     displayName: 'Morandi Orange',
+    category: 'morandi',
     primary: Color(0xFFC49564), // 調整為更深的橙色，適合作為背景
     secondary: Color(0xFFE0B8A8),
     accent: Color(0xFFECD1C5),
@@ -383,6 +395,7 @@ class ThemeScheme {
   static const ThemeScheme morandiLemon = ThemeScheme(
     name: 'morandi_lemon',
     displayName: 'Yellow',
+    category: 'morandi',
     primary: Color(0xFFB4A864), // 調整為更深的檸檬黃，適合作為背景
     secondary: Color(0xFFD4C8A8), // 更低飽和度的淺檸檬黃
     accent: Color(0xFFE4DCC5), // 更低飽和度的極淺檸檬黃
@@ -406,6 +419,7 @@ class ThemeScheme {
   static const ThemeScheme beachSunset = ThemeScheme(
     name: 'beach_sunset',
     displayName: 'Beach Sunset - Ocean Style',
+    category: 'Ocean',
     primary: Color(0xFF00BCD4), // 碧綠色 (Cyan)
     secondary: Color(0xFF26C6DA), // 淺碧綠色
     accent: Color(0xFF4DD0E1), // 更淺碧綠色
@@ -439,6 +453,7 @@ class ThemeScheme {
   static const ThemeScheme oceanGradient = ThemeScheme(
     name: 'ocean_gradient',
     displayName: 'Ocean Gradient',
+    category: 'Ocean',
     primary: Color(0xFF1182A4), // 基於 Pacific Ocean 色卡的第三色
     secondary: Color(0xFF2FA7B4), // 基於 Pacific Ocean 色卡的第四色
     accent: Color(0xFF00618D), // 基於 Pacific Ocean 色卡的第二色
@@ -471,6 +486,7 @@ class ThemeScheme {
   static const ThemeScheme sandyFootprints = ThemeScheme(
     name: 'sandy_footprints',
     displayName: 'Sandy Footprints',
+    category: 'Ocean',
     primary: Color(0xFF20B2AA), // 海綠色
     secondary: Color(0xFF48CAE4), // 淺青色
     accent: Color(0xFF90E0EF), // 淺藍色
@@ -504,6 +520,7 @@ class ThemeScheme {
   static const ThemeScheme milkTeaEarth = ThemeScheme(
     name: 'milk_tea_earth',
     displayName: 'Bubble Milk Tea',
+    category: 'Taiwan',
     primary: Color(0xFF8B6B5A), // Pantone 480C - 最深棕色
     secondary: Color(0xFFA67B5A), // Pantone 481C - 中等棕色
     accent: Color(0xFFC19B7A), // Pantone 482C - 最淺米色
@@ -539,6 +556,7 @@ class ThemeScheme {
   static const ThemeScheme minimalistStill = ThemeScheme(
     name: 'minimalist_still',
     displayName: 'Old Street',
+    category: 'Taiwan',
     primary: Color(0xFF5A6B7A), // 深藍灰色
     secondary: Color(0xFF6B7A8A), // 中藍灰色
     accent: Color(0xFF87CEEB), // 天空藍
@@ -564,6 +582,7 @@ class ThemeScheme {
   static const ThemeScheme glassmorphismBlur = ThemeScheme(
     name: 'glassmorphism_blur',
     displayName: 'Glassmorphism Blur',
+    category: 'Business',
     primary: Color.fromARGB(255, 94, 94, 94), // 半透明白色
     secondary: Color.fromARGB(223, 255, 255, 255), // 半透明白色
     accent: Color(0xFF8B5CF6), // 紫色強調
@@ -590,6 +609,7 @@ class ThemeScheme {
   static const ThemeScheme taipei = ThemeScheme(
     name: 'taipei_2019_pantone',
     displayName: 'Taipei 2019 Pantone',
+    category: 'Taiwan',
     primary: Color(0xFF9FB65A), // Revitalizing Green 作為主要互動色
     secondary: Color(0xFFE58FB0), // Vibrant Pink 作為次要強調
     accent: Color(0xFFB6C77A), // 綠色的較亮版本
@@ -626,6 +646,7 @@ class ThemeScheme {
   static const ThemeScheme taipei101 = ThemeScheme(
     name: 'taipei_101',
     displayName: 'Taipei 101',
+    category: 'Taiwan',
     primary: Color(0xFF4DA3FF), // 亮藍（街區冷白燈偏藍）
     secondary: Color(0xFF40C4FF), // 天色偏亮藍
     accent: Color(0xFF82B1FF),
@@ -662,6 +683,7 @@ class ThemeScheme {
   static const ThemeScheme rainbowPride = ThemeScheme(
     name: 'rainbow_pride',
     displayName: 'Rainbow Pride',
+    category: 'Emotions',
     primary: Color(0xFF004DFF), // Blue 作為主要互動色（穩定、可讀）
     secondary: Color(0xFF750787), // Violet 作為次要色
     accent: Color(0xFFFFED00), // Yellow 作為點綴
@@ -707,6 +729,7 @@ class ThemeScheme {
   static const ThemeScheme bluePink = ThemeScheme(
     name: 'blue_pink',
     displayName: 'Blue Pink',
+    category: 'Emotions',
     primary: Color(0xFF55CDFC), // Light Blue
     secondary: Color(0xFFF7A8B8), // Pink
     accent: Color(0xFFFFFFFF), // White（作為點綴）
@@ -748,6 +771,7 @@ class ThemeScheme {
   static const ThemeScheme pinkTheme = ThemeScheme(
     name: 'pink_theme',
     displayName: 'Pink',
+    category: 'Emotions',
     // 經典旗幟色系：深洋紅/粉紫/橘，採 UI 高對比
     primary: Color(0xFFA30262), // 深洋紅
     secondary: Color(0xFFD362A4), // 粉紫
@@ -790,6 +814,7 @@ class ThemeScheme {
   static const ThemeScheme yellowWhitePurple = ThemeScheme(
     name: 'yellow_white_purple',
     displayName: 'Yellow_white_purple',
+    category: 'Emotions',
     primary: Color(0xFF9B59D0), // 紫
     secondary: Color(0xFFFFF433), // 黃
     accent: Color(0xFF111111), // 黑
@@ -832,6 +857,7 @@ class ThemeScheme {
   static const ThemeScheme bearGayFlat = ThemeScheme(
     name: 'bear_gay_flat',
     displayName: 'Bears',
+    category: 'Emotions',
     primary: Color(0xFFE0812C), // 橙
     secondary: Color(0xFF5C3A21), // 深棕
     accent: Color(0xFFF3C55A), // 黃
@@ -875,7 +901,8 @@ class ThemeScheme {
   /// Emotions - Pride S-Curve（S 曲線彩虹背景，UI 元素採藍主色以維持可讀性）
   static const ThemeScheme prideSCurve = ThemeScheme(
     name: 'pride_s_curve',
-    displayName: 'Pride S-Curve',
+    displayName: 'Pride',
+    category: 'Emotions',
     primary: Color(0xFF4A79EA), // 較穩定的藍色作為互動主色
     secondary: Color(0xFFA262AD), // 紫作為次色
     accent: Color(0xFFF2A64F), // 橙作為點綴
@@ -902,6 +929,7 @@ class ThemeScheme {
   static const ThemeScheme sunsetBeach = ThemeScheme(
     name: 'sunset_beach',
     displayName: 'Sunset Beach',
+    category: 'Ocean',
     primary: Color(0xFFFF8A65),
     secondary: Color(0xFF7E57C2),
     accent: Color(0xFFFFB3C1),
@@ -932,6 +960,7 @@ class ThemeScheme {
   static const ThemeScheme clownfish = ThemeScheme(
     name: 'clownfish',
     displayName: 'Clownfish',
+    category: 'Ocean',
     primary: Color(0xFFFF7F2A),
     secondary: Color(0xFFFFFFFF),
     accent: Color(0xFF111111),
@@ -967,6 +996,7 @@ class ThemeScheme {
   static const ThemeScheme patrickStar = ThemeScheme(
     name: 'patrick_star',
     displayName: 'Patrick Star',
+    category: 'Ocean',
     primary: Color(0xFFF78DA7),
     secondary: Color(0xFF8ED081),
     accent: Color(0xFF9460D6),
@@ -1000,6 +1030,7 @@ class ThemeScheme {
   static const ThemeScheme glassmorphismBlueGrey = ThemeScheme(
     name: 'glassmorphism_blue_grey',
     displayName: 'Glassmorphism Blue Grey',
+    category: 'Business',
     primary: Color(0x805C7C8A), // 半透明藍灰色
     secondary: Color(0x807B8A95), // 半透明中藍灰色
     accent: Color(0xFF546E7A), // 深藍灰色強調
@@ -1310,6 +1341,7 @@ class ThemeScheme {
     return ThemeScheme(
       name: '${name}_dark',
       displayName: '$displayName (Dark)',
+      category: category,
       primary: _convertToDarkColor(primary),
       secondary: _convertToDarkColor(secondary),
       accent: _convertToDarkColor(accent),
@@ -1562,6 +1594,7 @@ class ThemeScheme {
       return ThemeScheme(
         name: json['name'] ?? '',
         displayName: json['displayName'] ?? '',
+        category: json['category'] ?? '',
         primary: Color(json['primary'] ?? 0xFF000000),
         secondary: Color(json['secondary'] ?? 0xFF000000),
         accent: Color(json['accent'] ?? 0xFF000000),

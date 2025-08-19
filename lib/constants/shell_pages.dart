@@ -106,20 +106,6 @@ final List<Map<String, dynamic>> shellPages = [
       );
     },
   },
-  // {
-  //   'path': '/chat/my-works',
-  //   'child': const ChatListPage(initialTab: 1), // My Works 分頁
-  //   'title': 'My Works',
-  //   'showBottomNav': true,
-  //   'showBackArrow': true
-  // },
-  // {
-  //   'path': '/chat/posted-tasks',
-  //   'child': const ChatListPage(initialTab: 0), // Posted Tasks 分頁
-  //   'title': 'Posted Tasks',
-  //   'showBottomNav': true,
-  //   'showBackArrow': true
-  // },
   {
     'path': '/chat/detail',
     'builder': (context, data) {

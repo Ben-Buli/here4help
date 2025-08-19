@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:here4help/services/theme_config_manager.dart';
-import 'package:here4help/constants/theme_schemes.dart';
-import 'package:here4help/widgets/glassmorphism_app_bar.dart';
-import 'package:here4help/widgets/color_selector.dart';
+import '../../services/theme_config_manager.dart';
+import '../../constants/theme_schemes.dart';
+import '../../widgets/glassmorphism_app_bar.dart';
+import '../../widgets/color_selector.dart';
 
 class ThemeSettingsPage extends StatefulWidget {
   const ThemeSettingsPage({super.key});
@@ -295,6 +295,18 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 背景預覽（特別為情感主題）
+                  if (_isEmotionsTheme(themeManager.currentTheme.name))
+                    Container(
+                      height: 120,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: _buildEmotionsThemeBackground(
+                            themeManager.currentTheme),
+                      ),
+                    ),
+
                   // AppBar 預覽
                   Container(
                     height: 56,
@@ -659,5 +671,60 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
 
     // 如果找不到，返回當前主題
     return currentTheme;
+  }
+
+  /// 判斷是否為情感主題
+  bool _isEmotionsTheme(String themeName) {
+    return themeName.contains('pride') ||
+        themeName.contains('love') ||
+        themeName.contains('friendship') ||
+        themeName.contains('happiness') ||
+        themeName.contains('celebration') ||
+        themeName.contains('community') ||
+        themeName.contains('support') ||
+        themeName.contains('togetherness') ||
+        themeName.contains('unity');
+  }
+
+  /// 構建情感主題的背景預覽
+  Widget _buildEmotionsThemeBackground(ThemeScheme theme) {
+    // 為情感主題提供漸層背景
+    return Container(
+      decoration: BoxDecoration(
+        gradient: theme.backgroundGradient != null
+            ? LinearGradient(
+                begin: theme.gradientBegin ?? Alignment.topLeft,
+                end: theme.gradientEnd ?? Alignment.bottomRight,
+                colors: theme.backgroundGradient!,
+              )
+            : null,
+        color: theme.backgroundGradient == null ? theme.background : null,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Emotions Theme Background',
+              style: TextStyle(
+                color: theme.onBackground,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Rich emotional expression theme',
+              style: TextStyle(
+                color: theme.onBackground.withOpacity(0.7),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

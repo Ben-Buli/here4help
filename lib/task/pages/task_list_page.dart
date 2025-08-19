@@ -1106,31 +1106,28 @@ class _TaskListPageState extends State<TaskListPage> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
-                                      Align(
-                                        alignment: Alignment.topRight,
-                                        child: PopupMenuButton<String>(
-                                          padding: EdgeInsets.zero,
-                                          icon: const Icon(Icons.more_vert,
-                                              size: 20),
-                                          onSelected: (value) {
-                                            if (value == 'report') {
-                                              _showReportDialog(task);
-                                            }
-                                          },
-                                          itemBuilder: (context) => const [
-                                            PopupMenuItem(
-                                              value: 'report',
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.flag_outlined),
-                                                  SizedBox(width: 8),
-                                                  Text('Report'),
-                                                ],
-                                              ),
+                                      // trailing menu, no extra SizedBox/Align so it uses the same 16px card padding
+                                      PopupMenuButton<String>(
+                                        padding: EdgeInsets.zero,
+                                        icon: const Icon(Icons.more_vert,
+                                            size: 20),
+                                        onSelected: (value) {
+                                          if (value == 'report') {
+                                            _showReportDialog(task);
+                                          }
+                                        },
+                                        itemBuilder: (context) => const [
+                                          PopupMenuItem(
+                                            value: 'report',
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.flag_outlined),
+                                                SizedBox(width: 8),
+                                                Text('Report'),
+                                              ],
                                             ),
-                                          ],
-                                        ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
@@ -1277,24 +1274,34 @@ class _TaskListPageState extends State<TaskListPage> {
                                   Row(
                                     children: [
                                       if (_isNewTask(task)) ...[
-                                        const Icon(Icons.eco,
-                                            size: 16, color: Colors.green),
+                                        Icon(Icons.eco,
+                                            size: 16,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary),
                                         const SizedBox(width: 6),
-                                        const Text('New',
+                                        Text('New',
                                             style: TextStyle(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w500,
-                                                color: Colors.green)),
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary)),
                                         const SizedBox(width: 16),
                                       ] else if (_isPopularTask(task)) ...[
-                                        const Icon(Icons.local_fire_department,
-                                            size: 16, color: Colors.red),
+                                        Icon(Icons.local_fire_department,
+                                            size: 16,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary),
                                         const SizedBox(width: 6),
-                                        const Text('Popular',
+                                        Text('Popular',
                                             style: TextStyle(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w500,
-                                                color: Colors.red)),
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary)),
                                         const SizedBox(width: 16),
                                       ],
                                       const Icon(Icons.schedule,
@@ -1312,7 +1319,7 @@ class _TaskListPageState extends State<TaskListPage> {
                             ),
                             // 書籤按鈕 - 固定在右下角
                             Positioned(
-                              right: 8,
+                              right: 16,
                               bottom: 8,
                               child: IconButton(
                                 icon: Icon(
