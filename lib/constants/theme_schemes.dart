@@ -1079,8 +1079,8 @@ class ThemeScheme {
     bearGayFlat,
     prideSCurve,
     sunsetBeach,
-    clownfish,
-    patrickStar,
+    // clownfish,
+    // patrickStar,
   ];
 
   /// 根據名稱獲取主題
