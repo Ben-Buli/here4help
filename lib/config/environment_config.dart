@@ -94,6 +94,28 @@ class EnvironmentConfig {
   static String get appleServiceId =>
       _config?['public']?['apple_service_id'] ?? '';
 
+  /// Google Android Client ID (公開)
+  static String get googleAndroidClientId =>
+      _config?['public']?['google_android_client_id'] ?? '';
+
+  /// Google iOS Client ID (公開)
+  static String get googleIosClientId =>
+      _config?['public']?['google_ios_client_id'] ?? '';
+
+  /// Google Web Client Secret (公開)
+  static String get googleWebClientSecret =>
+      _config?['public']?['google_web_client_secret'] ?? '';
+
+  /// Facebook App Secret (公開)
+  static String get facebookAppSecret =>
+      _config?['public']?['facebook_app_secret'] ?? '';
+
+  /// Apple Key ID (公開)
+  static String get appleKeyId => _config?['public']?['apple_key_id'] ?? '';
+
+  /// Apple Team ID (公開)
+  static String get appleTeamId => _config?['public']?['apple_team_id'] ?? '';
+
   /// 獲取完整的圖片 URL
   static String getFullImageUrl(String? relativePath) {
     if (relativePath == null || relativePath.isEmpty) {
@@ -131,9 +153,21 @@ class EnvironmentConfig {
       print('⚙️ 功能開關: $features');
       print(
           '🔑 Google Client ID: ${googleClientId.isNotEmpty ? "已配置" : "未配置"}');
+      print(
+          '🔑 Google Android Client ID: ${googleAndroidClientId.isNotEmpty ? "已配置" : "未配置"}');
+      print(
+          '🔑 Google iOS Client ID: ${googleIosClientId.isNotEmpty ? "已配置" : "未配置"}');
+      print(
+          '🔑 Google Web Client Secret: ${googleWebClientSecret.isNotEmpty ? "已配置" : "未配置"}');
       print('🔑 Facebook App ID: ${facebookAppId.isNotEmpty ? "已配置" : "未配置"}');
       print(
+          '🔑 Facebook App Secret: ${facebookAppSecret.isNotEmpty ? "已配置" : "未配置"}');
+      print(
           '🔑 Apple Service ID: ${appleServiceId.isNotEmpty ? "已配置" : "未配置"}');
+      print('🔑 Apple Key ID: ${appleKeyId.isNotEmpty ? "已配置" : "未配置"}');
+      print('🔑 Apple Team ID: ${appleTeamId.isNotEmpty ? "已配置" : "未配置"}');
+
+      print('🔒 注意：敏感資訊已移至後端環境配置');
     }
   }
 }

@@ -1,0 +1,22 @@
+{
+  "environment": "production",
+  "public": {
+    "api_base_url": "https://yourdomain.com",
+    "socket_url": "https://yourdomain.com:3001",
+    "image_base_url": "https://yourdomain.com",
+    "google_client_id": "YOUR_GOOGLE_CLIENT_ID_HERE",
+    "facebook_app_id": "YOUR_FACEBOOK_APP_ID_HERE",
+    "apple_service_id": "com.example.here4help.login"
+  },
+  "app": {
+    "debug_mode": false,
+    "log_level": "error",
+    "features": {
+      "third_party_auth": true,
+      "chat": true,
+      "tasks": true,
+      "payments": true
+    }
+  }
+}
+

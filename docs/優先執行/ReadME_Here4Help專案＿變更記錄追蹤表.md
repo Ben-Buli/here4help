@@ -41,6 +41,10 @@
 | 2025-01-19 | theme-optimization-01 | 主題系統整合優化 | Frontend | 主題系統 | 精簡主題數量從 30+ 個到 12 個，整合重複功能，創建優化版主題系統 |
 | 2025-01-19 | theme-optimization-02 | 創建主題使用指南 | Docs | 主題系統 | 創建完整的主題使用指南，說明如何使用 ThemeScheme 和 Theme.of(context).colorScheme |
 | 2025-01-19 | theme-optimization-03 | 主題系統文檔完善 | Docs | 主題系統 | 建立主題邏輯和檔案用途說明，更新專案整合規格文件 |
+| 2025-01-21 | oauth-callback-01 | Google OAuth 回調處理實作 | Backend | 第三方登入 | 實作完整的 Google OAuth 回調處理，包括授權碼交換、用戶資料獲取和重定向 |
+| 2025-01-21 | oauth-callback-02 | 環境配置系統完善 | Config | 第三方登入 | 創建開發環境配置檔案，支援 Google OAuth 的完整配置 |
+| 2025-01-21 | oauth-callback-03 | OAuth 回調文檔建立 | Docs | 第三方登入 | 創建完整的 Google OAuth 回調處理實作說明文件 |
+| 2025-01-21 | permission-system-01 | 建立權限設置開發追蹤表 | Docs | 權限系統 | 建立完整的權限系統開發追蹤和進度管理系統 |
 
 ## 📋 當前狀態
 

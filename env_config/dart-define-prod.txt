@@ -1,0 +1,6 @@
+--dart-define=ENVIRONMENT=production
+--dart-define=API_BASE_URL=https://hero4help.demofhs.com
+--dart-define=SOCKET_URL=https://hero4help.demofhs.com:3001
+--dart-define=IMAGE_BASE_URL=https://hero4help.demofhs.com
+--dart-define=DEBUG_MODE=false
+--dart-define=LOG_LEVEL=error

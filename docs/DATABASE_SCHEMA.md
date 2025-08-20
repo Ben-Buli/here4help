@@ -186,7 +186,7 @@ CREATE TABLE `users` (
   `primary_language` VARCHAR(50) DEFAULT 'English',
   `school` VARCHAR(20) DEFAULT NULL,
   `phone` VARCHAR(20) DEFAULT NULL,
-  `permission` INT DEFAULT NULL,
+  `permission` int DEFAULT '0' COMMENT '0=新用戶未認證, 1=已認證用戶, 99=管理員, -1=被管理員停權, -2=被管理員軟刪除, -3=用戶自行停權, -4=用戶自行軟刪除',
   `avatar_url` VARCHAR(255) DEFAULT NULL,
   `terms_accepted_at` DATETIME DEFAULT NULL COMMENT '條款接受時間',
   `points` INT DEFAULT NULL,

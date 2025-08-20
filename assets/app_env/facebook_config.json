@@ -1,0 +1,8 @@
+{
+  "facebook": {
+    "app_id": "1037019294991326",
+    "app_secret": "5ecadfb58ab349ad150ae2cdef906489",
+    "client_token": "0b81d2c8f405ca37d21f12b828c571cf",
+    "redirect_uri": "http://localhost:8888/auth/facebook/callback"
+  }
+}

@@ -22,6 +22,7 @@ import 'package:here4help/account/pages/wallet_page.dart';
 import 'package:here4help/auth/pages/login_page.dart';
 import 'package:here4help/auth/pages/signup_page.dart';
 import 'package:here4help/auth/pages/student_id_page.dart';
+import 'package:here4help/auth/pages/oauth_signup_page.dart';
 
 // ==================== chat 模組 ====================
 import 'package:here4help/chat/pages/chat_list_page.dart';
@@ -58,7 +59,8 @@ final List<Map<String, dynamic>> shellPages = [
   },
   {
     'path': '/signup',
-    'child': const SignupPage(),
+    'builder': (context, extra) =>
+        SignupPage(oauthData: extra as Map<String, dynamic>?),
     'title': 'ESSENTIAL INFORMATION',
     'showAppBar': true,
     'showBottomNav': false,
@@ -67,7 +69,7 @@ final List<Map<String, dynamic>> shellPages = [
   // 新增：第三方登入註冊頁面路由
   {
     'path': '/signup/oauth',
-    'child': const SignupPage(),
+    'child': const OAuthSignupPage(),
     'title': 'COMPLETE YOUR PROFILE',
     'showAppBar': true,
     'showBottomNav': false,

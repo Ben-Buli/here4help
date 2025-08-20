@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/auth/models/user_model.dart';
-import 'package:here4help/auth/services/platform_auth_service.dart';
+import 'package:here4help/auth/services/third_party_auth_service.dart';
 import 'package:here4help/auth/services/auth_service.dart';
 import 'package:here4help/utils/image_helper.dart';
 
@@ -25,7 +25,7 @@ class _LoginPageState extends State<LoginPage> {
   bool rememberMe = false;
 
   // 跨平台第三方登入服務
-  final PlatformAuthService _platformAuthService = PlatformAuthService();
+  final ThirdPartyAuthService _platformAuthService = ThirdPartyAuthService();
 
   @override
   void initState() {
@@ -179,7 +179,7 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final userData = await _platformAuthService.signInWithGoogle();
+      final userData = await _platformAuthService.signInWithProvider('google');
 
       if (userData != null) {
         // 檢查是否為新用戶，如果是則導向註冊頁面
@@ -261,7 +261,8 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final userData = await _platformAuthService.signInWithFacebook();
+      final userData =
+          await _platformAuthService.signInWithProvider('facebook');
 
       if (userData != null) {
         // 檢查是否為新用戶，如果是則導向註冊頁面
@@ -344,7 +345,7 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      final userData = await _platformAuthService.signInWithApple();
+      final userData = await _platformAuthService.signInWithProvider('apple');
 
       if (userData != null) {
         // 檢查是否為新用戶，如果是則導向註冊頁面

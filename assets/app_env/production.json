@@ -4,8 +4,8 @@
     "api_base_url": "https://hero4help.demofhs.com",
     "socket_url": "https://hero4help.demofhs.com:3001",
     "image_base_url": "https://hero4help.demofhs.com",
-    "google_client_id": "your_google_client_id_here",
-    "facebook_app_id": "your_facebook_app_id_here",
+    "google_client_id": "102744926949-bhrnm2970bgt3dfm2nmdbqt03mrvdh3i.apps.googleusercontent.com",
+    "facebook_app_id": "1037019294991326",
     "apple_service_id": "com.example.here4help.login"
   },
   "app": {

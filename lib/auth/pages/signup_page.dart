@@ -3,15 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:here4help/constants/app_colors.dart';
 import 'package:here4help/task/services/language_service.dart';
+import 'package:here4help/services/country_service.dart';
 import 'package:pinput/pinput.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:here4help/config/app_config.dart';
 
 class SignupPage extends StatefulWidget {
-  const SignupPage({super.key});
+  final Map<String, dynamic>? oauthData;
+
+  const SignupPage({super.key, this.oauthData});
 
   @override
   State<SignupPage> createState() => _SignupPageState();
@@ -36,6 +38,15 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   final TextEditingController schoolController = TextEditingController();
   final TextEditingController referralCodeController = TextEditingController();
 
+  // 推薦碼狀態
+  final referralCodeMap = {
+    'empty': 'empty',
+    'valid': 'valid',
+    'invalid': 'invalid',
+    'not_found': 'not_found',
+  };
+
+  // 性別選項
   final genderParams = {
     'Male': 'Male',
     'Female': 'Female',
@@ -48,7 +59,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     'Other': 'Other',
     'Prefer not to disclose': 'Prefer not to disclose',
   };
-  // 性別選項
+  // 性別選項列表
   late final List<String> genderOptions = genderParams.keys.toList();
 
   // 以下為表單狀態
@@ -69,6 +80,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     _loadPrefilledData();
     _loadLanguages();
     _loadUniversities();
+    _loadCountries(); // 新增：載入國家列表
     _loadThirdPartyData(); // 新增：載入第三方登入資料
   }
 
@@ -86,8 +98,21 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   List<Map<String, dynamic>> universityOptions = [];
   String? selectedUniversityId;
 
+  // 國家選項
+  List<Country> countryOptions = [];
+  Country? selectedCountry;
+  bool isLoadingCountries = false;
+
   // 新增：載入第三方登入資料
   Future<void> _loadThirdPartyData() async {
+    // 優先使用傳入的 oauthData
+    if (widget.oauthData != null) {
+      print('🔐 載入第三方登入資料: ${widget.oauthData}');
+      _prefillOAuthData(widget.oauthData!);
+      return;
+    }
+
+    // 備用：從 SharedPreferences 載入
     final prefs = await SharedPreferences.getInstance();
     final provider = prefs.getString('signup_provider');
 
@@ -109,6 +134,163 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       await prefs.remove('signup_provider');
       await prefs.remove('signup_provider_user_id');
       await prefs.remove('signup_avatar_url');
+    }
+  }
+
+  // 預填第三方登入資料
+  void _prefillOAuthData(Map<String, dynamic> oauthData) {
+    try {
+      // 預填基本資料
+      if (oauthData['name'] != null) {
+        fullNameController.text = oauthData['name'];
+      }
+
+      if (oauthData['email'] != null) {
+        emailController.text = oauthData['email'];
+      }
+
+      if (oauthData['avatar_url'] != null) {
+        // TODO: 處理頭像 URL
+        print('🖼️ 第三方登入頭像: ${oauthData['avatar_url']}');
+      }
+
+      // 標記為第三方登入
+      print('✅ 第三方登入資料預填完成');
+    } catch (e) {
+      print('❌ 預填第三方登入資料失敗: $e');
+    }
+  }
+
+  // 處理國家選擇變更
+  void _onCountryChanged(Country? country) {
+    if (country != null) {
+      setState(() {
+        selectedCountry = country;
+      });
+
+      // 自動填充主要語言
+      _autoFillPrimaryLanguage(country);
+
+      print('🌍 選擇國家: ${country.name}');
+      print('🗣️ 主要語言: ${country.languages.join(', ')}');
+    }
+  }
+
+  // 自動填充主要語言
+  void _autoFillPrimaryLanguage(Country country) {
+    if (country.languages.isNotEmpty) {
+      final primaryLanguage = country.languages.first;
+
+      // 更新 selectedLanguages
+      setState(() {
+        selectedLanguages = [primaryLanguage];
+        languagesError = false;
+      });
+
+      print('✅ 自動填充主要語言: $primaryLanguage');
+    }
+  }
+
+  // 處理 OAuth 註冊
+  Future<void> _handleOAuthRegistration() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // 準備註冊資料
+      final registrationData = {
+        'name': fullNameController.text.trim(),
+        'email': emailController.text.trim(),
+        'phone': phoneController.text.trim(),
+        'nickname': nicknameController.text.trim(),
+        'date_of_birth': dateOfBirthController.text.isNotEmpty
+            ? dateOfBirthController.text
+            : null,
+        'gender': selectedGender,
+        'country': selectedCountry?.name ?? '',
+        'address': addressController.text.trim(),
+        'is_permanent_address': isPermanentAddress,
+        'primary_language':
+            selectedLanguages.isNotEmpty ? selectedLanguages.first : 'English',
+        'school': selectedUniversityId ?? '',
+        'referral_code': referralCodeController.text.trim(),
+        'payment_password': paymentPasswordController.text.isNotEmpty
+            ? paymentPasswordController.text
+            : null,
+        'avatar_url': '', // TODO: 處理頭像上傳
+        'oauth_provider': widget.oauthData?['provider'] ?? 'google',
+        'provider_user_id': widget.oauthData?['provider_user_id'] ?? '',
+      };
+
+      print('🚀 開始 OAuth 註冊...');
+      print('📝 註冊資料: $registrationData');
+
+      // 調用註冊 API
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/register-oauth.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(registrationData),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (data['success']) {
+        print('✅ OAuth 註冊成功');
+
+        // 保存登入資訊
+        await _saveLoginInfo(data['data']['token'], data['data']['user']);
+
+        // 導向到學生證上傳頁面
+        _redirectToStudentIdPage();
+      } else {
+        print('❌ OAuth 註冊失敗: ${data['message']}');
+        _showErrorSnackBar(data['message'] ?? 'Registration failed');
+      }
+    } catch (e) {
+      print('❌ OAuth 註冊錯誤: $e');
+      _showErrorSnackBar('Registration error: $e');
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  // 保存登入資訊
+  Future<void> _saveLoginInfo(
+      String token, Map<String, dynamic> userData) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', token);
+      await prefs.setString('user_data', jsonEncode(userData));
+      print('💾 登入資訊已保存');
+    } catch (e) {
+      print('❌ 保存登入資訊失敗: $e');
+    }
+  }
+
+  // 導向到學生證上傳頁面
+  void _redirectToStudentIdPage() {
+    print('🔄 導向到學生證上傳頁面...');
+    if (mounted) {
+      context.go('/signup/student-id');
+    }
+  }
+
+  // 顯示錯誤提示
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
     }
   }
 
@@ -175,12 +357,38 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     }
   }
 
+  // 新增：載入國家列表
+  Future<void> _loadCountries() async {
+    try {
+      setState(() {
+        isLoadingCountries = true;
+      });
+
+      print('🌍 開始載入國家列表...');
+      final countries = await CountryService.getAllCountries();
+
+      setState(() {
+        countryOptions = countries;
+        isLoadingCountries = false;
+      });
+
+      print('✅ 成功載入 ${countries.length} 個國家');
+    } catch (e) {
+      print('❌ 載入國家列表失敗: $e');
+      setState(() {
+        isLoadingCountries = false;
+        // 使用預設國家列表
+        countryOptions = CountryService.getDefaultCountries();
+      });
+    }
+  }
+
   // 新增：驗證推薦碼
   Future<void> _verifyReferralCode() async {
     final referralCode = referralCodeController.text.trim();
-    if (referralCode.isEmpty) {
+    if (referralCode.isEmpty || referralCode == '') {
       setState(() {
-        referralCodeStatus = 'invalid';
+        referralCodeStatus = referralCodeMap['empty'];
       });
       return;
     }
@@ -200,10 +408,14 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       final data = jsonDecode(response.body);
 
       setState(() {
-        if (data['success']) {
-          referralCodeStatus = 'valid';
+        if (data['data'] == '' || data['data'].isEmpty) {
+          referralCodeStatus = referralCodeMap['empty'];
+        } else if (data['success'] && data['data'] != null) {
+          referralCodeStatus = referralCodeMap['valid'];
+        } else if (data['success'] && data['data'] == null) {
+          referralCodeStatus = referralCodeMap['not_found'];
         } else {
-          referralCodeStatus = 'invalid';
+          referralCodeStatus = referralCodeMap['invalid'];
         }
       });
     } catch (e) {
@@ -220,6 +432,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   // 新增：獲取推薦碼狀態的顏色
   Color _getReferralCodeStatusColor() {
     switch (referralCodeStatus) {
+      case 'empty':
+        return Theme.of(context).colorScheme.error;
       case 'valid':
         return Theme.of(context).colorScheme.secondary; // 通過時用系統色
       case 'invalid':
@@ -233,6 +447,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   // 新增：獲取推薦碼狀態的文字
   String _getReferralCodeStatusText() {
     switch (referralCodeStatus) {
+      case 'empty':
+        return 'Please enter a referral code';
       case 'valid':
         return 'Referral code is valid';
       case 'invalid':
@@ -508,44 +724,39 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             const SizedBox(height: 32),
 
             // Address (moved here)
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: addressController,
-                    decoration: InputDecoration(
-                      prefixIcon: Icon(
-                        Icons.location_on,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      labelText: 'Address',
-                      border: const OutlineInputBorder(),
+            TextFormField(
+              controller: addressController,
+              keyboardType: TextInputType.multiline,
+              minLines: 1,
+              maxLines: 3, // 自動換行且最多三行，不影響實際值
+              decoration: InputDecoration(
+                prefixIcon: Icon(
+                  Icons.location_on,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                labelText: 'Address',
+                border: const OutlineInputBorder(),
+                // 將 Permanent 自訂 Switch 放到輸入欄位右邊
+                suffixIcon: Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: GestureDetector(
+                    onTap: () => setState(
+                        () => isPermanentAddress = !isPermanentAddress),
+                    child: _PermanentPillSwitch(
+                      value: isPermanentAddress,
+                      label: 'Permanent',
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your address';
-                      }
-                      return null;
-                    },
                   ),
                 ),
-                const SizedBox(width: 8),
-                // Permanent Address Checkbox
-                Column(
-                  children: [
-                    const Text('Permanent Address?',
-                        style: TextStyle(fontSize: 8)),
-                    Checkbox(
-                      value: isPermanentAddress,
-                      onChanged: (value) {
-                        setState(() {
-                          isPermanentAddress = value!;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ],
+                suffixIconConstraints:
+                    const BoxConstraints(minWidth: 0, minHeight: 0),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter your address';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 16),
 
@@ -767,95 +978,71 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
               ),
             ],
 
-            // Referral Code - 新增
+            // Referral Code - 新增（整合 Verify 按鈕至欄位）
             const SizedBox(height: 16),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: referralCodeController,
-                    decoration: InputDecoration(
-                      labelText: 'Referral Code',
-                      hintText: 'Enter referral code (optional)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16.0, vertical: 12.0),
-                      prefixIcon: Icon(
-                        Icons.card_giftcard,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      suffixIcon: referralCodeStatus != null
-                          ? Icon(
-                              referralCodeStatus == 'valid'
-                                  ? Icons.check_circle
-                                  : Icons.error,
-                              color: _getReferralCodeStatusColor(),
-                            )
-                          : null,
-                    ),
-                    style: TextStyle(
-                      fontSize: 16.0,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
-                      LengthLimitingTextInputFormatter(12),
-                    ],
-                    onChanged: (value) {
-                      final upper = value.toUpperCase();
-                      if (referralCodeController.text != upper) {
-                        referralCodeController.value =
-                            referralCodeController.value.copyWith(
-                          text: upper,
-                          selection:
-                              TextSelection.collapsed(offset: upper.length),
-                        );
-                      }
-                      if (value.isEmpty) {
-                        setState(() {
-                          referralCodeStatus = null;
-                        });
-                      }
-                    },
-                    validator: (value) {
-                      // Referral code is optional
-                      return null;
-                    },
+            TextFormField(
+              controller: referralCodeController,
+              decoration: InputDecoration(
+                labelText: 'Referral Code',
+                hintText: 'Enter referral code (optional)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                contentPadding: const EdgeInsets.only(
+                    left: 16.0, top: 12.0, bottom: 12.0, right: 0.0),
+                prefixIcon: Icon(
+                  Icons.card_giftcard,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                suffixIcon: SizedBox(
+                  width: 80,
+                  height: 46,
+                  child: _ReferralInlineButton(
+                    fieldRadius: 8.0,
+                    label: 'Verify',
+                    isLoading: isVerifyingReferralCode,
+                    status: referralCodeStatus,
+                    onPressed: _verifyReferralCode,
+                    icon: referralCodeStatus == 'valid'
+                        ? Icons.check_circle
+                        : referralCodeStatus == 'invalid'
+                            ? Icons.error
+                            : null,
                   ),
                 ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  height: 56.0, // 與輸入欄位高度一致
-                  child: ElevatedButton(
-                    onPressed:
-                        isVerifyingReferralCode ? null : _verifyReferralCode,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.0),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16.0, vertical: 12.0),
-                    ),
-                    child: isVerifyingReferralCode
-                        ? SizedBox(
-                            width: 20.0,
-                            height: 20.0,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.0,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Theme.of(context).colorScheme.onPrimary,
-                              ),
-                            ),
-                          )
-                        : const Text('Verify'),
-                  ),
+                suffixIconConstraints: const BoxConstraints(
+                  minWidth: 80,
+                  maxWidth: 80,
+                  minHeight: 40,
+                  maxHeight: 48,
                 ),
+              ),
+              style: TextStyle(
+                fontSize: 16.0,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                LengthLimitingTextInputFormatter(12),
               ],
+              onChanged: (value) {
+                final upper = value.toUpperCase();
+                if (referralCodeController.text != upper) {
+                  referralCodeController.value =
+                      referralCodeController.value.copyWith(
+                    text: upper,
+                    selection: TextSelection.collapsed(offset: upper.length),
+                  );
+                }
+                // 任何變更都重置狀態（按鈕回到預設樣式）
+                setState(() {
+                  referralCodeStatus = null;
+                });
+              },
+              validator: (value) {
+                // Referral code is optional
+                return null;
+              },
             ),
 
             // 推薦碼狀態提示
@@ -1106,7 +1293,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                       }
                     },
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
+                      if (value == null || value.trim().isEmpty) {
                         return 'Please enter a password';
                       }
                       if (value.length < 6) {
@@ -1296,7 +1483,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                 ),
               ),
               content: SizedBox(
-                width: double.maxFinite,
+                width: 400,
                 height: 400,
                 child: Column(
                   children: [
@@ -1517,29 +1704,36 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     });
 
     try {
-      // 先創建用戶帳號
-      final success = await _createUserAccount();
+      // 檢查是否有 OAuth 資料，決定使用哪種註冊方式
+      if (widget.oauthData != null) {
+        // 使用 OAuth 註冊
+        await _handleOAuthRegistration();
+      } else {
+        // 使用傳統註冊
+        final success = await _createUserAccount();
 
-      if (success) {
-        // 儲存表單資料到 SharedPreferences 以便傳遞到下一個頁面
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('signup_full_name', fullNameController.text);
-        await prefs.setString('signup_nickname', nicknameController.text);
-        await prefs.setString('signup_gender', selectedGender);
-        await prefs.setString('signup_email', emailController.text);
-        await prefs.setString('signup_phone', phoneController.text);
-        await prefs.setString('signup_country', countryController.text);
-        await prefs.setString('signup_address', addressController.text);
-        await prefs.setString('signup_password', passwordController.text);
-        await prefs.setString(
-            'signup_date_of_birth', dateOfBirthController.text);
-        await prefs.setString(
-            'signup_payment_code', paymentPasswordController.text);
-        await prefs.setBool('signup_is_permanent_address', isPermanentAddress);
-        await prefs.setStringList('signup_languages', selectedLanguages);
+        if (success) {
+          // 儲存表單資料到 SharedPreferences 以便傳遞到下一個頁面
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('signup_full_name', fullNameController.text);
+          await prefs.setString('signup_nickname', nicknameController.text);
+          await prefs.setString('signup_gender', selectedGender);
+          await prefs.setString('signup_email', emailController.text);
+          await prefs.setString('signup_phone', phoneController.text);
+          await prefs.setString('signup_country', countryController.text);
+          await prefs.setString('signup_address', addressController.text);
+          await prefs.setString('signup_password', passwordController.text);
+          await prefs.setString(
+              'signup_date_of_birth', dateOfBirthController.text);
+          await prefs.setString(
+              'signup_payment_code', paymentPasswordController.text);
+          await prefs.setBool(
+              'signup_is_permanent_address', isPermanentAddress);
+          await prefs.setStringList('signup_languages', selectedLanguages);
 
-        // 導向學生證上傳頁面
-        context.go('/signup/student-id');
+          // 導向學生證上傳頁面
+          context.go('/signup/student-id');
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1595,9 +1789,9 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
 
       if (response.statusCode == 200 && responseData['success']) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account created successfully!'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Account created successfully!'),
+            backgroundColor: Theme.of(context).colorScheme.primary,
           ),
         );
         return true;
@@ -1608,7 +1802,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to create account: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
       return false;
@@ -1686,6 +1880,139 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// 自訂膠囊開關，放在 TextFormField 的 suffix 位置使用
+class _PermanentPillSwitch extends StatelessWidget {
+  final bool value;
+  final String label;
+  const _PermanentPillSwitch({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final on = value;
+    final cs = Theme.of(context).colorScheme;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeInOut,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: on
+            ? cs.primary.withOpacity(0.12)
+            : cs.surfaceVariant.withOpacity(0.6),
+        border: Border.all(
+          color: on ? cs.primary : cs.outline.withOpacity(0.4),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            on ? Icons.check_circle : Icons.radio_button_unchecked,
+            size: 18,
+            color: on ? Colors.green : cs.onSurface.withOpacity(0.65),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: on ? cs.onSurface : cs.onSurface.withOpacity(0.75),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 內嵌在輸入欄位右側的驗證按鈕：loading > success/fail > onChange 重置
+class _ReferralInlineButton extends StatelessWidget {
+  final bool isLoading;
+
+  /// 'valid' | 'invalid' | 'not_found' | null
+  final String? status;
+  final VoidCallback? onPressed;
+  final double fieldRadius;
+  final String label;
+  final IconData? icon;
+  const _ReferralInlineButton({
+    super.key,
+    required this.isLoading,
+    required this.status,
+    required this.onPressed,
+    this.fieldRadius = 8.0,
+    this.label = 'Verify',
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool isSuccess = status == 'valid';
+    final bool isFail = status == 'invalid' || status == 'not_found';
+    final Color bg = isSuccess
+        ? Theme.of(context).colorScheme.surfaceBright
+        : isFail
+            ? Theme.of(context).colorScheme.error
+            : theme.colorScheme.primary;
+    final Color fg = Colors.white;
+
+    return ConstrainedBox(
+      constraints:
+          const BoxConstraints(minHeight: 44, maxHeight: 48, minWidth: 80),
+      child: ClipRRect(
+        borderRadius: BorderRadius.only(
+          topRight: Radius.circular(fieldRadius),
+          bottomRight: Radius.circular(fieldRadius),
+        ),
+        child: Material(
+          color: bg,
+          child: InkWell(
+            onTap: isLoading
+                ? null
+                : () {
+                    // Guard clause: check if referral code is empty before proceeding
+                    final _signupPageState =
+                        context.findAncestorStateOfType<_SignupPageState>();
+                    if (_signupPageState != null &&
+                        _signupPageState.referralCodeController.text
+                            .trim()
+                            .isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Please enter a referral code'),
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                        ),
+                      );
+                      return;
+                    }
+                    if (onPressed != null) {
+                      onPressed!();
+                    }
+                  },
+            child: Center(
+              child: isLoading
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white)),
+                    )
+                  : Text(
+                      label,
+                      style: TextStyle(color: fg, fontWeight: FontWeight.w600),
+                    ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

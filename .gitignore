@@ -112,10 +112,16 @@ docs/TODO_LIST.md
 .env.test
 
 # Flutter environment configs (keep examples, ignore actual configs)
-app_env/*.json
-app_env/*.txt
-!app_env/*.example.json
-!app_env/*.example.txt
+# assets/app_env/*.json - 已清理敏感資訊，可以提交到版本控制
+assets/app_env/*.txt
+!assets/app_env/*.example.json
+!assets/app_env/*.example.txt
+
+# Third-party auth sensitive files (已移至後端 .env)
+# assets/app_env/facebook_config.json - 已刪除
+ios/Runner/AppleSignIn.plist
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
 
 # Scripts (keep examples, ignore actual scripts)
 scripts/*.sh

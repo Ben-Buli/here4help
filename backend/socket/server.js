@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 3001;
 require('dotenv').config({ path: '../../.env' });
 
 // Get JWT secret once
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'here4help_jwt_secret_key_2025_development_environment_secure_random_string';
 
 if (!JWT_SECRET) {
   console.error('❌ JWT_SECRET not configured in environment variables');
@@ -27,6 +27,7 @@ if (!JWT_SECRET) {
 }
 
 console.log('✅ JWT_SECRET loaded successfully');
+console.log('🔑 JWT_SECRET length:', JWT_SECRET.length);
 
 const app = express();
 app.use(cors());

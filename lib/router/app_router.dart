@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 // ===== Auth 模組 =====
 import 'package:here4help/auth/pages/login_page.dart';
+import 'package:here4help/auth/pages/auth_callback_page.dart';
 
 // ===== System 模組 =====
 import 'package:here4help/system/pages/banned_page.dart';
@@ -211,6 +212,8 @@ final GoRouter appRouter = GoRouter(
     ),
     // 其他非底部導航頁面
     GoRoute(path: '/login', builder: (_, __) => const LoginPage()),
+    GoRoute(
+        path: '/auth/callback', builder: (_, __) => const AuthCallbackPage()),
     GoRoute(path: '/banned', builder: (_, __) => const BannedPage()),
     GoRoute(
         path: '/unauthorized', builder: (_, __) => const UnauthorizedPage()),
