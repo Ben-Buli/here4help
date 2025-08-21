@@ -2,6 +2,7 @@
 
 > 紀錄格式參考如下，可再多增加一個欄位簡易備注修改主題類型，例如：Socket設定、環境設定、註冊登入、聊天室、任務 etc.
 
+＃ 專案變更紀錄 Logs
 | 日期 | 版本/PR | 項目 | 影響區 | 修改主題類型 | 說明 |
 |---|---|---|---|---|---|
 | 2025-08-18 | db-auth-01 | 建立 `user_identities` 表 | DB | 資料庫重構 | 新增表與索引，支援第三方登入 |
@@ -49,6 +50,8 @@
 | 2025-08-21 | oauth-temp-01 | 建立 `oauth_temp_users` 臨時表 | DB | 第三方登入 | 第三方登入註冊前暫存使用者資料（token 驗證，一次性取用） |
 | 2025-08-21 | database-table-rename-01 | users資料表欄位更名 | All | [users][name] =(rename)=>[users][firsname]  , [users][nickname] =(rename)=>[users][lastname]，欄位改名｜
 | 2025-08-21 | database-table-set | 新增第三方使用者暫存登入資訊資料表 | All | oauth_temp_users ｜
+| 2025-08-21 | project-guide-01 | 建立專案修改指南（Chief Architect 版） | Docs | 專案規劃 | 基於高階專案分析指令文件格式，提供完整的專案修改方案，包含 OAuth token 化流程、管理員後台、客服事件紀錄、任務功能增強等 |
+| 2025-08-21 | project-guide-02 | 擴充計畫至 plan（管理員/帳號安全/守衛/歷史/帳號設定/聊天/申訴） | Docs | 專案規劃 | 同步更新 PLAN.md 與 plan.json，納入高階指令未收錄項目，並依 PR4–PR11 分批執行 |
 
 
 ## 📋 當前狀態(版本變更詳細記錄)

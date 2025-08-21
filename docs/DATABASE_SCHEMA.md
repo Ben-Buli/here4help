@@ -510,6 +510,32 @@ CREATE TABLE `cache` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
+### 4.11 客服聊天室事件（新增）
+CREATE TABLE `support_events` (
+  `id` bigint NOT NULL,
+  `chat_room_id` bigint NOT NULL,
+  `user_id` bigint UNSIGNED NOT NULL COMMENT '客戶 ID',
+  `admin_id` int DEFAULT NULL COMMENT '客服 ID',
+  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `status` enum('open','in_progress','resolved','closed_by_customer') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'open',
+  `closed_at` datetime DEFAULT NULL,
+  `rating` tinyint DEFAULT NULL,
+  `review` text COLLATE utf8mb4_unicode_ci,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+### 4.11.1 客服聊天室事件_log （新增）
+CREATE TABLE `support_event_logs` (
+  `id` bigint NOT NULL,
+  `event_id` bigint NOT NULL,
+  `admin_id` int DEFAULT NULL COMMENT '操作人',
+  `old_status` enum('open','in_progress','resolved','closed_by_customer') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `new_status` enum('open','in_progress','resolved','closed_by_customer') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 ---
 
 ## 5) 外鍵建議（可選，但建議在新環境強化）

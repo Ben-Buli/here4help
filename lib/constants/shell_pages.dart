@@ -66,15 +66,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
   },
-  // 新增：第三方登入註冊頁面路由
-  {
-    'path': '/signup/oauth',
-    'child': const OAuthSignupPage(),
-    'title': 'COMPLETE YOUR PROFILE',
-    'showAppBar': true,
-    'showBottomNav': false,
-    'showBackArrow': true,
-  },
+
   {
     'path': '/signup/student-id',
     'child': const StudentIdPage(),

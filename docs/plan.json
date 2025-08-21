@@ -1,0 +1,509 @@
+{
+  "version": "1.0",
+  "project": "Here4Help",
+  "description": "專案修改指南 - 基於高階專案分析指令文件格式，以及API開發工具，以及資料庫結構",
+  "milestones": [
+    {
+      "id": "M-OAUTH-TEMP-FLOW",
+      "title": "第三方登入 token 化",
+      "description": "實作完整的第三方登入 OAuth token 化流程",
+      "scope": ["Google", "Facebook", "Apple 登入"],
+      "timeline": "預計兩天完成，搭配高階專案分析指令文件格式，以及API開發工具，以及資料庫結構",
+      "tasks": [
+        {
+          "id": "T1-BE-CALLBACK-SAVE-TEMP",
+          "todo_ref": "callback-save-temp-and-token",
+          "owner": "backend",
+          "goal": "重構 Google/Facebook/Apple 回調，寫入 oauth_temp_users 並簽發一次性 token",
+          "steps": [
+            "命中新用戶 → 寫 oauth_temp_users + 產一次性 token → 302 至 ${FRONTEND_URL}/signup?token=...",
+            "命中既有用戶 → 簽發 JWT → 302 至 ${FRONTEND_URL}/home?provider=google",
+            "統一錯誤重導 /auth/callback?success=false&provider=google&error=..."
+          ],
+          "commands": [
+            "php -l backend/api/auth/google-callback.php",
+            "php backend/test_google_oauth_config.php",
+            "tail -50 /Applications/MAMP/logs/php_error.log 2>/dev/null"
+          ],
+          "touch_files": [
+            "backend/api/auth/google-callback.php",
+            "backend/api/auth/facebook-callback.php",
+            "backend/api/auth/apple-callback.php"
+          ],
+          "acceptance": [
+            "新/舊用戶重導正確",
+            "錯誤重導一致"
+          ],
+          "rollback": "暫時切回舊分支（直接建 users/user_identities）或停用新分流",
+          "estimate_hours": 8,
+          "deps": []
+        },
+        {
+          "id": "T2-BE-API-FETCH-TEMP",
+          "todo_ref": "api-fetch-temp-user",
+          "owner": "backend",
+          "goal": "新增 API：GET /auth/oauth-temp?token=... 供 /signup 預填；設定逾期/一次性使用",
+          "steps": [
+            "token 有效 → 返回 { provider, provider_user_id, name, email, avatar_url }（raw_data節選）",
+            "token 無效/逾期 → 400/404 與清楚訊息"
+          ],
+          "commands": [
+            "php -l backend/api/auth/oauth-temp.php",
+            "curl -s 'http://localhost:8888/here4help/backend/api/auth/oauth-temp.php?token=TEST_TOKEN&peek=true'"
+          ],
+          "touch_files": [
+            "backend/api/auth/oauth-temp.php"
+          ],
+          "acceptance": [
+            "peek 可查看、未消費",
+            "若已被 T3 消費，token 失效"
+          ],
+          "rollback": "移除 oauth-temp.php 檔案",
+          "estimate_hours": 4,
+          "deps": ["T1-BE-CALLBACK-SAVE-TEMP"]
+        },
+        {
+          "id": "T3-BE-REGISTER-CONSUME-TEMP",
+          "todo_ref": "api-register-consume-temp",
+          "owner": "backend",
+          "goal": "改造註冊 API：消費 temp token 建立 users + user_identities，成功後刪除臨時資料",
+          "steps": [
+            "交易流程：消費 token → 建 users → 建 user_identities 綁定 → 刪除臨時 token → 簽發 JWT"
+          ],
+          "commands": [
+            "php -l backend/api/auth/register-oauth.php",
+            "curl -s -X POST -H 'Content-Type: application/json' -d '{\"token\":\"TEST_TOKEN\",\"name\":\"Test User\"}' http://localhost:8888/here4help/backend/api/auth/register-oauth.php"
+          ],
+          "touch_files": [
+            "backend/api/auth/register-oauth.php"
+          ],
+          "acceptance": [
+            "單 token 單次可用",
+            "成功回傳 { token, user }"
+          ],
+          "rollback": "移除 register-oauth.php 檔案",
+          "estimate_hours": 6,
+          "deps": ["T2-BE-API-FETCH-TEMP"]
+        },
+        {
+          "id": "T4-FE-SIGNUP-PREFILL",
+          "todo_ref": "fe-signup-prefill-by-token",
+          "owner": "flutter",
+          "goal": "前端 /signup 支援以 token 載入預填資料；UI 處理 token 過期/錯誤狀態",
+          "steps": [
+            "/signup 檢查 token → 呼叫 GET /auth/oauth-temp → 預填（name/email/avatar）"
+          ],
+          "commands": [
+            "flutter analyze",
+            "flutter test --plain-name signup"
+          ],
+          "touch_files": [
+            "lib/auth/pages/signup_page.dart",
+            "lib/services/api/oauth_api.dart"
+          ],
+          "acceptance": [
+            "預填 OK",
+            "過期/錯誤提示並引導返回登入"
+          ],
+          "rollback": "恢復 signup_page.dart 原始版本",
+          "estimate_hours": 6,
+          "deps": ["T3-BE-REGISTER-CONSUME-TEMP"]
+        },
+        {
+          "id": "T5-FE-OAUTH-WIRING",
+          "todo_ref": "fe-oauth-flow-wiring",
+          "owner": "flutter",
+          "goal": "前端第三方登入流程銜接：web OAuth → 後端回調 → 跳 /signup?token=...",
+          "steps": [
+            "Web OAuth → 回調 → 依 isNewUser 分流 → /signup?token=... 或 /home"
+          ],
+          "commands": [
+            "flutter analyze",
+            "flutter test --plain-name oauth"
+          ],
+          "touch_files": [
+            "lib/auth/services/third_party_auth_service.dart",
+            "lib/auth/pages/auth_callback_page.dart",
+            "lib/router/app_router.dart"
+          ],
+          "acceptance": [
+            "Google 完成",
+            "Facebook/Apple 後續"
+          ],
+          "rollback": "恢復原始檔案版本",
+          "estimate_hours": 8,
+          "deps": ["T4-FE-SIGNUP-PREFILL"]
+        }
+      ]
+    },
+    {
+      "id": "M-ADMIN-BACKEND",
+      "title": "管理員後台",
+      "description": "建立 Laravel + Vue 管理員後台（/api/admin/* 分離、Sanctum 認證、RBAC）",
+      "scope": ["用戶管理", "任務管理", "客服系統", "點數管理", "RBAC"],
+      "timeline": "5 個 PR",
+      "tasks": [
+        {
+          "id": "T6-LAR-ADMIN-SETUP",
+          "owner": "backend",
+          "goal": "建立 Laravel 管理員後台基礎架構",
+          "steps": [
+            "建立 Laravel 專案結構",
+            "設定資料庫連線與 Sanctum",
+            "建立基礎路由與控制器骨架"
+          ],
+          "commands": [
+            "composer create-project laravel/laravel admin",
+            "cd admin && composer require laravel/sanctum",
+            "php artisan make:controller Admin/AuthController"
+          ],
+          "touch_files": ["admin/", "admin/routes/api.php", "admin/app/Http/Controllers/Admin/"],
+          "acceptance": ["Laravel 專案可啟動", "基礎路由可訪問"],
+          "rollback": "移除 admin/ 目錄",
+          "estimate_hours": 4,
+          "deps": []
+        },
+        {
+          "id": "T6B-LAR-ADMIN-MIGRATIONS",
+          "owner": "backend",
+          "goal": "建立 RBAC 與稽核資料表（admins, admin_roles, admin_role_permissions, admin_activity_logs, admin_login_logs）",
+          "steps": [
+            "撰寫 migrations 與 seeders",
+            "建立 Eloquent Models 與關聯"
+          ],
+          "commands": [
+            "php artisan make:migration create_admins_tables --create=admins",
+            "php artisan migrate"
+          ],
+          "touch_files": ["admin/database/migrations/*", "admin/app/Models/*"],
+          "acceptance": ["資料表建立且含索引/外鍵", "seeders 匯入成功"],
+          "estimate_hours": 6,
+          "deps": ["T6-LAR-ADMIN-SETUP"]
+        },
+        {
+          "id": "T6C-LAR-ADMIN-ROUTES-RBAC",
+          "owner": "backend",
+          "goal": "/admin 路由樹與 RBAC 中介層：/login, /users(list/review/edit), /tasks(list/logs), /services(list/chat/events: list/view/stats), /points(list/manual-add), /admins(list/create/reset-password)",
+          "steps": [
+            "路由群組 prefix=admin、middleware=[auth:sanctum, admin]",
+            "控制器動作對應頁面樹"
+          ],
+          "commands": ["php artisan route:list --path=admin"],
+          "touch_files": ["admin/routes/api.php", "admin/app/Http/Middleware/AdminMiddleware.php"],
+          "acceptance": ["路由對應完整", "未授權 403"],
+          "estimate_hours": 6,
+          "deps": ["T6B-LAR-ADMIN-MIGRATIONS"]
+        },
+        {
+          "id": "T7-LAR-ADMIN-AUTH",
+          "owner": "backend",
+          "goal": "實作管理員登入與權限控制（Sanctum + RBAC）",
+          "steps": [
+            "登入/登出 API、Token 發放",
+            "RBAC 檢查與審計紀錄"
+          ],
+          "commands": ["php artisan make:middleware AdminMiddleware"],
+          "touch_files": ["admin/app/Http/Controllers/Admin/AuthController.php", "admin/app/Http/Middleware/AdminMiddleware.php"],
+          "acceptance": ["管理員可登入", "權限不足返回 403"],
+          "rollback": "移除認證相關檔案",
+          "estimate_hours": 8,
+          "deps": ["T6C-LAR-ADMIN-ROUTES-RBAC"]
+        },
+        {
+          "id": "T8-VUE-ADMIN-UI",
+          "owner": "frontend",
+          "goal": "建立 Vue.js 管理員前端介面（與 /api/admin 分離）",
+          "steps": ["建立專案、路由、Pinia 狀態、頁面樹對應"],
+          "commands": ["npm create vue@latest admin-frontend", "cd admin-frontend && npm install axios vue-router pinia"],
+          "touch_files": ["admin/admin-frontend/"]
+        }
+      ]
+    },
+    {
+      "id": "M-SUPPORT-EVENTS",
+      "title": "客服事件紀錄",
+      "description": "實作客服事件紀錄與管理系統",
+      "scope": ["事件建立", "狀態管理", "客戶評分", "管理員統計"],
+      "timeline": "3 個 PR，預計 2 週完成",
+      "tasks": [
+        {
+          "id": "T9-BE-SUPPORT-EVENTS",
+          "owner": "backend",
+          "goal": "實作客服事件紀錄後端 API",
+          "steps": ["建立 support_events / support_event_logs", "CRUD 與狀態更新"],
+          "commands": ["php -l backend/api/support/events.php"],
+          "touch_files": ["backend/api/support/events.php", "backend/database/migrations/"],
+          "acceptance": ["事件可建立/查詢/更新"],
+          "estimate_hours": 8
+        },
+        {
+          "id": "T10-FE-SUPPORT-EVENTS",
+          "owner": "flutter",
+          "goal": "實作客服事件前端介面",
+          "steps": ["列表/詳情/狀態更新 UI"],
+          "commands": ["flutter analyze"],
+          "touch_files": ["lib/pages/support/issues_status_page.dart", "lib/widgets/support_event_card.dart"],
+          "acceptance": ["事件列表顯示、狀態更新"],
+          "estimate_hours": 10
+        }
+      ]
+    },
+    {
+      "id": "M-TASK-FEATURES",
+      "title": "任務功能增強",
+      "description": "新增任務收藏與檢舉功能",
+      "scope": ["收藏管理", "檢舉系統", "管理員審核"],
+      "timeline": "2 個 PR，預計 1 週完成",
+      "tasks": [
+        {
+          "id": "T11-BE-TASK-FEATURES",
+          "owner": "backend",
+          "goal": "實作任務收藏與檢舉後端 API",
+          "steps": ["task_favorites / task_reports 建表與 API"],
+          "commands": ["php -l backend/api/tasks/favorites.php"],
+          "touch_files": ["backend/api/tasks/favorites.php", "backend/api/tasks/reports.php"],
+          "acceptance": ["收藏/檢舉 API 正常"],
+          "estimate_hours": 6
+        },
+        {
+          "id": "T12-FE-TASK-FEATURES",
+          "owner": "flutter",
+          "goal": "實作任務收藏與檢舉前端介面",
+          "steps": ["任務卡片收藏按鈕/檢舉對話框/收藏列表"],
+          "commands": ["flutter analyze"],
+          "touch_files": ["lib/widgets/task_card.dart", "lib/pages/account/favorites_page.dart"],
+          "acceptance": ["UI 正常運作"],
+          "estimate_hours": 8
+        }
+      ]
+    },
+
+    { "id": "M-ACCOUNT-SECURITY", "title": "帳號安全與保護", "description": "停用/啟用、風險檢查，與前端保護流程", "tasks": [
+      { "id": "T1-BE-SECURITY-GUARD", "owner": "backend", "goal": "GET /account/risky-actions-check, POST /account/deactivate, POST /account/reactivate", "commands": ["php -l backend/api/account/deactivate.php"], "acceptance": ["可正確回報風險", "停用後受保護 API 403" ] },
+      { "id": "T2-FLT-SECURITY-UI", "owner": "flutter", "goal": "/account/security UI 與保護流程", "commands": ["flutter analyze"], "acceptance": ["有進行中/發布中任務時提示", "自停用後可再啟用（非被管理員停權）"] }
+    ]},
+
+    { "id": "M-PERMISSION-GUARD", "title": "全域權限與路由守衛", "description": "user.permission / users.status 控制路由與元件", "tasks": [
+      { "id": "T1-PERMISSION-GUARD", "owner": "flutter", "goal": "新增 guards/permission_guard.dart 並套用至 /task, /chat/detail 與元件級按鈕", "commands": ["flutter analyze"], "acceptance": ["路由級/元件級皆生效", "提示一致"] }
+    ]},
+
+    { "id": "M-HISTORY-REVIEW", "title": "歷史任務與未評價快捷", "description": "歷史列表 + 快捷評價", "tasks": [
+      { "id": "T1-BE-HISTORY-ENDPOINTS", "owner": "backend", "goal": "GET /tasks/history?role=poster|acceptor", "commands": ["php -l backend/api/tasks/history.php"], "acceptance": ["可依角色分頁"] },
+      { "id": "T2-FLT-HISTORY-UI", "owner": "flutter", "goal": "history_page 與 review_dialog", "commands": ["flutter analyze"], "acceptance": ["未評價項目可快捷評分"] }
+    ]},
+
+    { "id": "M-OAUTH-FIRST-LOGIN", "title": "第三方首次登入導引", "description": "新用戶導引至 /signup 預填流程", "tasks": [
+      { "id": "T1-BE-OAUTH-SESSION", "owner": "backend", "goal": "回傳 isNewUser 與 session_key（沿用 temp token）", "commands": ["php -l backend/api/auth/google-callback.php"], "acceptance": ["新用戶返回 isNewUser=true"] },
+      { "id": "T2-FLT-OAUTH-SIGNUP-FLOW", "owner": "flutter", "goal": "shell/router：isNewUser=true 時導向 /signup 並帶預設值", "commands": ["flutter analyze"] }
+    ]},
+
+    { "id": "M-ACCOUNT-SETTINGS", "title": "用戶帳號設定模組", "description": "改密碼 / 重設信 / 自主停權 / 刪帳 / 恢復", "tasks": [
+      { "id": "T1-BE-CHANGE-PASSWORD", "owner": "backend", "goal": "POST /account/change-password（驗舊密碼、強度）", "acceptance": ["符合強度與驗證"] },
+      { "id": "T2-BE-REQUEST-RESET", "owner": "backend", "goal": "POST /account/request-password-reset（寄送驗證連結）", "acceptance": ["寄送成功且含過期時間"] },
+      { "id": "T3-BE-RESET-PASSWORD", "owner": "backend", "goal": "POST /account/reset-password（驗 token 重設）", "acceptance": ["一次性 token "] },
+      { "id": "T4-BE-DEACTIVATE-DELETE", "owner": "backend", "goal": "POST /account/deactivate, DELETE /account（軟刪除/標記）", "acceptance": ["刪除/停權流程記錄 task_logs"] },
+      { "id": "T5-FLT-ACCOUNT-PAGES", "owner": "flutter", "goal": "設定頁：改密碼/重設/停權/刪帳/恢復 UI", "acceptance": ["完整流程可操作"] }
+    ]},
+
+    { "id": "M-CHAT-POST-SWIPE", "title": "/chat POST 分頁滑動工具列", "description": "應徵者卡片左右滑（Read/Delete/Reject...）可擴充", "tasks": [
+      { "id": "T1-FLT-POST-SWIPE", "owner": "flutter", "goal": "在 chat_list_task_widget.dart 套用 Slidable/Dismissible 與可擴充動作列（依任務狀態條件顯示）", "acceptance": ["動作可擴充、狀態條件顯示一致"] },
+      { "id": "T2-BE-POST-ACTIONS", "owner": "backend", "goal": "補齊 Read/Delete/Reject 相關 API 或聚合端點", "acceptance": ["端點 2xx 並更新未讀/列表"] }
+    ]},
+
+    { "id": "M-CHAT-ACTION-BAR", "title": "1v1 聊天室 Action Bar", "description": "依任務狀態 + 使用者角色(creator/participant) 顯示工具", "tasks": [
+      { "id": "T1-FLT-ACTION-BAR-MATRIX", "owner": "flutter", "goal": "定義狀態×角色矩陣，動態渲染 Action（confirm, cancel, complete, dispute...）", "acceptance": ["矩陣覆蓋主要狀態"] },
+      { "id": "T2-BE-ACTION-ENDPOINTS", "owner": "backend", "goal": "補齊任務狀態變更端點與 task_logs 紀錄", "acceptance": ["狀態正確轉換並寫 log"] }
+    ]},
+
+    { "id": "M-TASK-COMPLETION-DISPUTE", "title": "任務自動完成與申訴流程", "description": "pending confirmation 七日自動 completed；Dispute 轉換與後台審核", "tasks": [
+      { "id": "T1-BE-AUTO-COMPLETE", "owner": "backend", "goal": "排程或 cron：pending confirmation 超過 7 日 → completed（寫 task_logs）", "acceptance": ["僅影響符合條件任務"] },
+      { "id": "T2-FLT-DISPUTE-ACTION", "owner": "flutter", "goal": "Action Bar 提供 dispute，轉為 dispute 狀態並中止七日倒數", "acceptance": ["觸發成功且 UI 反映"] },
+      { "id": "T3-LAR-ADMIN-DISPUTE-REVIEW", "owner": "backend", "goal": "後台 /admin/services/events + /disputes 審核（含圖片上傳/檢視）", "acceptance": ["管理員可審核、狀態記錄與關聯圖片"] }
+    ]}
+    ,
+    {
+      "id": "M-SECURITY-HARDENING",
+      "title": "Security Hardening（基本）",
+      "mvp": true,
+      "description": "最小可行的安全加固：CORS、Rate Limit、JWT 基礎策略",
+      "tasks": [
+        { "id": "T-SH-CORS", "owner": "backend", "goal": "設定 CORS 白名單（dev/stage/prod 分環境）" },
+        { "id": "T-SH-RATE-LIMIT", "owner": "backend", "goal": "登入/註冊/檢舉/傳訊 API 節流（如 5 req/min）" },
+        { "id": "T-SH-JWT-BASICS", "owner": "backend", "goal": "JWT 期限/Refresh Token 基本輪替；黑名單撤銷端點" }
+      ]
+    },
+    {
+      "id": "M-API-CONTRACTS",
+      "title": "API 合約與錯誤碼（最小集）",
+      "mvp": true,
+      "description": "統一 API 回應格式與錯誤碼、分頁/排序協議",
+      "tasks": [
+        { "id": "T-AC-ERROR-SPEC", "owner": "backend", "goal": "定義 {success, code, message, data, traceId} 統一格式" },
+        { "id": "T-AC-PAGINATION", "owner": "backend", "goal": "統一分頁參數與回傳欄位（page, per_page, total, items）" },
+        { "id": "T-AC-OPENAPI-MIN", "owner": "backend", "goal": "以 OpenAPI 標註關鍵端點（auth/tasks/chat 的最小子集）" }
+      ]
+    },
+    {
+      "id": "M-OBSERVABILITY",
+      "title": "可觀測性（最小）",
+      "mvp": true,
+      "description": "集中化日誌與前端錯誤上報（最小可用）",
+      "tasks": [
+        { "id": "T-OB-LOGGING", "owner": "backend", "goal": "後端加 traceId；記錄 4xx/5xx 與主要商務事件" },
+        { "id": "T-OB-FLT-ERROR", "owner": "flutter", "goal": "Flutter 全域錯誤上報 hook（含裝置/版本）" },
+        { "id": "T-OB-ALERT-MIN", "owner": "backend", "goal": "簡單警示：API 5xx 連續 N 次觸發通知（Email/Slack）" }
+      ]
+    },
+    {
+      "id": "M-DATA-GOVERNANCE",
+      "title": "資料治理（基礎）",
+      "mvp": true,
+      "description": "避免型別不一致與資料遺失的最小治理",
+      "tasks": [
+        { "id": "T-DG-ID-AUDIT", "owner": "backend", "goal": "列出所有 id/FK 型別差異清單與準備遷移計畫（不立即變更）" },
+        { "id": "T-DG-BACKUP", "owner": "infra", "goal": "建立每日/每 6 小時 DB 備份腳本與還原演練步驟" },
+        { "id": "T-DG-RETENTION", "owner": "backend", "goal": "定義最低限度資料保留/清理策略（暫不自動化）" }
+      ]
+    },
+    {
+      "id": "M-MEDIA-PIPELINE",
+      "title": "媒體上傳/掃毒/壓縮",
+      "mvp": false,
+      "description": "聊天室/申訴圖片的上傳規範與風險控管",
+      "tasks": [
+        { "id": "T-MP-LIMITS", "owner": "backend", "goal": "檔案大小/類型白名單與壓縮策略" },
+        { "id": "T-MP-STORAGE", "owner": "infra", "goal": "S3/本機儲存切換與清理排程" },
+        { "id": "T-MP-SCAN", "owner": "backend", "goal": "掃毒/惡意檔阻擋流程（hook）" }
+      ]
+    },
+    {
+      "id": "M-NOTIFICATION-POLICY",
+      "title": "通知策略",
+      "mvp": false,
+      "description": "推播/站內/Email 的規則與頻率，使用者可控",
+      "tasks": [
+        { "id": "T-NP-MATRIX", "owner": "backend", "goal": "事件→通知矩陣（任務/聊天/客服/審核）" },
+        { "id": "T-NP-SETTINGS", "owner": "flutter", "goal": "使用者通知偏好設定 UI" }
+      ]
+    },
+    {
+      "id": "M-OFFLINE-RESILIENCE",
+      "title": "離線/弱網體驗",
+      "mvp": false,
+      "description": "聊天室與列表的快取與重連策略",
+      "tasks": [
+        { "id": "T-OR-CACHE", "owner": "flutter", "goal": "列表快取與失效策略（最新 N 筆）" },
+        { "id": "T-OR-RETRY", "owner": "flutter", "goal": "Socket 重連與退避（backoff）" }
+      ]
+    },
+    {
+      "id": "M-A11Y",
+      "title": "無障礙",
+      "mvp": false,
+      "description": "字級、對比度、螢幕閱讀、可鍵盤操作",
+      "tasks": [
+        { "id": "T-A11Y-FONT", "owner": "flutter", "goal": "動態字級與可讀性檢查" },
+        { "id": "T-A11Y-ARIA", "owner": "flutter", "goal": "Semantics 標註與可鍵盤操作" }
+      ]
+    },
+    {
+      "id": "M-EMPTY-ERROR-STATES",
+      "title": "空狀態/錯誤態設計",
+      "mvp": false,
+      "description": "主要頁面的空/錯樣板與一致文案",
+      "tasks": [
+        { "id": "T-EES-TEMPLATES", "owner": "flutter", "goal": "空/錯頁模板組件（可參數化圖示/文案/CTA）" }
+      ]
+    }
+  ],
+
+  "pr_breakdown": [
+    { "id": "PR1", "title": "OAuth Token 化基礎架構", "scope": ["T1-BE-CALLBACK-SAVE-TEMP", "T2-BE-API-FETCH-TEMP"], "files": ["backend/api/auth/google-callback.php", "backend/api/auth/oauth-temp.php"], "acceptance": "回調可正常處理新/舊用戶分流" },
+    { "id": "PR2", "title": "OAuth 註冊流程", "scope": ["T3-BE-REGISTER-CONSUME-TEMP", "T4-FE-SIGNUP-PREFILL"], "files": ["backend/api/auth/register-oauth.php", "lib/auth/pages/signup_page.dart"], "acceptance": "新用戶可完成 OAuth 註冊流程" },
+    { "id": "PR3", "title": "OAuth 流程整合", "scope": ["T5-FE-OAUTH-WIRING"], "files": ["lib/auth/services/third_party_auth_service.dart", "backend/config/.env"], "acceptance": "完整 OAuth 流程可正常運作" },
+    { "id": "PR4", "title": "管理員後台基礎", "scope": ["T6-LAR-ADMIN-SETUP", "T6B-LAR-ADMIN-MIGRATIONS", "T6C-LAR-ADMIN-ROUTES-RBAC", "T7-LAR-ADMIN-AUTH"], "files": ["admin/"] , "acceptance": "管理員後台可正常登入與訪問（RBAC 生效）" },
+    { "id": "PR5", "title": "管理員後台前端", "scope": ["T8-VUE-ADMIN-UI"], "files": ["admin/admin-frontend/"] , "acceptance": "管理員操作 UI 可使用" },
+    { "id": "PR6", "title": "客服事件系統", "scope": ["T9-BE-SUPPORT-EVENTS", "T10-FE-SUPPORT-EVENTS"], "files": ["backend/api/support/events.php", "lib/pages/support/"] , "acceptance": "客服事件系統可正常運作" },
+    { "id": "PR7", "title": "任務功能增強", "scope": ["T11-BE-TASK-FEATURES", "T12-FE-TASK-FEATURES"], "files": ["backend/api/tasks/favorites.php", "lib/widgets/task_card.dart"], "acceptance": "任務收藏與檢舉功能正常" },
+    { "id": "PR8", "title": "帳號安全/權限守衛/歷史任務/首次 OAuth 導引", "scope": ["M-ACCOUNT-SECURITY", "M-PERMISSION-GUARD", "M-HISTORY-REVIEW", "M-OAUTH-FIRST-LOGIN"] , "files": ["lib/router/*", "backend/api/account/*"], "acceptance": "四模組如驗收條件通過" },
+    { "id": "PR9", "title": "帳號設定模組", "scope": ["M-ACCOUNT-SETTINGS"], "files": ["backend/api/account/*", "lib/pages/account/*"], "acceptance": "改密碼/重設/停權/刪帳/恢復全通過" },
+    { "id": "PR10", "title": "聊天滑動與 Action Bar", "scope": ["M-CHAT-POST-SWIPE", "M-CHAT-ACTION-BAR"], "files": ["lib/chat/widgets/*", "backend/api/tasks/*"], "acceptance": "滑動與動作矩陣可用" },
+    { "id": "PR11", "title": "任務自動完成與申訴", "scope": ["M-TASK-COMPLETION-DISPUTE"], "files": ["backend/scripts/*", "admin/*"], "acceptance": "七日自動完成/申訴審核可用" },
+    { "id": "PR12", "title": "Security Hardening（基本）", "scope": ["T-SH-CORS", "T-SH-RATE-LIMIT", "T-SH-JWT-BASICS"], "acceptance": "關鍵端點節流生效；跨域正確；JWT 基本輪替可用" },
+    { "id": "PR13", "title": "API 合約（最小集）", "scope": ["T-AC-ERROR-SPEC", "T-AC-PAGINATION", "T-AC-OPENAPI-MIN"], "acceptance": "主要端點回應格式一致；OpenAPI 文檔可產生" },
+    { "id": "PR14", "title": "Observability（最小）", "scope": ["T-OB-LOGGING", "T-OB-FLT-ERROR", "T-OB-ALERT-MIN"], "acceptance": "可由 traceId 追查錯誤；5xx 連續觸發能通知" },
+    { "id": "PR15", "title": "Data Governance（基礎）", "scope": ["T-DG-ID-AUDIT", "T-DG-BACKUP", "T-DG-RETENTION"], "acceptance": "有型別差異清單與備份/還原 SOP；最低限度保留策略就緒" },
+    { "id": "PR16", "title": "Media Pipeline", "scope": ["T-MP-LIMITS", "T-MP-STORAGE", "T-MP-SCAN"], "acceptance": "超限與非法檔案被阻擋；存放與清理規則生效" },
+    { "id": "PR17", "title": "通知策略", "scope": ["T-NP-MATRIX", "T-NP-SETTINGS"], "acceptance": "事件→通知矩陣落地；前端可調整偏好" },
+    { "id": "PR18", "title": "i18n/L10n", "scope": ["T-I18N-RES", "T-I18N-FMT"], "acceptance": "主要頁面文字抽離；日期/數字在地化" },
+    { "id": "PR19", "title": "離線/弱網體驗", "scope": ["T-OR-CACHE", "T-OR-RETRY"], "acceptance": "列表離線可瀏覽；斷線可自動重連與退避" },
+    { "id": "PR20", "title": "無障礙 & 空/錯狀態", "scope": ["T-A11Y-FONT", "T-A11Y-ARIA", "T-EES-TEMPLATES"], "acceptance": "主要流程具可讀性與空/錯態一致樣板" }
+  ],
+
+  "database_schema": {
+    "oauth_temp_users": { "status": "completed", "description": "第三方登入註冊前暫存使用者資料" },
+    "support_events": { "status": "pending", "description": "客服事件紀錄" },
+    "support_event_logs": { "status": "pending", "description": "客服事件歷程紀錄" },
+    "task_favorites": { "status": "pending", "description": "任務收藏" },
+    "task_reports": { "status": "pending", "description": "任務檢舉" },
+    "admins/rbac": { "status": "pending", "description": "管理員/角色/權限/稽核/登入紀錄" }
+  },
+
+  "environment_config": {
+    "frontend_url": "http://localhost:3000",
+    "socket_url": "ws://localhost:3001",
+    "mamp_web": "http://localhost:8888/here4help",
+    "mamp_db": "localhost:8889",
+    "google_redirect_uri": "http://localhost:8888/here4help/backend/api/auth/google-callback.php"
+  },
+
+  "project_language": "介面顯示語言使用英文，DebugPrint、註解、API文件使用中文",
+
+  "testing_plan": {
+    "unit_tests": [
+      "OAuth 流程：token 生成/驗證/消費",
+      "API 端點：所有新增 API",
+      "前端組件：Flutter 新增組件",
+      "管理員後台：Laravel 控制器/Vue 組件",
+      "權限守衛：不同 permission/status 下導向/禁用",
+      "帳號設定：改密碼/重設/刪帳/停權/恢復"
+    ],
+    "e2e_tests": [
+      "新用戶：OAuth → /signup?token → 註冊 → /student-id",
+      "既有用戶：OAuth → /home → /api/auth/profile 成功",
+      "客服事件：建立/狀態更新/評分",
+      "任務功能：收藏/檢舉/管理員處理",
+      "聊天：POST 滑動與 Action Bar 動作矩陣",
+      "任務：七日自動完成與申訴中斷倒數"
+    ],
+    "test_commands": [
+      "php backend/test_google_oauth_config.php",
+      "flutter analyze",
+      "flutter test --plain-name signup",
+      "cd admin && php artisan test",
+      "cd admin-frontend && npm run test"
+    ]
+  },
+
+  "rollback_plan": {
+    "database": [
+      "DELETE FROM oauth_temp_users WHERE expired_at < NOW()",
+      "DROP TABLE IF EXISTS oauth_temp_users",
+      "DROP TABLE IF EXISTS support_events",
+      "DROP TABLE IF EXISTS task_favorites"
+    ],
+    "code": ["切回舊的回調分支", "移除 admin/ 目錄", "移除新增的組件與頁面"],
+    "environment": ["git checkout HEAD -- backend/config/.env", "flutter clean", "cd admin && php artisan cache:clear"]
+  },
+
+  "open_questions": [
+    "管理員後台是否與現有 PHP 共用 DB（目前假設共用）？",
+    "Reset Password 寄信使用何 SMTP（cPanel or 第三方）？",
+    "Dispute 圖片上傳規格與容量限制？"
+  ],
+  "suggestions": [
+    "PermissionGuard 統一轉譯後端錯誤碼為前端文案",
+    "客服事件詳情可共用 review_dialog，減少重複 UI",
+    "為停權/停用/申訴等關鍵操作加入審計日誌"
+  ]
+}
