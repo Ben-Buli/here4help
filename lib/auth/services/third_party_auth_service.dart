@@ -53,19 +53,19 @@ class ThirdPartyAuthService {
     }
   }
 
-  // Web 版 Google 登入
+  // Web 版 Google 登入 - 使用新的 OAuth 流程
   Future<Map<String, dynamic>?> _signInWithGoogleWeb() async {
     try {
       // 檢查是否已配置 Google Client ID
       if (EnvironmentConfig.googleClientId.isEmpty) {
-        print('❌ Google Client ID 未配置，無法進行 Web 登入');
+        debugPrint('❌ Google Client ID 未配置，無法進行 Web 登入');
         throw Exception('Google Client ID 未配置');
       }
 
       // 使用 Google OAuth 2.0 進行真實登入
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
-      // 創建 Google OAuth 2.0 授權 URL
+      // 創建 Google OAuth 2.0 授權 URL - 直接重定向到後端回調
       final googleAuthUrl =
           Uri.https('accounts.google.com', '/o/oauth2/v2/auth', {
         'client_id': EnvironmentConfig.googleClientId,
@@ -78,93 +78,52 @@ class ThirdPartyAuthService {
         'prompt': 'consent',
       });
 
-      print('🔐 準備跳轉到 Google 登入頁面: $googleAuthUrl');
+      debugPrint('🔐 準備跳轉到 Google 登入頁面: $googleAuthUrl');
 
-      // 在 Web 環境中，我們需要打開新視窗或重定向
+      // 在 Web 環境中直接重定向到 Google OAuth
       if (isWeb) {
         try {
-          // 嘗試使用 url_launcher 打開 Google 登入頁面
+          // 使用 url_launcher 打開 Google 登入頁面
           final canLaunch = await canLaunchUrl(googleAuthUrl);
           if (canLaunch) {
-            print('🌐 正在打開 Google 登入頁面...');
+            debugPrint('🌐 正在重定向到 Google 登入頁面...');
             final launched = await launchUrl(
               googleAuthUrl,
               mode: LaunchMode.externalApplication,
             );
 
             if (launched) {
-              print('✅ Google 登入頁面已打開');
+              debugPrint('✅ Google OAuth 流程已啟動');
+              debugPrint('📋 用戶將在瀏覽器中完成登入，然後重定向回應用');
 
-              // 由於 OAuth 流程需要用戶在瀏覽器中完成，
-              // 我們需要等待回調或實作其他機制來獲取授權碼
-              // 目前先使用模擬資料，實際部署時需要實作完整的 OAuth 流程
-
-              print('⚠️ 注意：用戶需要在瀏覽器中完成 Google 登入，然後返回應用');
-              print('💡 建議：實作 OAuth 回調處理或使用 Popup 視窗');
-
-              // 暫時使用模擬資料進行測試
-              final userData = {
+              // 返回成功標記，表示 OAuth 流程已啟動
+              // 實際的登入結果將通過回調處理
+              return {
+                'success': true,
                 'provider': 'google',
                 'platform': 'web',
-                'google_id': 'web_google_user_$timestamp',
-                'name': 'Web Google User $timestamp',
-                'email': 'webuser_google_$timestamp@example.com',
-                'avatar_url': 'https://example.com/avatar.jpg',
-                'access_token': 'mock_access_token_$timestamp',
-                'id_token': 'mock_id_token_$timestamp',
-                'auth_code': 'mock_auth_code_$timestamp', // 模擬授權碼
-                'note': '真實 OAuth 流程需要實作回調處理',
+                'oauth_started': true,
+                'message': 'OAuth flow started successfully',
+                'timestamp': timestamp,
               };
-
-              return await _sendUserDataToBackend(userData);
             } else {
-              print('❌ 無法打開 Google 登入頁面');
-              throw Exception('無法打開 Google 登入頁面');
+              debugPrint('❌ 無法啟動 Google OAuth 流程');
+              throw Exception('無法啟動 Google OAuth 流程');
             }
           } else {
-            print('❌ 無法啟動 URL: $googleAuthUrl');
+            debugPrint('❌ 無法啟動 URL: $googleAuthUrl');
             throw Exception('無法啟動 Google 登入 URL');
           }
         } catch (e) {
-          print('❌ 打開 Google 登入頁面失敗: $e');
-          print('🔄 回退到模擬資料模式');
-
-          // 回退到模擬資料模式
-          final userData = {
-            'provider': 'google',
-            'platform': 'web',
-            'google_id': 'web_google_user_$timestamp',
-            'name': 'Web Google User $timestamp',
-            'email': 'webuser_google_$timestamp@example.com',
-            'avatar_url': 'https://example.com/avatar.jpg',
-            'access_token': 'mock_access_token_$timestamp',
-            'id_token': 'mock_id_token_$timestamp',
-            'auth_code': 'mock_auth_code_$timestamp',
-            'note': 'OAuth 啟動失敗，使用模擬資料',
-          };
-
-          return await _sendUserDataToBackend(userData);
+          debugPrint('❌ Google OAuth 流程啟動失敗: $e');
+          throw Exception('Google OAuth 流程啟動失敗: $e');
         }
       } else {
-        // 非 Web 平台，使用模擬資料
-        print('📱 非 Web 平台，使用模擬資料');
-        final userData = {
-          'provider': 'google',
-          'platform': 'web',
-          'google_id': 'web_google_user_$timestamp',
-          'name': 'Web Google User $timestamp',
-          'email': 'webuser_google_$timestamp@example.com',
-          'avatar_url': 'https://example.com/avatar.jpg',
-          'access_token': 'mock_access_token_$timestamp',
-          'id_token': 'mock_id_token_$timestamp',
-          'auth_code': 'mock_auth_code_$timestamp',
-          'note': '非 Web 平台，使用模擬資料',
-        };
-
-        return await _sendUserDataToBackend(userData);
+        // 非 Web 平台不支援此流程
+        throw UnsupportedError('Web OAuth 流程僅支援 Web 平台');
       }
     } catch (e) {
-      print('Web Google 登入錯誤: $e');
+      debugPrint('Web Google 登入錯誤: $e');
       return null;
     }
   }
@@ -216,25 +175,65 @@ class ThirdPartyAuthService {
     }
   }
 
-  // Web 版 Facebook 登入
+  // Web 版 Facebook 登入 - 使用新的 OAuth 流程
   Future<Map<String, dynamic>?> _signInWithFacebookWeb() async {
     try {
-      // 暫時使用模擬資料進行測試
-      // TODO: 整合 Facebook JavaScript SDK
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final userData = {
-        'provider': 'facebook',
-        'platform': 'web',
-        'facebook_id': 'web_facebook_user_$timestamp',
-        'name': 'Web Facebook User $timestamp',
-        'email': 'webuser_facebook_$timestamp@example.com',
-        'avatar_url': 'https://example.com/avatar.jpg',
-        'access_token': 'mock_access_token_$timestamp',
-      };
+      // 檢查是否已配置 Facebook App ID
+      if (EnvironmentConfig.facebookAppId.isEmpty) {
+        debugPrint('❌ Facebook App ID 未配置，無法進行 Web 登入');
+        throw Exception('Facebook App ID 未配置');
+      }
 
-      return await _sendUserDataToBackend(userData);
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+      // 創建 Facebook OAuth 2.0 授權 URL
+      final facebookAuthUrl =
+          Uri.https('www.facebook.com', '/v18.0/dialog/oauth', {
+        'client_id': EnvironmentConfig.facebookAppId,
+        'redirect_uri':
+            '${EnvironmentConfig.apiBaseUrl}/backend/api/auth/facebook-callback.php',
+        'response_type': 'code',
+        'scope': 'email,public_profile',
+        'state': 'web_facebook_$timestamp',
+      });
+
+      debugPrint('🔐 準備跳轉到 Facebook 登入頁面: $facebookAuthUrl');
+
+      if (isWeb) {
+        try {
+          final canLaunch = await canLaunchUrl(facebookAuthUrl);
+          if (canLaunch) {
+            debugPrint('🌐 正在重定向到 Facebook 登入頁面...');
+            final launched = await launchUrl(
+              facebookAuthUrl,
+              mode: LaunchMode.externalApplication,
+            );
+
+            if (launched) {
+              debugPrint('✅ Facebook OAuth 流程已啟動');
+              return {
+                'success': true,
+                'provider': 'facebook',
+                'platform': 'web',
+                'oauth_started': true,
+                'message': 'Facebook OAuth flow started successfully',
+                'timestamp': timestamp,
+              };
+            } else {
+              throw Exception('無法啟動 Facebook OAuth 流程');
+            }
+          } else {
+            throw Exception('無法啟動 Facebook 登入 URL');
+          }
+        } catch (e) {
+          debugPrint('❌ Facebook OAuth 流程啟動失敗: $e');
+          throw Exception('Facebook OAuth 流程啟動失敗: $e');
+        }
+      } else {
+        throw UnsupportedError('Web OAuth 流程僅支援 Web 平台');
+      }
     } catch (e) {
-      print('Web Facebook 登入錯誤: $e');
+      debugPrint('Web Facebook 登入錯誤: $e');
       return null;
     }
   }
@@ -279,24 +278,65 @@ class ThirdPartyAuthService {
     }
   }
 
-  // Web 版 Apple 登入
+  // Web 版 Apple 登入 - 使用新的 OAuth 流程
   Future<Map<String, dynamic>?> _signInWithAppleWeb() async {
     try {
-      // 暫時使用模擬資料進行測試
-      // TODO: 整合 Apple Sign-In JavaScript
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final userData = {
-        'provider': 'apple',
-        'platform': 'web',
-        'apple_id': 'web_apple_user_$timestamp',
-        'name': 'Web Apple User $timestamp',
-        'email': 'webuser_apple_$timestamp@example.com',
-        'identity_token': 'mock_identity_token_$timestamp',
-      };
+      // 檢查是否已配置 Apple Service ID
+      if (EnvironmentConfig.appleServiceId.isEmpty) {
+        debugPrint('❌ Apple Service ID 未配置，無法進行 Web 登入');
+        throw Exception('Apple Service ID 未配置');
+      }
 
-      return await _sendUserDataToBackend(userData);
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+
+      // 創建 Apple Sign In 授權 URL
+      final appleAuthUrl = Uri.https('appleid.apple.com', '/auth/authorize', {
+        'client_id': EnvironmentConfig.appleServiceId,
+        'redirect_uri':
+            '${EnvironmentConfig.apiBaseUrl}/backend/api/auth/apple-callback.php',
+        'response_type': 'code',
+        'scope': 'name email',
+        'response_mode': 'form_post',
+        'state': 'web_apple_$timestamp',
+      });
+
+      debugPrint('🔐 準備跳轉到 Apple 登入頁面: $appleAuthUrl');
+
+      if (isWeb) {
+        try {
+          final canLaunch = await canLaunchUrl(appleAuthUrl);
+          if (canLaunch) {
+            debugPrint('🌐 正在重定向到 Apple 登入頁面...');
+            final launched = await launchUrl(
+              appleAuthUrl,
+              mode: LaunchMode.externalApplication,
+            );
+
+            if (launched) {
+              debugPrint('✅ Apple OAuth 流程已啟動');
+              return {
+                'success': true,
+                'provider': 'apple',
+                'platform': 'web',
+                'oauth_started': true,
+                'message': 'Apple OAuth flow started successfully',
+                'timestamp': timestamp,
+              };
+            } else {
+              throw Exception('無法啟動 Apple OAuth 流程');
+            }
+          } else {
+            throw Exception('無法啟動 Apple 登入 URL');
+          }
+        } catch (e) {
+          debugPrint('❌ Apple OAuth 流程啟動失敗: $e');
+          throw Exception('Apple OAuth 流程啟動失敗: $e');
+        }
+      } else {
+        throw UnsupportedError('Web OAuth 流程僅支援 Web 平台');
+      }
     } catch (e) {
-      print('Web Apple 登入錯誤: $e');
+      debugPrint('Web Apple 登入錯誤: $e');
       return null;
     }
   }
@@ -323,15 +363,24 @@ class ThirdPartyAuthService {
     }
   }
 
-  /// 發送用戶資料到後端
+  /// 發送用戶資料到後端 - 使用新的 OAuth 流程
   Future<Map<String, dynamic>?> _sendUserDataToBackend(
       Map<String, dynamic> userData) async {
     try {
-      final apiUrl =
-          '${EnvironmentConfig.apiBaseUrl}/backend/api/auth/google-login.php';
+      // 根據平台選擇不同的 API 端點
+      String apiUrl;
+      if (userData['platform'] == 'web') {
+        // Web 平台應該通過 OAuth 回調處理，不應該直接調用此方法
+        throw Exception('Web 平台應使用 OAuth 回調流程');
+      } else {
+        // 移動平台使用統一的第三方登入 API
+        final provider = userData['provider'] ?? 'google';
+        apiUrl =
+            '${EnvironmentConfig.apiBaseUrl}/backend/api/auth/${provider}-login.php';
+      }
 
-      print('🌐 發送請求到: $apiUrl');
-      print('📦 請求資料: ${jsonEncode(userData)}');
+      debugPrint('🌐 發送請求到: $apiUrl');
+      debugPrint('📦 請求資料: ${userData.keys.toList()}'); // 不記錄敏感資料
 
       final response = await http.post(
         Uri.parse(apiUrl),
@@ -339,8 +388,7 @@ class ThirdPartyAuthService {
         body: jsonEncode(userData),
       );
 
-      print('📥 後端回應狀態碼: ${response.statusCode}');
-      print('📥 後端回應內容: ${response.body}');
+      debugPrint('📥 後端回應狀態碼: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

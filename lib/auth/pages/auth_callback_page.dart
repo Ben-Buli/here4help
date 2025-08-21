@@ -62,42 +62,61 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
         _status = '登入成功，正在處理...';
       });
 
-      // 解析參數
-      final token = uri.queryParameters['token'];
-      final userDataStr = uri.queryParameters['user_data'];
-      final isNewUserStr = uri.queryParameters['is_new_user'];
+      // 檢查是否為新用戶（需要註冊）
+      final oauthToken = uri.queryParameters['oauth_token'];
+      final provider = uri.queryParameters['provider'] ?? '';
 
-      if (token == null || userDataStr == null) {
-        throw Exception('缺少必要的登入資訊');
+      if (oauthToken != null && oauthToken.isNotEmpty) {
+        // 新用戶：重定向到註冊頁面
+        debugPrint('✅ 新用戶 OAuth 流程，重定向到註冊頁面');
+        debugPrint('   Provider: $provider');
+        debugPrint('   OAuth Token: ${oauthToken.substring(0, 8)}...');
+
+        setState(() {
+          _isProcessing = false;
+          _status = '新用戶註冊';
+          _isNewUser = true;
+        });
+
+        // 延遲後重定向到註冊頁面
+        Future.delayed(const Duration(seconds: 1), () {
+          _redirectToSignupPage(oauthToken, provider);
+        });
+      } else {
+        // 現有用戶：處理直接登入
+        final token = uri.queryParameters['token'];
+        final userDataStr = uri.queryParameters['user_data'];
+
+        if (token == null || userDataStr == null) {
+          throw Exception('缺少必要的登入資訊');
+        }
+
+        // 解析用戶資料
+        final userData = jsonDecode(userDataStr) as Map<String, dynamic>;
+
+        debugPrint('✅ 現有用戶登入成功');
+        debugPrint('   Token: ${token.substring(0, 20)}...');
+        debugPrint('   User ID: ${userData['id']}');
+        debugPrint('   Name: ${userData['name']}');
+
+        // 儲存登入資訊
+        await _saveLoginInfo(token, userData);
+
+        setState(() {
+          _isProcessing = false;
+          _status = '登入成功！';
+          _userData = userData;
+          _token = token;
+          _isNewUser = false;
+        });
+
+        // 延遲後重定向到主頁
+        Future.delayed(const Duration(seconds: 2), () {
+          _redirectToMainPage();
+        });
       }
-
-      // 解析用戶資料
-      final userData = jsonDecode(userDataStr) as Map<String, dynamic>;
-      final isNewUser = isNewUserStr == 'true';
-
-      print('✅ 登入成功');
-      print('   Token: ${token.substring(0, 20)}...');
-      print('   User ID: ${userData['id']}');
-      print('   Name: ${userData['name']}');
-      print('   Is New User: $isNewUser');
-
-      // 儲存登入資訊
-      await _saveLoginInfo(token, userData);
-
-      setState(() {
-        _isProcessing = false;
-        _status = '登入成功！';
-        _userData = userData;
-        _token = token;
-        _isNewUser = isNewUser;
-      });
-
-      // 延遲後重定向到主頁
-      Future.delayed(const Duration(seconds: 2), () {
-        _redirectToMainPage();
-      });
     } catch (e) {
-      print('❌ 登入成功處理失敗: $e');
+      debugPrint('❌ 登入成功處理失敗: $e');
       setState(() {
         _isProcessing = false;
         _status = '登入處理失敗';
@@ -138,15 +157,24 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
   }
 
   void _redirectToMainPage() {
-    print('🔄 重定向到主頁...');
+    debugPrint('🔄 重定向到主頁...');
     // 重定向到主頁或儀表板
     html.window.location.href = '/home';
   }
 
   void _redirectToLoginPage() {
-    print('🔄 重定向到登入頁面...');
+    debugPrint('🔄 重定向到登入頁面...');
     // 重定向到登入頁面
     html.window.location.href = '/login';
+  }
+
+  void _redirectToSignupPage(String oauthToken, String provider) {
+    debugPrint('🔄 重定向到註冊頁面...');
+    debugPrint('   OAuth Token: ${oauthToken.substring(0, 8)}...');
+    debugPrint('   Provider: $provider');
+    // 重定向到註冊頁面並帶上 OAuth token
+    html.window.location.href =
+        '/signup?oauth_token=$oauthToken&provider=$provider';
   }
 
   void _retryLogin() {
@@ -202,27 +230,35 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    '歡迎回來，${_userData!['name']}！',
-                    style: const TextStyle(fontSize: 18),
-                    textAlign: TextAlign.center,
-                  ),
                   if (_isNewUser == true) ...[
+                    const Text(
+                      '歡迎使用 Here4Help！',
+                      style: TextStyle(fontSize: 18),
+                      textAlign: TextAlign.center,
+                    ),
                     const SizedBox(height: 8),
                     const Text(
-                      '這是您第一次使用 Google 登入',
+                      '正在為您準備註冊頁面...',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.orange,
                       ),
                       textAlign: TextAlign.center,
                     ),
+                  ] else ...[
+                    Text(
+                      '歡迎回來，${_userData!['name']}！',
+                      style: const TextStyle(fontSize: 18),
+                      textAlign: TextAlign.center,
+                    ),
                   ],
                   const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _redirectToMainPage,
-                    child: const Text('前往主頁'),
-                  ),
+                  if (_isNewUser != true) ...[
+                    ElevatedButton(
+                      onPressed: _redirectToMainPage,
+                      child: const Text('前往主頁'),
+                    ),
+                  ],
                 ] else ...[
                   // 錯誤狀態
                   const Icon(
