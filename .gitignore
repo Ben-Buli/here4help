@@ -87,8 +87,22 @@ dev-tools/php-test/
 dev-tools/test-files/
 dev-tools/scripts/
 
-# Admin panel (incomplete)
-admin/
+# Admin panel (completed - now tracked)
+# admin/ - removed to allow tracking of Laravel admin backend
+
+# Laravel admin backend specific ignores
+admin/.env
+admin/.env.*
+admin/storage/logs/
+admin/storage/framework/cache/
+admin/storage/framework/sessions/
+admin/storage/framework/views/
+admin/bootstrap/cache/
+admin/vendor/
+admin/node_modules/
+admin/public/hot
+admin/public/storage
+admin/.phpunit.result.cache
 
 # Root level PHP files (keep only essential)
 index.php
