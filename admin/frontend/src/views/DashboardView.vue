@@ -163,6 +163,56 @@
       </div>
     </div>
 
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div class="admin-card">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">User Registration Trend</h3>
+        <div class="h-64">
+          <Line v-if="userRegistrationData" :data="userRegistrationData" :options="chartOptions" />
+          <div v-else class="h-full flex items-center justify-center text-gray-500">
+            Loading chart...
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Task Status Distribution</h3>
+        <div class="h-64">
+          <Doughnut v-if="taskStatusData" :data="taskStatusData" :options="doughnutOptions" />
+          <div v-else class="h-full flex items-center justify-center text-gray-500">
+            Loading chart...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Additional Charts -->
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div class="admin-card">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Daily Activity</h3>
+        <div class="h-64">
+          <Bar v-if="dailyActivityData" :data="dailyActivityData" :options="chartOptions" />
+          <div v-else class="h-full flex items-center justify-center text-gray-500">
+            Loading chart...
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Points Distribution</h3>
+        <div class="h-64">
+          <Line
+            v-if="pointsDistributionData"
+            :data="pointsDistributionData"
+            :options="chartOptions"
+          />
+          <div v-else class="h-full flex items-center justify-center text-gray-500">
+            Loading chart...
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 最近活動 -->
     <div class="admin-card">
       <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
@@ -202,11 +252,69 @@
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { logApi } from '@/services/api'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js'
+import { Line, Bar, Doughnut } from 'vue-chartjs'
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+)
 
 const authStore = useAuthStore()
 const isLoading = ref(false)
 const stats = ref<any>({})
 const recentActivity = ref<any[]>([])
+
+// Chart data
+const userRegistrationData = ref<any>(null)
+const taskStatusData = ref<any>(null)
+const dailyActivityData = ref<any>(null)
+const pointsDistributionData = ref<any>(null)
+
+// Chart options
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'top' as const,
+    },
+  },
+  scales: {
+    y: {
+      beginAtZero: true,
+    },
+  },
+}
+
+const doughnutOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: 'right' as const,
+    },
+  },
+}
 
 const loadDashboardData = async () => {
   try {
@@ -227,10 +335,109 @@ const loadDashboardData = async () => {
     if (activityResponse.data.success) {
       recentActivity.value = activityResponse.data.data?.items || []
     }
+
+    // Load chart data
+    await loadChartData()
   } catch (error) {
     console.error('Failed to load dashboard data:', error)
+    // Load mock data for development
+    loadMockChartData()
   } finally {
     isLoading.value = false
+  }
+}
+
+const loadChartData = async () => {
+  try {
+    // This would be real API calls to get chart data
+    // For now, we'll use mock data
+    loadMockChartData()
+  } catch (error) {
+    console.error('Failed to load chart data:', error)
+    loadMockChartData()
+  }
+}
+
+const loadMockChartData = () => {
+  // User Registration Trend
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date()
+    date.setDate(date.getDate() - (6 - i))
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  })
+
+  userRegistrationData.value = {
+    labels: last7Days,
+    datasets: [
+      {
+        label: 'New Users',
+        data: [12, 19, 8, 15, 22, 18, 25],
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.4,
+      },
+    ],
+  }
+
+  // Task Status Distribution
+  taskStatusData.value = {
+    labels: ['Open', 'In Progress', 'Completed', 'Cancelled', 'Disputed'],
+    datasets: [
+      {
+        data: [45, 25, 120, 8, 3],
+        backgroundColor: [
+          'rgba(59, 130, 246, 0.8)',
+          'rgba(251, 191, 36, 0.8)',
+          'rgba(34, 197, 94, 0.8)',
+          'rgba(156, 163, 175, 0.8)',
+          'rgba(239, 68, 68, 0.8)',
+        ],
+        borderWidth: 0,
+      },
+    ],
+  }
+
+  // Daily Activity
+  dailyActivityData.value = {
+    labels: last7Days,
+    datasets: [
+      {
+        label: 'Logins',
+        data: [65, 59, 80, 81, 56, 55, 70],
+        backgroundColor: 'rgba(34, 197, 94, 0.8)',
+      },
+      {
+        label: 'Tasks Created',
+        data: [28, 48, 40, 19, 86, 27, 45],
+        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+      },
+      {
+        label: 'Tasks Completed',
+        data: [18, 35, 25, 15, 42, 20, 35],
+        backgroundColor: 'rgba(251, 191, 36, 0.8)',
+      },
+    ],
+  }
+
+  // Points Distribution
+  pointsDistributionData.value = {
+    labels: last7Days,
+    datasets: [
+      {
+        label: 'Points Earned',
+        data: [450, 320, 580, 420, 650, 380, 520],
+        borderColor: 'rgb(168, 85, 247)',
+        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+        tension: 0.4,
+      },
+      {
+        label: 'Points Spent',
+        data: [200, 180, 250, 190, 280, 160, 220],
+        borderColor: 'rgb(239, 68, 68)',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        tension: 0.4,
+      },
+    ],
   }
 }
 

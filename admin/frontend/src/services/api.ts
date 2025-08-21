@@ -149,6 +149,17 @@ export const taskApi = {
 
 // 日誌管理 API
 export const logApi = {
+  list: (params?: {
+    page?: number
+    per_page?: number
+    search?: string
+    user_id?: number
+    action_type?: string
+    date_from?: string
+    date_to?: string
+    log_type?: string
+  }) => api.get<PaginatedResponse<any>>('/admin/logs', { params }),
+
   activityLogs: (params?: {
     page?: number
     per_page?: number
