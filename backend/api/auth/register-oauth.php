@@ -36,15 +36,15 @@ try {
     }
     
     // 驗證必要參數
-    $requiredFields = ['name', 'oauth_provider', 'provider_user_id'];
+    $requiredFields = ['name', 'oauth_token'];
     foreach ($requiredFields as $field) {
         if (empty($input[$field])) {
             throw new Exception("Missing required field: $field");
         }
     }
     
+    $oauthToken = trim($input['oauth_token']);
     $name = trim($input['name']);
-    $email = trim($input['email'] ?? '');
     $phone = trim($input['phone'] ?? '');
     $nickname = trim($input['nickname'] ?? '');
     $dateOfBirth = $input['date_of_birth'] ?? null;
@@ -57,24 +57,30 @@ try {
     $referralCode = trim($input['referral_code'] ?? '');
     $paymentPassword = $input['payment_password'] ?? null;
     
-    // OAuth 相關參數
-    $oauthProvider = $input['oauth_provider'];
-    $providerUserId = $input['provider_user_id'];
-    $avatarUrl = $input['avatar_url'] ?? '';
-    
-    error_log("OAuth Register - 開始處理用戶註冊: $name, Provider: $oauthProvider");
+    error_log("OAuth Register - 開始處理用戶註冊: $name, Token: " . substr($oauthToken, 0, 8) . "...");
     
     // 建立資料庫連線
     $db = Database::getInstance();
     
-    // 檢查 session 中是否有暫存的 OAuth 資料
-    if (!isset($_SESSION['oauth_temp_data']) || 
-        $_SESSION['oauth_temp_data']['provider'] !== $oauthProvider ||
-        $_SESSION['oauth_temp_data']['provider_user_id'] !== $providerUserId) {
-        throw new Exception('OAuth session data not found or invalid');
+    // 第一步：從 oauth_temp_users 表獲取並消費 token
+    $stmt = $db->query(
+        "SELECT * FROM oauth_temp_users WHERE token = ? AND expired_at > NOW()",
+        [$oauthToken]
+    );
+    
+    $tempUser = $stmt->fetch();
+    if (!$tempUser) {
+        throw new Exception('OAuth token expired or invalid');
     }
     
-    $oauthData = $_SESSION['oauth_temp_data'];
+    // 獲取 OAuth 資料
+    $oauthProvider = $tempUser['provider'];
+    $providerUserId = $tempUser['provider_user_id'];
+    $email = $tempUser['email'];
+    $avatarUrl = $tempUser['avatar_url'] ?? '';
+    $rawData = json_decode($tempUser['raw_data'], true) ?? [];
+    
+    error_log("OAuth Register - 找到臨時用戶資料，Provider: $oauthProvider, Email: $email");
     
     // 檢查 email 是否已存在（如果提供了 email）
     if (!empty($email)) {
@@ -135,12 +141,17 @@ try {
         
         $db->query($insertIdentityQuery, [
             $userId, $oauthProvider, $providerUserId, $email, $name, $avatarUrl,
-            $oauthData['access_token'] ?? null, json_encode($oauthData['raw_profile'] ?? [])
+            null, // access_token 不再從 rawData 獲取
+            json_encode($rawData)
         ]);
         
         error_log("OAuth Register - user_identity 建立成功");
         
-        // 第三步：如果提供了推薦碼，處理推薦關係
+        // 第三步：刪除臨時 token（消費）
+        $db->query("DELETE FROM oauth_temp_users WHERE token = ?", [$oauthToken]);
+        error_log("OAuth Register - 臨時 token 已消費刪除");
+        
+        // 第四步：如果提供了推薦碼，處理推薦關係
         if (!empty($referralCode) && isset($referrer)) {
             // TODO: 實作推薦關係處理邏輯
             error_log("OAuth Register - 推薦關係處理（待實作）");
@@ -167,8 +178,7 @@ try {
             throw new Exception('Token generation failed: ' . $e->getMessage());
         }
         
-        // 清理 session 中的暫存資料
-        unset($_SESSION['oauth_temp_data']);
+        // Token 已在交易中刪除，無需額外清理
         
         // 準備回應資料
         $userData = [

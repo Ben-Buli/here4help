@@ -7,6 +7,7 @@ import 'package:here4help/task/services/language_service.dart';
 import 'package:here4help/services/country_service.dart';
 import 'package:pinput/pinput.dart';
 import 'package:http/http.dart' as http;
+import 'package:here4help/services/api/oauth_api.dart';
 import 'dart:convert';
 import 'package:here4help/config/app_config.dart';
 
@@ -105,6 +106,21 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
 
   // 新增：載入第三方登入資料
   Future<void> _loadThirdPartyData() async {
+    // 支援 token 預填：/signup?token=...
+    final uri = Uri.base;
+    final tokenParam = uri.queryParameters['token'];
+    if (tokenParam != null && tokenParam.isNotEmpty) {
+      try {
+        final temp = await OAuthApi.fetchTempUser(tokenParam);
+        if (temp != null) {
+          _prefillOAuthData(temp);
+          setState(() {});
+        }
+      } catch (e) {
+        debugPrint('❌ OAuth token 預填失敗: $e');
+      }
+    }
+
     // 優先使用傳入的 oauthData
     if (widget.oauthData != null) {
       print('🔐 載入第三方登入資料: ${widget.oauthData}');
@@ -202,12 +218,22 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     });
 
     try {
-      // 準備註冊資料
+      // 獲取 OAuth token（從 URL 參數或 widget 資料）
+      final uri = Uri.base;
+      final oauthToken = uri.queryParameters['oauth_token'] ??
+          widget.oauthData?['oauth_token'];
+
+      if (oauthToken == null || oauthToken.isEmpty) {
+        throw Exception(
+            'OAuth token not found. Please restart the login process.');
+      }
+
+      // 準備註冊資料（使用新的 token 化 API）
       final registrationData = {
+        'oauth_token': oauthToken,
         'name': fullNameController.text.trim(),
-        'email': emailController.text.trim(),
-        'phone': phoneController.text.trim(),
         'nickname': nicknameController.text.trim(),
+        'phone': phoneController.text.trim(),
         'date_of_birth': dateOfBirthController.text.isNotEmpty
             ? dateOfBirthController.text
             : null,
@@ -217,20 +243,17 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         'is_permanent_address': isPermanentAddress,
         'primary_language':
             selectedLanguages.isNotEmpty ? selectedLanguages.first : 'English',
-        'school': selectedUniversityId ?? '',
+        'school': _getSchoolValue(),
         'referral_code': referralCodeController.text.trim(),
         'payment_password': paymentPasswordController.text.isNotEmpty
             ? paymentPasswordController.text
             : null,
-        'avatar_url': '', // TODO: 處理頭像上傳
-        'oauth_provider': widget.oauthData?['provider'] ?? 'google',
-        'provider_user_id': widget.oauthData?['provider_user_id'] ?? '',
       };
 
-      print('🚀 開始 OAuth 註冊...');
-      print('📝 註冊資料: $registrationData');
+      debugPrint('🚀 開始 OAuth 註冊...');
+      debugPrint('📝 註冊資料: ${registrationData.keys.toList()}'); // 不記錄敏感資料
 
-      // 調用註冊 API
+      // 調用新的 OAuth 註冊 API
       final response = await http.post(
         Uri.parse('${AppConfig.apiBaseUrl}/auth/register-oauth.php'),
         headers: {'Content-Type': 'application/json'},
@@ -239,8 +262,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
 
       final data = jsonDecode(response.body);
 
-      if (data['success']) {
-        print('✅ OAuth 註冊成功');
+      if (response.statusCode == 200 && data['success'] == true) {
+        debugPrint('✅ OAuth 註冊成功');
 
         // 保存登入資訊
         await _saveLoginInfo(data['data']['token'], data['data']['user']);
@@ -248,12 +271,18 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         // 導向到學生證上傳頁面
         _redirectToStudentIdPage();
       } else {
-        print('❌ OAuth 註冊失敗: ${data['message']}');
-        _showErrorSnackBar(data['message'] ?? 'Registration failed');
+        final errorMessage = data['message'] ?? 'Registration failed';
+        debugPrint('❌ OAuth 註冊失敗: $errorMessage');
+        _showErrorSnackBar(errorMessage);
+
+        // 如果是 token 相關錯誤，建議重新登入
+        if (errorMessage.toLowerCase().contains('token')) {
+          _showTokenExpiredDialog();
+        }
       }
     } catch (e) {
-      print('❌ OAuth 註冊錯誤: $e');
-      _showErrorSnackBar('Registration error: $e');
+      debugPrint('❌ OAuth 註冊錯誤: $e');
+      _showErrorSnackBar('Registration error: ${e.toString()}');
     } finally {
       setState(() {
         isLoading = false;
@@ -292,6 +321,49 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         ),
       );
     }
+  }
+
+  // 獲取學校值
+  String _getSchoolValue() {
+    if (selectedUniversityId == 'other') {
+      return schoolController.text.trim();
+    } else if (selectedUniversityId != null) {
+      final university = universityOptions.firstWhere(
+        (u) => u['id'].toString() == selectedUniversityId,
+        orElse: () => {},
+      );
+      if (university.isNotEmpty) {
+        return '${university['abbr']} - ${university['en_name']}';
+      }
+    }
+    return '';
+  }
+
+  // 顯示 Token 過期對話框
+  void _showTokenExpiredDialog() {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Session Expired'),
+          content: const Text(
+            'Your login session has expired. Please restart the login process.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                context.go('/login');
+              },
+              child: const Text('Back to Login'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _loadLanguages() async {
@@ -1704,8 +1776,12 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     });
 
     try {
-      // 檢查是否有 OAuth 資料，決定使用哪種註冊方式
-      if (widget.oauthData != null) {
+      // 檢查是否有 OAuth token，決定使用哪種註冊方式
+      final uri = Uri.base;
+      final oauthToken = uri.queryParameters['oauth_token'] ??
+          widget.oauthData?['oauth_token'];
+
+      if (oauthToken != null && oauthToken.isNotEmpty) {
         // 使用 OAuth 註冊
         await _handleOAuthRegistration();
       } else {

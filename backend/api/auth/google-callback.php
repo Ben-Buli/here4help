@@ -357,28 +357,31 @@ try {
     
     // 根據用戶狀態建立不同的重定向 URL
     if ($isNewUser) {
-        // 新用戶：暫存 user_identities 資料到 session
-        $_SESSION['oauth_temp_data'] = [
-            'provider' => 'google',
-            'provider_user_id' => $googleId,
-            'user_data' => $userData,
-            'access_token' => $accessToken,
-            'id_token' => $idToken,
-            'raw_profile' => $userInfo,
-            'expires_at' => time() + 3600 // 1小時過期
-        ];
-        
-        error_log("Google OAuth Callback - 新用戶資料已暫存到 session");
-        
-        // 重定向到註冊頁面
+        // 新用戶：寫入 oauth_temp_users 並產生一次性 token
+        $token = bin2hex(random_bytes(24));
+        $expiresAt = date('Y-m-d H:i:s', time() + 3600);
+
+        $db->query(
+            "INSERT INTO oauth_temp_users (provider, provider_user_id, email, name, avatar_url, raw_data, token, expired_at, created_at)\n             VALUES ('google', ?, ?, ?, ?, ?, ?, ?, NOW())",
+            [
+                $googleId,
+                $email ?: null,
+                $name ?: null,
+                $avatarUrl ?: null,
+                json_encode($userInfo),
+                $token,
+                $expiresAt
+            ]
+        );
+
+        // 重定向到註冊頁面（帶 token）
         $redirectUrl = rtrim($frontendUrl, '/') . '/signup?' . http_build_query([
-            'oauth_provider' => 'google',
-            'oauth_data' => base64_encode(json_encode($userData)),
-            'is_new_user' => 'true',
-            'provider_user_id' => $googleId
+            'token' => $token,
+            'provider' => 'google',
+            'is_new_user' => 'true'
         ]);
-        
-        error_log("Google OAuth Callback - 新用戶重定向到註冊頁面: $redirectUrl");
+
+        error_log("Google OAuth Callback - 新用戶建立 temp token 並重定向: $redirectUrl");
     } else {
         // 現有用戶：重定向到主頁
         $redirectUrl = rtrim($frontendUrl, '/') . '/home?' . http_build_query([
