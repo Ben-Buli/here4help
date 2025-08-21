@@ -55,6 +55,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': false,
     'showBottomNav': false,
     'showBackArrow': false,
+    'permission': -4, // 任何狀態都可訪問登入頁
   },
   {
     'path': '/signup',
@@ -64,6 +65,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'permission': -4, // 任何狀態都可訪問註冊頁
   },
 
   {
@@ -73,6 +75,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'permission': 0, // 新用戶可訪問身份驗證
   },
   {
     'path': '/home',
@@ -80,7 +83,8 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Home',
     'showBottomNav': true,
     'showAppBar': true,
-    'showBackArrow': true
+    'showBackArrow': true,
+    'permission': 0, // 新用戶可訪問首頁
   },
   {
     'path': '/chat',
@@ -88,6 +92,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Chats',
     'showBottomNav': true,
     'showBackArrow': true,
+    'permission': 1, // 需要已認證用戶才能訪問聊天
     'titleWidgetBuilder': (context, data) {
       // 透過 ChatListProvider 的靜態實例建立雙向同步
       return ChatListTaskWidget(
@@ -108,6 +113,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'permission': 1, // 需要已認證用戶才能訪問聊天詳情
     'titleWidgetBuilder': (context, data) {
       return ChatTitleWidget(data: data as Map<String, dynamic>?);
     },
@@ -118,6 +124,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Account',
     'showBottomNav': true,
     'showBackArrow': true,
+    'permission': 0, // 新用戶可訪問帳戶頁面
   },
   {
     'path': '/task/create',
@@ -128,14 +135,16 @@ final List<Map<String, dynamic>> shellPages = [
     },
     'title': 'Posting Task',
     'showBottomNav': true,
-    'showBackArrow': true
+    'showBackArrow': true,
+    'permission': 1, // 需要已認證用戶才能創建任務
   },
   {
     'path': '/task/create/preview',
     'child': const TaskPreviewPage(),
     'title': 'Task Preview',
     'showBottomNav': false,
-    'showBackArrow': true
+    'showBackArrow': true,
+    'permission': 1, // 需要已認證用戶才能預覽任務
   },
   {
     'path': '/task',
@@ -143,6 +152,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Task',
     'showBottomNav': true,
     'showBackArrow': true,
+    'permission': 0, // 新用戶可瀏覽任務列表
     'actionsBuilder': (context) => [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -197,7 +207,8 @@ final List<Map<String, dynamic>> shellPages = [
     },
     'title': 'Task Apply Resume',
     'showBottomNav': false,
-    'showBackArrow': true
+    'showBackArrow': true,
+    'permission': 1, // 需要已認證用戶才能應徵任務
   },
   // Account 模組路由
   {
@@ -208,6 +219,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.person,
+    'permission': 0, // 新用戶可編輯個人資料
   },
   {
     'path': '/account/wallet',
@@ -217,6 +229,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.account_balance_wallet,
+    'permission': 1, // 需要已認證用戶才能訪問錢包
   },
   {
     'path': '/account/wallet/point_policy',
@@ -226,6 +239,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.stars,
+    'permission': 1, // 需要已認證用戶才能查看點數政策
   },
   {
     'path': '/account/ratings',
@@ -235,6 +249,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.star_rate,
+    'permission': 1, // 需要已認證用戶才能查看評價
   },
   {
     'path': '/account/task_history',
@@ -244,6 +259,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.history,
+    'permission': 1, // 需要已認證用戶才能查看任務歷史
   },
   {
     'path': '/account/security',
@@ -253,6 +269,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.lock,
+    'permission': 0, // 新用戶可訪問安全設定
   },
   {
     'path': '/account/theme',
@@ -262,6 +279,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.palette,
+    'permission': 0, // 新用戶可訪問主題設定
   },
   {
     'path': '/account/support',
@@ -271,6 +289,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.support_agent,
+    'permission': 0, // 新用戶可聯繫客服
   },
   {
     'path': '/account/logout',
@@ -280,6 +299,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.logout,
+    'permission': 0, // 新用戶可登出
   },
   // Support 子路由
   {
@@ -290,6 +310,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.contact_mail,
+    'permission': 0, // 新用戶可聯繫客服
   },
   {
     'path': '/account/support/faq',
@@ -299,6 +320,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.help_outline,
+    'permission': 0, // 新用戶可查看 FAQ
   },
   {
     'path': '/account/support/issue_status',
@@ -308,12 +330,14 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.report_problem,
+    'permission': 0, // 新用戶可查看問題狀態
   },
   {
     'path': '/pay/setting',
     'child': const PaySettingPage(),
     'title': 'Pay Setting',
     'showBottomNav': false,
-    'showBackArrow': true
+    'showBackArrow': true,
+    'permission': 1, // 需要已認證用戶才能設定支付
   },
 ];
