@@ -8,45 +8,50 @@
 | 2025-08-18 | api-auth-02 | OAuth callback 改讀 `user_identities` | API | 註冊登入 | 舊欄位維持只讀，新表處理第三方登入 |
 | 2025-08-19 | data-migrate-03 | 將 `users.provider/google_id` 搬到新表 | DB | 資料庫重構 | 一次性 INSERT 資料遷移 |
 | 2025-08-21 | cleanup-04 | DROP `users.provider/google_id` | DB/API | 資料庫重構 | 程式已不再依賴舊欄位 |
-| 2025-01-18 | env-config-05 | 建立環境配置系統 | Config | 環境設定 | 新增 `app_env/` 目錄和 JSON 配置檔案 |
-| 2025-01-18 | env-config-06 | 建立啟動腳本系統 | Scripts | 環境設定 | 新增 `scripts/` 目錄和自動化腳本 |
-| 2025-01-18 | env-config-07 | 更新 Flutter 配置系統 | Frontend | 環境設定 | 移除硬編碼，使用動態環境配置 |
-| 2025-01-18 | env-config-08 | 建立 ngrok 同步腳本 | Scripts | 環境設定 | 自動同步 ngrok URL 到所有配置檔案 |
-| 2025-01-18 | env-config-09 | 修復 Flutter Web 資產載入 | Frontend | 環境設定 | 將配置檔案移動到 `assets/app_env/` 目錄 |
-| 2025-01-18 | env-config-10 | 更新 pubspec.yaml | Config | 環境設定 | 添加 `assets/app_env/` 到 Flutter 資產配置 |
-| 2025-01-18 | env-config-11 | 區分公開/私密配置 | Security | 環境設定 | 前端只包含公開配置，後端包含私密配置 |
-| 2025-01-18 | env-config-12 | 建立 dart-define 配置檔案 | Config | 環境設定 | 支援 Flutter 的 `--dart-define` 參數 |
-| 2025-01-18 | env-config-13 | 更新 .gitignore | Security | 環境設定 | 保護敏感配置檔案不被提交到版本控制 |
-| 2025-01-18 | env-config-14 | 建立配置範例檔案 | Config | 環境設定 | 提供 `*.example.*` 檔案作為配置模板 |
-| 2025-01-18 | env-config-15 | 建立完整配置指南 | Docs | 環境設定 | 更新 README_ENV_SETUP.md 說明文件 |
-| 2025-01-18 | bug-fix-01 | 修復 PHP 警告問題 | Backend | 註冊登入 | 修復 login.php 和 profile.php 中的 provider 和 google_id 欄位問題 |
-| 2025-01-18 | test-01 | 傳統登入功能測試成功 | Testing | 註冊登入 | 確認 email/password 登入功能正常，無 PHP 警告，JSON 回應格式正確 |
-| 2025-01-18 | test-02 | 環境配置載入測試成功 | Testing | 環境設定 | 確認 Flutter Web 能正確載入 assets/app_env/development.json 配置檔案 |
-| 2025-01-18 | test-03 | Profile API 測試成功 | Testing | 註冊登入 | 確認用戶資料讀取 API 正常，無 PHP 警告，資料格式正確 |
-| 2025-01-18 | bug-fix-02 | 修復 Socket 伺服器 JWT 問題 | Backend | Socket設定 | 修復 JWT_SECRET 配置和重複 dotenv 載入問題，Socket 伺服器現在正常運作 |
-| 2025-01-18 | bug-fix-03 | 修復第三方登入模擬資料問題 | Frontend | 第三方登入 | 修復 Web 版 Google/Facebook/Apple 登入的模擬資料，確保所有必要參數都有值 |
-| 2025-01-18 | bug-fix-04 | 修復註冊頁面硬編碼 URL 問題 | Frontend | 環境配置 | 修復註冊頁面、學生證上傳頁面中的硬編碼 API URL，統一使用 AppConfig 管理 |
-| 2025-01-18 | ui-enhance-01 | 優化大學選項 RWD 設計 | Frontend | UI/UX | 優化大學選項的下拉選單設計，包括斜線分隔、字體大小、間距、邊框和響應式佈局 |
-| 2025-01-18 | bug-fix-05 | 修復大學選項佈局錯誤 | Frontend | 佈局修復 | 修復大學選項下拉選單中的 RenderFlex 佈局錯誤，使用 Flexible 和明確的寬度約束 |
-| 2025-01-18 | bug-fix-06 | 修復學校選項顯示和佈局溢出 | Frontend | UI/UX修復 | 修復學校選項選中項目只顯示縮寫，並解決 Column 佈局溢出 40 像素的問題 |
-| 2025-01-18 | ui-enhance-02 | 優化學校選項文字省略顯示 | Frontend | UI/UX | 優化學校選項的文字省略顯示，使用 TextOverflow.ellipsis 讓超出的文字在 UI 上顯示省略符號 |
-| 2025-01-18 | ui-enhance-03 | 優化 Primary Languages 設計和主題配色 | Frontend | UI/UX | 優化 Primary Languages 的設計，使用主題配色，改善語言標籤、選擇器和彈出視窗的視覺效果 |
-| 2025-01-18 | bug-fix-07 | 修復 School 下拉選單佈局錯誤 | Frontend | 佈局修復 | 修復 School 下拉選單中的 selectedItemBuilder 佈局錯誤，添加安全檢查和錯誤處理 |
-| 2025-01-18 | ui-complete-01 | School 下拉選單設計完成 | Frontend | UI/UX完成 | School 下拉選單完全優化完成，包括佈局修復、主題配色、文字省略、響應式設計等 |
-| 2025-01-18 | version-2025-01-18 | 2025-01-18 版本推送 | All | 版本發布 | 本次版本包含環境配置系統、第三方登入基礎架構、UI優化、自動化腳本等完整功能 |
-| 2025-01-19 | third-party-auth-01 | 第三方登入憑證配置優化 | Config | 第三方登入 | 重構環境配置系統，將敏感資訊移至 private 區塊，支援公開/私密配置分離 |
-| 2025-01-19 | third-party-auth-02 | 創建第三方登入服務架構 | Frontend | 第三方登入 | 新增 Facebook、Apple Sign-In 服務類，建立統一的第三方登入管理服務 |
-| 2025-01-19 | third-party-auth-03 | 更新 Apple Team ID 配置 | Config | 第三方登入 | 更新所有環境配置檔案中的 Apple Team ID 為 Q4C6BSB74K |
-| 2025-01-19 | third-party-auth-04 | 完善第三方登入配置文檔 | Docs | 第三方登入 | 創建完整的第三方登入配置指南和安全性配置說明 |
-| 2025-01-19 | theme-optimization-01 | 主題系統整合優化 | Frontend | 主題系統 | 精簡主題數量從 30+ 個到 12 個，整合重複功能，創建優化版主題系統 |
-| 2025-01-19 | theme-optimization-02 | 創建主題使用指南 | Docs | 主題系統 | 創建完整的主題使用指南，說明如何使用 ThemeScheme 和 Theme.of(context).colorScheme |
-| 2025-01-19 | theme-optimization-03 | 主題系統文檔完善 | Docs | 主題系統 | 建立主題邏輯和檔案用途說明，更新專案整合規格文件 |
-| 2025-01-21 | oauth-callback-01 | Google OAuth 回調處理實作 | Backend | 第三方登入 | 實作完整的 Google OAuth 回調處理，包括授權碼交換、用戶資料獲取和重定向 |
-| 2025-01-21 | oauth-callback-02 | 環境配置系統完善 | Config | 第三方登入 | 創建開發環境配置檔案，支援 Google OAuth 的完整配置 |
-| 2025-01-21 | oauth-callback-03 | OAuth 回調文檔建立 | Docs | 第三方登入 | 創建完整的 Google OAuth 回調處理實作說明文件 |
-| 2025-01-21 | permission-system-01 | 建立權限設置開發追蹤表 | Docs | 權限系統 | 建立完整的權限系統開發追蹤和進度管理系統 |
+| 2025-08-18 | env-config-05 | 建立環境配置系統 | Config | 環境設定 | 新增 `app_env/` 目錄和 JSON 配置檔案 |
+| 2025-08-18 | env-config-06 | 建立啟動腳本系統 | Scripts | 環境設定 | 新增 `scripts/` 目錄和自動化腳本 |
+| 2025-08-18 | env-config-07 | 更新 Flutter 配置系統 | Frontend | 環境設定 | 移除硬編碼，使用動態環境配置 |
+| 2025-08-18 | env-config-08 | 建立 ngrok 同步腳本 | Scripts | 環境設定 | 自動同步 ngrok URL 到所有配置檔案 |
+| 2025-08-18 | env-config-09 | 修復 Flutter Web 資產載入 | Frontend | 環境設定 | 將配置檔案移動到 `assets/app_env/` 目錄 |
+| 2025-08-18 | env-config-10 | 更新 pubspec.yaml | Config | 環境設定 | 添加 `assets/app_env/` 到 Flutter 資產配置 |
+| 2025-08-18 | env-config-11 | 區分公開/私密配置 | Security | 環境設定 | 前端只包含公開配置，後端包含私密配置 |
+| 2025-08-18 | env-config-12 | 建立 dart-define 配置檔案 | Config | 環境設定 | 支援 Flutter 的 `--dart-define` 參數 |
+| 2025-08-18 | env-config-13 | 更新 .gitignore | Security | 環境設定 | 保護敏感配置檔案不被提交到版本控制 |
+| 2025-08-18 | env-config-14 | 建立配置範例檔案 | Config | 環境設定 | 提供 `*.example.*` 檔案作為配置模板 |
+| 2025-08-18 | env-config-15 | 建立完整配置指南 | Docs | 環境設定 | 更新 README_ENV_SETUP.md 說明文件 |
+| 2025-08-18 | bug-fix-01 | 修復 PHP 警告問題 | Backend | 註冊登入 | 修復 login.php 和 profile.php 中的 provider 和 google_id 欄位問題 |
+| 2025-08-18 | test-01 | 傳統登入功能測試成功 | Testing | 註冊登入 | 確認 email/password 登入功能正常，無 PHP 警告，JSON 回應格式正確 |
+| 2025-08-18 | test-02 | 環境配置載入測試成功 | Testing | 環境設定 | 確認 Flutter Web 能正確載入 assets/app_env/development.json 配置檔案 |
+| 2025-08-18 | test-03 | Profile API 測試成功 | Testing | 註冊登入 | 確認用戶資料讀取 API 正常，無 PHP 警告，資料格式正確 |
+| 2025-08-18 | bug-fix-02 | 修復 Socket 伺服器 JWT 問題 | Backend | Socket設定 | 修復 JWT_SECRET 配置和重複 dotenv 載入問題，Socket 伺服器現在正常運作 |
+| 2025-08-18 | bug-fix-03 | 修復第三方登入模擬資料問題 | Frontend | 第三方登入 | 修復 Web 版 Google/Facebook/Apple 登入的模擬資料，確保所有必要參數都有值 |
+| 2025-08-18 | bug-fix-04 | 修復註冊頁面硬編碼 URL 問題 | Frontend | 環境配置 | 修復註冊頁面、學生證上傳頁面中的硬編碼 API URL，統一使用 AppConfig 管理 |
+| 2025-08-18 | ui-enhance-01 | 優化大學選項 RWD 設計 | Frontend | UI/UX | 優化大學選項的下拉選單設計，包括斜線分隔、字體大小、間距、邊框和響應式佈局 |
+| 2025-08-18 | bug-fix-05 | 修復大學選項佈局錯誤 | Frontend | 佈局修復 | 修復大學選項下拉選單中的 RenderFlex 佈局錯誤，使用 Flexible 和明確的寬度約束 |
+| 2025-08-18 | bug-fix-06 | 修復學校選項顯示和佈局溢出 | Frontend | UI/UX修復 | 修復學校選項選中項目只顯示縮寫，並解決 Column 佈局溢出 40 像素的問題 |
+| 2025-08-18 | ui-enhance-02 | 優化學校選項文字省略顯示 | Frontend | UI/UX | 優化學校選項的文字省略顯示，使用 TextOverflow.ellipsis 讓超出的文字在 UI 上顯示省略符號 |
+| 2025-08-18 | ui-enhance-03 | 優化 Primary Languages 設計和主題配色 | Frontend | UI/UX | 優化 Primary Languages 的設計，使用主題配色，改善語言標籤、選擇器和彈出視窗的視覺效果 |
+| 2025-08-18 | bug-fix-07 | 修復 School 下拉選單佈局錯誤 | Frontend | 佈局修復 | 修復 School 下拉選單中的 selectedItemBuilder 佈局錯誤，添加安全檢查和錯誤處理 |
+| 2025-08-18 | ui-complete-01 | School 下拉選單設計完成 | Frontend | UI/UX完成 | School 下拉選單完全優化完成，包括佈局修復、主題配色、文字省略、響應式設計等 |
+| 2025-08-18 | version-2025-08-18 | 2025-08-18 版本推送 | All | 版本發布 | 本次版本包含環境配置系統、第三方登入基礎架構、UI優化、自動化腳本等完整功能 |
+| 2025-08-19 | third-party-auth-01 | 第三方登入憑證配置優化 | Config | 第三方登入 | 重構環境配置系統，將敏感資訊移至 private 區塊，支援公開/私密配置分離 |
+| 2025-08-19 | third-party-auth-02 | 創建第三方登入服務架構 | Frontend | 第三方登入 | 新增 Facebook、Apple Sign-In 服務類，建立統一的第三方登入管理服務 |
+| 2025-08-19 | third-party-auth-03 | 更新 Apple Team ID 配置 | Config | 第三方登入 | 更新所有環境配置檔案中的 Apple Team ID 為 Q4C6BSB74K |
+| 2025-08-19 | third-party-auth-04 | 完善第三方登入配置文檔 | Docs | 第三方登入 | 創建完整的第三方登入配置指南和安全性配置說明 |
+| 2025-08-19 | theme-optimization-01 | 主題系統整合優化 | Frontend | 主題系統 | 精簡主題數量從 30+ 個到 12 個，整合重複功能，創建優化版主題系統 |
+| 2025-08-19 | theme-optimization-02 | 創建主題使用指南 | Docs | 主題系統 | 創建完整的主題使用指南，說明如何使用 ThemeScheme 和 Theme.of(context).colorScheme |
+| 2025-08-19 | theme-optimization-03 | 主題系統文檔完善 | Docs | 主題系統 | 建立主題邏輯和檔案用途說明，更新專案整合規格文件 |
+| 2025-08-21 | oauth-callback-01 | Google OAuth 回調處理實作 | Backend | 第三方登入 | 實作完整的 Google OAuth 回調處理，包括授權碼交換、用戶資料獲取和重定向 |
+| 2025-08-21 | oauth-callback-02 | 環境配置系統完善 | Config | 第三方登入 | 創建開發環境配置檔案，支援 Google OAuth 的完整配置 |
+| 2025-08-21 | oauth-callback-03 | OAuth 回調文檔建立 | Docs | 第三方登入 | 創建完整的 Google OAuth 回調處理實作說明文件 |
+| 2025-08-21 | permission-system-01 | 建立權限設置開發追蹤表 | Docs | 權限系統 | 建立完整的權限系統開發追蹤和進度管理系統 |
+| 2025-08-21 | permission-system-02 | 完成權限系統所有階段 | All | 權限系統 | 完成權限系統的 5 個階段共 10 個任務，實現完整的權限控制功能 |
+| 2025-08-21 | oauth-temp-01 | 建立 `oauth_temp_users` 臨時表 | DB | 第三方登入 | 第三方登入註冊前暫存使用者資料（token 驗證，一次性取用） |
+| 2025-08-21 | database-table-rename-01 | users資料表欄位更名 | All | [users][name] =(rename)=>[users][firsname]  , [users][nickname] =(rename)=>[users][lastname]，欄位改名｜
+| 2025-08-21 | database-table-set | 新增第三方使用者暫存登入資訊資料表 | All | oauth_temp_users ｜
 
-## 📋 當前狀態
+
+## 📋 當前狀態(版本變更詳細記錄)
 
 ### ✅ **已完成功能**
 - **環境配置系統**：完整的環境變數管理，支援開發/測試/生產環境
@@ -75,7 +80,7 @@
 - **密碼重設功能**：忘記密碼的處理流程
 - **多語言支援**：國際化 (i18n) 功能
 
-## 🚀 **2025-01-18 版本詳細異動記錄**
+## 🚀 **2025-08-18 版本詳細異動記錄**
 
 ### **📁 新增檔案和目錄**
 1. **`app_env/` 目錄**
@@ -244,19 +249,19 @@
 - **視覺反饋**：選中狀態明確顯示
 - **響應式設計**：適應各種螢幕尺寸
 
-**完成時間**：2025-01-18  
+**完成時間**：2025-08-18  
 **狀態**：✅ 完全完成  
 **測試狀態**：待測試
 
 ---
 
-**版本發布時間**：2025-01-18  
+**版本發布時間**：2025-08-18  
 **版本狀態**：✅ 已推送  
 **測試狀態**：待測試
 
 ---
 
-## 🚀 **2025-01-19 版本詳細異動記錄**
+## 🚀 **2025-08-19 版本詳細異動記錄**
 
 ### **📁 新增檔案和目錄**
 1. **第三方登入服務**
@@ -325,13 +330,13 @@
 - 配置驗證和狀態管理
 - 跨平台第三方登入支援
 
-**版本發布時間**：2025-01-19  
+**版本發布時間**：2025-08-19  
 **版本狀態**：✅ 已推送  
 **測試狀態**：待測試
 
 ---
 
-## 🚀 **2025-01-19 版本詳細異動記錄**
+## 🚀 **2025-08-19 版本詳細異動記錄**
 
 ### **📁 新增檔案和目錄**
 1. **主題系統優化**
@@ -367,6 +372,6 @@
 - 檔案結構優化
 - 維護性提升
 
-**版本發布時間**：2025-01-19  
+**版本發布時間**：2025-08-19  
 **版本狀態**：✅ 已推送  
 **測試狀態**：待測試
