@@ -15,7 +15,7 @@ class EnvironmentConfig {
         defaultValue: 'development',
       );
 
-      final configFile = 'assets/app_env/$environment.json';
+      const configFile = 'assets/app_env/$environment.json';
       final configString = await rootBundle.loadString(configFile);
       _config = json.decode(configString) as Map<String, dynamic>;
 

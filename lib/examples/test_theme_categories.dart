@@ -10,7 +10,7 @@ class TestThemeCategories {
     try {
       // 1. 檢查所有主題的 category 屬性
       print('\n1. 檢查所有主題的 category 屬性...');
-      final allThemes = ThemeScheme.allThemes;
+      const allThemes = ThemeScheme.allThemes;
 
       final categoryCounts = <String, int>{};
       for (final theme in allThemes) {
@@ -64,7 +64,7 @@ class TestThemeCategories {
       print('\n3. 測試特定主題的分類...');
 
       // 測試 H4H 主題
-      final h4hTheme = null; // H4H theme has been removed
+      const h4hTheme = null; // H4H theme has been removed
       if (h4hTheme != null) {
         print('   H4H 主題測試:');
         print('     category: ${h4hTheme.category}');
@@ -165,7 +165,7 @@ class TestThemeCategories {
     print('=== 測試 $category 分類 ===');
 
     try {
-      final allThemes = ThemeScheme.allThemes;
+      const allThemes = ThemeScheme.allThemes;
       final categoryThemes = allThemes
           .where((t) => t.category.toLowerCase() == category.toLowerCase())
           .toList();

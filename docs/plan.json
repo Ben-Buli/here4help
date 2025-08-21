@@ -280,7 +280,7 @@
 
     { "id": "M-ACCOUNT-SECURITY", "title": "帳號安全與保護", "description": "停用/啟用、風險檢查，與前端保護流程", "tasks": [
       { "id": "T1-BE-SECURITY-GUARD", "owner": "backend", "goal": "GET /account/risky-actions-check, POST /account/deactivate, POST /account/reactivate", "commands": ["php -l backend/api/account/deactivate.php"], "acceptance": ["可正確回報風險", "停用後受保護 API 403" ] },
-      { "id": "T2-FLT-SECURITY-UI", "owner": "flutter", "goal": "/account/security UI 與保護流程", "commands": ["flutter analyze"], "acceptance": ["有進行中/發布中任務時提示", "自停用後可再啟用（非被管理員停權）"] }
+      { "id": "T2-FLT-SECURITY-UI", "owner": "flutter", "goal": "/account/security UI 與保護流程", "commands": ["flutter analyze"], "acceptance": ["有進行中/發布中任務時提示，並且禁止在有尚未完成任務時停用", "自停用後可再啟用（非被管理員停權）"] }
     ]},
 
     { "id": "M-PERMISSION-GUARD", "title": "全域權限與路由守衛", "description": "user.permission / users.status 控制路由與元件", "tasks": [

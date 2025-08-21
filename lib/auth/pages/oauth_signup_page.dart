@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
-import 'package:here4help/auth/services/user_service.dart';
-import 'package:here4help/auth/models/user_model.dart';
 import 'package:here4help/utils/image_helper.dart';
 
 class OAuthSignupPage extends StatefulWidget {

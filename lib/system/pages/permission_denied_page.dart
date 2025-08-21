@@ -204,7 +204,7 @@ class _PermissionDeniedPageState extends State<PermissionDeniedPage> {
                   decoration: BoxDecoration(
                     color: Theme.of(context)
                         .colorScheme
-                        .surfaceVariant
+                        .surfaceContainerHighest
                         .withOpacity(0.3),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(

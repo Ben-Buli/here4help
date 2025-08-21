@@ -1468,8 +1468,9 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                     validator: (v) {
                       final t = (v ?? '').trim();
                       if (t.isEmpty) return 'Please enter payment password';
-                      if (t.length != 6)
+                      if (t.length != 6) {
                         return 'Payment password must be 6 digits';
+                      }
                       if (!RegExp(r'^\d{6}$').hasMatch(t)) return 'Digits only';
                       return null;
                     },
@@ -1978,7 +1979,7 @@ class _PermanentPillSwitch extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         color: on
             ? cs.primary.withOpacity(0.12)
-            : cs.surfaceVariant.withOpacity(0.6),
+            : cs.surfaceContainerHighest.withOpacity(0.6),
         border: Border.all(
           color: on ? cs.primary : cs.outline.withOpacity(0.4),
         ),
@@ -2017,7 +2018,6 @@ class _ReferralInlineButton extends StatelessWidget {
   final String label;
   final IconData? icon;
   const _ReferralInlineButton({
-    super.key,
     required this.isLoading,
     required this.status,
     required this.onPressed,
@@ -2036,7 +2036,7 @@ class _ReferralInlineButton extends StatelessWidget {
         : isFail
             ? Theme.of(context).colorScheme.error
             : theme.colorScheme.primary;
-    final Color fg = Colors.white;
+    const Color fg = Colors.white;
 
     return ConstrainedBox(
       constraints:
@@ -2053,10 +2053,10 @@ class _ReferralInlineButton extends StatelessWidget {
                 ? null
                 : () {
                     // Guard clause: check if referral code is empty before proceeding
-                    final _signupPageState =
+                    final signupPageState =
                         context.findAncestorStateOfType<_SignupPageState>();
-                    if (_signupPageState != null &&
-                        _signupPageState.referralCodeController.text
+                    if (signupPageState != null &&
+                        signupPageState.referralCodeController.text
                             .trim()
                             .isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(

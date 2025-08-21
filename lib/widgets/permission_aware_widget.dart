@@ -56,8 +56,10 @@ class PermissionAwareWidget extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color:
-                Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+            color: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest
+                .withOpacity(0.3),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
@@ -75,7 +77,10 @@ class PermissionAwareWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withOpacity(0.3),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: Theme.of(context).colorScheme.outline.withOpacity(0.2),

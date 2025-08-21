@@ -152,7 +152,7 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
       print('✅ 登入資訊儲存成功');
     } catch (e) {
       print('❌ 儲存登入資訊失敗: $e');
-      throw e;
+      rethrow;
     }
   }
 

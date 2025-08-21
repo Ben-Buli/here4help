@@ -1,7 +1,35 @@
-@import './base.css';
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+
+/* Tailwind v4 theme tokens */
+@theme {
+  /* primary brand */
+  --color-primary-50: #eff6ff;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+
+  /* admin neutral palette */
+  --color-admin-50: #f8fafc;
+  --color-admin-100: #f1f5f9;
+  --color-admin-500: #64748b;
+  --color-admin-600: #475569;
+  --color-admin-700: #334155;
+  --color-admin-800: #1e293b;
+  --color-admin-900: #0f172a;
+
+  /* gray alias (v3 -> v4) */
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+}
 
 #app {
   @apply min-h-screen bg-gray-50;
@@ -17,11 +45,13 @@
 }
 
 .admin-button-primary {
-  @apply admin-button bg-primary-600 text-white hover:bg-primary-700;
+  @apply px-4 py-2 rounded-md font-medium transition-colors duration-200
+         bg-primary-600 text-white hover:bg-primary-700;
 }
 
 .admin-button-secondary {
-  @apply admin-button bg-gray-200 text-gray-900 hover:bg-gray-300;
+  @apply px-4 py-2 rounded-md font-medium transition-colors duration-200
+         bg-gray-200 text-gray-900 hover:bg-gray-300;
 }
 
 .admin-input {

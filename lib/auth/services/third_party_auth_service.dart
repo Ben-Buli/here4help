@@ -376,7 +376,7 @@ class ThirdPartyAuthService {
         // 移動平台使用統一的第三方登入 API
         final provider = userData['provider'] ?? 'google';
         apiUrl =
-            '${EnvironmentConfig.apiBaseUrl}/backend/api/auth/${provider}-login.php';
+            '${EnvironmentConfig.apiBaseUrl}/backend/api/auth/$provider-login.php';
       }
 
       debugPrint('🌐 發送請求到: $apiUrl');

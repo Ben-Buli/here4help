@@ -22,7 +22,6 @@ import 'package:here4help/account/pages/wallet_page.dart';
 import 'package:here4help/auth/pages/login_page.dart';
 import 'package:here4help/auth/pages/signup_page.dart';
 import 'package:here4help/auth/pages/student_id_page.dart';
-import 'package:here4help/auth/pages/oauth_signup_page.dart';
 
 // ==================== chat 模組 ====================
 import 'package:here4help/chat/pages/chat_list_page.dart';
