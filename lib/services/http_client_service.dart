@@ -180,6 +180,50 @@ class HttpClientService {
     }
   }
 
+  /// PATCH 請求
+  static Future<http.Response> patch(
+    String url, {
+    Map<String, String>? additionalHeaders,
+    Object? body,
+    bool useQueryParamToken = true, // MAMP 兼容性選項
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      String finalUrl = url;
+
+      // 如果啟用查詢參數 token（MAMP 兼容性）
+      if (useQueryParamToken && token != null && token.isNotEmpty) {
+        finalUrl = addTokenToUrl(url, token);
+        debugPrint('🔍 [HTTP] MAMP 兼容模式：使用查詢參數傳遞 token');
+      }
+
+      final headers = await getAuthHeaders();
+      if (additionalHeaders != null) {
+        headers.addAll(additionalHeaders);
+      }
+
+      if (kDebugMode) {
+        debugPrint('🔍 [HTTP] PATCH: $finalUrl');
+        debugPrint('🔍 [HTTP] Headers: ${headers.keys.toList()}');
+      }
+
+      final response = await http.patch(
+        Uri.parse(finalUrl),
+        headers: headers,
+        body: body is String ? body : jsonEncode(body),
+      );
+
+      if (kDebugMode) {
+        debugPrint('🔍 [HTTP] Response: ${response.statusCode}');
+      }
+
+      return response;
+    } catch (e) {
+      debugPrint('❌ [HTTP] PATCH 請求失敗: $e');
+      rethrow;
+    }
+  }
+
   /// DELETE 請求
   static Future<http.Response> delete(
     String url, {

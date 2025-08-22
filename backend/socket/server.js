@@ -13,6 +13,9 @@ const { Server } = require('socket.io');
 const mysql = require('mysql2/promise');
 const jwt = require('jsonwebtoken');
 
+// 引入客服事件處理器
+const SupportEventHandler = require('./support_events');
+
 const PORT = process.env.PORT || 3001;
 
 // Load environment variables once at startup
@@ -216,6 +219,18 @@ async function emitUnread(userId) {
 // Initialize database connection
 initDatabase();
 
+// 初始化客服事件處理器
+let supportEventHandler = null;
+
+// 創建客服事件處理器
+function initSupportEventHandler() {
+  supportEventHandler = new SupportEventHandler(io);
+  console.log('✅ Support Event Handler initialized');
+}
+
+// 在 IO 初始化後創建客服事件處理器
+initSupportEventHandler();
+
 io.use((socket, next) => {
   const { token } = socket.handshake.query || {};
   if (!token) return next(new Error('Unauthorized: token missing'));
@@ -233,6 +248,11 @@ io.on('connection', (socket) => {
 
   // Initial push for safety (client can also fetch snapshot via REST)
   emitUnread(userId);
+
+  // 處理客服事件相關連線
+  if (supportEventHandler) {
+    supportEventHandler.handleConnection(socket);
+  }
 
   socket.on('join_room', ({ roomId }) => {
     if (!roomId) return;
@@ -358,9 +378,13 @@ app.get('/health', (req, res) => {
   res.json({ 
     ok: true, 
     database: dbPool ? 'connected' : 'disconnected',
+    supportEvents: supportEventHandler ? 'initialized' : 'not initialized',
     timestamp: new Date().toISOString()
   });
 });
+
+// 暴露客服事件處理器給外部使用（供 PHP API 調用）
+global.supportEventHandler = supportEventHandler;
 
 server.listen(PORT, () => {
   console.log(`Socket.IO Gateway listening on :${PORT}`);
