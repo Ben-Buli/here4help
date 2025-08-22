@@ -181,7 +181,7 @@ class TraceId {
     /**
      * 獲取執行時間
      */
-    private static function getExecutionTime() {
+    public static function getExecutionTime() {
         if (defined('REQUEST_START_TIME')) {
             return round((microtime(true) - REQUEST_START_TIME) * 1000, 2) . 'ms';
         }

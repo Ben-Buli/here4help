@@ -6,6 +6,7 @@
 
 require_once __DIR__ . '/ErrorCodes.php';
 require_once __DIR__ . '/TraceId.php';
+require_once __DIR__ . '/Logger.php';
 
 class Response {
     /**
@@ -106,6 +107,13 @@ class Response {
         $response = array_filter($response, function($value) {
             return $value !== null;
         });
+        
+        // 記錄響應日誌
+        Logger::logResponse($httpCode, $response, [
+            'success' => $success,
+            'code' => $code,
+            'message' => $message
+        ]);
         
         // 記錄回應到追蹤日誌
         TraceId::endRequest($httpCode, $response);

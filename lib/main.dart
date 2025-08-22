@@ -5,6 +5,7 @@ import 'package:here4help/router/app_router.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/config/environment_config.dart';
+import 'package:here4help/services/error_reporting_service.dart';
 
 class Here4HelpApp extends StatelessWidget {
   const Here4HelpApp({super.key});
@@ -30,6 +31,9 @@ void main() async {
 
   // 初始化環境配置
   await EnvironmentConfig.initialize();
+
+  // 初始化錯誤報告服務
+  ErrorReportingService.initialize();
 
   // 打印環境信息
   EnvironmentConfig.printEnvironmentInfo();

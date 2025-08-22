@@ -1,0 +1,21 @@
+{
+    "id": "alert_20250822_094142_20aec5d2",
+    "timestamp": "2025-08-22 09:41:42",
+    "type": "error_rate",
+    "level": "critical",
+    "message": "\u932f\u8aa4\u7387\u904e\u9ad8: 61.538461538462%",
+    "context": {
+        "error_rate": 61.53846153846154,
+        "threshold": 5,
+        "error_count": 16,
+        "total_requests": 26
+    },
+    "status": "active",
+    "sent_notifications": [
+        {
+            "type": "system_log",
+            "timestamp": "2025-08-22 09:41:42",
+            "status": "sent"
+        }
+    ]
+}

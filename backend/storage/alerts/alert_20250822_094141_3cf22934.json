@@ -1,0 +1,20 @@
+{
+    "id": "alert_20250822_094141_3cf22934",
+    "timestamp": "2025-08-22 09:41:41",
+    "type": "security",
+    "level": "info",
+    "message": "\u6e2c\u8a66\u4fe1\u606f\u8b66\u5831",
+    "context": {
+        "test": true
+    },
+    "status": "resolved",
+    "sent_notifications": [
+        {
+            "type": "system_log",
+            "timestamp": "2025-08-22 09:41:41",
+            "status": "sent"
+        }
+    ],
+    "resolved_at": "2025-08-22 09:41:41",
+    "resolved_by": "test_script"
+}

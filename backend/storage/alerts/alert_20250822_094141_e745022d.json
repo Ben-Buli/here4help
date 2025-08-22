@@ -1,0 +1,18 @@
+{
+    "id": "alert_20250822_094141_e745022d",
+    "timestamp": "2025-08-22 09:41:41",
+    "type": "performance",
+    "level": "warning",
+    "message": "\u6e2c\u8a66\u8b66\u544a\u8b66\u5831",
+    "context": {
+        "performance_issue": "slow_query"
+    },
+    "status": "active",
+    "sent_notifications": [
+        {
+            "type": "system_log",
+            "timestamp": "2025-08-22 09:41:41",
+            "status": "sent"
+        }
+    ]
+}

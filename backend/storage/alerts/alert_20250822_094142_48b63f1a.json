@@ -1,0 +1,81 @@
+{
+    "id": "alert_20250822_094142_48b63f1a",
+    "timestamp": "2025-08-22 09:41:42",
+    "type": "consecutive_5xx",
+    "level": "critical",
+    "message": "\u9023\u7e8c 8 \u500b 5xx \u932f\u8aa4",
+    "context": {
+        "consecutive_count": 8,
+        "threshold": 5,
+        "recent_errors": [
+            {
+                "timestamp": "2025-08-22 09:41:42",
+                "trace_id": "68A83B5504EEB9A716AB3",
+                "level": "ERROR",
+                "type": "response",
+                "message": "HTTP Response: 500",
+                "context": {
+                    "status_code": 500,
+                    "response_size": 36,
+                    "execution_time": "521.73ms",
+                    "request_id": "consecutive_5xx_5",
+                    "timestamp": "2025-08-22 09:41:42"
+                },
+                "request": {
+                    "method": "",
+                    "uri": "",
+                    "ip": "",
+                    "user_agent": ""
+                }
+            },
+            {
+                "timestamp": "2025-08-22 09:41:42",
+                "trace_id": "68A83B5504EEB9A716AB3",
+                "level": "ERROR",
+                "type": "response",
+                "message": "HTTP Response: 500",
+                "context": {
+                    "status_code": 500,
+                    "response_size": 36,
+                    "execution_time": "420.56ms",
+                    "request_id": "consecutive_5xx_4",
+                    "timestamp": "2025-08-22 09:41:42"
+                },
+                "request": {
+                    "method": "",
+                    "uri": "",
+                    "ip": "",
+                    "user_agent": ""
+                }
+            },
+            {
+                "timestamp": "2025-08-22 09:41:42",
+                "trace_id": "68A83B5504EEB9A716AB3",
+                "level": "ERROR",
+                "type": "response",
+                "message": "HTTP Response: 500",
+                "context": {
+                    "status_code": 500,
+                    "response_size": 36,
+                    "execution_time": "315.08ms",
+                    "request_id": "consecutive_5xx_3",
+                    "timestamp": "2025-08-22 09:41:42"
+                },
+                "request": {
+                    "method": "",
+                    "uri": "",
+                    "ip": "",
+                    "user_agent": ""
+                }
+            }
+        ]
+    },
+    "status": "active",
+    "sent_notifications": [
+        {
+            "type": "system_log",
+            "timestamp": "2025-08-22 09:41:42",
+            "status": "sent"
+        }
+    ]
+}
