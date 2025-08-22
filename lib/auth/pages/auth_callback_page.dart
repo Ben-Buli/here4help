@@ -1,9 +1,7 @@
 import 'dart:convert';
 import 'dart:html' as html;
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
 import '../services/third_party_auth_service.dart';
-import '../../config/app_config.dart';
 
 class AuthCallbackPage extends StatefulWidget {
   const AuthCallbackPage({Key? key}) : super(key: key);

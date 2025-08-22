@@ -195,6 +195,12 @@ class ActionBarConfigManager {
                   content: 'Disagree this task is completed?',
                 ),
             ActionBarAction(
+              id: 'dispute',
+              label: 'Dispute',
+              icon: Icons.report_problem,
+              onTap: actionCallbacks['dispute'] ?? () {},
+            ).asDestructive(),
+            ActionBarAction(
               id: 'report',
               label: 'Report',
               icon: Icons.article,
@@ -202,14 +208,20 @@ class ActionBarConfigManager {
             ),
           ]);
         } else {
-          actions.add(
+          actions.addAll([
+            ActionBarAction(
+              id: 'dispute',
+              label: 'Dispute',
+              icon: Icons.report_problem,
+              onTap: actionCallbacks['dispute'] ?? () {},
+            ).asDestructive(),
             ActionBarAction(
               id: 'report',
               label: 'Report',
               icon: Icons.article,
               onTap: actionCallbacks['report'] ?? () {},
             ),
-          );
+          ]);
         }
         break;
 
@@ -229,6 +241,12 @@ class ActionBarConfigManager {
               onTap: actionCallbacks['review'] ?? () {},
             ),
             ActionBarAction(
+              id: 'dispute',
+              label: 'Dispute',
+              icon: Icons.report_problem,
+              onTap: actionCallbacks['dispute'] ?? () {},
+            ).asDestructive(),
+            ActionBarAction(
               id: 'block',
               label: 'Block',
               icon: Icons.block,
@@ -241,10 +259,22 @@ class ActionBarConfigManager {
         } else {
           actions.addAll([
             ActionBarAction(
+              id: 'dispute',
+              label: 'Dispute',
+              icon: Icons.report_problem,
+              onTap: actionCallbacks['dispute'] ?? () {},
+            ).asDestructive(),
+            ActionBarAction(
               id: 'report',
               label: 'Report',
               icon: Icons.article,
               onTap: actionCallbacks['report'] ?? () {},
+            ),
+            ActionBarAction(
+              id: 'review',
+              label: 'Reviews',
+              icon: Icons.reviews,
+              onTap: actionCallbacks['review'] ?? () {},
             ),
             ActionBarAction(
               id: 'block',

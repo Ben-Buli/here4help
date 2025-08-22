@@ -130,7 +130,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
             const SizedBox(height: 32),
 
             // 標題和說明
-            Center(
+            const Center(
               child: Icon(
                 Icons.lock_reset,
                 size: 80,

@@ -172,9 +172,7 @@ class DynamicActionBar extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: action.backgroundColor != null
-                        ? action.backgroundColor
-                        : null,
+                    color: action.backgroundColor,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -333,7 +331,7 @@ class ActionBarBuilder {
           DynamicActionBar(
             taskStatus: taskStatus,
             userRole: UserRole.participant, // 這裡只用於狀態顯示
-            actionCallbacks: {},
+            actionCallbacks: const {},
             showStatusBar: true,
             statusDisplayName: statusDisplayName,
             progressRatio: progressRatio,
@@ -352,7 +350,7 @@ class ActionBarBuilder {
                   children: _actions
                       .map(
                         (action) => Expanded(
-                          child: DynamicActionBar(
+                          child: const DynamicActionBar(
                             taskStatus: TaskStatus.open, // 佔位符
                             userRole: UserRole.participant, // 佔位符
                             actionCallbacks: {},

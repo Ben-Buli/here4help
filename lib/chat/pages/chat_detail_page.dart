@@ -22,6 +22,7 @@ import 'package:here4help/services/theme_config_manager.dart';
 import 'dart:ui';
 import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/chat/services/chat_storage_service.dart';
+import 'package:here4help/widgets/dispute_dialog.dart';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, this.data});
@@ -1919,7 +1920,30 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       'disagree': () => _handleDisagreeCompletion(),
       'paid_info': () => _showPaidInfo(),
       'review': () => _openReviewDialog(readOnlyIfExists: true),
+      'dispute': () => _handleDispute(),
     };
+  }
+
+  /// 處理申訴
+  Future<void> _handleDispute() async {
+    if (_task == null) return;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => DisputeDialog(
+        taskId: _task!['id'].toString(),
+        taskTitle: _task!['title']?.toString() ?? 'Unknown Task',
+        onDisputeSubmitted: () {
+          // 刷新任務資料
+          _initializeChat();
+        },
+      ),
+    );
+
+    if (result == true) {
+      // 申訴提交成功，刷新頁面資料
+      await _initializeChat();
+    }
   }
 
   /// 處理接受應徵

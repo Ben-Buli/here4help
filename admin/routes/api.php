@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\TaskController;
 use App\Http\Controllers\Admin\LogController;
+use App\Http\Controllers\Admin\DisputeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -67,6 +68,22 @@ Route::prefix('admin')->group(function () {
                 Route::get('/activity', [LogController::class, 'activityLogs']);
                 Route::get('/login', [LogController::class, 'loginLogs']);
                 Route::get('/stats', [LogController::class, 'systemStats']);
+            });
+        });
+        
+        // 申訴管理路由
+        Route::prefix('disputes')->group(function () {
+            Route::middleware('admin:disputes.list')->group(function () {
+                Route::get('/', [DisputeController::class, 'index']);
+            });
+            
+            Route::middleware('admin:disputes.view')->group(function () {
+                Route::get('/{id}', [DisputeController::class, 'show']);
+            });
+            
+            Route::middleware('admin:disputes.edit')->group(function () {
+                Route::patch('/{id}/status', [DisputeController::class, 'updateStatus']);
+                Route::post('/batch-action', [DisputeController::class, 'batchAction']);
             });
         });
         

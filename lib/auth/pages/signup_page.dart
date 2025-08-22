@@ -2083,7 +2083,8 @@ class _ReferralInlineButton extends StatelessWidget {
                     )
                   : Text(
                       label,
-                      style: TextStyle(color: fg, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                          color: fg, fontWeight: FontWeight.w600),
                     ),
             ),
           ),

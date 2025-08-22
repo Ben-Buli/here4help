@@ -219,7 +219,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                             });
                           },
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: AppColors.primary),
+                      side: const BorderSide(color: AppColors.primary),
                       foregroundColor: AppColors.primary,
                     ),
                     child: const Text(

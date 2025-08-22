@@ -21,6 +21,7 @@ class AdminRole extends Model
             'tasks.list', 'tasks.view', 'tasks.edit', 'tasks.delete',
             'services.list', 'services.view', 'services.edit', 'services.delete',
             'points.list', 'points.view', 'points.edit', 'points.delete',
+            'disputes.list', 'disputes.view', 'disputes.edit', 'disputes.delete',
             'admins.list', 'admins.view', 'admins.create', 'admins.edit', 'admins.delete',
             'roles.list', 'roles.view', 'roles.create', 'roles.edit', 'roles.delete',
             'logs.view'
@@ -29,21 +30,25 @@ class AdminRole extends Model
             'users.list', 'users.view', 'users.edit',
             'tasks.list', 'tasks.view', 'tasks.edit',
             'services.list', 'services.view', 'services.edit',
-            'points.list', 'points.view', 'points.edit'
+            'points.list', 'points.view', 'points.edit',
+            'disputes.list', 'disputes.view', 'disputes.edit'
         ],
         'moderator' => [
             'users.list', 'users.view',
             'tasks.list', 'tasks.view', 'tasks.edit',
-            'services.list', 'services.view'
+            'services.list', 'services.view',
+            'disputes.list', 'disputes.view', 'disputes.edit'
         ],
         'developer' => [
             'users.list', 'users.view',
             'tasks.list', 'tasks.view',
+            'disputes.list', 'disputes.view',
             'logs.view'
         ],
         'support' => [
             'users.list', 'users.view',
-            'services.list', 'services.view'
+            'services.list', 'services.view',
+            'disputes.list', 'disputes.view'
         ]
     ];
 

@@ -155,7 +155,7 @@ final List<Map<String, dynamic>> shellPages = [
     'permission': 0, // 新用戶可瀏覽任務列表
     'actionsBuilder': (context) => [
           IconButton(
-            icon: const Icon(Icons.edit),
+            icon: const Icon(Icons.add_box_outlined),
             onPressed: () async {
               print('🔍 Edit Icon 被點擊，準備導航到 /chat');
               print('🔍 當前路徑: ${GoRouterState.of(context).uri.path}');
