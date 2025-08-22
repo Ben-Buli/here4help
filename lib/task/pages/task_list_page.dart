@@ -10,6 +10,7 @@ import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/task/services/language_service.dart';
 import 'package:here4help/widgets/range_slider_widget.dart';
 import 'package:here4help/widgets/multi_select_search_dropdown.dart';
+import 'package:here4help/services/api/task_favorites_api.dart';
 
 class TaskListPage extends StatefulWidget {
   const TaskListPage({super.key});
@@ -74,23 +75,80 @@ class _TaskListPageState extends State<TaskListPage> {
 
   /// 載入收藏的任務
   Future<void> _loadFavorites() async {
-    // TODO: 從本地存儲或API載入收藏的任務ID
-    // 暫時使用空集合
-    setState(() {
-      _favoriteTaskIds = <String>{};
-    });
+    try {
+      // 從 API 載入收藏的任務ID
+      final result = await TaskFavoritesApi.getFavorites(page: 1, perPage: 100);
+      final favorites = result['favorites'] as List<dynamic>;
+
+      setState(() {
+        _favoriteTaskIds =
+            favorites.map((favorite) => favorite['task_id'].toString()).toSet();
+      });
+    } catch (e) {
+      // 如果載入失敗，使用空集合
+      if (mounted) {
+        setState(() {
+          _favoriteTaskIds = <String>{};
+        });
+      }
+    }
   }
 
   /// 切換任務收藏狀態
-  void _toggleFavorite(String taskId) {
-    setState(() {
+  Future<void> _toggleFavorite(String taskId) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    try {
       if (_favoriteTaskIds.contains(taskId)) {
-        _favoriteTaskIds.remove(taskId);
+        // 取消收藏
+        await TaskFavoritesApi.removeFavorite(taskId: taskId);
+        setState(() {
+          _favoriteTaskIds.remove(taskId);
+        });
+
+        if (mounted) {
+          scaffoldMessenger.showSnackBar(
+            const SnackBar(
+              content: Text('已取消收藏'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
       } else {
-        _favoriteTaskIds.add(taskId);
+        // 添加收藏
+        await TaskFavoritesApi.addFavorite(taskId: taskId);
+        setState(() {
+          _favoriteTaskIds.add(taskId);
+        });
+
+        if (mounted) {
+          scaffoldMessenger.showSnackBar(
+            const SnackBar(
+              content: Text('已加入收藏'),
+              duration: Duration(seconds: 1),
+            ),
+          );
+        }
       }
-    });
-    // TODO: 保存到本地存儲或API
+    } catch (e) {
+      // 如果 API 操作失敗，恢復原狀態
+      setState(() {
+        if (_favoriteTaskIds.contains(taskId)) {
+          _favoriteTaskIds.remove(taskId);
+        } else {
+          _favoriteTaskIds.add(taskId);
+        }
+      });
+
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('操作失敗: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   /// 滾動監聽
@@ -1329,7 +1387,8 @@ class _TaskListPageState extends State<TaskListPage> {
                                   size: 22,
                                   color: isFavorite ? Colors.amber : null,
                                 ),
-                                onPressed: () => _toggleFavorite(taskId),
+                                onPressed: () async =>
+                                    await _toggleFavorite(taskId),
                                 tooltip: isFavorite
                                     ? 'Remove from favorites'
                                     : 'Add to favorites',

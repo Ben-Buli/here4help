@@ -14,10 +14,11 @@ const mysql = require('mysql2/promise');
 // 資料庫連線配置
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'here4help',
-  charset: 'utf8mb4'
+  port: process.env.DB_PORT || 8889,
+  user: process.env.DB_USERNAME || 'root',
+  password: process.env.DB_PASSWORD || 'root',
+  database: process.env.DB_NAME || 'hero4helpdemofhs_hero4help',
+  charset: process.env.DB_CHARSET || 'utf8mb4'
 };
 
 class SupportEventHandler {
@@ -33,6 +34,8 @@ class SupportEventHandler {
       console.log('✅ Support Events WebSocket: 資料庫連線成功');
     } catch (error) {
       console.error('❌ Support Events WebSocket: 資料庫連線失敗', error);
+      console.log('⚠️ Support Events WebSocket: 將使用離線模式運作');
+      this.db = null;
     }
   }
 
@@ -46,7 +49,7 @@ class SupportEventHandler {
     socket.on('authenticate', async (data) => {
       try {
         const { token } = data;
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'here4help_jwt_secret_key_2025_development_environment_secure_random_string');
         
         socket.userId = decoded.user_id;
         socket.userRole = decoded.role || 'user';
@@ -194,6 +197,10 @@ class SupportEventHandler {
     try {
       if (!this.db) {
         await this.initDatabase();
+        if (!this.db) {
+          console.log('⚠️ Support Events: 資料庫未連線，返回基本事件資料');
+          return { id: eventId, status: 'unknown' };
+        }
       }
 
       const [rows] = await this.db.execute(`
@@ -231,7 +238,7 @@ class SupportEventHandler {
       return event;
     } catch (error) {
       console.error('❌ Support Events: 獲取事件詳細資料失敗', error);
-      return null;
+      return { id: eventId, status: 'error', error: error.message };
     }
   }
 }

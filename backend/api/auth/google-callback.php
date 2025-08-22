@@ -142,189 +142,121 @@ try {
     
     $db = Database::getInstance();
     
-    // 檢查是否已存在對應的 user_identity
+    // 情況1：檢查 user_identities 表中是否存在該 email 且 user_id 對應 users.id
     $stmt = $db->query(
         "SELECT ui.*, u.* FROM user_identities ui 
          INNER JOIN users u ON ui.user_id = u.id 
-         WHERE ui.provider = 'google' AND ui.provider_user_id = ?",
-        [$googleId]
+         WHERE ui.provider = 'google' AND ui.email = ?",
+        [$email]
     );
     
-    $existingIdentity = $stmt->fetch();
+    $existingIdentityWithValidUser = $stmt->fetch();
     
-    if ($existingIdentity) {
-        error_log("Google OAuth Callback - 找到現有用戶，用戶 ID: {$existingIdentity['user_id']}");
+    if ($existingIdentityWithValidUser) {
+        error_log("Google OAuth Callback - 情況1：找到現有用戶，用戶 ID: {$existingIdentityWithValidUser['user_id']}");
         
-        // 現有用戶，更新最後登入時間
+        // 更新最後登入時間
         $db->query(
             "UPDATE users SET updated_at = NOW() WHERE id = ?",
-            [$existingIdentity['user_id']]
+            [$existingIdentityWithValidUser['user_id']]
         );
         
-        // 更新 user_identity 的 access_token 和最後更新時間
+        // 更新 user_identity 的 access_token
         $db->query(
             "UPDATE user_identities SET 
              access_token = ?, 
              updated_at = NOW() 
              WHERE id = ?",
-            [$accessToken, $existingIdentity['id']]
+            [$accessToken, $existingIdentityWithValidUser['id']]
         );
         
-        $user = $existingIdentity;
+        $user = $existingIdentityWithValidUser;
         $isNewUser = false;
+        $redirectToSignup = false;
+        $existingUserId = null;
         
-        error_log("Google OAuth Callback - 現有用戶登入成功");
+        error_log("Google OAuth Callback - 情況1：現有用戶登入成功，前往 /home");
     } else {
-        error_log("Google OAuth Callback - 新用戶，檢查 email 是否已存在...");
+        // 情況2：檢查 user_identities 表中是否存在該 email 但 user_id 不存在於 users.id
+        $stmt = $db->query(
+            "SELECT ui.* FROM user_identities ui 
+             LEFT JOIN users u ON ui.user_id = u.id 
+             WHERE ui.provider = 'google' AND ui.email = ? AND u.id IS NULL",
+            [$email]
+        );
         
-        // 檢查 email 是否已存在於 users 表
-        if (!empty($email)) {
-            $stmt = $db->query(
-                "SELECT * FROM users WHERE email = ?",
-                [$email]
-            );
+        $existingIdentityWithInvalidUser = $stmt->fetch();
+        
+        if ($existingIdentityWithInvalidUser) {
+            error_log("Google OAuth Callback - 情況2：Email 存在但 user_id 無效，user_id: {$existingIdentityWithInvalidUser['user_id']}");
             
-            $existingUser = $stmt->fetch();
-            
-            if ($existingUser) {
-                error_log("Google OAuth Callback - Email 已存在，需要綁定到現有帳號，用戶 ID: {$existingUser['id']}");
-                
-                // Email 已存在，需要綁定到現有帳號
-                $db->query(
-                    "INSERT INTO user_identities (
-                        user_id, provider, provider_user_id, email, name, avatar_url, 
-                        access_token, raw_profile, created_at, updated_at
-                    ) VALUES (?, 'google', ?, ?, ?, ?, ?, ?, NOW(), NOW())",
-                    [
-                        $existingUser['id'], 
-                        $googleId, 
-                        $email, 
-                        $name, 
-                        $avatarUrl, 
-                        $accessToken,
-                        json_encode($userInfo) // 儲存原始 Google 資料
-                    ]
-                );
-                
-                $user = $existingUser;
-                $isNewUser = false;
-                
-                error_log("Google OAuth Callback - 成功綁定 Google 帳號到現有用戶");
-            } else {
-                error_log("Google OAuth Callback - 完全新用戶，建立新帳號...");
-                
-                // 完全新用戶，建立 users 記錄
-                $db->query(
-                    "INSERT INTO users (
-                        name, email, avatar_url, status, created_at, updated_at
-                    ) VALUES (?, ?, ?, 'active', NOW(), NOW())",
-                    [$name, $email, $avatarUrl]
-                );
-                
-                $userId = $db->lastInsertId();
-                error_log("Google OAuth Callback - 新用戶建立成功，用戶 ID: $userId");
-                
-                // 建立 user_identity 記錄
-                $db->query(
-                    "INSERT INTO user_identities (
-                        user_id, provider, provider_user_id, email, name, avatar_url, 
-                        access_token, raw_profile, created_at, updated_at
-                    ) VALUES (?, 'google', ?, ?, ?, ?, ?, ?, NOW(), NOW())",
-                    [
-                        $userId, 
-                        $googleId, 
-                        $email, 
-                        $name, 
-                        $avatarUrl, 
-                        $accessToken,
-                        json_encode($userInfo) // 儲存原始 Google 資料
-                    ]
-                );
-                
-                // 重新查詢用戶資料
-                $stmt = $db->query("SELECT * FROM users WHERE id = ?", [$userId]);
-                $user = $stmt->fetch();
-                $isNewUser = true;
-                
-                error_log("Google OAuth Callback - 新用戶和 user_identity 建立完成");
-            }
-        } else {
-            error_log("Google OAuth Callback - 無 email 的新用戶，建立新帳號...");
-            
-            // 無 email 的新用戶，建立 users 記錄
-            $db->query(
-                "INSERT INTO users (
-                    name, avatar_url, status, created_at, updated_at
-                ) VALUES (?, ?, 'active', NOW(), NOW())",
-                [$name, $avatarUrl]
-            );
-            
-            $userId = $db->lastInsertId();
-            error_log("Google OAuth Callback - 無 email 新用戶建立成功，用戶 ID: $userId");
-            
-            // 建立 user_identity 記錄
-            $db->query(
-                "INSERT INTO user_identities (
-                    user_id, provider, provider_user_id, name, avatar_url, 
-                    access_token, raw_profile, created_at, updated_at
-                ) VALUES (?, 'google', ?, ?, ?, ?, ?, NOW(), NOW())",
-                [
-                    $userId, 
-                    $googleId, 
-                    $name, 
-                    $avatarUrl, 
-                    $accessToken,
-                    json_encode($userInfo) // 儲存原始 Google 資料
-                ]
-            );
-            
-            // 重新查詢用戶資料
-            $stmt = $db->query("SELECT * FROM users WHERE id = ?", [$userId]);
-            $user = $stmt->fetch();
+            $user = null;
             $isNewUser = true;
+            $redirectToSignup = true;
+            $existingUserId = $existingIdentityWithInvalidUser['user_id'];
             
-            error_log("Google OAuth Callback - 無 email 新用戶和 user_identity 建立完成");
+            error_log("Google OAuth Callback - 情況2：前往註冊頁面，傳遞 user_id: $existingUserId");
+        } else {
+            // 情況3：user_identities.email 不存在且 users 中也不存在
+            error_log("Google OAuth Callback - 情況3：完全新用戶，email 不存在於任何表");
+            
+            $user = null;
+            $isNewUser = true;
+            $redirectToSignup = true;
+            $existingUserId = null;
+            
+            error_log("Google OAuth Callback - 情況3：前往註冊頁面，不傳遞 user_id");
         }
     }
     
-    // 生成 JWT Token
-    $payload = [
-        'user_id' => $user['id'],
-        'email' => $user['email'] ?? '',
-        'name' => $user['name'],
-        'iat' => time(),
-        'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
-    ];
-    
-    try {
-        $token = JWTManager::generateToken($payload);
-        error_log("Google OAuth Callback - JWT token 生成成功，用戶: " . $user['id']);
-    } catch (Exception $e) {
-        error_log("Google OAuth Callback - JWT token 生成失敗: " . $e->getMessage());
-        throw new Exception('Token generation failed: ' . $e->getMessage());
+    // 生成 JWT Token（僅在情況1中）
+    if ($user !== null) {
+        $payload = [
+            'user_id' => $user['id'],
+            'email' => $user['email'] ?? '',
+            'name' => $user['name'],
+            'iat' => time(),
+            'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
+        ];
+        
+        try {
+            $token = JWTManager::generateToken($payload);
+            error_log("Google OAuth Callback - JWT token 生成成功，用戶: " . $user['id']);
+        } catch (Exception $e) {
+            error_log("Google OAuth Callback - JWT token 生成失敗: " . $e->getMessage());
+            throw new Exception('Token generation failed: ' . $e->getMessage());
+        }
+        
+        // 準備用戶資料
+        $userData = [
+            'id' => $user['id'],
+            'name' => $user['name'] ?? '',
+            'email' => $user['email'] ?? '',
+            'phone' => $user['phone'] ?? '',
+            'nickname' => $user['nickname'] ?? '',
+            'avatar_url' => $user['avatar_url'] ?? '',
+            'points' => (int)($user['points'] ?? 0),
+            'status' => $user['status'],
+            'provider' => 'google',
+            'created_at' => $user['created_at'],
+            'updated_at' => $user['updated_at'],
+            'referral_code' => $user['referral_code'] ?? '',
+            'primary_language' => $user['primary_language'] ?? 'English',
+            'permission' => (int)($user['permission'] ?? 0),
+            'is_new_user' => $isNewUser,
+            'provider_user_id' => $googleId
+        ];
+    } else {
+        // 情況2和3：不需要生成 JWT token
+        $token = null;
+        $userData = null;
     }
     
-    // 準備用戶資料
-    $userData = [
-        'id' => $user['id'],
-        'name' => $user['name'] ?? '',
-        'email' => $user['email'] ?? '',
-        'phone' => $user['phone'] ?? '',
-        'nickname' => $user['nickname'] ?? '',
-        'avatar_url' => $user['avatar_url'] ?? '',
-        'points' => (int)($user['points'] ?? 0),
-        'status' => $user['status'],
-        'provider' => 'google',
-        'created_at' => $user['created_at'],
-        'updated_at' => $user['updated_at'],
-        'referral_code' => $user['referral_code'] ?? '',
-        'primary_language' => $user['primary_language'] ?? 'English',
-        'permission' => (int)($user['permission'] ?? 0),
-        'is_new_user' => $isNewUser,
-        'provider_user_id' => $googleId
-    ];
-    
-    error_log("Google OAuth Callback - 登入成功，用戶 ID: {$user['id']}, 新用戶: " . ($isNewUser ? '是' : '否'));
+    if ($user !== null) {
+        error_log("Google OAuth Callback - 登入成功，用戶 ID: {$user['id']}, 新用戶: " . ($isNewUser ? '是' : '否'));
+    } else {
+        error_log("Google OAuth Callback - 前往註冊頁面，新用戶: " . ($isNewUser ? '是' : '否'));
+    }
     
     // 第四步：重定向到前端應用，並傳遞登入結果
     // 根據用戶狀態決定重定向目標
@@ -356,34 +288,44 @@ try {
     $frontendUrl = $origin ?: EnvLoader::get('FRONTEND_URL', 'http://localhost:3000');
     
     // 根據用戶狀態建立不同的重定向 URL
-    if ($isNewUser) {
-        // 新用戶：寫入 oauth_temp_users 並產生一次性 token
-        $token = bin2hex(random_bytes(24));
+    if ($redirectToSignup) {
+        // 情況2和3：前往註冊頁面
+        $tempToken = bin2hex(openssl_random_pseudo_bytes(24));
         $expiresAt = date('Y-m-d H:i:s', time() + 3600);
 
         $db->query(
-            "INSERT INTO oauth_temp_users (provider, provider_user_id, email, name, avatar_url, raw_data, token, expired_at, created_at)\n             VALUES ('google', ?, ?, ?, ?, ?, ?, ?, NOW())",
+            "INSERT INTO oauth_temp_users (provider, provider_user_id, email, name, avatar_url, raw_data, token, expired_at, created_at)
+             VALUES ('google', ?, ?, ?, ?, ?, ?, ?, NOW())",
             [
                 $googleId,
                 $email ?: null,
                 $name ?: null,
                 $avatarUrl ?: null,
                 json_encode($userInfo),
-                $token,
+                $tempToken,
                 $expiresAt
             ]
         );
 
-        // 重定向到註冊頁面（帶 token）
-        $redirectUrl = rtrim($frontendUrl, '/') . '/signup?' . http_build_query([
-            'token' => $token,
+        // 重定向到註冊頁面（帶 token 和可選的 existing_user_id）
+        $signupParams = [
+            'token' => $tempToken,
             'provider' => 'google',
             'is_new_user' => 'true'
-        ]);
+        ];
+        
+        if ($existingUserId !== null) {
+            $signupParams['existing_user_id'] = $existingUserId;
+        }
 
-        error_log("Google OAuth Callback - 新用戶建立 temp token 並重定向: $redirectUrl");
+        $redirectUrl = rtrim($frontendUrl, '/') . '/signup?' . http_build_query($signupParams);
+
+        error_log("Google OAuth Callback - 前往註冊頁面: $redirectUrl");
+        if ($existingUserId !== null) {
+            error_log("Google OAuth Callback - 傳遞 existing_user_id: $existingUserId");
+        }
     } else {
-        // 現有用戶：重定向到主頁
+        // 情況1：現有用戶，重定向到主頁
         $redirectUrl = rtrim($frontendUrl, '/') . '/home?' . http_build_query([
             'token' => $token,
             'user_data' => json_encode($userData),

@@ -1,3 +1,10 @@
+// Generate a trace ID for logging
+function generateTraceId(socket) {
+  if (socket && socket.id) {
+    return `socket:${socket.id}`;
+  }
+  return `trace:${Math.random().toString(36).substring(2, 10)}`;
+}
 /*
   Enhanced Socket.IO Gateway for Here4Help Chat
   - Auth via base64 token (consistent with PHP profile.php)
@@ -74,51 +81,85 @@ async function initDatabase() {
 }
 
 // 驗證 JWT Token
-function validateJWT(token) {
+function validateJWT(token, traceId) {
   try {
-    if (!JWT_SECRET) {
-      console.error('JWT_SECRET not configured');
+    // 使用與 PHP 相同的 JWT 驗證邏輯
+    const payload = jwt.verify(token, JWT_SECRET, {
+      algorithms: ['HS256'], // 明確指定算法
+      ignoreExpiration: false,
+      ignoreNotBefore: false
+    });
+    
+    if (!payload.user_id) {
+      console.error(`[${traceId}] ❌ JWT payload missing user_id`);
       return null;
     }
     
-    const payload = jwt.verify(token, JWT_SECRET);
-    if (!payload.user_id) return null;
-    return payload; // { user_id, email, name, ... }
+    // 檢查必要欄位
+    if (!payload.iat || !payload.exp) {
+      console.error(`[${traceId}] ❌ JWT payload missing required fields (iat/exp)`);
+      return null;
+    }
+    
+    return payload;
   } catch (e) {
-    console.error('JWT validation failed:', e.message);
+    console.error(`[${traceId}] ❌ JWT validation failed:`, e.name, e.message);
     return null;
   }
 }
 
-function validateTokenBase64(token) {
+function validateTokenBase64(token, traceId) {
   try {
     const decoded = Buffer.from(token, 'base64').toString('utf8');
     const payload = JSON.parse(decoded);
-    if (!payload.user_id || !payload.exp) return null;
-    if (payload.exp < Date.now() / 1000) return null;
-    return payload; // { user_id, email, name, ... }
+    if (!payload.user_id) {
+      console.error(`[${traceId}] ❌ Base64 payload missing user_id`);
+      return null;
+    }
+    if (!payload.exp) {
+      console.error(`[${traceId}] ❌ Base64 payload missing exp`);
+      return null;
+    }
+    if (payload.exp < Date.now() / 1000) {
+      console.error(`[${traceId}] ❌ Base64 token expired`);
+      return null;
+    }
+    return payload;
   } catch (e) {
+    console.error(`[${traceId}] ❌ Base64 validation failed:`, e.message);
     return null;
   }
 }
 
 // 統一的 token 驗證函數
-function validateToken(token) {
-  // 首先嘗試 JWT 驗證
-  let payload = validateJWT(token);
+function validateToken(token, socket) {
+  const traceId = generateTraceId(socket);
+
+  // 調試：顯示 token 格式資訊
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[${traceId}] 🔍 Token format analysis:`);
+    console.log(`[${traceId}] - Length: ${token ? token.length : 0}`);
+    console.log(`[${traceId}] - Parts: ${token ? token.split('.').length : 0}`);
+    console.log(`[${traceId}] - First 50 chars: ${token ? token.slice(0, 50) + '...' : 'null'}`);
+  }
+
+  let payload = validateJWT(token, traceId);
   if (payload) {
-    console.log('✅ JWT token validated successfully');
+    console.log(`[${traceId}] ✅ JWT token validated successfully`);
     return payload;
   }
-  
-  // 如果 JWT 失敗，嘗試 base64 驗證（向後兼容）
-  payload = validateTokenBase64(token);
+
+  payload = validateTokenBase64(token, traceId);
   if (payload) {
-    console.log('✅ Base64 token validated successfully (legacy)');
+    console.log(`[${traceId}] ✅ Base64 token validated successfully (legacy)`);
     return payload;
   }
-  
-  console.log('❌ Token validation failed for both JWT and Base64');
+
+  if (process.env.NODE_ENV === 'development') {
+    console.error(`[${traceId}] ❌ Token validation failed (neither valid JWT nor Base64). Token snippet:`, token ? token.slice(0, 30) + '...' : 'null');
+  } else {
+    console.error(`[${traceId}] ❌ Token validation failed (JWT & Base64).`);
+  }
   return null;
 }
 
@@ -234,7 +275,7 @@ initSupportEventHandler();
 io.use((socket, next) => {
   const { token } = socket.handshake.query || {};
   if (!token) return next(new Error('Unauthorized: token missing'));
-  const payload = validateToken(String(token));
+  const payload = validateToken(String(token), socket);
   if (!payload) return next(new Error('Unauthorized: invalid token'));
   socket.user = { id: String(payload.user_id) };
   return next();
