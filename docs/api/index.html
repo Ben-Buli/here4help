@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+        }
+        .version {
+            opacity: 0.8;
+            font-size: 1.1rem;
+        }
+        .section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 0.5rem;
+        }
+        .endpoint {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0 5px 5px 0;
+        }
+        .method {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 0.8rem;
+            margin-right: 0.5rem;
+        }
+        .method.get { background: #28a745; color: white; }
+        .method.post { background: #007bff; color: white; }
+        .method.put { background: #ffc107; color: black; }
+        .method.delete { background: #dc3545; color: white; }
+        .code {
+            background: #f1f3f4;
+            padding: 1rem;
+            border-radius: 5px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+        }
+        .error-codes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+        .error-code {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 1rem;
+            border-radius: 5px;
+        }
+        .error-code.success { background: #d4edda; border-color: #c3e6cb; }
+        .error-code.error { background: #f8d7da; border-color: #f5c6cb; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1></h1>
+        <div class="version">版本 1.0.0</div>
+    </div>
+
+    <div class="section">
+        <h2>📖 API 概述</h2>
+        <p>|</p>
+        
+        <h3>🔗 基礎 URL</h3>
+        <div class="code">http://localhost:8888/here4help/backend/api</div>
+        
+        <h3>🔐 認證方式</h3>
+        <ul>
+            <li><strong>Bearer Token (JWT)</strong>: 在 Authorization 標頭中傳遞 <code>Bearer &lt;token&gt;</code></li>
+            <li><strong>API Key</strong>: 在 X-API-Key 標頭中傳遞（開發環境）</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>📋 統一回應格式</h2>
+        <p>所有 API 端點都遵循統一的回應格式：</p>
+        
+        <h3>✅ 成功回應</h3>
+        <div class="code">{
+  "success": true,
+  "code": "SUCCESS",
+  "message": "操作成功",
+  "data": {...},
+  "traceId": "68A8362D5712F07814D26",
+  "timestamp": "2025-01-11T17:30:00+08:00",
+  "server_time": 1641897000
+}</div>
+
+        <h3>❌ 錯誤回應</h3>
+        <div class="code">{
+  "success": false,
+  "code": "E2001",
+  "message": "未授權訪問",
+  "traceId": "68A8362D5712F07814D26",
+  "timestamp": "2025-01-11T17:30:00+08:00",
+  "server_time": 1641897000
+}</div>
+    </div>
+
+    <div class="section">
+        <h2>📄 分頁格式</h2>
+        
+        <h3>請求參數</h3>
+        <ul>
+            <li><code>page</code>: 頁碼（預設: 1）</li>
+            <li><code>per_page</code>: 每頁數量（預設: 20，最大: 100）</li>
+        </ul>
+        
+        <h3>回應格式</h3>
+        <div class="code">{
+  "success": true,
+  "code": "SUCCESS",
+  "data": {
+    "items": [...],
+    "pagination": {
+      "current_page": 1,
+      "per_page": 20,
+      "total": 100,
+      "total_pages": 5,
+      "has_next_page": true,
+      "has_previous_page": false,
+      "from": 1,
+      "to": 20
+    }
+  }
+}</div>
+    </div>
+
+    <div class="section">
+        <h2>🔢 錯誤碼參考</h2>
+        <div class="error-codes"><div class="error-code"><h4>✅ 成功</h4><div><code>SUCCESS</code>: Operation completed successfully</div></div><div class="error-code"><h4>🔧 一般錯誤</h4><div><code>E1001</code>: 無效的請求</div><div><code>E1002</code>: 無效的 JSON 格式</div><div><code>E1003</code>: 缺少必要參數</div><div><code>E1004</code>: 參數格式錯誤</div><div><code>E1005</code>: 不支援的請求方法</div><div><code>E1006</code>: 伺服器內部錯誤</div></div><div class="error-code"><h4>🔐 認證錯誤</h4><div><code>E2001</code>: 未授權訪問</div><div><code>E2002</code>: 無效的認證令牌</div><div><code>E2003</code>: 認證令牌已過期</div><div><code>E2004</code>: 認證令牌已撤銷</div><div><code>E2005</code>: 權限不足</div><div><code>E2006</code>: 登入失敗</div><div><code>E2007</code>: 帳號已鎖定</div><div><code>E2008</code>: 帳號已停用</div><div><code>E2009</code>: 帳號已刪除</div></div><div class="error-code"><h4>👤 用戶錯誤</h4><div><code>E3001</code>: 用戶不存在</div><div><code>E3002</code>: 用戶已存在</div><div><code>E3003</code>: 電子郵件已被使用</div><div><code>E3004</code>: 無效的電子郵件格式</div><div><code>E3005</code>: 密碼錯誤</div><div><code>E3006</code>: 密碼強度不足</div><div><code>E3007</code>: 用戶未驗證</div><div><code>E3008</code>: 驗證失敗</div></div><div class="error-code"><h4>📋 任務錯誤</h4><div><code>E4001</code>: 任務不存在</div><div><code>E4002</code>: 無權限訪問此任務</div><div><code>E4003</code>: 任務狀態無效</div><div><code>E4004</code>: 已申請過此任務</div><div><code>E4005</code>: 申請記錄不存在</div><div><code>E4006</code>: 不能申請自己的任務</div><div><code>E4007</code>: 點數不足</div><div><code>E4008</code>: 任務已過期</div></div><div class="error-code"><h4>💬 聊天錯誤</h4><div><code>E5001</code>: 聊天室不存在</div><div><code>E5002</code>: 無權限訪問此聊天室</div><div><code>E5003</code>: 訊息過長</div><div><code>E5004</code>: 檔案上傳失敗</div><div><code>E5005</code>: 檔案過大</div><div><code>E5006</code>: 不支援的檔案類型</div></div><div class="error-code"><h4>🚦 節流限制</h4><div><code>E6001</code>: 請求過於頻繁</div><div><code>E6002</code>: 請求次數過多</div><div><code>E6003</code>: 已達每日限制</div></div><div class="error-code"><h4>💼 業務邏輯</h4><div><code>E7001</code>: 重複操作</div><div><code>E7002</code>: 不允許的操作</div><div><code>E7003</code>: 資源衝突</div><div><code>E7004</code>: 配額已滿</div><div><code>E7005</code>: 功能已停用</div></div><div class="error-code"><h4>🔗 第三方服務</h4><div><code>E8001</code>: 第三方登入錯誤</div><div><code>E8002</code>: 支付處理錯誤</div><div><code>E8003</code>: 郵件服務錯誤</div><div><code>E8004</code>: 簡訊服務錯誤</div></div><div class="error-code"><h4>✏️ 資料驗證</h4><div><code>E9001</code>: 資料驗證失敗</div><div><code>E9002</code>: 格式錯誤</div><div><code>E9003</code>: 數值超出範圍</div><div><code>E9004</code>: 必填欄位缺失</div></div>        </div>
+    </div>
+
+    <div class="section">
+        <h2>🚀 主要端點</h2>
+        
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <strong>/auth/login.php</strong>
+            <p>用戶登入</p>
+            <div class="code">curl -X POST http://localhost:8888/here4help/backend/api/auth/login.php \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "password123"}'</div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <strong>/auth/refresh-token.php</strong>
+            <p>刷新 Access Token</p>
+            <div class="code">curl -X POST http://localhost:8888/here4help/backend/api/auth/refresh-token.php \
+  -H "Content-Type: application/json" \
+  -d '{"refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."}'</div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <strong>/tasks/list.php</strong>
+            <p>獲取任務列表</p>
+            <div class="code">curl -X GET "http://localhost:8888/here4help/backend/api/tasks/list.php?page=1&per_page=20" \
+  -H "Authorization: Bearer &lt;token&gt;"</div>
+        </div>
+
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <strong>/chat/get_rooms.php</strong>
+            <p>獲取聊天室列表</p>
+            <div class="code">curl -X GET "http://localhost:8888/here4help/backend/api/chat/get_rooms.php?page=1&per_page=20" \
+  -H "Authorization: Bearer &lt;token&gt;"</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🔍 請求追蹤</h2>
+        <p>每個 API 請求都會生成唯一的 TraceId，用於問題追蹤和除錯：</p>
+        <ul>
+            <li><strong>請求標頭</strong>: 可在 <code>X-Trace-Id</code> 標頭中傳遞自定義 TraceId</li>
+            <li><strong>回應標頭</strong>: 回應會包含 <code>X-Trace-Id</code> 標頭</li>
+            <li><strong>回應內容</strong>: TraceId 也會包含在回應的 JSON 中</li>
+        </ul>
+        
+        <div class="code"># 請求範例
+curl -X GET "http://localhost:8888/here4help/backend/api/tasks/list.php" \
+  -H "Authorization: Bearer &lt;token&gt;" \
+  -H "X-Trace-Id: CUSTOM123456789"
+
+# 回應標頭
+X-Trace-Id: CUSTOM123456789
+X-Request-Id: CUSTOM123456789</div>
+    </div>
+
+    <div class="section">
+        <h2>⚡ 節流限制</h2>
+        <p>API 實施節流限制以防止濫用：</p>
+        <ul>
+            <li><strong>認證端點</strong>: 5 requests / 5 minutes</li>
+            <li><strong>訊息端點</strong>: 30 requests / 1 minute</li>
+            <li><strong>檢舉端點</strong>: 3 requests / 1 hour</li>
+            <li><strong>一般端點</strong>: 100 requests / 1 minute</li>
+        </ul>
+        
+        <p>節流資訊會在回應標頭中提供：</p>
+        <div class="code">X-RateLimit-Remaining: 4
+X-RateLimit-Reset: 1641897600
+Retry-After: 300</div>
+    </div>
+
+    <footer style="text-align: center; margin-top: 3rem; padding: 2rem; color: #666;">
+        <p>Generated by Here4Help API Documentation Generator</p>
+        <p>Last updated: " . date('Y-m-d H:i:s') . "</p>
+    </footer>
+</body>
+</html>

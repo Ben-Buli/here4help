@@ -1,0 +1,644 @@
+openapi: 3.0.3
+info:
+  title: Here4Help API
+  description: |
+    Here4Help 平台 API 文檔
+    
+    ## 認證方式
+    - Bearer Token (JWT)
+    - API Key (開發環境)
+    
+    ## 錯誤處理
+    所有 API 回應都遵循統一格式：
+    ```json
+    {
+      "success": true|false,
+      "code": "SUCCESS|E1001|E2001|...",
+      "message": "操作描述",
+      "data": {...},
+      "traceId": "68A8362D5712F07814D26",
+      "timestamp": "2025-01-11T17:30:00+08:00",
+      "server_time": 1641897000
+    }
+    ```
+    
+    ## 分頁格式
+    分頁請求參數：
+    - `page`: 頁碼 (預設: 1)
+    - `per_page`: 每頁數量 (預設: 20, 最大: 100)
+    
+    分頁回應格式：
+    ```json
+    {
+      "items": [...],
+      "pagination": {
+        "current_page": 1,
+        "per_page": 20,
+        "total": 100,
+        "total_pages": 5,
+        "has_next_page": true,
+        "has_previous_page": false
+      }
+    }
+    ```
+    
+  version: 1.0.0
+  contact:
+    name: Here4Help Team
+    email: support@here4help.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8888/here4help/backend/api
+    description: 開發環境
+  - url: https://staging.here4help.com/api
+    description: 測試環境
+  - url: https://api.here4help.com
+    description: 生產環境
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  # 認證相關端點
+  /auth/login.php:
+    post:
+      tags:
+        - Authentication
+      summary: 用戶登入
+      description: 使用 email 和密碼進行用戶登入
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: password123
+      responses:
+        '200':
+          description: 登入成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: 登入失敗
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh-token.php:
+    post:
+      tags:
+        - Authentication
+      summary: 刷新 Access Token
+      description: 使用 Refresh Token 獲取新的 Access Token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  example: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
+      responses:
+        '200':
+          description: Token 刷新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+        '401':
+          description: Refresh Token 無效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/revoke-token.php:
+    post:
+      tags:
+        - Authentication
+      summary: 撤銷 Token
+      description: 撤銷當前或指定的 Token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: 要撤銷的 Token（可選，預設撤銷當前 Token）
+                revoke_all:
+                  type: boolean
+                  description: 是否撤銷用戶所有 Token
+                  default: false
+                reason:
+                  type: string
+                  description: 撤銷原因
+                  example: user_logout
+      responses:
+        '200':
+          description: Token 撤銷成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # 任務相關端點
+  /tasks/list.php:
+    get:
+      tags:
+        - Tasks
+      summary: 獲取任務列表
+      description: 分頁獲取任務列表，支援篩選和排序
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - name: status
+          in: query
+          description: 任務狀態篩選
+          schema:
+            type: string
+            enum: [open, in_progress, completed, cancelled]
+        - name: category
+          in: query
+          description: 任務分類篩選
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: 排序欄位
+          schema:
+            type: string
+            enum: [created_at, updated_at, reward_points, deadline]
+            default: created_at
+        - name: order
+          in: query
+          description: 排序方向
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: 任務列表獲取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+
+  /tasks/favorites.php:
+    get:
+      tags:
+        - Tasks
+      summary: 獲取收藏任務列表
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+      responses:
+        '200':
+          description: 收藏列表獲取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FavoriteListResponse'
+    post:
+      tags:
+        - Tasks
+      summary: 收藏任務
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - task_id
+              properties:
+                task_id:
+                  type: string
+                  example: "123"
+      responses:
+        '200':
+          description: 收藏成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+    delete:
+      tags:
+        - Tasks
+      summary: 取消收藏任務
+      parameters:
+        - name: task_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 取消收藏成功
+
+  # 聊天相關端點
+  /chat/get_rooms.php:
+    get:
+      tags:
+        - Chat
+      summary: 獲取聊天室列表
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PerPageParam'
+        - name: type
+          in: query
+          description: 聊天室類型
+          schema:
+            type: string
+            enum: [application, task, support, dispute]
+      responses:
+        '200':
+          description: 聊天室列表獲取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatRoomListResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Token 認證
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API Key 認證（開發環境）
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: 頁碼
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+        example: 1
+    PerPageParam:
+      name: per_page
+      in: query
+      description: 每頁數量
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+        example: 20
+
+  schemas:
+    # 基礎回應格式
+    BaseResponse:
+      type: object
+      required:
+        - success
+        - code
+        - message
+        - traceId
+        - timestamp
+        - server_time
+      properties:
+        success:
+          type: boolean
+          description: 操作是否成功
+        code:
+          type: string
+          description: 回應碼
+          example: SUCCESS
+        message:
+          type: string
+          description: 回應訊息
+        traceId:
+          type: string
+          description: 請求追蹤 ID
+          example: 68A8362D5712F07814D26
+        timestamp:
+          type: string
+          format: date-time
+          description: 回應時間戳 (ISO 8601)
+        server_time:
+          type: integer
+          description: 伺服器時間戳
+          example: 1641897000
+
+    SuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            success:
+              type: boolean
+              enum: [true]
+            data:
+              type: object
+              description: 回應資料
+
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            success:
+              type: boolean
+              enum: [false]
+            code:
+              type: string
+              enum: [E1001, E2001, E3001, E4001, E5001, E6001, E7001, E8001, E9001]
+              description: 錯誤碼
+
+    # 分頁相關
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 100
+        total_pages:
+          type: integer
+          example: 5
+        has_next_page:
+          type: boolean
+          example: true
+        has_previous_page:
+          type: boolean
+          example: false
+        next_page:
+          type: integer
+          nullable: true
+          example: 2
+        previous_page:
+          type: integer
+          nullable: true
+          example: null
+        from:
+          type: integer
+          example: 1
+        to:
+          type: integer
+          example: 20
+
+    PaginatedResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items: {}
+                pagination:
+                  $ref: '#/components/schemas/PaginationMeta'
+
+    # 認證相關
+    LoginResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                access_token:
+                  type: string
+                  example: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
+                refresh_token:
+                  type: string
+                  example: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
+                token_type:
+                  type: string
+                  example: Bearer
+                expires_in:
+                  type: integer
+                  example: 3600
+                user:
+                  $ref: '#/components/schemas/User'
+
+    TokenPairResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                access_token:
+                  type: string
+                refresh_token:
+                  type: string
+                token_type:
+                  type: string
+                  example: Bearer
+                expires_in:
+                  type: integer
+                  example: 3600
+                refresh_expires_in:
+                  type: integer
+                  example: 604800
+
+    # 資料模型
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 123
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        nickname:
+          type: string
+          example: johndoe
+        avatar_url:
+          type: string
+          nullable: true
+          example: https://example.com/avatar.jpg
+        points:
+          type: integer
+          example: 1000
+        status:
+          type: string
+          enum: [active, unverified, banned, self_deleted, self_suspended]
+        permission:
+          type: integer
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 456
+        title:
+          type: string
+          example: 幫忙搬家
+        description:
+          type: string
+          example: 需要幫忙搬家到新住址
+        reward_points:
+          type: integer
+          example: 100
+        status:
+          type: string
+          enum: [open, in_progress, completed, cancelled]
+        creator_id:
+          type: integer
+          example: 123
+        participant_id:
+          type: integer
+          nullable: true
+          example: 789
+        deadline:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ChatRoom:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 789
+        type:
+          type: string
+          enum: [application, task, support, dispute]
+        task_id:
+          type: integer
+          nullable: true
+          example: 456
+        participants:
+          type: array
+          items:
+            type: integer
+          example: [123, 789]
+        last_message:
+          type: string
+          nullable: true
+          example: 你好，我想申請這個任務
+        last_message_at:
+          type: string
+          format: date-time
+          nullable: true
+        unread_count:
+          type: integer
+          example: 3
+        created_at:
+          type: string
+          format: date-time
+
+    # 回應類型
+    TaskListResponse:
+      allOf:
+        - $ref: '#/components/schemas/PaginatedResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Task'
+
+    FavoriteListResponse:
+      allOf:
+        - $ref: '#/components/schemas/PaginatedResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      task:
+                        $ref: '#/components/schemas/Task'
+                      favorited_at:
+                        type: string
+                        format: date-time
+
+    ChatRoomListResponse:
+      allOf:
+        - $ref: '#/components/schemas/PaginatedResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ChatRoom'
+
+tags:
+  - name: Authentication
+    description: 認證相關 API
+  - name: Tasks
+    description: 任務相關 API
+  - name: Chat
+    description: 聊天相關 API
+  - name: Users
+    description: 用戶相關 API
+  - name: Admin
+    description: 管理員相關 API
+
