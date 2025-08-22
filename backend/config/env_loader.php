@@ -70,7 +70,9 @@ class EnvLoader {
                 }
 
                 // 設置環境變數
-                $_ENV[$key] = $value;
+                if (isset($_ENV[$key])) {
+                    return $_ENV[$key];
+                }
                 putenv("$key=$value");
                 self::$vars[$key] = $value;
             }

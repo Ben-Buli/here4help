@@ -1,0 +1,33 @@
+{
+    "original_path": "\/var\/folders\/r7\/tvdwzw5j5_dgx3wlshj2cc1w0000gn\/T\/suspicious.php",
+    "quarantine_time": "2025-08-22 10:25:28",
+    "scan_result": {
+        "status": "infected",
+        "message": "\u6a94\u6848\u5305\u542b\u60e1\u610f\u5167\u5bb9\uff0c\u5df2\u88ab\u963b\u6b62",
+        "details": {
+            "scanners_used": [
+                "builtin"
+            ],
+            "scan_results": {
+                "builtin": {
+                    "status": "infected",
+                    "message": "\u5167\u5efa\u6383\u63cf\u767c\u73fe 2 \u500b\u9ad8\u98a8\u96aa\u5a01\u8105",
+                    "threats": [
+                        "php_eval",
+                        "dangerous_extension_php"
+                    ],
+                    "checks_performed": [
+                        "header",
+                        "content",
+                        "filename",
+                        "hash"
+                    ]
+                }
+            },
+            "scan_duration": 0,
+            "file_size": 30,
+            "file_hash": "3995c171569b748de75699b7fc200d922848ed846c84ce3be2136e4af65e75ee"
+        }
+    },
+    "file_hash": "3995c171569b748de75699b7fc200d922848ed846c84ce3be2136e4af65e75ee"
+}

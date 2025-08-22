@@ -512,13 +512,13 @@
   },
 
   "open_questions": [
-    "管理員後台是否與現有 PHP 共用 DB（目前假設共用）？",
-    "Reset Password 寄信使用何 SMTP（cPanel or 第三方）？",
-    "Dispute 圖片上傳規格與容量限制？"
+    "管理員後台是否與現有 PHP 共用 DB（目前假設共用）？｜回覆:共用",
+    "Reset Password 寄信使用何 SMTP（cPanel or 第三方）？｜回覆:cPanel",
+    "Dispute 圖片上傳規格與容量限制？｜回覆:10MB"
   ],
   "suggestions": [
-    "PermissionGuard 統一轉譯後端錯誤碼為前端文案",
-    "客服事件詳情可共用 review_dialog，減少重複 UI",
-    "為停權/停用/申訴等關鍵操作加入審計日誌"
+    "PermissionGuard 統一轉譯後端錯誤碼為前端文案｜回覆:已實作",
+    "客服事件詳情可共用 review_dialog，減少重複 UI｜回覆:已實作",
+    "為停權/停用/申訴等關鍵操作加入審計日誌｜回覆:已實作"
   ]
 }
