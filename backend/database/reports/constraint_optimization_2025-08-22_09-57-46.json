@@ -1,0 +1,944 @@
+{
+    "analysis_date": "2025-08-22 09:57:46",
+    "database": "hero4helpdemofhs_hero4help",
+    "summary": {
+        "total_issues": 59,
+        "high_priority": 37,
+        "medium_priority": 1,
+        "low_priority": 21,
+        "optimizations": 10
+    },
+    "issues": [
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "admin_role_permissions",
+            "column": "role_id",
+            "constraint": "fk_role_permission",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "application_questions",
+            "column": "task_id",
+            "constraint": "application_questions_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "chat_rooms",
+            "column": "creator_id",
+            "constraint": "fk_room_creator",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "chat_rooms",
+            "column": "participant_id",
+            "constraint": "fk_room_participant",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "chat_rooms",
+            "column": "task_id",
+            "constraint": "fk_room_task",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "discarded_support_chat_messages",
+            "column": "chat_room_id",
+            "constraint": "discarded_support_chat_messages_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "discarded_support_chat_rooms",
+            "column": "user_id",
+            "constraint": "discarded_support_chat_rooms_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "dispute_chats",
+            "column": "task_id",
+            "constraint": "dispute_chats_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "dispute_chats",
+            "column": "user_id",
+            "constraint": "dispute_chats_ibfk_2",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "dispute_status_logs",
+            "column": "dispute_id",
+            "constraint": "fk_dsl_dispute",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "email_verification_tokens",
+            "column": "user_id",
+            "constraint": "fk_email_verification_tokens_user",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "point_deposit_requests",
+            "column": "user_id",
+            "constraint": "point_deposit_requests_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "referral_codes",
+            "column": "user_id",
+            "constraint": "referral_codes_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "referral_events",
+            "column": "referrer_id",
+            "constraint": "fk_referrer",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "service_chats",
+            "column": "user_id",
+            "constraint": "service_chats_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "student_verifications",
+            "column": "user_id",
+            "constraint": "student_verifications_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "support_event_logs",
+            "column": "event_id",
+            "constraint": "fk_event_logs_event",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "support_events",
+            "column": "chat_room_id",
+            "constraint": "fk_support_events_chat_room",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "support_events",
+            "column": "user_id",
+            "constraint": "fk_support_events_user",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "task_applications",
+            "column": "task_id",
+            "constraint": "fk_app_task",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "task_applications",
+            "column": "user_id",
+            "constraint": "fk_app_user",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "task_dispute_chat_messages",
+            "column": "chat_room_id",
+            "constraint": "task_dispute_chat_messages_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "task_dispute_chat_rooms",
+            "column": "user_id",
+            "constraint": "task_dispute_chat_rooms_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "task_disputes",
+            "column": "task_id",
+            "constraint": "fk_dispute_task",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "task_disputes",
+            "column": "user_id",
+            "constraint": "fk_dispute_user",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "task_ratings",
+            "column": "rater_id",
+            "constraint": "fk_task_ratings_rater",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "task_ratings",
+            "column": "task_id",
+            "constraint": "fk_task_ratings_task",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "task_reports",
+            "column": "reporter_id",
+            "constraint": "fk_task_reports_reporter",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "task_reports",
+            "column": "task_id",
+            "constraint": "fk_task_reports_task",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "task_status_logs_legacy_20250820",
+            "column": "task_id",
+            "constraint": "task_status_logs_legacy_20250820_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "user_identities",
+            "column": "user_id",
+            "constraint": "fk_user_identities_user",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "user_point_reviews",
+            "column": "user_id",
+            "constraint": "user_point_reviews_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "user_tokens",
+            "column": "user_id",
+            "constraint": "user_tokens_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "user_verification_rejections",
+            "column": "admin_id",
+            "constraint": "user_verification_rejections_ibfk_2",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "user_verification_rejections",
+            "column": "user_id",
+            "constraint": "user_verification_rejections_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "verification_rejections",
+            "column": "admin_id",
+            "constraint": "verification_rejections_ibfk_1",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "dangerous_cascade_delete",
+            "severity": "high",
+            "table": "verification_rejections",
+            "column": "user_id",
+            "constraint": "verification_rejections_ibfk_2",
+            "message": "CASCADE DELETE 可能造成意外的數據刪除"
+        },
+        {
+            "type": "missing_foreign_key",
+            "severity": "medium",
+            "table": "tasks",
+            "column": "status_id",
+            "referenced_table": "task_statuses",
+            "referenced_column": "id",
+            "message": "缺失外鍵約束"
+        },
+        {
+            "type": "missing_query_index",
+            "severity": "low",
+            "table": "task_applications",
+            "column": "status",
+            "description": "申請狀態篩選",
+            "message": "常用查詢欄位建議添加索引"
+        },
+        {
+            "type": "duplicate_index",
+            "severity": "low",
+            "table": "admins",
+            "index1": "idx_email",
+            "index2": "email",
+            "columns": "email",
+            "message": "重複索引浪費存儲空間"
+        },
+        {
+            "type": "duplicate_index",
+            "severity": "low",
+            "table": "admins",
+            "index1": "username",
+            "index2": "idx_username",
+            "columns": "username",
+            "message": "重複索引浪費存儲空間"
+        },
+        {
+            "type": "duplicate_index",
+            "severity": "low",
+            "table": "languages",
+            "index1": "idx_code",
+            "index2": "code",
+            "columns": "code",
+            "message": "重複索引浪費存儲空間"
+        },
+        {
+            "type": "duplicate_index",
+            "severity": "low",
+            "table": "orders",
+            "index1": "order_number",
+            "index2": "idx_order_number",
+            "columns": "order_number",
+            "message": "重複索引浪費存儲空間"
+        },
+        {
+            "type": "duplicate_index",
+            "severity": "low",
+            "table": "referral_codes",
+            "index1": "referral_code",
+            "index2": "idx_referral_code",
+            "columns": "referral_code",
+            "message": "重複索引浪費存儲空間"
+        },
+        {
+            "type": "duplicate_index",
+            "severity": "low",
+            "table": "tasks",
+            "index1": "idx_tasks_acceptor_id",
+            "index2": "idx_acceptor_id",
+            "columns": "participant_id",
+            "message": "重複索引浪費存儲空間"
+        },
+        {
+            "type": "duplicate_index",
+            "severity": "low",
+            "table": "universities",
+            "index1": "idx_abbr",
+            "index2": "abbr",
+            "columns": "abbr",
+            "message": "重複索引浪費存儲空間"
+        },
+        {
+            "type": "duplicate_index",
+            "severity": "low",
+            "table": "user_tokens",
+            "index1": "token",
+            "index2": "idx_token",
+            "columns": "token",
+            "message": "重複索引浪費存儲空間"
+        },
+        {
+            "type": "oversized_indexes",
+            "severity": "low",
+            "table": "languages",
+            "ratio": "3.00",
+            "message": "索引大小相對於數據過大，可能有冗餘索引"
+        },
+        {
+            "type": "oversized_indexes",
+            "severity": "low",
+            "table": "chat_rooms",
+            "ratio": "3.00",
+            "message": "索引大小相對於數據過大，可能有冗餘索引"
+        },
+        {
+            "type": "oversized_indexes",
+            "severity": "low",
+            "table": "tasks",
+            "ratio": "2.67",
+            "message": "索引大小相對於數據過大，可能有冗餘索引"
+        },
+        {
+            "type": "oversized_indexes",
+            "severity": "low",
+            "table": "universities",
+            "ratio": "4.00",
+            "message": "索引大小相對於數據過大，可能有冗餘索引"
+        },
+        {
+            "type": "oversized_indexes",
+            "severity": "low",
+            "table": "tasks_backup",
+            "ratio": "7.00",
+            "message": "索引大小相對於數據過大，可能有冗餘索引"
+        },
+        {
+            "type": "oversized_indexes",
+            "severity": "low",
+            "table": "admin_login_logs",
+            "ratio": "3.00",
+            "message": "索引大小相對於數據過大，可能有冗餘索引"
+        },
+        {
+            "type": "oversized_indexes",
+            "severity": "low",
+            "table": "admin_activity_logs",
+            "ratio": "4.00",
+            "message": "索引大小相對於數據過大，可能有冗餘索引"
+        },
+        {
+            "type": "oversized_indexes",
+            "severity": "low",
+            "table": "student_verifications",
+            "ratio": "4.00",
+            "message": "索引大小相對於數據過大，可能有冗餘索引"
+        },
+        {
+            "type": "oversized_indexes",
+            "severity": "low",
+            "table": "service_chats",
+            "ratio": "4.00",
+            "message": "索引大小相對於數據過大，可能有冗餘索引"
+        },
+        {
+            "type": "oversized_indexes",
+            "severity": "low",
+            "table": "orders",
+            "ratio": "6.00",
+            "message": "索引大小相對於數據過大，可能有冗餘索引"
+        },
+        {
+            "type": "oversized_indexes",
+            "severity": "low",
+            "table": "admins",
+            "ratio": "6.00",
+            "message": "索引大小相對於數據過大，可能有冗餘索引"
+        },
+        {
+            "type": "oversized_indexes",
+            "severity": "low",
+            "table": "user_identities",
+            "ratio": "4.00",
+            "message": "索引大小相對於數據過大，可能有冗餘索引"
+        }
+    ],
+    "optimization_plan": [
+        {
+            "priority": 2,
+            "action": "ADD_FOREIGN_KEY",
+            "table": "tasks",
+            "sql": "ALTER TABLE `tasks` ADD CONSTRAINT `fk_tasks_status_id` FOREIGN KEY (`status_id`) REFERENCES `task_statuses`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;",
+            "risk": "medium",
+            "description": "添加外鍵約束: tasks.status_id"
+        },
+        {
+            "priority": 3,
+            "action": "ADD_INDEX",
+            "table": "task_applications",
+            "sql": "CREATE INDEX `idx_task_applications_status` ON `task_applications`(`status`);",
+            "risk": "low",
+            "description": "為常用查詢欄位添加索引: task_applications.status"
+        },
+        {
+            "priority": 4,
+            "action": "DROP_INDEX",
+            "table": "admins",
+            "sql": "DROP INDEX `email` ON `admins`;",
+            "risk": "low",
+            "description": "刪除重複索引: admins.email"
+        },
+        {
+            "priority": 4,
+            "action": "DROP_INDEX",
+            "table": "admins",
+            "sql": "DROP INDEX `idx_username` ON `admins`;",
+            "risk": "low",
+            "description": "刪除重複索引: admins.idx_username"
+        },
+        {
+            "priority": 4,
+            "action": "DROP_INDEX",
+            "table": "languages",
+            "sql": "DROP INDEX `code` ON `languages`;",
+            "risk": "low",
+            "description": "刪除重複索引: languages.code"
+        },
+        {
+            "priority": 4,
+            "action": "DROP_INDEX",
+            "table": "orders",
+            "sql": "DROP INDEX `idx_order_number` ON `orders`;",
+            "risk": "low",
+            "description": "刪除重複索引: orders.idx_order_number"
+        },
+        {
+            "priority": 4,
+            "action": "DROP_INDEX",
+            "table": "referral_codes",
+            "sql": "DROP INDEX `idx_referral_code` ON `referral_codes`;",
+            "risk": "low",
+            "description": "刪除重複索引: referral_codes.idx_referral_code"
+        },
+        {
+            "priority": 4,
+            "action": "DROP_INDEX",
+            "table": "tasks",
+            "sql": "DROP INDEX `idx_acceptor_id` ON `tasks`;",
+            "risk": "low",
+            "description": "刪除重複索引: tasks.idx_acceptor_id"
+        },
+        {
+            "priority": 4,
+            "action": "DROP_INDEX",
+            "table": "universities",
+            "sql": "DROP INDEX `abbr` ON `universities`;",
+            "risk": "low",
+            "description": "刪除重複索引: universities.abbr"
+        },
+        {
+            "priority": 4,
+            "action": "DROP_INDEX",
+            "table": "user_tokens",
+            "sql": "DROP INDEX `idx_token` ON `user_tokens`;",
+            "risk": "low",
+            "description": "刪除重複索引: user_tokens.idx_token"
+        }
+    ],
+    "table_stats": [
+        {
+            "TABLE_NAME": "chat_messages",
+            "TABLE_ROWS": 318,
+            "DATA_LENGTH": 98304,
+            "INDEX_LENGTH": 49152
+        },
+        {
+            "TABLE_NAME": "chat_reads_backup_20250816",
+            "TABLE_ROWS": 252,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "chat_reads_duplicates_backup",
+            "TABLE_ROWS": 243,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "application_questions",
+            "TABLE_ROWS": 105,
+            "DATA_LENGTH": 49152,
+            "INDEX_LENGTH": 16384
+        },
+        {
+            "TABLE_NAME": "application_questions_backup_fill_20250111",
+            "TABLE_ROWS": 105,
+            "DATA_LENGTH": 49152,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "application_questions_backup_seed_20250111",
+            "TABLE_ROWS": 105,
+            "DATA_LENGTH": 49152,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "languages",
+            "TABLE_ROWS": 81,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152
+        },
+        {
+            "TABLE_NAME": "chat_rooms",
+            "TABLE_ROWS": 70,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152
+        },
+        {
+            "TABLE_NAME": "task_applications",
+            "TABLE_ROWS": 63,
+            "DATA_LENGTH": 65536,
+            "INDEX_LENGTH": 65536
+        },
+        {
+            "TABLE_NAME": "tasks",
+            "TABLE_ROWS": 60,
+            "DATA_LENGTH": 49152,
+            "INDEX_LENGTH": 131072
+        },
+        {
+            "TABLE_NAME": "task_applications_backup_fill_20250111",
+            "TABLE_ROWS": 60,
+            "DATA_LENGTH": 65536,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "universities",
+            "TABLE_ROWS": 38,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536
+        },
+        {
+            "TABLE_NAME": "chat_reads",
+            "TABLE_ROWS": 38,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 16384
+        },
+        {
+            "TABLE_NAME": "application_questions_backup_20250111",
+            "TABLE_ROWS": 24,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "tasks_backup_20250809",
+            "TABLE_ROWS": 20,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "tasks_backup",
+            "TABLE_ROWS": 20,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 114688
+        },
+        {
+            "TABLE_NAME": "admin_login_logs",
+            "TABLE_ROWS": 19,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152
+        },
+        {
+            "TABLE_NAME": "admin_activity_logs",
+            "TABLE_ROWS": 14,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536
+        },
+        {
+            "TABLE_NAME": "migrations",
+            "TABLE_ROWS": 10,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "admin_role_permissions",
+            "TABLE_ROWS": 9,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 16384
+        },
+        {
+            "TABLE_NAME": "student_verifications",
+            "TABLE_ROWS": 9,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536
+        },
+        {
+            "TABLE_NAME": "task_applications_backup_seed_20250111",
+            "TABLE_ROWS": 8,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "task_applications_backup_20250111",
+            "TABLE_ROWS": 8,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "task_statuses",
+            "TABLE_ROWS": 7,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 16384
+        },
+        {
+            "TABLE_NAME": "service_chats",
+            "TABLE_ROWS": 6,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536
+        },
+        {
+            "TABLE_NAME": "admin_roles",
+            "TABLE_ROWS": 5,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 16384
+        },
+        {
+            "TABLE_NAME": "orders",
+            "TABLE_ROWS": 5,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 98304
+        },
+        {
+            "TABLE_NAME": "chat_rooms_backup_20250111",
+            "TABLE_ROWS": 5,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "admins",
+            "TABLE_ROWS": 4,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 98304
+        },
+        {
+            "TABLE_NAME": "personal_access_tokens",
+            "TABLE_ROWS": 3,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 32768
+        },
+        {
+            "TABLE_NAME": "user_identities",
+            "TABLE_ROWS": 2,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536
+        },
+        {
+            "TABLE_NAME": "oauth_temp_users",
+            "TABLE_ROWS": 1,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 32768
+        },
+        {
+            "TABLE_NAME": "referral_codes",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920
+        },
+        {
+            "TABLE_NAME": "referral_events",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 32768
+        },
+        {
+            "TABLE_NAME": "point_deposit_requests",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536
+        },
+        {
+            "TABLE_NAME": "order_items",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 32768
+        },
+        {
+            "TABLE_NAME": "support_event_logs",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 32768
+        },
+        {
+            "TABLE_NAME": "support_events",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152
+        },
+        {
+            "TABLE_NAME": "task_activity_logs_legacy_20250820",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920
+        },
+        {
+            "TABLE_NAME": "jobs",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "job_batches",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "failed_jobs",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "email_verification_tokens",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536
+        },
+        {
+            "TABLE_NAME": "task_dispute_chat_messages",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920
+        },
+        {
+            "TABLE_NAME": "task_dispute_chat_rooms",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 98304
+        },
+        {
+            "TABLE_NAME": "task_disputes",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152
+        },
+        {
+            "TABLE_NAME": "task_favorites",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152
+        },
+        {
+            "TABLE_NAME": "task_logs",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920
+        },
+        {
+            "TABLE_NAME": "task_ratings",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 98304
+        },
+        {
+            "TABLE_NAME": "task_reports",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536
+        },
+        {
+            "TABLE_NAME": "task_status_logs_legacy_20250820",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152
+        },
+        {
+            "TABLE_NAME": "dispute_status_logs",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152
+        },
+        {
+            "TABLE_NAME": "dispute_chats",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920
+        },
+        {
+            "TABLE_NAME": "discarded_support_chat_rooms",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920
+        },
+        {
+            "TABLE_NAME": "discarded_support_chat_messages",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920
+        },
+        {
+            "TABLE_NAME": "cache_locks",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "user_blocks",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 16384
+        },
+        {
+            "TABLE_NAME": "cache",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0
+        },
+        {
+            "TABLE_NAME": "user_point_reviews",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536
+        },
+        {
+            "TABLE_NAME": "user_tokens",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536
+        },
+        {
+            "TABLE_NAME": "user_verification_rejections",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152
+        },
+        {
+            "TABLE_NAME": "users",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 114688
+        },
+        {
+            "TABLE_NAME": "verification_rejections",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152
+        }
+    ]
+}

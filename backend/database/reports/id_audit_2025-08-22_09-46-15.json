@@ -1,0 +1,1171 @@
+{
+    "audit_date": "2025-08-22 09:46:15",
+    "database": "hero4helpdemofhs_hero4help",
+    "summary": {
+        "total_issues": 52,
+        "high_priority": 0,
+        "medium_priority": 27,
+        "low_priority": 25
+    },
+    "issues": [
+        {
+            "type": "primary_key_inconsistency",
+            "severity": "medium",
+            "tables": [
+                "admin_activity_logs",
+                "admin_login_logs",
+                "admins",
+                "discarded_support_chat_messages",
+                "discarded_support_chat_rooms",
+                "languages",
+                "migrations",
+                "order_items",
+                "orders",
+                "point_deposit_requests",
+                "referral_codes",
+                "task_activity_logs_legacy_20250820",
+                "task_dispute_chat_messages",
+                "task_dispute_chat_rooms",
+                "task_statuses",
+                "universities",
+                "user_verification_rejections"
+            ],
+            "current_type": "int_auto_increment",
+            "message": "多個表格使用不同的主鍵類型，建議統一使用 BIGINT UNSIGNED AUTO_INCREMENT"
+        },
+        {
+            "type": "primary_key_inconsistency",
+            "severity": "medium",
+            "tables": [
+                "application_questions",
+                "cache",
+                "cache_locks",
+                "job_batches",
+                "tasks",
+                "tasks_backup"
+            ],
+            "current_type": "varchar_",
+            "message": "多個表格使用不同的主鍵類型，建議統一使用 BIGINT UNSIGNED AUTO_INCREMENT"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "admin_activity_logs",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "admin_login_logs",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "admins",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "application_questions",
+            "column": "id",
+            "current_type": "varchar",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "application_questions",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "application_questions_backup_20250111",
+            "column": "id",
+            "current_type": "varchar",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "application_questions_backup_20250111",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "application_questions_backup_fill_20250111",
+            "column": "id",
+            "current_type": "varchar",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "application_questions_backup_fill_20250111",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "application_questions_backup_seed_20250111",
+            "column": "id",
+            "current_type": "varchar",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "application_questions_backup_seed_20250111",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "chat_rooms",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "chat_rooms_backup_20250111",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "discarded_support_chat_messages",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "discarded_support_chat_rooms",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "dispute_chats",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "job_batches",
+            "column": "id",
+            "current_type": "varchar",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "languages",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "migrations",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "oauth_temp_users",
+            "column": "provider_user_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "order_items",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "orders",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "point_deposit_requests",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "referral_codes",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "student_verifications",
+            "column": "student_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "task_activity_logs_legacy_20250820",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "task_activity_logs_legacy_20250820",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "task_applications",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "task_applications_backup_20250111",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "task_applications_backup_fill_20250111",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "task_applications_backup_seed_20250111",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "task_dispute_chat_messages",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "task_dispute_chat_rooms",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "task_dispute_chat_rooms",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "task_disputes",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "task_favorites",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "task_logs",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "task_ratings",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "task_reports",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "task_status_logs_legacy_20250820",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "task_statuses",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "tasks",
+            "column": "id",
+            "current_type": "varchar",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "tasks_backup",
+            "column": "acceptor_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "tasks_backup",
+            "column": "id",
+            "current_type": "varchar",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "tasks_backup_20250809",
+            "column": "id",
+            "current_type": "varchar",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "universities",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "user_identities",
+            "column": "provider_user_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "primary_key_not_bigint",
+            "severity": "medium",
+            "table": "user_verification_rejections",
+            "column": "id",
+            "current_type": "int",
+            "message": "主鍵 ID 不是 BIGINT 類型，可能在大量數據時溢出"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "v_task_activity_logs",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        },
+        {
+            "type": "varchar_foreign_key",
+            "severity": "low",
+            "table": "v_task_status_logs",
+            "column": "task_id",
+            "current_type": "varchar",
+            "message": "外鍵使用 VARCHAR 類型，建議檢查是否應為數值類型"
+        }
+    ],
+    "migration_plan": [
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "admin_activity_logs",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `admin_activity_logs` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "admin_login_logs",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `admin_login_logs` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "admins",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `admins` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "application_questions",
+            "column": "id",
+            "from_type": "varchar",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `application_questions` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "application_questions_backup_20250111",
+            "column": "id",
+            "from_type": "varchar",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `application_questions_backup_20250111` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "application_questions_backup_fill_20250111",
+            "column": "id",
+            "from_type": "varchar",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `application_questions_backup_fill_20250111` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "application_questions_backup_seed_20250111",
+            "column": "id",
+            "from_type": "varchar",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `application_questions_backup_seed_20250111` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "discarded_support_chat_messages",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `discarded_support_chat_messages` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "discarded_support_chat_rooms",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `discarded_support_chat_rooms` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "job_batches",
+            "column": "id",
+            "from_type": "varchar",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `job_batches` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "languages",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `languages` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "migrations",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `migrations` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "order_items",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `order_items` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "orders",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `orders` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "point_deposit_requests",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `point_deposit_requests` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "referral_codes",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `referral_codes` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "task_activity_logs_legacy_20250820",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `task_activity_logs_legacy_20250820` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "task_dispute_chat_messages",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `task_dispute_chat_messages` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "task_dispute_chat_rooms",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `task_dispute_chat_rooms` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "task_statuses",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `task_statuses` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "tasks",
+            "column": "id",
+            "from_type": "varchar",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `tasks` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "tasks_backup",
+            "column": "id",
+            "from_type": "varchar",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `tasks_backup` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "tasks_backup_20250809",
+            "column": "id",
+            "from_type": "varchar",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `tasks_backup_20250809` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "universities",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `universities` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        },
+        {
+            "priority": 2,
+            "action": "ALTER_PRIMARY_KEY",
+            "table": "user_verification_rejections",
+            "column": "id",
+            "from_type": "int",
+            "to_type": "BIGINT UNSIGNED",
+            "sql": "ALTER TABLE `user_verification_rejections` MODIFY COLUMN `id` BIGINT UNSIGNED AUTO_INCREMENT;",
+            "risk": "high",
+            "description": "升級主鍵為 BIGINT"
+        }
+    ],
+    "table_analysis": [
+        {
+            "TABLE_NAME": "chat_messages",
+            "TABLE_ROWS": 318,
+            "DATA_LENGTH": 98304,
+            "INDEX_LENGTH": 49152,
+            "AUTO_INCREMENT": 320
+        },
+        {
+            "TABLE_NAME": "chat_reads_backup_20250816",
+            "TABLE_ROWS": 252,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "chat_reads_duplicates_backup",
+            "TABLE_ROWS": 243,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "application_questions",
+            "TABLE_ROWS": 105,
+            "DATA_LENGTH": 49152,
+            "INDEX_LENGTH": 16384,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "application_questions_backup_fill_20250111",
+            "TABLE_ROWS": 105,
+            "DATA_LENGTH": 49152,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "application_questions_backup_seed_20250111",
+            "TABLE_ROWS": 105,
+            "DATA_LENGTH": 49152,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "languages",
+            "TABLE_ROWS": 81,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152,
+            "AUTO_INCREMENT": 184
+        },
+        {
+            "TABLE_NAME": "chat_rooms",
+            "TABLE_ROWS": 70,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152,
+            "AUTO_INCREMENT": 112
+        },
+        {
+            "TABLE_NAME": "task_applications",
+            "TABLE_ROWS": 63,
+            "DATA_LENGTH": 65536,
+            "INDEX_LENGTH": 65536,
+            "AUTO_INCREMENT": 123129
+        },
+        {
+            "TABLE_NAME": "task_applications_backup_fill_20250111",
+            "TABLE_ROWS": 60,
+            "DATA_LENGTH": 65536,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "tasks",
+            "TABLE_ROWS": 59,
+            "DATA_LENGTH": 49152,
+            "INDEX_LENGTH": 131072,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "universities",
+            "TABLE_ROWS": 38,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536,
+            "AUTO_INCREMENT": 39
+        },
+        {
+            "TABLE_NAME": "chat_reads",
+            "TABLE_ROWS": 38,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 16384,
+            "AUTO_INCREMENT": 376
+        },
+        {
+            "TABLE_NAME": "application_questions_backup_20250111",
+            "TABLE_ROWS": 24,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "tasks_backup_20250809",
+            "TABLE_ROWS": 20,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "tasks_backup",
+            "TABLE_ROWS": 20,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 114688,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "admin_login_logs",
+            "TABLE_ROWS": 17,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152,
+            "AUTO_INCREMENT": 21
+        },
+        {
+            "TABLE_NAME": "admin_activity_logs",
+            "TABLE_ROWS": 14,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536,
+            "AUTO_INCREMENT": 15
+        },
+        {
+            "TABLE_NAME": "admin_role_permissions",
+            "TABLE_ROWS": 9,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 16384,
+            "AUTO_INCREMENT": 10
+        },
+        {
+            "TABLE_NAME": "student_verifications",
+            "TABLE_ROWS": 9,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536,
+            "AUTO_INCREMENT": 11
+        },
+        {
+            "TABLE_NAME": "task_applications_backup_20250111",
+            "TABLE_ROWS": 8,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "task_applications_backup_seed_20250111",
+            "TABLE_ROWS": 8,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "task_statuses",
+            "TABLE_ROWS": 7,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 16384,
+            "AUTO_INCREMENT": 9
+        },
+        {
+            "TABLE_NAME": "service_chats",
+            "TABLE_ROWS": 6,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536,
+            "AUTO_INCREMENT": 7
+        },
+        {
+            "TABLE_NAME": "admin_roles",
+            "TABLE_ROWS": 5,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 16384,
+            "AUTO_INCREMENT": 6
+        },
+        {
+            "TABLE_NAME": "orders",
+            "TABLE_ROWS": 5,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 98304,
+            "AUTO_INCREMENT": 6
+        },
+        {
+            "TABLE_NAME": "chat_rooms_backup_20250111",
+            "TABLE_ROWS": 5,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "admins",
+            "TABLE_ROWS": 3,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 98304,
+            "AUTO_INCREMENT": 7
+        },
+        {
+            "TABLE_NAME": "personal_access_tokens",
+            "TABLE_ROWS": 3,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 32768,
+            "AUTO_INCREMENT": 4
+        },
+        {
+            "TABLE_NAME": "migrations",
+            "TABLE_ROWS": 2,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": 4
+        },
+        {
+            "TABLE_NAME": "user_identities",
+            "TABLE_ROWS": 1,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536,
+            "AUTO_INCREMENT": 64
+        },
+        {
+            "TABLE_NAME": "oauth_temp_users",
+            "TABLE_ROWS": 1,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 32768,
+            "AUTO_INCREMENT": 3
+        },
+        {
+            "TABLE_NAME": "referral_codes",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920,
+            "AUTO_INCREMENT": 2
+        },
+        {
+            "TABLE_NAME": "referral_events",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 32768,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "point_deposit_requests",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "order_items",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 32768,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "support_event_logs",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 32768,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "support_events",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "task_activity_logs_legacy_20250820",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "jobs",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "job_batches",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "failed_jobs",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "email_verification_tokens",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "task_dispute_chat_messages",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "task_dispute_chat_rooms",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 98304,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "task_disputes",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "task_favorites",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "task_logs",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "task_ratings",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 98304,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "task_reports",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "task_status_logs_legacy_20250820",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "dispute_status_logs",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "dispute_chats",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920,
+            "AUTO_INCREMENT": 3
+        },
+        {
+            "TABLE_NAME": "discarded_support_chat_rooms",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "discarded_support_chat_messages",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 81920,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "cache_locks",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "user_blocks",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 16384,
+            "AUTO_INCREMENT": 2
+        },
+        {
+            "TABLE_NAME": "cache",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 0,
+            "AUTO_INCREMENT": null
+        },
+        {
+            "TABLE_NAME": "user_point_reviews",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536,
+            "AUTO_INCREMENT": 7
+        },
+        {
+            "TABLE_NAME": "user_tokens",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 65536,
+            "AUTO_INCREMENT": 14
+        },
+        {
+            "TABLE_NAME": "user_verification_rejections",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152,
+            "AUTO_INCREMENT": 1
+        },
+        {
+            "TABLE_NAME": "users",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 114688,
+            "AUTO_INCREMENT": 50
+        },
+        {
+            "TABLE_NAME": "verification_rejections",
+            "TABLE_ROWS": 0,
+            "DATA_LENGTH": 16384,
+            "INDEX_LENGTH": 49152,
+            "AUTO_INCREMENT": 1
+        }
+    ]
+}

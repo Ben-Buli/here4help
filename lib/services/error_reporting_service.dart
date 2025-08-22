@@ -15,7 +15,7 @@ class ErrorReportingService {
   static const Duration _reportInterval = Duration(minutes: 5);
 
   static DateTime? _lastReportTime;
-  static List<Map<String, dynamic>> _pendingReports = [];
+  static final List<Map<String, dynamic>> _pendingReports = [];
 
   /// 初始化全域錯誤處理
   static void initialize() {

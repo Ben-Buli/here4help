@@ -1,10 +1,12 @@
 <?php
+/** @var array<string,string> $_ENV */
 /**
  * Environment Variables Loader
  * 載入 .env 檔案並提供環境變數管理功能
  */
 
 class EnvLoader {
+
     private static $loaded = false;
     private static $vars = [];
     private static $instance = null;
