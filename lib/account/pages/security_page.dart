@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:here4help/account/pages/change_password.dart';
 import 'package:here4help/services/api/account_api.dart';
-
+import 'package:here4help/services/api/password_api.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SecurityPage extends StatefulWidget {
@@ -401,6 +402,40 @@ class _SecurityPageState extends State<SecurityPage> {
                     const Text('log out', style: TextStyle(color: Colors.red)),
               ),
             ),
+
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 8),
+
+            // 危險操作區域
+            const Text('Danger Zone',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                )),
+            const SizedBox(height: 8),
+
+            // 刪除帳號按鈕
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.red[300]!),
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.red[50],
+              ),
+              child: ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: const Text('Delete Account',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    )),
+                subtitle: const Text(
+                  'Permanently delete your account and all data',
+                  style: TextStyle(color: Colors.red),
+                ),
+                onTap: () => _showDeleteAccountDialog(),
+              ),
+            ),
           ],
         ),
         if (isLoading)
@@ -411,6 +446,161 @@ class _SecurityPageState extends State<SecurityPage> {
             ),
           ),
       ],
+    );
+  }
+
+  void _showDeleteAccountDialog() {
+    final TextEditingController passwordController = TextEditingController();
+    final TextEditingController reasonController = TextEditingController();
+    bool isDeleting = false;
+    String? deleteError;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('Delete Account'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'This action cannot be undone. Your account and all associated data will be permanently deleted.',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: passwordController,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Confirm Password',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.lock),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: reasonController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Reason for deletion (required)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.comment),
+                      ),
+                    ),
+                    if (deleteError != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.red[200]!),
+                        ),
+                        child: Text(
+                          deleteError!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isDeleting
+                      ? null
+                      : () {
+                          passwordController.dispose();
+                          reasonController.dispose();
+                          Navigator.of(context).pop();
+                        },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isDeleting
+                      ? null
+                      : () async {
+                          if (passwordController.text.isEmpty ||
+                              reasonController.text.isEmpty) {
+                            setDialogState(() {
+                              deleteError = 'Please fill in all fields';
+                            });
+                            return;
+                          }
+
+                          setDialogState(() {
+                            isDeleting = true;
+                            deleteError = null;
+                          });
+
+                          try {
+                            await PasswordApi.deleteAccount(
+                              password: passwordController.text,
+                              reason: reasonController.text,
+                            );
+
+                            if (mounted) {
+                              // 清除本地資料
+                              final prefs =
+                                  await SharedPreferences.getInstance();
+                              await prefs.clear();
+
+                              // 顯示成功訊息並跳轉到登入頁面
+                              if (mounted) {
+                                Navigator.of(context).pop();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content:
+                                        Text('Account deleted successfully'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                                context.go('/login');
+                              }
+                            }
+                          } catch (e) {
+                            setDialogState(() {
+                              deleteError =
+                                  e.toString().replaceFirst('Exception: ', '');
+                              isDeleting = false;
+                            });
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: isDeleting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text('Delete Account'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

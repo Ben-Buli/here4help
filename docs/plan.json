@@ -299,16 +299,31 @@
 
     { "id": "M-ACCOUNT-SETTINGS", "title": "用戶帳號設定模組", "description": "改密碼 / 重設信 / 自主停權 / 刪帳 / 恢復", "tasks": [
       { "id": "T1-BE-CHANGE-PASSWORD", "owner": "backend", "goal": "POST /account/change-password（驗舊密碼、強度）", "acceptance": ["符合強度與驗證"] },
-      { "id": "T2-BE-REQUEST-RESET", "owner": "backend", "goal": "POST /account/request-password-reset（寄送驗證連結）", "acceptance": ["寄送成功且含過期時間"] },
+      { "id": "T2-BE-REQUEST-RESET", "owner": "backend", "goal": "POST /account/request-password-reset（/login 頁面'忘記密碼'按鈕，寄送驗證連結）", "acceptance": ["寄送成功且含過期時間"] },
       { "id": "T3-BE-RESET-PASSWORD", "owner": "backend", "goal": "POST /account/reset-password（驗 token 重設）", "acceptance": ["一次性 token "] },
       { "id": "T4-BE-DEACTIVATE-DELETE", "owner": "backend", "goal": "POST /account/deactivate, DELETE /account（軟刪除/標記）", "acceptance": ["刪除/停權流程記錄 task_logs"] },
       { "id": "T5-FLT-ACCOUNT-PAGES", "owner": "flutter", "goal": "設定頁：改密碼/重設/停權/刪帳/恢復 UI", "acceptance": ["完整流程可操作"] }
     ]},
 
-    { "id": "M-CHAT-POST-SWIPE", "title": "/chat POST 分頁滑動工具列", "description": "應徵者卡片左右滑（Read/Delete/Reject...）可擴充", "tasks": [
-      { "id": "T1-FLT-POST-SWIPE", "owner": "flutter", "goal": "在 chat_list_task_widget.dart 套用 Slidable/Dismissible 與可擴充動作列（依任務狀態條件顯示）", "acceptance": ["動作可擴充、狀態條件顯示一致"] },
-      { "id": "T2-BE-POST-ACTIONS", "owner": "backend", "goal": "補齊 Read/Delete/Reject 相關 API 或聚合端點", "acceptance": ["端點 2xx 並更新未讀/列表"] }
-    ]},
+    { 
+      "id": "M-CHAT-POST-SWIPE", 
+      "title": "/chat POST 分頁滑動工具列", 
+      "description": "應徵者卡片左右滑（Read/Delete/Reject...）可擴充", 
+      "tasks": [
+        { 
+          "id": "T1-FLT-POST-SWIPE", 
+          "owner": "flutter", 
+          "goal": "在 chat_list_task_widget.dart 套用 Slidable/Dismissible 與可擴充動作列（依任務狀態條件顯示）", 
+          "acceptance": ["動作可擴充、狀態條件顯示一致"] 
+        },
+        { 
+          "id": "T2-BE-POST-ACTIONS", 
+          "owner": "backend", 
+          "goal": "補齊 Read/Delete/Reject 相關 API 或聚合端點", 
+          "acceptance": ["端點 2xx 並更新未讀/列表"] 
+        }
+      ]
+    },
 
     { "id": "M-CHAT-ACTION-BAR", "title": "1v1 聊天室 Action Bar", "description": "依任務狀態 + 使用者角色(creator/participant) 顯示工具", "tasks": [
       { "id": "T1-FLT-ACTION-BAR-MATRIX", "owner": "flutter", "goal": "定義狀態×角色矩陣，動態渲染 Action（confirm, cancel, complete, dispute...）", "acceptance": ["矩陣覆蓋主要狀態"] },
