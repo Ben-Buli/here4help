@@ -15,9 +15,14 @@ class JWTManager {
     private static $algorithm = 'HS256';
     
     /**
-     * Token 過期時間（秒）
+     * Access Token 過期時間（秒）
      */
-    private static $expirationTime = 604800; // 7 天
+    private static $accessTokenExpiration = 3600; // 1 小時
+    
+    /**
+     * Refresh Token 過期時間（秒）
+     */
+    private static $refreshTokenExpiration = 604800; // 7 天
     
     /**
      * 獲取 JWT 密鑰
@@ -350,5 +355,272 @@ class JWTManager {
         } catch (Exception $e) {
             return ['error' => $e->getMessage()];
         }
+    }
+    
+    /**
+     * 生成 Access Token 和 Refresh Token 對
+     * 
+     * @param array $payload 載荷資料
+     * @return array
+     * @throws Exception
+     */
+    public static function generateTokenPair($payload) {
+        // 生成 Access Token（短期）
+        $accessPayload = $payload;
+        $accessPayload['type'] = 'access';
+        $accessToken = self::generateToken($accessPayload, self::$accessTokenExpiration);
+        
+        // 生成 Refresh Token（長期）
+        $refreshPayload = [
+            'user_id' => $payload['user_id'],
+            'type' => 'refresh',
+            'jti' => bin2hex(random_bytes(16)) // JWT ID，用於黑名單
+        ];
+        $refreshToken = self::generateToken($refreshPayload, self::$refreshTokenExpiration);
+        
+        return [
+            'access_token' => $accessToken,
+            'refresh_token' => $refreshToken,
+            'token_type' => 'Bearer',
+            'expires_in' => self::$accessTokenExpiration,
+            'refresh_expires_in' => self::$refreshTokenExpiration
+        ];
+    }
+    
+    /**
+     * 使用 Refresh Token 刷新 Access Token
+     * 
+     * @param string $refreshToken Refresh Token
+     * @param array $newPayload 新的載荷資料（可選）
+     * @return array|false
+     */
+    public static function refreshAccessToken($refreshToken, $newPayload = null) {
+        try {
+            // 驗證 Refresh Token
+            $payload = self::validateToken($refreshToken);
+            if (!$payload) {
+                return false;
+            }
+            
+            // 檢查是否為 Refresh Token
+            if (!isset($payload['type']) || $payload['type'] !== 'refresh') {
+                error_log("Token refresh failed: Not a refresh token");
+                return false;
+            }
+            
+            // 檢查是否在黑名單中
+            if (self::isTokenBlacklisted($refreshToken)) {
+                error_log("Token refresh failed: Token is blacklisted");
+                return false;
+            }
+            
+            // 準備新的 Access Token 載荷
+            $accessPayload = $newPayload ?? [
+                'user_id' => $payload['user_id']
+            ];
+            
+            // 生成新的 Token 對
+            return self::generateTokenPair($accessPayload);
+            
+        } catch (Exception $e) {
+            error_log("Token refresh failed: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * 將 Token 加入黑名單
+     * 
+     * @param string $token JWT Token
+     * @param string $reason 加入黑名單的原因
+     * @return bool
+     */
+    public static function blacklistToken($token, $reason = 'revoked') {
+        try {
+            $payload = self::validateToken($token);
+            if (!$payload) {
+                return false;
+            }
+            
+            // 獲取 Token ID
+            $jti = $payload['jti'] ?? hash('sha256', $token);
+            $exp = $payload['exp'] ?? (time() + 86400); // 預設 24 小時後過期
+            
+            // 儲存到黑名單
+            $blacklistDir = __DIR__ . '/../storage/jwt_blacklist';
+            if (!is_dir($blacklistDir)) {
+                mkdir($blacklistDir, 0755, true);
+            }
+            
+            $blacklistFile = $blacklistDir . '/' . $jti . '.json';
+            $blacklistData = [
+                'jti' => $jti,
+                'token_hash' => hash('sha256', $token),
+                'reason' => $reason,
+                'blacklisted_at' => time(),
+                'expires_at' => $exp,
+                'user_id' => $payload['user_id'] ?? null
+            ];
+            
+            return file_put_contents($blacklistFile, json_encode($blacklistData)) !== false;
+            
+        } catch (Exception $e) {
+            error_log("Token blacklist failed: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * 檢查 Token 是否在黑名單中
+     * 
+     * @param string $token JWT Token
+     * @return bool
+     */
+    public static function isTokenBlacklisted($token) {
+        try {
+            $payload = self::validateToken($token);
+            if (!$payload) {
+                return true; // 無效 token 視為已撤銷
+            }
+            
+            $jti = $payload['jti'] ?? hash('sha256', $token);
+            
+            $blacklistDir = __DIR__ . '/../storage/jwt_blacklist';
+            $blacklistFile = $blacklistDir . '/' . $jti . '.json';
+            
+            if (!file_exists($blacklistFile)) {
+                return false;
+            }
+            
+            $blacklistData = json_decode(file_get_contents($blacklistFile), true);
+            if (!$blacklistData) {
+                return false;
+            }
+            
+            // 檢查是否過期
+            if ($blacklistData['expires_at'] < time()) {
+                // 清理過期的黑名單記錄
+                unlink($blacklistFile);
+                return false;
+            }
+            
+            return true;
+            
+        } catch (Exception $e) {
+            error_log("Token blacklist check failed: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * 撤銷用戶的所有 Token
+     * 
+     * @param int $userId 用戶 ID
+     * @param string $reason 撤銷原因
+     * @return int 撤銷的 Token 數量
+     */
+    public static function revokeAllUserTokens($userId, $reason = 'user_revoked') {
+        $blacklistDir = __DIR__ . '/../storage/jwt_blacklist';
+        if (!is_dir($blacklistDir)) {
+            mkdir($blacklistDir, 0755, true);
+        }
+        
+        // 創建用戶撤銷記錄
+        $revokeFile = $blacklistDir . '/user_' . $userId . '_revoked.json';
+        $revokeData = [
+            'user_id' => $userId,
+            'revoked_at' => time(),
+            'reason' => $reason,
+            'expires_at' => time() + self::$refreshTokenExpiration // 使用最長的 token 過期時間
+        ];
+        
+        file_put_contents($revokeFile, json_encode($revokeData));
+        
+        return 1; // 返回撤銷記錄數
+    }
+    
+    /**
+     * 檢查用戶的 Token 是否被全域撤銷
+     * 
+     * @param int $userId 用戶 ID
+     * @param int $tokenIssuedAt Token 簽發時間
+     * @return bool
+     */
+    public static function isUserTokenRevoked($userId, $tokenIssuedAt) {
+        $blacklistDir = __DIR__ . '/../storage/jwt_blacklist';
+        $revokeFile = $blacklistDir . '/user_' . $userId . '_revoked.json';
+        
+        if (!file_exists($revokeFile)) {
+            return false;
+        }
+        
+        $revokeData = json_decode(file_get_contents($revokeFile), true);
+        if (!$revokeData) {
+            return false;
+        }
+        
+        // 檢查撤銷記錄是否過期
+        if ($revokeData['expires_at'] < time()) {
+            unlink($revokeFile);
+            return false;
+        }
+        
+        // 檢查 Token 是否在撤銷之前簽發
+        return $tokenIssuedAt < $revokeData['revoked_at'];
+    }
+    
+    /**
+     * 清理過期的黑名單記錄
+     * 
+     * @return int 清理的記錄數量
+     */
+    public static function cleanupBlacklist() {
+        $blacklistDir = __DIR__ . '/../storage/jwt_blacklist';
+        if (!is_dir($blacklistDir)) {
+            return 0;
+        }
+        
+        $files = glob($blacklistDir . '/*.json');
+        $cleaned = 0;
+        
+        foreach ($files as $file) {
+            $data = json_decode(file_get_contents($file), true);
+            if ($data && isset($data['expires_at']) && $data['expires_at'] < time()) {
+                unlink($file);
+                $cleaned++;
+            }
+        }
+        
+        return $cleaned;
+    }
+    
+    /**
+     * 驗證 Token 並檢查黑名單
+     * 
+     * @param string $token JWT Token
+     * @return array|false
+     */
+    public static function validateTokenWithBlacklist($token) {
+        // 基本驗證
+        $payload = self::validateToken($token);
+        if (!$payload) {
+            return false;
+        }
+        
+        // 檢查個別 Token 黑名單
+        if (self::isTokenBlacklisted($token)) {
+            error_log("Token validation failed: Token is blacklisted");
+            return false;
+        }
+        
+        // 檢查用戶全域撤銷
+        if (isset($payload['user_id'], $payload['iat'])) {
+            if (self::isUserTokenRevoked($payload['user_id'], $payload['iat'])) {
+                error_log("Token validation failed: User tokens revoked");
+                return false;
+            }
+        }
+        
+        return $payload;
     }
 }

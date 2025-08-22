@@ -72,16 +72,9 @@ class Response {
      * 設定 CORS 標頭
      */
     public static function setCorsHeaders() {
-        header('Access-Control-Allow-Origin: *');
-        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-        header('Content-Type: application/json; charset=utf-8');
-        
-        // 處理 OPTIONS 請求
-        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            http_response_code(200);
-            exit;
-        }
+        // 載入 CORS 配置
+        require_once __DIR__ . '/../config/cors.php';
+        CorsConfig::setCorsHeaders();
     }
 }
 ?> 
