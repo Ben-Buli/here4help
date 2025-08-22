@@ -3,7 +3,9 @@ import 'package:intl/intl.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/chat/services/global_chat_room.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:here4help/constants/task_status.dart';
+import 'package:here4help/constants/task_status.dart' as TaskStatusConstants;
+import 'package:here4help/chat/widgets/dynamic_action_bar.dart';
+import 'package:here4help/chat/utils/action_bar_config.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
@@ -759,13 +761,14 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       setState(() {
         remainingTime = Duration.zero;
         if (_task != null) {
-          _task!['status'] = TaskStatus.statusString['completed_tasker'];
+          _task!['status'] =
+              TaskStatusConstants.TaskStatus.statusString['completed_tasker'];
         }
       });
       if (_task != null) {
         TaskService().updateTaskStatus(
           _task!['id'].toString(),
-          TaskStatus.statusString['completed_tasker']!,
+          TaskStatusConstants.TaskStatus.statusString['completed_tasker']!,
           statusCode: 'completed',
         );
       }
@@ -1688,105 +1691,18 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           thickness: 2,
         ),
         // Action Bar 區域
-        if (_showActionBar) ...[
-          // 任務狀態顯示（在 Action Bar 上方）
-          if (_task != null && _task!['status'] != null) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: _getStatusBarColor().withOpacity(0.1),
-                border: Border(
-                  top: BorderSide(
-                    color: _getStatusBarColor().withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _getStatusBarIcon(),
-                    color: _getStatusBarColor(),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _task!['status']['display_name'] ?? 'Unknown Status',
-                          style: TextStyle(
-                            color: _getStatusBarColor(),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                        if (_task!['status']['progress_ratio'] != null) ...[
-                          const SizedBox(height: 4),
-                          LinearProgressIndicator(
-                            value: double.tryParse(_task!['status']
-                                        ['progress_ratio']
-                                    .toString()) ??
-                                0.0,
-                            backgroundColor:
-                                _getStatusBarColor().withOpacity(0.2),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                _getStatusBarColor()),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${((double.tryParse(_task!['status']['progress_ratio'].toString()) ?? 0.0) * 100).toStringAsFixed(0)}%',
-                            style: TextStyle(
-                              color: _getStatusBarColor(),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          // Action Bar 按鈕
-          ClipRect(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _glassNavColor(context),
-                ),
-                padding: const EdgeInsets.only(top: 12, bottom: 10),
-                child: Row(
-                  children: _buildActionButtonsByStatus()
-                      .map((e) => Expanded(
-                            child: IconTheme(
-                              data: IconThemeData(
-                                color: Theme.of(context)
-                                        .appBarTheme
-                                        .foregroundColor ??
-                                    Colors.white,
-                              ),
-                              child: DefaultTextStyle(
-                                style: TextStyle(
-                                  color: Theme.of(context)
-                                          .appBarTheme
-                                          .foregroundColor ??
-                                      Colors.white,
-                                ),
-                                child: e,
-                              ),
-                            ),
-                          ))
-                      .toList(),
-                ),
-              ),
-            ),
+        if (_showActionBar && _task != null)
+          DynamicActionBar(
+            taskStatus: ActionBarConfigManager.parseTaskStatus(
+                _task!['status']?['code']),
+            userRole: ActionBarConfigManager.parseUserRole(_userRole),
+            actionCallbacks: _buildActionCallbacks(),
+            showStatusBar: true,
+            statusDisplayName: _task!['status']?['display_name'],
+            progressRatio: double.tryParse(
+                _task!['status']?['progress_ratio']?.toString() ?? '0'),
+            backgroundColor: _glassNavColor(context),
           ),
-        ],
         // ActionBar + Input 區塊採用與 AppBar 相同的背景/前景配色，並提供 hover/pressed/focus 覆蓋色
         Builder(builder: (context) {
           final theme = Theme.of(context);
@@ -1991,6 +1907,125 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   // Store applierChatItems in state for Accept button logic
   List<Map<String, dynamic>> applierChatItems = [];
 
+  /// 構建動作回調映射
+  Map<String, VoidCallback> _buildActionCallbacks() {
+    return {
+      'accept': () => _handleAcceptApplication(),
+      'block': () => _handleBlockUser(),
+      'report': () => _openReportSheet(),
+      'pay': () => _openPayAndReview(),
+      'complete': () => _handleCompleteTask(),
+      'confirm': () => _handleConfirmCompletion(),
+      'disagree': () => _handleDisagreeCompletion(),
+      'paid_info': () => _showPaidInfo(),
+      'review': () => _openReviewDialog(readOnlyIfExists: true),
+    };
+  }
+
+  /// 處理接受應徵
+  Future<void> _handleAcceptApplication() async {
+    if (_task != null) {
+      await TaskService().updateTaskStatus(
+        _task!['id'].toString(),
+        TaskStatusConstants.TaskStatus.statusString['in_progress']!,
+        statusCode: 'in_progress',
+      );
+      // 關閉其他申請聊天室
+      GlobalChatRoom().removeRoomsByTaskIdExcept(
+        _task!['id'].toString(),
+        _currentRoomId ?? '',
+      );
+      if (mounted) setState(() {});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Task accepted. Now in progress.')),
+        );
+      }
+    }
+  }
+
+  /// 處理封鎖用戶
+  Future<void> _handleBlockUser() async {
+    final opponentId = _getOpponentUserId();
+    if (opponentId == null) return;
+
+    try {
+      await ChatService().blockUser(targetUserId: opponentId, block: true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User blocked.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Block failed: $e')),
+        );
+      }
+    }
+  }
+
+  /// 處理完成任務
+  Future<void> _handleCompleteTask() async {
+    if (_task != null) {
+      _task!['pendingStart'] = DateTime.now().toIso8601String();
+      await TaskService().updateTaskStatus(
+        _task!['id'].toString(),
+        TaskStatusConstants
+            .TaskStatus.statusString['pending_confirmation_tasker']!,
+        statusCode: 'pending_confirmation',
+      );
+      if (mounted) setState(() {});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Waiting for poster confirmation.')),
+        );
+      }
+    }
+  }
+
+  /// 處理確認完成
+  Future<void> _handleConfirmCompletion() async {
+    try {
+      if (_task != null) {
+        await TaskService().confirmCompletion(taskId: _task!['id'].toString());
+        if (mounted) setState(() {});
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Task confirmed and paid.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Confirm failed: $e')),
+        );
+      }
+    }
+  }
+
+  /// 處理不同意完成
+  Future<void> _handleDisagreeCompletion() async {
+    try {
+      if (_task != null) {
+        await TaskService().disagreeCompletion(taskId: _task!['id'].toString());
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Disagree submitted.')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Disagree failed: $e')),
+        );
+      }
+    }
+  }
+
+  /// 舊的 Action Bar 構建方法（保留用於向後相容）
   List<Widget> _buildActionButtonsByStatus() {
     final status = (_task?['status']?['code'] ?? '').toString();
     final isCreator = _userRole == 'creator';
@@ -2040,7 +2075,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                 if (_task != null) {
                   await TaskService().updateTaskStatus(
                     _task!['id'].toString(),
-                    TaskStatus.statusString['in_progress']!,
+                    TaskStatusConstants.TaskStatus.statusString['in_progress']!,
                     statusCode: 'in_progress',
                   );
                   // 關閉其他申請聊天室（舊全域資料結構保留）
@@ -2127,7 +2162,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                   _task!['pendingStart'] = DateTime.now().toIso8601String();
                   await TaskService().updateTaskStatus(
                     _task!['id'].toString(),
-                    TaskStatus.statusString['pending_confirmation_tasker']!,
+                    TaskStatusConstants.TaskStatus
+                        .statusString['pending_confirmation_tasker']!,
                     statusCode: 'pending_confirmation',
                   );
                   if (mounted) setState(() {});

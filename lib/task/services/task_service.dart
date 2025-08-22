@@ -800,6 +800,88 @@ class TaskService extends ChangeNotifier {
     }
   }
 
+  /// 更新應徵狀態（通用方法）
+  Future<bool> updateApplicationStatus({
+    required String applicationId,
+    required String status,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('No authentication token');
+      }
+
+      final body = {
+        'application_id': applicationId,
+        'status': status,
+      };
+
+      final response = await http
+          .put(
+            Uri.parse(
+                '${AppConfig.apiBaseUrl}/backend/api/tasks/applications/update-status.php'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          return true;
+        } else {
+          throw Exception(
+              data['message'] ?? 'Failed to update application status');
+        }
+      } else {
+        throw Exception(
+            'HTTP ${response.statusCode}: Failed to update application status');
+      }
+    } catch (e) {
+      debugPrint('TaskService updateApplicationStatus error: $e');
+      throw Exception('Failed to update application status: $e');
+    }
+  }
+
+  /// 刪除應徵（軟刪除）
+  Future<bool> deleteApplication({
+    required String applicationId,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('No authentication token');
+      }
+
+      final response = await http.delete(
+        Uri.parse(
+            '${AppConfig.apiBaseUrl}/backend/api/tasks/applications/delete.php?application_id=$applicationId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          return true;
+        } else {
+          throw Exception(data['message'] ?? 'Failed to delete application');
+        }
+      } else {
+        throw Exception(
+            'HTTP ${response.statusCode}: Failed to delete application');
+      }
+    } catch (e) {
+      debugPrint('TaskService deleteApplication error: $e');
+      throw Exception('Failed to delete application: $e');
+    }
+  }
+
   /// 載入特定任務的應徵者列表（Poster 用）
   Future<List<Map<String, dynamic>>> loadApplicationsByTask(
       String taskId) async {

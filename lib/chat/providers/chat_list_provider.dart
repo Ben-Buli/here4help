@@ -712,6 +712,11 @@ class ChatListProvider extends ChangeNotifier {
     setUnreadForRoom(roomId, 0);
   }
 
+  /// 標記房間為已讀（別名方法，用於向後相容）
+  void markRoomAsRead(String roomId) {
+    markRoomRead(roomId);
+  }
+
   /// 批量更新未讀數（用於初始化或同步）
   void updateUnreadByRoom(Map<String, int> unreadData) {
     bool hasChanges = false;
@@ -748,6 +753,19 @@ class ChatListProvider extends ChangeNotifier {
   void handleEnterChatRoom(String roomId) {
     markRoomRead(roomId);
     debugPrint('🚪 [ChatListProvider] 進入聊天室: $roomId');
+  }
+
+  /// 刷新 Posted Tasks 應徵數據
+  Future<void> refreshPostedTasksApplications() async {
+    debugPrint('🔄 [ChatListProvider] 開始刷新 Posted Tasks 應徵數據');
+
+    // 清除現有的應徵數據快取
+    _applicationsByTask.clear();
+
+    // 重新載入 Posted Tasks 分頁數據
+    await _loadTabData(TAB_POSTED_TASKS);
+
+    debugPrint('✅ [ChatListProvider] Posted Tasks 應徵數據刷新完成');
   }
 
   /// ID 綁定驗證方法

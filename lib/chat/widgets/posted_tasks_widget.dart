@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:here4help/chat/providers/chat_list_provider.dart';
 import 'package:here4help/chat/widgets/task_card_components.dart';
 import 'package:here4help/task/services/task_service.dart';
@@ -1531,107 +1532,404 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
   Widget _buildApplierCard(
       Map<String, dynamic> applier, String taskId, ColorScheme colorScheme) {
     final roomId = applier['chat_room_id']?.toString() ?? '';
+    final applicationStatus =
+        applier['application_status']?.toString() ?? 'applied';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Card(
+      child: Slidable(
         key: ValueKey('posted-applicant-$roomId'), // 應徵者卡片綁定 room id
-        elevation: 0,
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: Colors.grey[200]!, width: 1),
+        endActionPane: ActionPane(
+          motion: const ScrollMotion(),
+          children: _buildSwipeActions(
+              applier, taskId, applicationStatus, colorScheme),
         ),
-        child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          leading: _buildAvatarWithFallback(
-            applier['avatar']?.toString(),
-            applier['name'],
-            radius: 20,
-            fontSize: 14,
+        child: Card(
+          elevation: 0,
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(color: Colors.grey[200]!, width: 1),
           ),
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Expanded(
-                child: Text(
-                  applier['name'] ?? 'Unknown name',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w500, fontSize: 14),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          child: ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            leading: _buildAvatarWithFallback(
+              applier['avatar']?.toString(),
+              applier['name'],
+              radius: 20,
+              fontSize: 14,
+            ),
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Expanded(
+                  child: Text(
+                    applier['name'] ?? 'Unknown name',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w500, fontSize: 14),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              // 評分與評論數（小字灰色）
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.star, color: Colors.amber[600], size: 12),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${applier['rating'] ?? 0.0}',
-                    style: const TextStyle(fontSize: 11, color: Colors.grey),
-                  ),
-                  Text(
-                    '(${applier['reviewsCount'] ?? 0})',
-                    style: const TextStyle(fontSize: 10, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          subtitle: Text(
-            applier['latest_message_snippet'] ??
-                applier['first_message_snippet'] ??
-                'No messages',
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          trailing: // 未讀數字徽章（警示色）
-              Selector<ChatListProvider, int>(
-            selector: (context, provider) {
-              final roomId = applier['chat_room_id']?.toString();
-              return roomId == null ? 0 : provider.unreadForRoom(roomId);
-            },
-            builder: (context, unread, child) {
-              if (unread <= 0) return const SizedBox.shrink();
+                const SizedBox(width: 8),
+                // 評分與評論數（小字灰色）
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.star, color: Colors.amber[600], size: 12),
+                    const SizedBox(width: 2),
+                    Text(
+                      '${applier['rating'] ?? 0.0}',
+                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                    Text(
+                      '(${applier['reviewsCount'] ?? 0})',
+                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            subtitle: Text(
+              applier['latest_message_snippet'] ??
+                  applier['first_message_snippet'] ??
+                  'No messages',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: // 未讀數字徽章（警示色）
+                Selector<ChatListProvider, int>(
+              selector: (context, provider) {
+                final roomId = applier['chat_room_id']?.toString();
+                return roomId == null ? 0 : provider.unreadForRoom(roomId);
+              },
+              builder: (context, unread, child) {
+                if (unread <= 0) return const SizedBox.shrink();
 
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.error,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  unread > 99 ? '99+' : '$unread',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+                return Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.error,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                ),
-              );
+                  child: Text(
+                    unread > 99 ? '99+' : '$unread',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                );
+              },
+            ),
+            onTap: () {
+              final chatRoomId = applier['chat_room_id'];
+              if (chatRoomId != null) {
+                // 直接跳轉到聊天詳情頁面
+                context.go('/chat/detail?room_id=$chatRoomId');
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                      content: Text(
+                          'Chat room not available for ${applier['name']}')),
+                );
+              }
             },
           ),
-          onTap: () {
-            final chatRoomId = applier['chat_room_id'];
-            if (chatRoomId != null) {
-              // 直接跳轉到聊天詳情頁面
-              context.go('/chat/detail?room_id=$chatRoomId');
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                    content:
-                        Text('Chat room not available for ${applier['name']}')),
-              );
-            }
-          },
         ),
       ),
     );
+  }
+
+  /// 構建滑動動作按鈕
+  List<SlidableAction> _buildSwipeActions(Map<String, dynamic> applier,
+      String taskId, String applicationStatus, ColorScheme colorScheme) {
+    final List<SlidableAction> actions = [];
+
+    // 根據應徵狀態決定可用的動作
+    switch (applicationStatus.toLowerCase()) {
+      case 'applied':
+        // 新應徵：可以標記已讀、拒絕、刪除
+        actions.addAll([
+          SlidableAction(
+            onPressed: (context) => _markAsRead(applier, taskId),
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+            icon: Icons.mark_email_read,
+            label: 'Read',
+          ),
+          SlidableAction(
+            onPressed: (context) => _rejectApplication(applier, taskId),
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+            icon: Icons.close,
+            label: 'Reject',
+          ),
+          SlidableAction(
+            onPressed: (context) => _deleteApplication(applier, taskId),
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+            icon: Icons.delete,
+            label: 'Delete',
+          ),
+        ]);
+        break;
+
+      case 'accepted':
+        // 已接受：可以標記已讀、取消接受
+        actions.addAll([
+          SlidableAction(
+            onPressed: (context) => _markAsRead(applier, taskId),
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+            icon: Icons.mark_email_read,
+            label: 'Read',
+          ),
+          SlidableAction(
+            onPressed: (context) => _cancelAcceptance(applier, taskId),
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+            icon: Icons.undo,
+            label: 'Cancel',
+          ),
+        ]);
+        break;
+
+      case 'rejected':
+        // 已拒絕：可以標記已讀、刪除
+        actions.addAll([
+          SlidableAction(
+            onPressed: (context) => _markAsRead(applier, taskId),
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+            icon: Icons.mark_email_read,
+            label: 'Read',
+          ),
+          SlidableAction(
+            onPressed: (context) => _deleteApplication(applier, taskId),
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+            icon: Icons.delete,
+            label: 'Delete',
+          ),
+        ]);
+        break;
+
+      default:
+        // 其他狀態：只能標記已讀
+        actions.add(
+          SlidableAction(
+            onPressed: (context) => _markAsRead(applier, taskId),
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+            icon: Icons.mark_email_read,
+            label: 'Read',
+          ),
+        );
+    }
+
+    return actions;
+  }
+
+  /// 標記為已讀
+  Future<void> _markAsRead(Map<String, dynamic> applier, String taskId) async {
+    final roomId = applier['chat_room_id']?.toString();
+    if (roomId == null) return;
+
+    try {
+      // 這裡可以調用相應的 API 來標記聊天室為已讀
+      // 暫時使用 Provider 來清除未讀數
+      final provider = context.read<ChatListProvider>();
+      provider.markRoomAsRead(roomId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text('Marked conversation with ${applier['name']} as read'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to mark as read: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 拒絕應徵
+  Future<void> _rejectApplication(
+      Map<String, dynamic> applier, String taskId) async {
+    final applicationId = applier['application_id']?.toString();
+    if (applicationId == null) return;
+
+    // 顯示確認對話框
+    final confirmed = await _showConfirmDialog(
+      'Reject Application',
+      'Are you sure you want to reject ${applier['name']}\'s application?',
+    );
+
+    if (!confirmed) return;
+
+    try {
+      // 調用 TaskService 來拒絕應徵
+      await TaskService().updateApplicationStatus(
+        applicationId: applicationId,
+        status: 'rejected',
+      );
+
+      // 刷新數據
+      _refreshApplications();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Rejected ${applier['name']}\'s application'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to reject application: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 刪除應徵
+  Future<void> _deleteApplication(
+      Map<String, dynamic> applier, String taskId) async {
+    final applicationId = applier['application_id']?.toString();
+    if (applicationId == null) return;
+
+    // 顯示確認對話框
+    final confirmed = await _showConfirmDialog(
+      'Delete Application',
+      'Are you sure you want to permanently delete ${applier['name']}\'s application? This action cannot be undone.',
+    );
+
+    if (!confirmed) return;
+
+    try {
+      // 調用 TaskService 來刪除應徵
+      await TaskService().deleteApplication(applicationId: applicationId);
+
+      // 刷新數據
+      _refreshApplications();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Deleted ${applier['name']}\'s application'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete application: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 取消接受
+  Future<void> _cancelAcceptance(
+      Map<String, dynamic> applier, String taskId) async {
+    final applicationId = applier['application_id']?.toString();
+    if (applicationId == null) return;
+
+    // 顯示確認對話框
+    final confirmed = await _showConfirmDialog(
+      'Cancel Acceptance',
+      'Are you sure you want to cancel the acceptance of ${applier['name']}\'s application?',
+    );
+
+    if (!confirmed) return;
+
+    try {
+      // 調用 TaskService 來取消接受
+      await TaskService().updateApplicationStatus(
+        applicationId: applicationId,
+        status: 'applied',
+      );
+
+      // 刷新數據
+      _refreshApplications();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Cancelled acceptance of ${applier['name']}\'s application'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to cancel acceptance: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 顯示確認對話框
+  Future<bool> _showConfirmDialog(String title, String content) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text(title),
+              content: Text(content),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Confirm'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
+  }
+
+  /// 刷新應徵數據
+  void _refreshApplications() {
+    // 觸發 Provider 重新載入數據
+    final provider = context.read<ChatListProvider>();
+    provider.refreshPostedTasksApplications();
   }
 
   /// 顯示任務資訊對話框（使用 awesome_dialog）
