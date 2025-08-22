@@ -175,7 +175,7 @@ class JWTMigration {
      * 添加 TokenValidator 引入
      */
     private function addTokenValidatorImport($content) {
-        $importLine = "require_once '../../utils/TokenValidator.php';";
+        $importLine = "require_once __DIR__ . '/../../utils/TokenValidator.php';";
         
         // 檢查是否已經引入
         if (strpos($content, 'TokenValidator.php') !== false) {
@@ -204,7 +204,7 @@ class JWTMigration {
      * 在文件頂部添加 TokenValidator 引入
      */
     private function addTokenValidatorImportAtTop($content) {
-        $importLine = "require_once '../../utils/TokenValidator.php';";
+        $importLine = "require_once __DIR__ . '/../../utils/TokenValidator.php';";
         return $importLine . "\n" . $content;
     }
     

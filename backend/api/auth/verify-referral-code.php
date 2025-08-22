@@ -17,8 +17,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // 引入資料庫配置
-require_once '../../config/database.php';
-require_once '../../utils/Response.php';
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../utils/Response.php';
 
 try {
     // 獲取 POST 資料

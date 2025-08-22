@@ -81,7 +81,7 @@ echo "\n";
 // 檢查 4：資料庫連線測試
 echo "🗄️ 檢查 4：資料庫連線測試\n";
 try {
-    require_once 'config/database.php';
+    require_once __DIR__ . '/config/database.php';
     
     if (class_exists('Database')) {
         echo "✅ Database 類別已載入\n";

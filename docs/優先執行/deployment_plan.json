@@ -1,0 +1,439 @@
+{
+  "version": "1.0",
+  "project": "Here4Help",
+  "description": "CPanel + TestFlight → App Store + Google Play 部署計畫",
+  "deployment_phases": [
+    {
+      "id": "PHASE-TESTING",
+      "title": "測試階段部署",
+      "description": "TestFlight + CPanel 測試環境",
+      "timeline": "2 週",
+      "milestones": [
+        {
+          "id": "M-DEPLOY-TESTING",
+          "title": "測試環境完整部署",
+          "description": "CPanel 後端 + TestFlight iOS + Web 版本",
+          "tasks": [
+            {
+              "id": "T1-CPANEL-BACKEND-SETUP",
+              "owner": "backend",
+              "goal": "設置 CPanel 後端環境與資料庫",
+              "priority": "high",
+              "steps": [
+                "設置 CPanel 檔案結構 (public_html/here4help/)",
+                "配置生產環境 .env 檔案",
+                "遷移 MAMP 資料庫至 CPanel MySQL",
+                "設置檔案權限和 .htaccess 規則",
+                "測試 API 連接和功能"
+              ],
+              "commands": [
+                "cp backend/config/env.example backend/config/.env",
+                "mysqldump -u root -p hero4helpdemofhs_hero4help > backup.sql",
+                "chmod 755 backend/uploads/",
+                "curl https://yourdomain.com/here4help/backend/api/test_connection.php"
+              ],
+              "touch_files": [
+                "backend/config/.env",
+                "backend/.htaccess",
+                "backend/api/test_connection.php",
+                "backend/uploads/"
+              ],
+              "acceptance": [
+                "後端 API 可正常訪問",
+                "資料庫連線成功",
+                "媒體上傳功能正常",
+                "OAuth 登入流程正常"
+              ],
+              "estimate_hours": 16,
+              "deps": []
+            },
+            {
+              "id": "T2-CPANEL-SOCKET-SETUP",
+              "owner": "backend",
+              "goal": "設置 Node.js Socket 伺服器或備用方案",
+              "priority": "medium",
+              "steps": [
+                "檢查 CPanel Node.js 支援",
+                "配置 Socket 伺服器生產環境",
+                "實現長輪詢備用方案 (如需要)",
+                "設置 CORS 和安全配置"
+              ],
+              "commands": [
+                "cd backend/socket && npm install --production",
+                "node server.js",
+                "curl https://yourdomain.com:3001/health"
+              ],
+              "touch_files": [
+                "backend/socket/server.js",
+                "backend/api/chat/polling.php"
+              ],
+              "acceptance": [
+                "Socket 伺服器可正常啟動或備用方案可用",
+                "即時訊息功能正常",
+                "跨域設置正確"
+              ],
+              "estimate_hours": 12,
+              "deps": ["T1-CPANEL-BACKEND-SETUP"]
+            },
+            {
+              "id": "T3-CPANEL-ADMIN-SETUP",
+              "owner": "backend",
+              "goal": "部署 Laravel 管理員後台",
+              "priority": "medium",
+              "steps": [
+                "設置 Laravel 環境和依賴",
+                "配置 Laravel .env 檔案",
+                "建置並上傳 Vue.js 前端",
+                "設置 Laravel 快取和優化"
+              ],
+              "commands": [
+                "composer install --no-dev --optimize-autoloader",
+                "php artisan key:generate",
+                "php artisan config:cache",
+                "npm run build"
+              ],
+              "touch_files": [
+                "admin/.env",
+                "admin/public/",
+                "admin-frontend/dist/"
+              ],
+              "acceptance": [
+                "Laravel 後台可正常訪問",
+                "Vue.js 前端正常載入",
+                "RBAC 權限系統正常",
+                "與主資料庫連接正常"
+              ],
+              "estimate_hours": 10,
+              "deps": ["T1-CPANEL-BACKEND-SETUP"]
+            },
+            {
+              "id": "T4-FLUTTER-WEB-DEPLOY",
+              "owner": "flutter",
+              "goal": "部署 Flutter Web 版本至 CPanel",
+              "priority": "medium",
+              "steps": [
+                "建置 Flutter Web 生產版本",
+                "設置生產環境配置檔案",
+                "上傳至 CPanel public_html",
+                "測試 Web 版本功能"
+              ],
+              "commands": [
+                "flutter build web --release --dart-define=ENVIRONMENT=production",
+                "flutter test",
+                "flutter analyze"
+              ],
+              "touch_files": [
+                "build/web/",
+                "assets/app_env/production.json",
+                "web/.htaccess"
+              ],
+              "acceptance": [
+                "Web 版本可正常載入",
+                "API 連接正常",
+                "OAuth 登入功能正常",
+                "響應式設計正常"
+              ],
+              "estimate_hours": 8,
+              "deps": ["T1-CPANEL-BACKEND-SETUP"]
+            },
+            {
+              "id": "T5-IOS-TESTFLIGHT-SETUP",
+              "owner": "flutter",
+              "goal": "設置 iOS TestFlight 測試",
+              "priority": "high",
+              "steps": [
+                "配置 iOS 生產環境建置",
+                "設置 App Store Connect",
+                "上傳至 TestFlight",
+                "設置測試群組和說明"
+              ],
+              "commands": [
+                "flutter build ios --release --dart-define=ENVIRONMENT=production",
+                "flutter analyze",
+                "xcodebuild archive"
+              ],
+              "touch_files": [
+                "ios/Runner/Info.plist",
+                "ios/Runner.xcodeproj/",
+                "build/ios/"
+              ],
+              "acceptance": [
+                "iOS 應用可正常建置",
+                "TestFlight 上傳成功",
+                "測試用戶可正常下載",
+                "所有功能正常運作"
+              ],
+              "estimate_hours": 12,
+              "deps": ["T1-CPANEL-BACKEND-SETUP"]
+            },
+            {
+              "id": "T6-SECURITY-HARDENING",
+              "owner": "backend",
+              "goal": "生產環境安全加固",
+              "priority": "high",
+              "steps": [
+                "設置 HTTPS 強制重定向",
+                "配置安全標頭",
+                "實現 Rate Limiting",
+                "檔案上傳安全檢查"
+              ],
+              "commands": [
+                "openssl verify certificate.crt",
+                "curl -I https://yourdomain.com/here4help/",
+                "ab -n 1000 -c 10 https://yourdomain.com/here4help/backend/api/auth/login.php"
+              ],
+              "touch_files": [
+                "backend/.htaccess",
+                "backend/config/security_headers.php",
+                "backend/utils/RateLimiter.php"
+              ],
+              "acceptance": [
+                "HTTPS 強制重定向正常",
+                "安全標頭設置正確",
+                "Rate Limiting 生效",
+                "檔案上傳安全檢查正常"
+              ],
+              "estimate_hours": 8,
+              "deps": ["T1-CPANEL-BACKEND-SETUP"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PHASE-PRODUCTION",
+      "title": "正式階段部署",
+      "description": "App Store + Google Play Store + 正式環境",
+      "timeline": "1 週",
+      "milestones": [
+        {
+          "id": "M-DEPLOY-PRODUCTION",
+          "title": "正式環境完整部署",
+          "description": "App Store + Google Play + 生產監控",
+          "tasks": [
+            {
+              "id": "T7-APP-STORE-SUBMISSION",
+              "owner": "flutter",
+              "goal": "提交 iOS App Store 審核",
+              "priority": "high",
+              "steps": [
+                "完善 App Store Connect 資訊",
+                "準備截圖和描述",
+                "提交審核",
+                "回應審核意見"
+              ],
+              "commands": [
+                "flutter build ios --release",
+                "xcodebuild -exportArchive"
+              ],
+              "touch_files": [
+                "ios/metadata/",
+                "ios/screenshots/",
+                "ios/Runner/Info.plist"
+              ],
+              "acceptance": [
+                "應用程式成功提交審核",
+                "通過 App Store 審核",
+                "正式上架 App Store"
+              ],
+              "estimate_hours": 16,
+              "deps": ["T5-IOS-TESTFLIGHT-SETUP"]
+            },
+            {
+              "id": "T8-GOOGLE-PLAY-SUBMISSION",
+              "owner": "flutter",
+              "goal": "提交 Google Play Store 審核",
+              "priority": "high",
+              "steps": [
+                "設置 Google Play Console",
+                "建置 Android App Bundle",
+                "提交審核",
+                "回應審核意見"
+              ],
+              "commands": [
+                "flutter build appbundle --release --dart-define=ENVIRONMENT=production",
+                "flutter analyze"
+              ],
+              "touch_files": [
+                "android/app/build.gradle",
+                "android/key.properties",
+                "build/app/outputs/bundle/"
+              ],
+              "acceptance": [
+                "應用程式成功提交審核",
+                "通過 Google Play 審核",
+                "正式上架 Google Play Store"
+              ],
+              "estimate_hours": 12,
+              "deps": ["T1-CPANEL-BACKEND-SETUP"]
+            },
+            {
+              "id": "T9-PRODUCTION-MONITORING",
+              "owner": "backend",
+              "goal": "設置生產環境監控",
+              "priority": "medium",
+              "steps": [
+                "設置錯誤監控和通知",
+                "配置效能監控",
+                "實施備份策略",
+                "設置警報機制"
+              ],
+              "commands": [
+                "php backend/utils/test_error_reporting.php",
+                "crontab -e",
+                "mysqldump --single-transaction database > backup.sql"
+              ],
+              "touch_files": [
+                "backend/utils/ErrorReporting.php",
+                "backend/scripts/backup.sh",
+                "backend/config/monitoring.php"
+              ],
+              "acceptance": [
+                "錯誤監控系統正常",
+                "效能監控數據正常",
+                "備份策略執行正常"
+              ],
+              "estimate_hours": 10,
+              "deps": ["T6-SECURITY-HARDENING"]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "environment_configs": {
+    "cpanel_production": {
+      "app_url": "https://yourdomain.com/here4help",
+      "database": {
+        "host": "localhost",
+        "port": "3306",
+        "charset": "utf8mb4"
+      },
+      "storage": {
+        "type": "local",
+        "path": "/home/username/public_html/here4help/backend/uploads",
+        "url": "https://yourdomain.com/here4help/backend/api/media/serve.php"
+      },
+      "security": {
+        "https_only": true,
+        "rate_limiting": true,
+        "cors_origins": ["https://yourdomain.com", "https://apps.apple.com"]
+      }
+    },
+    "flutter_production": {
+      "api_base_url": "https://yourdomain.com/here4help/backend/api",
+      "socket_url": "https://yourdomain.com:3001",
+      "oauth": {
+        "google_client_id": "production_google_client_id",
+        "facebook_app_id": "production_facebook_app_id",
+        "apple_service_id": "com.yourcompany.here4help.login"
+      }
+    }
+  },
+  "deployment_checklist": {
+    "testing_phase": [
+      "CPanel 後端環境設置完成",
+      "資料庫遷移成功",
+      "媒體上傳功能正常",
+      "Socket 伺服器運行正常 (或備用方案)",
+      "Laravel 管理後台部署完成",
+      "Flutter Web 版本部署完成",
+      "iOS TestFlight 設置完成",
+      "所有 OAuth 登入流程測試通過",
+      "安全設置檢查完成"
+    ],
+    "production_phase": [
+      "iOS App Store 提交並通過審核",
+      "Android Google Play Store 提交並通過審核",
+      "生產環境監控設置完成",
+      "備份策略實施完成",
+      "效能優化完成",
+      "安全加固完成",
+      "使用者文檔準備完成"
+    ]
+  },
+  "rollback_plan": {
+    "triggers": [
+      "嚴重安全漏洞",
+      "資料遺失風險",
+      "核心功能無法使用",
+      "用戶大量投訴"
+    ],
+    "steps": [
+      "停止新版本部署",
+      "恢復資料庫備份",
+      "恢復檔案備份",
+      "切換到穩定版本",
+      "通知用戶和團隊"
+    ],
+    "recovery_time": "< 30 分鐘"
+  },
+  "monitoring_metrics": [
+    "API 回應時間",
+    "資料庫查詢效能",
+    "錯誤率",
+    "用戶活躍度",
+    "伺服器資源使用率",
+    "檔案上傳成功率",
+    "OAuth 登入成功率"
+  ],
+  "security_requirements": [
+    "HTTPS 強制啟用",
+    "安全標頭設置",
+    "Rate Limiting 實施",
+    "檔案上傳驗證",
+    "SQL 注入防護",
+    "XSS 防護",
+    "CSRF 防護",
+    "敏感資料加密"
+  ],
+  "cpanel_limitations": {
+    "node_js_support": "需要檢查 CPanel 是否支援 Node.js",
+    "file_permissions": "需要正確設置檔案權限",
+    "database_connections": "注意連接數限制",
+    "ssl_certificate": "確保 SSL 憑證正確配置",
+    "backup_solutions": [
+      "使用第三方 WebSocket 服務 (Pusher, Socket.IO Cloud)",
+      "實現長輪詢機制",
+      "使用 CPanel 內建備份功能"
+    ]
+  },
+  "mobile_app_requirements": {
+    "ios": {
+      "app_transport_security": "設置 ATS 允許的網域",
+      "oauth_callback_urls": "配置正確的回調 URL",
+      "push_notifications": "設置推播通知憑證",
+      "app_store_guidelines": "確保符合 App Store 審核指南"
+    },
+    "android": {
+      "signing_key": "管理應用程式簽名金鑰",
+      "google_play_policies": "符合 Google Play 政策",
+      "permissions": "正確聲明應用程式權限",
+      "target_sdk": "使用最新的目標 SDK 版本"
+    }
+  },
+  "testing_strategy": {
+    "unit_tests": [
+      "API 端點測試",
+      "資料庫操作測試",
+      "OAuth 流程測試",
+      "媒體上傳測試"
+    ],
+    "integration_tests": [
+      "前後端整合測試",
+      "Socket 連接測試",
+      "跨平台功能測試"
+    ],
+    "e2e_tests": [
+      "完整用戶流程測試",
+      "多裝置相容性測試",
+      "效能壓力測試"
+    ]
+  },
+  "support_contacts": {
+    "cpanel_support": "聯繫主機商技術支援",
+    "apple_developer": "https://developer.apple.com/support/",
+    "google_play_console": "https://support.google.com/googleplay/android-developer/",
+    "flutter_community": "https://flutter.dev/community"
+  }
+}

@@ -8,8 +8,8 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require_once '../../../config/database.php';
-require_once '../../../utils/Response.php';
+require_once __DIR__ . '/../../../config/database.php';
+require_once __DIR__ . '/../../../utils/Response.php';
 
 Response::setCorsHeaders();
 

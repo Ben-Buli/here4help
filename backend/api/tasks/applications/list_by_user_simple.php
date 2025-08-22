@@ -4,8 +4,8 @@
  * 用於測試基本功能
  */
 
-require_once '../../../config/database.php';
-require_once '../../../utils/Response.php';
+require_once __DIR__ . '/../../../config/database.php';
+require_once __DIR__ . '/../../../utils/Response.php';
 
 Response::setCorsHeaders();
 

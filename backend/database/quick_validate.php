@@ -4,7 +4,7 @@
  * 直接執行驗證，適合自動化腳本使用
  */
 
-require_once '../config/database.php';
+require_once __DIR__ . '/../config/database.php';
 
 echo "=== 快速資料庫驗證 ===\n";
 echo "時間: " . date('Y-m-d H:i:s') . "\n\n";

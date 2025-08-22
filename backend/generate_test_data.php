@@ -4,7 +4,7 @@
  * 為 users.id = 2 的使用者生成完整的測試資料
  */
 
-require_once 'config/database.php';
+require_once __DIR__ . '/config/database.php';
 
 try {
     $db = Database::getInstance();

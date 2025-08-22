@@ -10,9 +10,9 @@
  * 路徑：/api/support/events
  */
 
-require_once '../../config/database.php';
-require_once '../../utils/JWTManager.php';
-require_once '../../utils/Response.php';
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../utils/JWTManager.php';
+require_once __DIR__ . '/../../utils/Response.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');

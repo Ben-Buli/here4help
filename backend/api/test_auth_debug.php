@@ -1,6 +1,6 @@
 <?php
-require_once '../config/env_loader.php';
-require_once '../utils/Response.php';
+require_once __DIR__ . '/../config/env_loader.php';
+require_once __DIR__ . '/../utils/Response.php';
 
 // 確保環境變數已載入
 EnvLoader::load();

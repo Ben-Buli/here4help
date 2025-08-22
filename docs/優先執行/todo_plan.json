@@ -1,0 +1,426 @@
+{
+  "version": "1.0",
+  "project": "Here4Help",
+  "description": "待辦項目高階專案指南 - 基於整合待辦項目分析",
+  "current_status": {
+    "core_modules_completed": "21/21 (100%)",
+    "backend_api_completion": "90%",
+    "frontend_ui_completion": "98%",
+    "testing_completion": "80%",
+    "deployment_readiness": "75%"
+  },
+  "critical_issues": [
+    {
+      "issue": "JWT 驗證問題",
+      "description": "Socket 伺服器與 PHP 後端 JWT 簽名不一致",
+      "error_log": "[socket:K-uaTpVeosJ38WbmAAAB] ❌ JWT validation failed: JsonWebTokenError invalid signature",
+      "impact": "聊天功能無法正常使用",
+      "priority": "critical"
+    },
+    {
+      "issue": "後端配置問題", 
+      "description": "多個 PHP 檔案引用不存在的 database.php",
+      "impact": "10+ 個後端腳本無法正常運行",
+      "priority": "high"
+    }
+  ],
+  "milestones": [
+    {
+      "id": "M-CRITICAL-FIXES",
+      "title": "關鍵問題修復",
+      "description": "修復影響系統運行的關鍵問題",
+      "priority": "critical",
+      "timeline": "1 週",
+      "tasks": [
+        {
+          "id": "T1-JWT-SOCKET-SYNC",
+          "owner": "backend",
+          "goal": "修復 JWT 驗證問題，確保 Socket 伺服器與 PHP 後端一致性",
+          "priority": "critical",
+          "root_cause": "PHP JWTManager 和 Node.js jwt 庫使用不同的簽名算法或密鑰處理方式",
+          "steps": [
+            "統一 JWT Secret 管理",
+            "修復 PHP JWTManager Base64 編碼",
+            "同步 Node.js JWT 驗證邏輯",
+            "創建 JWT 測試腳本"
+          ],
+          "commands": [
+            "grep JWT_SECRET backend/config/.env",
+            "grep JWT_SECRET backend/socket/.env",
+            "php backend/test/jwt_compatibility_test.php",
+            "node backend/socket/test_jwt.js"
+          ],
+          "touch_files": [
+            "backend/utils/JWTManager.php",
+            "backend/socket/server.js",
+            "backend/test/jwt_compatibility_test.php",
+            "backend/config/.env"
+          ],
+          "acceptance": [
+            "PHP 生成的 JWT 可被 Node.js 正確驗證",
+            "Socket 連接不再出現 JWT 驗證錯誤",
+            "聊天功能正常運作",
+            "JWT 測試腳本通過"
+          ],
+          "estimate_hours": 8,
+          "deps": []
+        },
+        {
+          "id": "T2-BACKEND-CONFIG-FIX",
+          "owner": "backend", 
+          "goal": "修復後端配置問題，創建缺失的 database.php",
+          "priority": "high",
+          "steps": [
+            "創建標準 database.php",
+            "修復檔案引用路徑",
+            "統一環境變數載入"
+          ],
+          "commands": [
+            "cp backend/config/database.example.php backend/config/database.php",
+            "find backend -name \"*.php\" -exec grep -l \"database.php\" {} \\;",
+            "php backend/database/test_connection.php"
+          ],
+          "touch_files": [
+            "backend/config/database.php",
+            "backend/database/test_connection.php",
+            "backend/database/backup_manager.php"
+          ],
+          "acceptance": [
+            "所有 PHP 腳本可正常載入 database.php",
+            "資料庫連接測試通過",
+            "備份和測試腳本正常運行"
+          ],
+          "estimate_hours": 4,
+          "deps": []
+        },
+        {
+          "id": "T3-PATH-STANDARDIZATION",
+          "owner": "backend",
+          "goal": "統一 PHP 檔案路徑引用，解決相對路徑問題",
+          "priority": "medium",
+          "steps": [
+            "路徑標準化腳本",
+            "統一使用絕對路徑",
+            "測試所有腳本"
+          ],
+          "commands": [
+            "php backend/scripts/fix_paths.php",
+            "find backend -name \"*.php\" -exec php -l {} \\;"
+          ],
+          "touch_files": [
+            "backend/scripts/fix_paths.php"
+          ],
+          "acceptance": [
+            "所有 PHP 檔案語法檢查通過",
+            "備份、測試、初始化腳本正常運行",
+            "無路徑相關錯誤"
+          ],
+          "estimate_hours": 4,
+          "deps": ["T2-BACKEND-CONFIG-FIX"]
+        }
+      ]
+    },
+    {
+      "id": "M-FEATURE-ENHANCEMENT", 
+      "title": "功能完善",
+      "description": "完善用戶體驗和功能細節",
+      "priority": "medium",
+      "timeline": "1 週",
+      "tasks": [
+        {
+          "id": "T4-ACCOUNT-SECURITY-COMPLETE",
+          "owner": "flutter",
+          "goal": "完善帳戶安全頁面功能",
+          "priority": "medium",
+          "current_issues": [
+            "Contact Support 按鈕為 TODO 狀態 (第386行)",
+            "登出邏輯為 TODO 狀態 (第399行)"
+          ],
+          "steps": [
+            "實現客服聯繫功能",
+            "實現登出功能", 
+            "整合客服聊天室"
+          ],
+          "commands": [
+            "flutter analyze",
+            "flutter test --plain-name security_page"
+          ],
+          "touch_files": [
+            "lib/account/pages/security_page.dart",
+            "lib/auth/services/auth_service.dart",
+            "lib/router/app_router.dart"
+          ],
+          "acceptance": [
+            "Contact Support 按鈕可正常導航至客服聊天室",
+            "登出功能完整實現",
+            "用戶體驗流暢"
+          ],
+          "estimate_hours": 4,
+          "deps": []
+        },
+        {
+          "id": "T5-CHAT-SWIPE-OPTIMIZATION",
+          "owner": "flutter",
+          "goal": "優化聊天頁面滑動工具列配置",
+          "priority": "medium",
+          "current_issues": [
+            "任務狀態條件需要手動調整",
+            "狀態轉換邏輯需要確保正確"
+          ],
+          "steps": [
+            "分析任務狀態條件",
+            "優化狀態轉換邏輯",
+            "測試不同任務狀態"
+          ],
+          "commands": [
+            "flutter analyze",
+            "flutter test --plain-name posted_tasks_widget"
+          ],
+          "touch_files": [
+            "lib/chat/widgets/posted_tasks_widget.dart",
+            "lib/chat/utils/action_bar_config.dart",
+            "lib/constants/task_status.dart"
+          ],
+          "acceptance": [
+            "滑動動作與任務狀態正確對應",
+            "狀態轉換邏輯正確",
+            "用戶操作直觀"
+          ],
+          "estimate_hours": 6,
+          "deps": []
+        },
+        {
+          "id": "T6-CHAT-DETAIL-ENHANCEMENT",
+          "owner": "flutter",
+          "goal": "優化聊天詳情頁面資料載入和 Action Bar",
+          "priority": "medium",
+          "current_issues": [
+            "聚合 API 失敗時需要備用方案",
+            "Action Bar 狀態需要與任務狀態同步"
+          ],
+          "steps": [
+            "加強聚合 API 容錯",
+            "優化 Action Bar 狀態同步",
+            "改善錯誤處理"
+          ],
+          "commands": [
+            "flutter analyze",
+            "flutter test --plain-name chat_detail_page"
+          ],
+          "touch_files": [
+            "lib/chat/pages/chat_detail_page.dart",
+            "lib/chat/widgets/dynamic_action_bar.dart",
+            "lib/chat/services/chat_service.dart"
+          ],
+          "acceptance": [
+            "聚合 API 失敗時有備用方案",
+            "Action Bar 狀態與任務狀態同步",
+            "錯誤處理完善"
+          ],
+          "estimate_hours": 8,
+          "deps": []
+        }
+      ]
+    },
+    {
+      "id": "M-UX-OPTIMIZATION",
+      "title": "體驗優化", 
+      "description": "改善 UI/UX 和系統穩定性",
+      "priority": "low",
+      "timeline": "1 週",
+      "tasks": [
+        {
+          "id": "T7-TASK-RATINGS-FIX",
+          "owner": "backend",
+          "goal": "修復 task_ratings 表結構適配問題",
+          "priority": "medium",
+          "current_issues": [
+            "API 查詢與實際表結構不符",
+            "評分系統顯示異常"
+          ],
+          "steps": [
+            "檢查實際表結構",
+            "修正 API 查詢",
+            "測試評分功能"
+          ],
+          "commands": [
+            "mysql -e \"DESCRIBE task_ratings;\"",
+            "curl -X POST /api/tasks/ratings.php",
+            "php backend/test/ratings_test.php"
+          ],
+          "touch_files": [
+            "backend/api/tasks/ratings.php"
+          ],
+          "acceptance": [
+            "評分系統正常顯示",
+            "API 查詢與表結構一致",
+            "評分功能完整"
+          ],
+          "estimate_hours": 4,
+          "deps": ["T2-BACKEND-CONFIG-FIX"]
+        },
+        {
+          "id": "T8-TABBAR-SYNC-FIX",
+          "owner": "flutter",
+          "goal": "修復聊天頁面 TabBar 雙向同步問題",
+          "priority": "low",
+          "current_issues": [
+            "TabBar 與 TabBarView 雙向同步不完整",
+            "UI/UX 體驗問題"
+          ],
+          "steps": [
+            "分析同步問題",
+            "實現雙向同步",
+            "測試用戶體驗"
+          ],
+          "commands": [
+            "flutter analyze",
+            "flutter test --plain-name tabbar_sync"
+          ],
+          "touch_files": [
+            "lib/chat/pages/chat_list_page.dart"
+          ],
+          "acceptance": [
+            "TabBar 與 TabBarView 完全同步",
+            "用戶操作體驗流暢",
+            "無同步延遲或錯誤"
+          ],
+          "estimate_hours": 4,
+          "deps": []
+        },
+        {
+          "id": "T9-UI-ENHANCEMENTS",
+          "owner": "flutter",
+          "goal": "UI/UX 完善項目",
+          "priority": "low",
+          "current_issues": [
+            "應徵者卡片缺少頭像資料來源",
+            "未讀訊息數呈現機制需要優化",
+            "任務編輯時間欄位預填問題"
+          ],
+          "steps": [
+            "添加應徵者卡片頭像",
+            "優化未讀訊息數",
+            "修復任務編輯時間欄位"
+          ],
+          "commands": [
+            "flutter analyze",
+            "flutter test --plain-name ui_enhancements"
+          ],
+          "touch_files": [
+            "lib/widgets/applicant_card.dart",
+            "lib/chat/widgets/unread_badge.dart",
+            "lib/task/pages/task_edit_page.dart"
+          ],
+          "acceptance": [
+            "應徵者卡片顯示頭像",
+            "未讀訊息數準確顯示",
+            "時間欄位正確預填"
+          ],
+          "estimate_hours": 6,
+          "deps": []
+        }
+      ]
+    }
+  ],
+  "testing_strategy": {
+    "unit_tests": [
+      "JWT 相容性測試 - PHP 與 Node.js JWT 互通性",
+      "API 端點測試 - 所有修復的 API 功能",
+      "UI 組件測試 - 修改的 Flutter 組件"
+    ],
+    "integration_tests": [
+      "Socket 連接測試 - 完整的 WebSocket 通訊流程",
+      "聊天功能測試 - 端到端聊天體驗",
+      "權限系統測試 - 各種用戶角色和權限"
+    ],
+    "e2e_tests": [
+      "用戶流程測試 - 完整的用戶使用流程",
+      "跨平台測試 - iOS、Android、Web 一致性",
+      "效能測試 - 系統回應時間和穩定性"
+    ]
+  },
+  "rollback_plan": {
+    "triggers": [
+      "JWT 驗證完全失效",
+      "聊天功能無法使用", 
+      "用戶無法登入",
+      "資料遺失風險"
+    ],
+    "steps": [
+      "程式碼回滾 - git checkout HEAD~1",
+      "資料庫回滾 - 恢復備份",
+      "服務重啟 - pm2 restart socket-server"
+    ],
+    "recovery_time": "< 15 分鐘"
+  },
+  "acceptance_criteria": {
+    "critical_fixes": [
+      "JWT 驗證錯誤完全解決",
+      "所有 PHP 腳本正常運行",
+      "資料庫連接穩定",
+      "Socket 伺服器正常運作"
+    ],
+    "feature_enhancement": [
+      "帳戶安全頁面功能完整",
+      "聊天滑動工具列優化完成",
+      "聊天詳情頁面穩定可靠"
+    ],
+    "ux_optimization": [
+      "評分系統正常顯示",
+      "TabBar 同步問題解決",
+      "UI/UX 細節完善"
+    ],
+    "testing_validation": [
+      "所有單元測試通過",
+      "整合測試無錯誤",
+      "端對端測試流暢"
+    ]
+  },
+  "success_metrics": {
+    "technical": {
+      "jwt_validation_success_rate": "> 99%",
+      "api_response_time": "< 500ms",
+      "socket_connection_stability": "> 99%",
+      "critical_errors": "0"
+    },
+    "user_experience": {
+      "chat_functionality_smoothness": "excellent",
+      "login_success_rate": "> 99%",
+      "feature_completeness": "100%",
+      "ui_consistency": "excellent"
+    },
+    "deployment_readiness": {
+      "all_tests_pass": true,
+      "documentation_complete": true,
+      "configuration_correct": true,
+      "monitoring_ready": true
+    }
+  },
+  "timeline": {
+    "week_1": "M-CRITICAL-FIXES (T1-T3)",
+    "week_2": "M-FEATURE-ENHANCEMENT (T4-T6)", 
+    "week_3": "M-UX-OPTIMIZATION (T7-T9)"
+  },
+  "risk_assessment": {
+    "low_risk": ["UI/UX 優化項目"],
+    "medium_risk": ["功能完善項目"],
+    "high_risk": ["JWT 驗證修復 (需謹慎測試)"]
+  },
+  "project_completion_update": {
+    "before_fixes": {
+      "core_functionality": "100%",
+      "backend_api": "90%",
+      "frontend_ui": "98%",
+      "testing_validation": "80%",
+      "deployment_preparation": "75%"
+    },
+    "after_fixes": {
+      "core_functionality": "100%",
+      "backend_api": "95%",
+      "frontend_ui": "99%", 
+      "testing_validation": "90%",
+      "deployment_preparation": "85%"
+    }
+  }
+}

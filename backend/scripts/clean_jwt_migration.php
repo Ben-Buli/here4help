@@ -212,7 +212,7 @@ php_value memory_limit 256M';
             if (strpos($content, 'require_once \'../../utils/JWTManager.php\';') === false) {
                 $content = str_replace(
                     'require_once \'../../config/database.php\';',
-                    "require_once '../../config/database.php';\nrequire_once '../../utils/JWTManager.php';",
+                    "require_once __DIR__ . '/../../config/database.php';\nrequire_once __DIR__ . '/../../utils/JWTManager.php';",
                     $content
                 );
                 $modified = true;
@@ -281,7 +281,7 @@ php_value memory_limit 256M';
             if (strpos($content, 'require_once \'../../utils/TokenValidator.php\';') === false) {
                 $content = str_replace(
                     'require_once \'../../config/database.php\';',
-                    "require_once '../../config/database.php';\nrequire_once '../../utils/TokenValidator.php';",
+                    "require_once __DIR__ . '/../../config/database.php';\nrequire_once __DIR__ . '/../../utils/TokenValidator.php';",
                     $content
                 );
                 $modified = true;
@@ -358,7 +358,7 @@ php_value memory_limit 256M';
             if (strpos($content, 'require_once \'../../utils/TokenValidator.php\';') === false) {
                 $content = str_replace(
                     'require_once \'../../config/database.php\';',
-                    "require_once '../../config/database.php';\nrequire_once '../../utils/TokenValidator.php';",
+                    "require_once __DIR__ . '/../../config/database.php';\nrequire_once __DIR__ . '/../../utils/TokenValidator.php';",
                     $content
                 );
                 $modified = true;

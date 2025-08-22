@@ -17,9 +17,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // 引入資料庫配置
-require_once '../../config/database.php';
-require_once '../../utils/TokenValidator.php';
-require_once '../../utils/JWTManager.php';
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../utils/TokenValidator.php';
+require_once __DIR__ . '/../../utils/JWTManager.php';
 
 try {
     // 獲取 POST 資料

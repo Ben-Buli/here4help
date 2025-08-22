@@ -6,7 +6,7 @@
 echo "🧪 開始測試 JWT 功能...\n\n";
 
 // 引入 JWT 組件
-require_once 'utils/JWTManager.php';
+require_once __DIR__ . '/utils/JWTManager.php';
 
 try {
     echo "1️⃣ 測試 JWT Token 生成...\n";

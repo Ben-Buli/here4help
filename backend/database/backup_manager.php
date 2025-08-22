@@ -605,7 +605,17 @@ if (basename(__FILE__) === basename($_SERVER['SCRIPT_NAME'])) {
                     $stats = $manager->getBackupStats();
                     echo "備份統計:\n";
                     echo "總備份數: {$stats['total_backups']}\n";
-                    echo "總大小: " . $manager->formatBytes($stats['total_size']) . "\n";
+                    // 修正：直接在這裡實作 bytes 格式化，避免呼叫不存在的方法
+                    function formatBytes($bytes, $precision = 2) {
+                        $units = array('B', 'KB', 'MB', 'GB', 'TB');
+                        $bytes = max($bytes, 0);
+                        $pow = $bytes > 0 ? floor(log($bytes) / log(1024)) : 0;
+                        $pow = min($pow, count($units) - 1);
+                        $bytes /= pow(1024, $pow);
+                        return round($bytes, $precision) . ' ' . $units[$pow];
+                    }
+                    echo "總大小: " . formatBytes($stats['total_size']) . "\n";
+                    
                     if ($stats['latest_backup']) {
                         echo "最新備份: " . date('Y-m-d H:i:s', $stats['latest_backup']) . "\n";
                     }

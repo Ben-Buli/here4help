@@ -8,8 +8,8 @@
  * @since 2025-01-11
  */
 
-require_once 'utils/JWTManager.php';
-require_once 'utils/TokenValidator.php';
+require_once __DIR__ . '/utils/JWTManager.php';
+require_once __DIR__ . '/utils/TokenValidator.php';
 
 echo "<h1>🔐 JWT 功能測試工具</h1>\n";
 echo "<p>此工具用於測試 JWT 系統的各項功能</p>\n";

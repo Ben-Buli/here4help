@@ -4,7 +4,7 @@
  * 將現有的 task_applications 資料轉換為 chat_messages 中的 applyMessage 類型訊息
  */
 
-require_once 'config/database.php';
+require_once __DIR__ . '/config/database.php';
 
 try {
     $db = Database::getInstance();

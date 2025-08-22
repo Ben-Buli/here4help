@@ -1,9 +1,9 @@
 <?php
-require_once '../../config/database.php';
-require_once '../../utils/TokenValidator.php';
-require_once '../../utils/JWTManager.php';
-require_once '../../utils/Response.php';
-require_once '../../utils/JWT.php';
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../utils/TokenValidator.php';
+require_once __DIR__ . '/../../utils/JWTManager.php';
+require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/JWT.php';
 
 // 設置 CORS 標頭
 Response::setCorsHeaders();

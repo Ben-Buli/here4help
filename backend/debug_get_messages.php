@@ -1,6 +1,6 @@
 <?php
-require_once 'config/database.php';
-require_once 'utils/Response.php';
+require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/utils/Response.php';
 
 // 模擬測試參數
 $_GET['room_id'] = '69';

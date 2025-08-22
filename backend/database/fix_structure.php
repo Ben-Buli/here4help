@@ -41,7 +41,7 @@ try {
  * 自動修復常見的資料庫結構問題
  */
 
-require_once '../config/database.php';
+require_once __DIR__ . '/../config/database.php';
 
 class DatabaseStructureFixer {
     private $db;

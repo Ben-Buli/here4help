@@ -8,7 +8,7 @@
 require_once 'config/env_test.php';
 
 // 載入 JWT 管理器
-require_once 'utils/JWTManager.php';
+require_once __DIR__ . '/utils/JWTManager.php';
 
 echo "🧪 開始 JWT 功能測試...\n\n";
 

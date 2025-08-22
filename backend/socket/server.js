@@ -25,8 +25,14 @@ const SupportEventHandler = require('./support_events');
 
 const PORT = process.env.PORT || 3001;
 
-// Load environment variables once at startup
-require('dotenv').config({ path: '../../.env' });
+// Load environment variables once at startup (try root .env, then backend/config/.env)
+const path = require('path');
+const crypto = require('crypto');
+const dotenv = require('dotenv');
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+if (!process.env.JWT_SECRET) {
+  dotenv.config({ path: path.resolve(__dirname, '../config/.env') });
+}
 
 // Get JWT secret once
 const JWT_SECRET = process.env.JWT_SECRET || 'here4help_jwt_secret_key_2025_development_environment_secure_random_string';
@@ -38,6 +44,12 @@ if (!JWT_SECRET) {
 
 console.log('✅ JWT_SECRET loaded successfully');
 console.log('🔑 JWT_SECRET length:', JWT_SECRET.length);
+try {
+  const hash = crypto.createHash('sha256').update(JWT_SECRET).digest('hex');
+  console.log('🔐 JWT_SECRET SHA256:', hash);
+} catch (err) {
+  console.log('⚠️ Unable to hash JWT_SECRET');
+}
 
 const app = express();
 app.use(cors());
@@ -82,6 +94,9 @@ async function initDatabase() {
 
 // 驗證 JWT Token
 function validateJWT(token, traceId) {
+  console.log("JWT_SECRET: ", JWT_SECRET);
+  console.log("token: ", token);
+  console.log("traceId: ", traceId);
   try {
     // 使用與 PHP 相同的 JWT 驗證邏輯
     const payload = jwt.verify(token, JWT_SECRET, {

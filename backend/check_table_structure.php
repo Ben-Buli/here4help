@@ -3,7 +3,7 @@
  * 檢查資料表結構腳本
  */
 
-require_once 'config/database.php';
+require_once __DIR__ . '/config/database.php';
 
 try {
     $db = Database::getInstance();

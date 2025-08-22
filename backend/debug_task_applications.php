@@ -4,7 +4,7 @@
  * 用於檢查為什麼 applications[] 為空
  */
 
-require_once 'config/database.php';
+require_once __DIR__ . '/config/database.php';
 
 try {
     echo "<h1>任務應徵記錄診斷</h1>\n";

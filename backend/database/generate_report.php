@@ -4,7 +4,7 @@
  * 生成詳細的資料庫結構報告，包含表格、欄位、索引和外鍵關係
  */
 
-require_once '../config/database.php';
+require_once __DIR__ . '/../config/database.php';
 
 class DatabaseReportGenerator {
     private $db;

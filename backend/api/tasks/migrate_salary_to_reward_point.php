@@ -4,8 +4,8 @@
  * 執行此腳本前請先備份資料庫
  */
 
-require_once '../../config/database.php';
-require_once '../../utils/TokenValidator.php';
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../utils/TokenValidator.php';
 
 try {
     $db = Database::getInstance();

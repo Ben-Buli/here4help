@@ -4,7 +4,7 @@
  * 用於驗證資料庫配置是否正確
  */
 
-require_once '../config/database.php';
+require_once __DIR__ . '/../config/database.php';
 
 echo "=== 資料庫連線測試 ===\n";
 

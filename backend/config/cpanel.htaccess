@@ -1,0 +1,224 @@
+# Here4Help CPanel 部署 .htaccess 配置
+# 適用於 Apache 2.4.65 + CPanel 環境
+
+# 啟用重寫引擎
+RewriteEngine On
+
+# 強制 HTTPS (生產環境)
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# 安全標頭設置
+<IfModule mod_headers.c>
+    # 防止 MIME 類型嗅探
+    Header always set X-Content-Type-Options nosniff
+    
+    # 防止點擊劫持
+    Header always set X-Frame-Options DENY
+    
+    # XSS 保護
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # HSTS (僅 HTTPS)
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
+    
+    # 內容安全政策
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https: wss:; frame-src 'self' https://accounts.google.com https://www.facebook.com"
+    
+    # 推薦者政策
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# API 路由重寫
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/(.*)$ backend/api/$1 [L,QSA]
+
+# 管理後台路由 (Laravel)
+RewriteCond %{REQUEST_URI} ^/admin
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^admin/(.*)$ admin/public/$1 [L,QSA]
+
+# Flutter Web 應用路由
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/backend
+RewriteCond %{REQUEST_URI} !^/admin
+RewriteCond %{REQUEST_URI} !^/socket
+RewriteRule ^(.*)$ web/index.html [L]
+
+# 媒體檔案處理
+RewriteRule ^media/(.*)$ backend/api/media/serve.php?file=$1 [L,QSA]
+
+# 檔案上傳大小限制 (PHP 設置)
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 20M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+    php_value memory_limit 256M
+</IfModule>
+
+# 快取設置
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # 圖片快取 1 個月
+    ExpiresByType image/jpg "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/gif "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    
+    # CSS/JS 快取 1 週
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType application/javascript "access plus 1 week"
+    ExpiresByType text/javascript "access plus 1 week"
+    
+    # 字體快取 1 年
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType application/font-woff "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
+    
+    # HTML 不快取
+    ExpiresByType text/html "access plus 0 seconds"
+    
+    # API 回應不快取
+    <LocationMatch "^/api/">
+        ExpiresActive Off
+        Header unset ETag
+        Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "Wed, 11 Jan 1984 05:00:00 GMT"
+    </LocationMatch>
+</IfModule>
+
+# Gzip 壓縮
+<IfModule mod_deflate.c>
+    # 壓縮 HTML, CSS, JavaScript, Text, XML 和字體
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/vnd.ms-fontobject
+    AddOutputFilterByType DEFLATE application/x-font
+    AddOutputFilterByType DEFLATE application/x-font-opentype
+    AddOutputFilterByType DEFLATE application/x-font-otf
+    AddOutputFilterByType DEFLATE application/x-font-truetype
+    AddOutputFilterByType DEFLATE application/x-font-ttf
+    AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE font/opentype
+    AddOutputFilterByType DEFLATE font/otf
+    AddOutputFilterByType DEFLATE font/ttf
+    AddOutputFilterByType DEFLATE image/svg+xml
+    AddOutputFilterByType DEFLATE image/x-icon
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/javascript
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/xml
+</IfModule>
+
+# 檔案保護
+<Files ".env">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files ".htaccess">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "*.log">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "composer.json">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "composer.lock">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "package.json">
+    Order allow,deny
+    Deny from all
+</Files>
+
+# 防止直接訪問 PHP 配置檔案
+<FilesMatch "\.(inc|conf|config)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# 防止訪問備份檔案
+<FilesMatch "\.(bak|backup|old|tmp)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# 限制檔案上傳類型
+<FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|jsp|asp|sh|cgi)$">
+    <RequireAll>
+        Require all denied
+    </RequireAll>
+</FilesMatch>
+
+# 允許上傳目錄中的圖片和文檔
+<Directory "backend/uploads">
+    <FilesMatch "\.(jpg|jpeg|png|gif|webp|pdf|doc|docx|txt)$">
+        Require all granted
+    </FilesMatch>
+</Directory>
+
+# CORS 設置 (用於 API)
+<IfModule mod_headers.c>
+    # 預檢請求處理
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
+    
+    # API 端點 CORS
+    <LocationMatch "^/api/">
+        Header always set Access-Control-Allow-Origin "https://yourdomain.com"
+        Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+        Header always set Access-Control-Allow-Credentials "true"
+        Header always set Access-Control-Max-Age "3600"
+    </LocationMatch>
+</IfModule>
+
+# 錯誤頁面
+ErrorDocument 404 /backend/api/errors/404.php
+ErrorDocument 500 /backend/api/errors/500.php
+
+# 防止目錄瀏覽
+Options -Indexes
+
+# 防止 HTTP TRACE 方法
+RewriteCond %{REQUEST_METHOD} ^TRACE
+RewriteRule .* - [F]
+
+# 防止常見攻擊
+RewriteCond %{QUERY_STRING} (<|%3C)([^s]*s)+cript.*(>|%3E) [NC,OR]
+RewriteCond %{QUERY_STRING} GLOBALS(=|\[|\%[0-9A-Z]{0,2}) [OR]
+RewriteCond %{QUERY_STRING} _REQUEST(=|\[|\%[0-9A-Z]{0,2}) [OR]
+RewriteCond %{QUERY_STRING} ^.*(\[|\]|\(|\)|<|>|ê|"|;|\?|\*|=$).* [NC,OR]
+RewriteCond %{QUERY_STRING} ^.*("|'|<|>|\|).* [NC,OR]
+RewriteCond %{QUERY_STRING} ^.*(%0|%A|%B|%C|%D|%E|%F|127\.0).* [NC,OR]
+RewriteCond %{QUERY_STRING} ^.*(globals|encode|localhost|loopback).* [NC,OR]
+RewriteCond %{QUERY_STRING} ^.*(request|select|insert|union|declare).* [NC]
+RewriteRule ^(.*)$ - [F,L]
+
+# 限制請求大小
+LimitRequestBody 20971520
+
+# 設置伺服器簽名
+ServerTokens Prod

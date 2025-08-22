@@ -4,7 +4,7 @@
  * 整合驗證、修復和報告生成功能
  */
 
-require_once '../config/database.php';
+require_once __DIR__ . '/../config/database.php';
 require_once 'validate_structure.php';
 require_once 'fix_structure.php';
 require_once 'generate_report.php';

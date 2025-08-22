@@ -73,7 +73,7 @@ class JWTManager {
             
             // 準備 payload
             $payload['iat'] = time(); // 簽發時間
-            $payload['exp'] = time() + ($expiration ?? self::$expirationTime); // 過期時間
+            $payload['exp'] = time() + ($expiration ?? self::$accessTokenExpiration); // 過期時間
             $payload['nbf'] = time(); // 生效時間（現在）
             
             // 編碼 header 和 payload
@@ -90,6 +90,8 @@ class JWTManager {
             
             // 組合 JWT
             $token = $headerEncoded . '.' . $payloadEncoded . '.' . $signatureEncoded;
+            error_log("JWTManager generated token (first 50): " . substr($token, 0, 50) . "...");
+            error_log("JWTManager using secret hash: " . hash('sha256', $secret));
             
             // 驗證生成的 token（使用內部驗證，避免循環調用）
             if (!self::internalValidateToken($token)) {
@@ -113,6 +115,7 @@ class JWTManager {
     public static function validateToken($token) {
         try {
             $secret = self::getSecret();
+            error_log("JWTManager validateToken secret hash: " . hash('sha256', $secret));
             
             // 檢查 token 格式
             $parts = explode('.', $token);
@@ -144,6 +147,8 @@ class JWTManager {
                 true
             );
             $expectedSignatureEncoded = self::base64UrlEncode($expectedSignature);
+            error_log("JWTManager expected signature: " . substr($expectedSignatureEncoded, 0, 20) . "...");
+            error_log("JWTManager provided signature: " . substr($signatureEncoded, 0, 20) . "...");
             
             if (!hash_equals($signatureEncoded, $expectedSignatureEncoded)) {
                 error_log("JWT validation failed: Invalid signature");

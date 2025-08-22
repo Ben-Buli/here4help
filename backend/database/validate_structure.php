@@ -4,7 +4,7 @@
  * 檢查所有重要表格的結構、索引和外鍵關係
  */
 
-require_once '../config/database.php';
+require_once __DIR__ . '/../config/database.php';
 
 class DatabaseStructureValidator {
     private $db;

@@ -4,8 +4,8 @@
  * 用於檢查數據庫連接和基本查詢
  */
 
-require_once 'config/database.php';
-require_once 'utils/Response.php';
+require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/utils/Response.php';
 
 Response::setCorsHeaders();
 

@@ -4,7 +4,7 @@
  * 根據 docs/優先執行/聊天室模組_整合規格＿now_todo.md
  */
 
-require_once 'config/database.php';
+require_once __DIR__ . '/config/database.php';
 
 try {
     echo "<h1>資料庫結構規格檢查</h1>\n";

@@ -4,8 +4,8 @@
  * 只查詢基本的應徵記錄，不做複雜的 JOIN
  */
 
-require_once '../../../config/database.php';
-require_once '../../../utils/Response.php';
+require_once __DIR__ . '/../../../config/database.php';
+require_once __DIR__ . '/../../../utils/Response.php';
 
 Response::setCorsHeaders();
 
