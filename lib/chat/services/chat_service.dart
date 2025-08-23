@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/auth/services/auth_service.dart';
+import 'package:here4help/services/media/cross_platform_image_service.dart';
 
 class ChatService {
   static final ChatService _instance = ChatService._internal();
@@ -145,48 +145,59 @@ class ChatService {
     }
   }
 
-  /// 上傳聊天附件（回傳檔名與 URL），限制檔案大小與副檔名由後端處理
+  /// 上傳聊天附件（跨平台）
   Future<Map<String, dynamic>> uploadAttachment({
     required String roomId,
-    String? filePath,
-    List<int>? bytes,
-    String? fileName,
+    required ImageResult image,
   }) async {
-    final token = await AuthService.getToken();
-    if (token == null) {
-      throw Exception('未登入');
-    }
-    final uri = Uri.parse(AppConfig.chatUploadAttachmentUrl);
-    final request = http.MultipartRequest('POST', uri)
-      ..headers.addAll({'Authorization': 'Bearer $token'})
-      ..fields['room_id'] = roomId;
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('未登入');
+      }
 
-    if (bytes != null && (fileName != null && fileName.isNotEmpty)) {
-      final lower = fileName.toLowerCase();
-      MediaType? ct;
-      if (lower.endsWith('.png')) ct = MediaType('image', 'png');
-      if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
-        ct = MediaType('image', 'jpeg');
-      }
-      if (lower.endsWith('.gif')) ct = MediaType('image', 'gif');
-      request.files.add(http.MultipartFile.fromBytes('file', bytes,
-          filename: fileName, contentType: ct));
-    } else if (filePath != null) {
-      request.files.add(await http.MultipartFile.fromPath('file', filePath));
-    } else {
-      throw Exception('缺少檔案資料');
+      // 使用跨平台圖片服務上傳
+      final imageService = CrossPlatformImageService();
+      return await imageService.uploadImage(
+        image: image,
+        uploadUrl: AppConfig.chatUploadAttachmentUrl,
+        token: token,
+        fieldName: 'file',
+        additionalFields: {
+          'room_id': roomId,
+        },
+      );
+    } catch (e) {
+      throw Exception('上傳失敗: $e');
     }
-    final streamed = await request.send();
-    final response = await http.Response.fromStream(streamed);
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['success'] == true) {
-        return Map<String, dynamic>.from(data['data'] ?? {});
-      }
-      throw Exception(data['message'] ?? '上傳失敗');
-    } else {
-      throw Exception('HTTP ${response.statusCode}: 上傳失敗');
+  }
+
+  /// 從相機選擇並上傳聊天圖片
+  Future<Map<String, dynamic>> pickAndUploadFromCamera(String roomId) async {
+    final imageService = CrossPlatformImageService();
+    final image = await imageService.pickFromCamera(
+      config: ImageValidationConfig.chat,
+    );
+
+    if (image == null) {
+      throw Exception('未選擇圖片');
     }
+
+    return await uploadAttachment(roomId: roomId, image: image);
+  }
+
+  /// 從相簿選擇並上傳聊天圖片
+  Future<Map<String, dynamic>> pickAndUploadFromGallery(String roomId) async {
+    final imageService = CrossPlatformImageService();
+    final image = await imageService.pickFromGallery(
+      config: ImageValidationConfig.chat,
+    );
+
+    if (image == null) {
+      throw Exception('未選擇圖片');
+    }
+
+    return await uploadAttachment(roomId: roomId, image: image);
   }
 
   /// 確保聊天房間存在

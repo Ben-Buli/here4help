@@ -79,9 +79,62 @@ class _HomePageState extends State<HomePage> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(user?.name ?? 'User',
-                                style: const TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.bold)),
+                            Row(
+                              children: [
+                                Builder(
+                                  // 使用 Builder 來確保 user 顯示名稱 有值
+                                  builder: (context) {
+                                    final displayName = [
+                                      user?.nickname,
+                                      user?.name,
+                                      'User'
+                                    ]
+                                        .firstWhere(
+                                            (v) => v != null && v.isNotEmpty)
+                                        .toString();
+                                    return Text(displayName,
+                                        style: const TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black));
+                                  },
+                                ),
+                                Builder(
+                                  builder: (context) {
+                                    String? getPermissionStatus(int? level) {
+                                      if (level == -1 || level == -3) {
+                                        return 'Suspended';
+                                      }
+                                      return null;
+                                    }
+
+                                    final status = getPermissionStatus(
+                                        user?.permission_level);
+                                    if (status != null) {
+                                      return Row(
+                                        children: [
+                                          const SizedBox(width: 12),
+                                          Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: Text(
+                                                '($status)',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .secondary,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              )),
+                                        ],
+                                      );
+                                    }
+                                    return const SizedBox.shrink();
+                                  },
+                                ),
+                              ],
+                            ),
                             Text(
                                 '${NumberFormat.decimalPattern().format(user?.points ?? 0)} points',
                                 style: const TextStyle(fontSize: 16)),

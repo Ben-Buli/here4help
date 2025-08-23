@@ -23,7 +23,7 @@ class OfflineTaskApi extends OfflineAwareApi {
     if (status != null) queryParams['status'] = status;
     if (category != null) queryParams['category'] = category;
 
-    final endpoint = '/tasks?' + Uri(queryParameters: queryParams).query;
+    final endpoint = '/tasks?${Uri(queryParameters: queryParams).query}';
 
     return await cachedListGet(
       endpoint: endpoint,

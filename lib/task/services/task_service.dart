@@ -140,24 +140,24 @@ class TaskService extends ChangeNotifier {
 
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
-        debugPrint(
-            '🔐 [Posted Tasks Aggregated] 使用認證 token: ${token.substring(0, 20)}...');
-        debugPrint('🔐 [Posted Tasks Aggregated] 完整 headers: $headers');
+        // debugPrint(
+        //     '🔐 [Posted Tasks Aggregated] 使用認證 token: ${token.substring(0, 20)}...');
+        // debugPrint('🔐 [Posted Tasks Aggregated] 完整 headers: $headers');
       } else {
-        debugPrint('⚠️ [Posted Tasks Aggregated] 沒有認證 token');
-        debugPrint('⚠️ [Posted Tasks Aggregated] token 值: $token');
+        // debugPrint('⚠️ [Posted Tasks Aggregated] 沒有認證 token');
+        // debugPrint('⚠️ [Posted Tasks Aggregated] token 值: $token');
       }
 
       final resp = await http
           .get(uri, headers: headers)
           .timeout(const Duration(seconds: 30));
 
-      debugPrint(
-          '🔍 [Posted Tasks Aggregated] Response Status: ${resp.statusCode}');
+      // debugPrint(
+      //     '🔍 [Posted Tasks Aggregated] Response Status: ${resp.statusCode}');
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
-        debugPrint(
-            '🔍 [Posted Tasks Aggregated] Response Success: ${data['success']}');
+        // debugPrint(
+        //     '🔍 [Posted Tasks Aggregated] Response Success: ${data['success']}');
         if (data['success'] == true) {
           final payload = data['data'] ?? {};
           final itemsRaw = payload['tasks'] ?? [];
@@ -165,7 +165,7 @@ class TaskService extends ChangeNotifier {
               ? itemsRaw.map((e) => Map<String, dynamic>.from(e)).toList()
               : [];
           final hasMore = (payload['pagination']?['has_more'] ?? false) == true;
-          debugPrint('🔍 [Posted Tasks Aggregated] 成功獲取 ${items.length} 個任務');
+          // debugPrint('🔍 [Posted Tasks Aggregated] 成功獲取 ${items.length} 個任務');
 
           // 調試：顯示前幾個任務的詳細數據
           for (int i = 0; i < items.length && i < 3; i++) {
@@ -404,7 +404,7 @@ class TaskService extends ChangeNotifier {
       ).timeout(const Duration(seconds: 30));
       debugPrint(
           '🔍 TaskService loadMyApplications: HTTP 狀態碼: ${response.statusCode}');
-      debugPrint('🔍 TaskService loadMyApplications: 回應內容: ${response.body}');
+      // debugPrint('🔍 TaskService loadMyApplications: 回應內容: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

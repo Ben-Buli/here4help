@@ -280,6 +280,10 @@ function serveFile($filePath, $fileRecord, $download = false) {
  * 處理範圍請求
  */
 function serveRangeRequest($filePath, $fileSize) {
+    if (!isset($_SERVER['HTTP_RANGE'])) {
+        return;
+    }
+    
     $range = $_SERVER['HTTP_RANGE'];
     
     if (preg_match('/bytes=(\d+)-(\d*)/', $range, $matches)) {

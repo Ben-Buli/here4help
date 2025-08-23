@@ -1,0 +1,312 @@
+{
+  "module_name": "個人資料更新模組 (Profile Update Module)",
+  "version": "2.0",
+  "priority": "high",
+  "estimated_time": "3-4 days",
+  "description": "完善用戶個人資料管理功能，包含頭像上傳、資料驗證、權限控制等",
+  
+  "current_status": {
+    "existing_files": [
+      "lib/account/pages/profile_page.dart",
+      "backend/api/account/profile.php", 
+      "backend/api/auth/update-profile.php"
+    ],
+    "issues": [
+      "缺乏統一的 API 規範",
+      "頭像上傳功能不完整",
+      "缺乏資料驗證",
+      "權限控制不足",
+      "錯誤處理不一致"
+    ]
+  },
+
+  "tasks": [
+    {
+      "id": "T1-BE-PROFILE-API",
+      "title": "後端個人資料 API 重構",
+      "priority": "high",
+      "estimated_hours": 8,
+      "description": "統一個人資料 CRUD API，整合權限控制和資料驗證",
+      "subtasks": [
+        {
+          "id": "T1.1",
+          "title": "重構 profile.php API",
+          "details": [
+            "統一 GET /api/account/profile 端點",
+            "整合 JWT 認證和權限檢查",
+            "添加多源 token 讀取支持（MAMP 兼容）",
+            "使用統一的 Response 格式和錯誤碼"
+          ]
+        },
+        {
+          "id": "T1.2", 
+          "title": "重構 update-profile.php API",
+          "details": [
+            "統一 PUT /api/account/profile 端點",
+            "強化資料驗證（email、phone、date 格式）",
+            "添加欄位級別的權限控制",
+            "記錄操作日誌到 user_active_log"
+          ]
+        },
+        {
+          "id": "T1.3",
+          "title": "新增頭像上傳 API",
+          "details": [
+            "POST /api/account/avatar 端點",
+            "整合媒體處理系統（壓縮、格式驗證）",
+            "支援本機和 S3 儲存",
+            "舊頭像自動清理機制"
+          ]
+        }
+      ]
+    },
+    
+    {
+      "id": "T2-FE-PROFILE-UI",
+      "title": "前端個人資料介面優化",
+      "priority": "high", 
+      "estimated_hours": 10,
+      "description": "重構個人資料頁面，提升用戶體驗和資料驗證",
+      "subtasks": [
+        {
+          "id": "T2.1",
+          "title": "重構 ProfilePage 組件",
+          "details": [
+            "模組化編輯組件（ProfileEditField, AvatarUpload）",
+            "整合 PermissionProvider 狀態管理",
+            "添加即時資料驗證",
+            "改善載入狀態和錯誤處理"
+          ]
+        },
+        {
+          "id": "T2.2",
+          "title": "新增頭像上傳功能",
+          "details": [
+            "支援相機拍照和相簿選擇",
+            "即時預覽和裁剪功能",
+            "上傳進度指示器",
+            "頭像快取和離線支援"
+          ]
+        },
+        {
+          "id": "T2.3",
+          "title": "資料驗證和表單優化",
+          "details": [
+            "即時欄位驗證（email、phone、date）",
+            "國家和語言選擇器優化",
+            "表單狀態管理（dirty checking）",
+            "自動儲存和變更提示"
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "T3-VALIDATION-SYSTEM",
+      "title": "資料驗證系統",
+      "priority": "medium",
+      "estimated_hours": 6,
+      "description": "建立前後端一致的資料驗證系統",
+      "subtasks": [
+        {
+          "id": "T3.1",
+          "title": "後端驗證器",
+          "details": [
+            "ProfileValidator 類別",
+            "Email、Phone、Date 格式驗證",
+            "國家代碼和語言代碼驗證",
+            "自定義驗證規則支援"
+          ]
+        },
+        {
+          "id": "T3.2",
+          "title": "前端驗證器",
+          "details": [
+            "profile_validator.dart 服務",
+            "即時驗證反饋",
+            "多語言錯誤訊息",
+            "與後端驗證規則同步"
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "T4-PERMISSION-CONTROL",
+      "title": "權限控制系統",
+      "priority": "medium",
+      "estimated_hours": 4,
+      "description": "實作欄位級別的權限控制",
+      "subtasks": [
+        {
+          "id": "T4.1",
+          "title": "欄位權限配置",
+          "details": [
+            "定義可編輯欄位權限矩陣",
+            "管理員可編輯所有欄位",
+            "一般用戶限制敏感欄位",
+            "停權用戶唯讀模式"
+          ]
+        },
+        {
+          "id": "T4.2",
+          "title": "前端權限整合",
+          "details": [
+            "動態顯示/隱藏編輯按鈕",
+            "權限不足時的友好提示",
+            "整合 PermissionGuard 系統"
+          ]
+        }
+      ]
+    },
+
+    {
+      "id": "T5-TESTING-DOCS",
+      "title": "測試和文檔",
+      "priority": "low",
+      "estimated_hours": 4,
+      "description": "完善測試覆蓋和使用文檔",
+      "subtasks": [
+        {
+          "id": "T5.1",
+          "title": "API 測試",
+          "details": [
+            "profile_api_test.php 測試腳本",
+            "頭像上傳測試",
+            "權限控制測試",
+            "資料驗證測試"
+          ]
+        },
+        {
+          "id": "T5.2",
+          "title": "文檔更新",
+          "details": [
+            "API 文檔更新（OpenAPI）",
+            "前端組件使用說明",
+            "權限配置指南"
+          ]
+        }
+      ]
+    }
+  ],
+
+  "technical_requirements": {
+    "backend": {
+      "apis": [
+        "GET /api/account/profile - 獲取個人資料",
+        "PUT /api/account/profile - 更新個人資料", 
+        "POST /api/account/avatar - 上傳頭像",
+        "DELETE /api/account/avatar - 刪除頭像"
+      ],
+      "features": [
+        "JWT 認證和權限檢查",
+        "多源 token 讀取（MAMP 兼容）",
+        "統一 Response 格式和錯誤碼",
+        "資料驗證和清理",
+        "操作日誌記錄",
+        "媒體檔案處理"
+      ]
+    },
+    "frontend": {
+      "components": [
+        "ProfilePage - 主要個人資料頁面",
+        "ProfileEditField - 可編輯欄位組件",
+        "AvatarUpload - 頭像上傳組件",
+        "ProfileValidator - 資料驗證服務"
+      ],
+      "features": [
+        "即時資料驗證",
+        "權限感知 UI",
+        "離線支援和快取",
+        "載入狀態和錯誤處理",
+        "頭像裁剪和預覽"
+      ]
+    }
+  },
+
+  "database_changes": {
+    "users_table": {
+      "new_columns": [
+        "avatar_updated_at TIMESTAMP - 頭像更新時間",
+        "profile_updated_at TIMESTAMP - 資料更新時間"
+      ],
+      "indexes": [
+        "INDEX idx_users_updated (updated_at)",
+        "INDEX idx_users_avatar (avatar_url)"
+      ]
+    },
+    "user_active_log": {
+      "new_actions": [
+        "profile_update - 個人資料更新",
+        "avatar_upload - 頭像上傳",
+        "avatar_delete - 頭像刪除"
+      ]
+    }
+  },
+
+  "security_considerations": [
+    "頭像檔案大小和格式限制",
+    "敏感欄位的權限控制",
+    "資料驗證防止 XSS 攻擊",
+    "上傳檔案的安全掃描",
+    "操作頻率限制"
+  ],
+
+  "performance_optimizations": [
+    "頭像圖片壓縮和快取",
+    "資料變更的增量更新",
+    "前端表單狀態最佳化",
+    "API 回應快取策略"
+  ],
+
+  "testing_strategy": {
+    "unit_tests": [
+      "資料驗證器測試",
+      "權限控制邏輯測試",
+      "API 端點功能測試"
+    ],
+    "integration_tests": [
+      "完整個人資料更新流程",
+      "頭像上傳和處理流程",
+      "權限控制端對端測試"
+    ],
+    "user_acceptance_tests": [
+      "個人資料編輯用戶體驗",
+      "頭像上傳用戶體驗",
+      "錯誤處理和恢復"
+    ]
+  },
+
+  "deployment_checklist": [
+    "資料庫遷移腳本執行",
+    "媒體儲存目錄權限設定",
+    "API 端點路由配置",
+    "前端組件整合測試",
+    "權限配置驗證",
+    "效能基準測試"
+  ],
+
+  "success_criteria": [
+    "用戶可以順利編輯所有個人資料欄位",
+    "頭像上傳功能穩定運作",
+    "資料驗證前後端一致",
+    "權限控制正確執行",
+    "API 回應時間 < 500ms",
+    "錯誤處理用戶友好"
+  ],
+
+  "risks_and_mitigation": [
+    {
+      "risk": "頭像上傳檔案過大影響效能",
+      "mitigation": "實作檔案大小限制和自動壓縮"
+    },
+    {
+      "risk": "資料驗證不一致導致錯誤",
+      "mitigation": "建立共用驗證規則和測試覆蓋"
+    },
+    {
+      "risk": "權限控制漏洞",
+      "mitigation": "多層權限檢查和安全測試"
+    }
+  ]
+}

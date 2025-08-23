@@ -9,6 +9,7 @@ import 'package:here4help/auth/models/user_model.dart';
 import 'package:here4help/auth/services/third_party_auth_service.dart';
 import 'package:here4help/auth/services/auth_service.dart';
 import 'package:here4help/utils/image_helper.dart';
+import 'package:here4help/providers/permission_provider.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -102,6 +103,11 @@ class _LoginPageState extends State<LoginPage> {
         permission_level: user['permission'] ?? 0,
       ));
 
+      // 同步 PermissionProvider 權限狀態
+      final permissionProvider =
+          Provider.of<PermissionProvider>(context, listen: false);
+      permissionProvider.syncWithBackendResponse(authData);
+
       // 儲存用戶 email 到 SharedPreferences（用於路由重定向）
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_email', user['email']);
@@ -117,6 +123,7 @@ class _LoginPageState extends State<LoginPage> {
 
       print('🚀 準備跳轉到首頁...');
       print('📍 當前路徑: ${GoRouterState.of(context).uri.path}');
+      print('🔐 當前權限: ${permissionProvider.permission}');
 
       context.go('/home');
 

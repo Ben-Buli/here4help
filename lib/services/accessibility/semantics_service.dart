@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 
 /// 語義標註服務
 /// 提供統一的無障礙語義標註和鍵盤操作支援
@@ -18,8 +17,9 @@ class SemanticsService {
     required String reward,
     VoidCallback? onTap,
   }) {
-    final semanticsLabel = '任務: $taskTitle. 描述: $taskDescription. 狀態: $status. 獎勵: $reward 點數';
-    
+    final semanticsLabel =
+        '任務: $taskTitle. 描述: $taskDescription. 狀態: $status. 獎勵: $reward 點數';
+
     return Semantics(
       label: semanticsLabel,
       button: onTap != null,
@@ -38,10 +38,10 @@ class SemanticsService {
     required bool isOwn,
   }) {
     final timeString = _formatTime(timestamp);
-    final semanticsLabel = isOwn 
+    final semanticsLabel = isOwn
         ? '您在 $timeString 發送: $message'
         : '$senderName 在 $timeString 發送: $message';
-    
+
     return Semantics(
       label: semanticsLabel,
       liveRegion: true,
@@ -77,7 +77,7 @@ class SemanticsService {
     VoidCallback? onTap,
   }) {
     final semanticsLabel = isSelected ? '$label, 已選取' : label;
-    
+
     return Semantics(
       label: semanticsLabel,
       button: true,
@@ -109,9 +109,9 @@ class SemanticsService {
     required int count,
     required String itemName,
   }) {
-    final semanticsLabel = count == 0 
+    final semanticsLabel = count == 0
         ? '沒有$itemName'
-        : count == 1 
+        : count == 1
             ? '1個$itemName'
             : '$count個$itemName';
 
@@ -130,7 +130,7 @@ class SemanticsService {
     bool interactive = false,
   }) {
     final semanticsLabel = '評分 $rating 分，滿分 $maxRating 分';
-    
+
     return Semantics(
       label: semanticsLabel,
       slider: interactive,
@@ -145,7 +145,7 @@ class SemanticsService {
     String? loadingMessage,
   }) {
     final semanticsLabel = loadingMessage ?? '載入中';
-    
+
     return Semantics(
       label: semanticsLabel,
       liveRegion: true,
@@ -221,7 +221,7 @@ class KeyboardNavigationHelper {
       child: Builder(
         builder: (context) {
           final hasFocus = Focus.of(context).hasFocus;
-          
+
           return GestureDetector(
             onTap: onTap,
             child: Container(
@@ -253,7 +253,7 @@ class KeyboardNavigationHelper {
   }) {
     return Focus(
       onKeyEvent: (node, event) {
-        if (event.logicalKey.keyLabel == 'Enter' || 
+        if (event.logicalKey.keyLabel == 'Enter' ||
             event.logicalKey.keyLabel == 'Space') {
           onActivate();
           return KeyEventResult.handled;

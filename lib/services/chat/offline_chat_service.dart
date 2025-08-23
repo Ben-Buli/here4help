@@ -275,7 +275,7 @@ class OfflineChatService extends ChangeNotifier {
     required String content,
     String type = 'text',
   }) async {
-    final tempId = '${DateTime.now().millisecondsSinceEpoch}_${chatRoomId}';
+    final tempId = '${DateTime.now().millisecondsSinceEpoch}_$chatRoomId';
 
     try {
       // 創建本地訊息

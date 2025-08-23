@@ -1,4 +1,6 @@
 // auth_guard.dart
+// ⚠️ DEPRECATED: 此檔案已被棄用，請使用 lib/router/guards/permission_guard.dart
+// 新的權限守衛系統提供更完整的權限控制和更好的用戶體驗
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +19,7 @@ final Map<String, dynamic> publicRoutes = {};
 final Map<String, dynamic> protectedRoutes = {};
 
 /// ✅ 檢查目前使用者是否具備進入某路由的權限
+/// ⚠️ DEPRECATED: 請使用 PermissionGuard.canAccessRoute()
 bool isAuthorized(BuildContext context, String? routeName) {
   if (routeName == null) return false;
 
@@ -31,6 +34,7 @@ bool isAuthorized(BuildContext context, String? routeName) {
 
 /// ✅ 路由守衛，用於 GoRouter 中的 `builder` 呼叫
 /// 根據目前使用者權限等級判斷要進入原本頁面、登入頁面、或封鎖頁面
+/// ⚠️ DEPRECATED: 請使用 PermissionGuard.guardRoute()
 Widget guardRoute(BuildContext context, GoRouterState state, Widget page) {
   final routeName = state.uri.path;
   final userService = Provider.of<UserService>(context, listen: false);

@@ -7,18 +7,18 @@ class PasswordApi {
   static Future<Map<String, dynamic>> changePassword({
     required String currentPassword,
     required String newPassword,
-    required String confirmPassword,
   }) async {
     try {
       final body = {
         'current_password': currentPassword,
         'new_password': newPassword,
-        'confirm_password': confirmPassword,
+        'confirm_password': newPassword, // 後端需要此參數進行二次驗證
       };
 
       final response = await HttpClientService.post(
         '${AppConfig.apiBaseUrl}/backend/api/account/change-password.php',
         body: jsonEncode(body),
+        useQueryParamToken: true, // 使用查詢參數傳遞 token（MAMP 兼容）
       );
 
       if (response.statusCode == 200) {
@@ -90,18 +90,23 @@ class PasswordApi {
 
   /// 刪除帳號
   static Future<Map<String, dynamic>> deleteAccount({
-    required String password,
-    required String reason,
+    required String password, // 現在是 "DELETE" 確認文字
+    String? reason, // 改為可選參數
   }) async {
     try {
-      final body = {
-        'password': password,
-        'reason': reason,
+      final body = <String, dynamic>{
+        'confirmation': password, // 傳遞 "DELETE" 確認文字
       };
+
+      // 只有在有原因時才添加
+      if (reason != null && reason.isNotEmpty) {
+        body['reason'] = reason;
+      }
 
       final response = await HttpClientService.post(
         '${AppConfig.apiBaseUrl}/backend/api/account/delete.php',
         body: jsonEncode(body),
+        useQueryParamToken: true, // 使用查詢參數傳遞 token（MAMP 兼容）
       );
 
       if (response.statusCode == 200) {

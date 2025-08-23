@@ -643,8 +643,8 @@ class ChatListProvider extends ChangeNotifier {
     final prev = _tabHasUnread[tabIndex];
     // 若實際狀態未變更，直接忽略
     if (prev == value) {
-      debugPrint(
-          '🔄 [ChatListProvider] 未讀狀態未改變，跳過通知: tab=$tabIndex, value=$value');
+      // debugPrint(
+      //     '🔄 [ChatListProvider] 未讀狀態未改變，跳過通知: tab=$tabIndex, value=$value');
       return;
     }
 
@@ -655,9 +655,9 @@ class ChatListProvider extends ChangeNotifier {
 
     if (timeDiff < 500) {
       // 500ms 內的重複更新被忽略
-      debugPrint(
-          '⏱️ [ChatListProvider] 時間防抖: tab=$tabIndex, 間隔=${timeDiff}ms < 500ms');
-      return;
+      // debugPrint(
+      //     '⏱️ [ChatListProvider] 時間防抖: tab=$tabIndex, 間隔=${timeDiff}ms < 500ms');
+      // return;
     }
 
     // 記錄待更新值
@@ -903,7 +903,7 @@ class ChatListProvider extends ChangeNotifier {
         debugPrint(
             '  - Posted Tasks: ${_cacheManager.postedTasksCache.length}');
         debugPrint('  - My Works: ${_cacheManager.myWorksCache.length}');
-        debugPrint('  - 應徵者數據: ${_applicationsByTask.length} 個任務');
+        // debugPrint('  - 應徵者數據: ${_applicationsByTask.length} 個任務');
 
         // 進入頁面後輕量檢查更新
         _checkForUpdatesAfterEnter();

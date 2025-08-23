@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:here4help/constants/app_scaffold_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:here4help/router/guards/permission_guard.dart';
 
 // ===== Auth 模組 =====
 import 'package:here4help/auth/pages/login_page.dart';
@@ -39,8 +40,8 @@ final GoRouter appRouter = GoRouter(
     final prefs = await SharedPreferences.getInstance();
     final email = prefs.getString('user_email');
 
-    print('🔄 路由重定向檢查: ${state.uri.path}');
-    print('👤 用戶狀態: ${email != null ? "已登入 ($email)" : "未登入"}');
+    debugPrint('🔄 路由重定向檢查: ${state.uri.path}');
+    debugPrint('👤 用戶狀態: ${email != null ? "已登入 ($email)" : "未登入"}');
 
     // 定義公開頁面（不需要登入驗證）
     final publicPages = ['/login', '/signup', '/signup/student-id'];
@@ -136,6 +137,20 @@ final GoRouter appRouter = GoRouter(
         debugPrint('🔍 [app_router] title: ${pageConfig['title']}');
         debugPrint('🔍 [app_router] titleWidget: ${titleWidget.runtimeType}');
 
+        // 創建頁面內容
+        Widget pageContent;
+        if (pageConfig.containsKey('builder')) {
+          final builderFunction =
+              pageConfig['builder'] as Widget Function(BuildContext, dynamic);
+          pageContent = builderFunction(context, state.extra);
+        } else {
+          pageContent = pageConfig['child'] as Widget;
+        }
+
+        // 應用權限守衛
+        final guardedPage =
+            PermissionGuard.guardRoute(context, state, pageContent);
+
         return AppScaffold(
           title: pageConfig['title'] ?? AppScaffoldDefaults.defaultTitle,
           titleWidget: titleWidget, // 只傳遞 title 組件
@@ -147,7 +162,7 @@ final GoRouter appRouter = GoRouter(
               AppScaffoldDefaults.defaultShowBackArrow,
           centerTitle: AppScaffoldDefaults.defaultCenterTitle,
           actions: actions,
-          child: child,
+          child: guardedPage,
         );
       },
       routes: [
@@ -162,13 +177,16 @@ final GoRouter appRouter = GoRouter(
                       if (page.containsKey('builder')) {
                         final builderFunction = page['builder'] as Widget
                             Function(BuildContext, dynamic);
-                        return NoTransitionPage(
-                          child: builderFunction(context, state.extra),
-                        );
+                        final pageContent =
+                            builderFunction(context, state.extra);
+                        final guardedPage = PermissionGuard.guardRoute(
+                            context, state, pageContent);
+                        return NoTransitionPage(child: guardedPage);
                       } else {
-                        return NoTransitionPage(
-                          child: page['child'] as Widget,
-                        );
+                        final pageContent = page['child'] as Widget;
+                        final guardedPage = PermissionGuard.guardRoute(
+                            context, state, pageContent);
+                        return NoTransitionPage(child: guardedPage);
                       }
                     },
                     routes: subRoutes.map((subRoute) {
@@ -176,13 +194,16 @@ final GoRouter appRouter = GoRouter(
                         path: subRoute['path'],
                         pageBuilder: (context, state) {
                           if (subRoute.containsKey('builder')) {
-                            return NoTransitionPage(
-                              child: subRoute['builder'](context, state.extra),
-                            );
+                            final pageContent =
+                                subRoute['builder'](context, state.extra);
+                            final guardedPage = PermissionGuard.guardRoute(
+                                context, state, pageContent);
+                            return NoTransitionPage(child: guardedPage);
                           } else {
-                            return NoTransitionPage(
-                              child: subRoute['child'],
-                            );
+                            final pageContent = subRoute['child'];
+                            final guardedPage = PermissionGuard.guardRoute(
+                                context, state, pageContent);
+                            return NoTransitionPage(child: guardedPage);
                           }
                         },
                       );
@@ -196,18 +217,21 @@ final GoRouter appRouter = GoRouter(
                       if (page.containsKey('builder')) {
                         final builderFunction = page['builder'] as Widget
                             Function(BuildContext, dynamic);
-                        return NoTransitionPage(
-                          child: builderFunction(context, state.extra),
-                        );
+                        final pageContent =
+                            builderFunction(context, state.extra);
+                        final guardedPage = PermissionGuard.guardRoute(
+                            context, state, pageContent);
+                        return NoTransitionPage(child: guardedPage);
                       } else {
-                        return NoTransitionPage(
-                          child: page['child'] as Widget,
-                        );
+                        final pageContent = page['child'] as Widget;
+                        final guardedPage = PermissionGuard.guardRoute(
+                            context, state, pageContent);
+                        return NoTransitionPage(child: guardedPage);
                       }
                     },
                   ),
                 ];
-        }).toList(),
+        }),
       ],
     ),
     // 其他非底部導航頁面

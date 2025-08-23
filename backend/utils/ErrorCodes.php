@@ -27,6 +27,8 @@ class ErrorCodes {
     const ACCOUNT_LOCKED = 'E2007';
     const ACCOUNT_SUSPENDED = 'E2008';
     const ACCOUNT_DELETED = 'E2009';
+    // 新增：帳號未處於可恢復的停用狀態
+    const ACCOUNT_NOT_IN_DEACTIVATED_STATE = 'E2010';
     
     // 用戶相關錯誤碼 (3000-3999)
     const USER_NOT_FOUND = 'E3001';
@@ -67,6 +69,8 @@ class ErrorCodes {
     const RESOURCE_CONFLICT = 'E7003';
     const QUOTA_EXCEEDED = 'E7004';
     const FEATURE_DISABLED = 'E7005';
+    // 新增：有活躍任務阻擋帳號停用
+    const ACCOUNT_DEACTIVATION_BLOCKED = 'E7010';
     
     // 第三方服務錯誤碼 (8000-8999)
     const OAUTH_ERROR = 'E8001';
@@ -105,6 +109,7 @@ class ErrorCodes {
         self::ACCOUNT_LOCKED => '帳號已鎖定',
         self::ACCOUNT_SUSPENDED => '帳號已停用',
         self::ACCOUNT_DELETED => '帳號已刪除',
+        self::ACCOUNT_NOT_IN_DEACTIVATED_STATE => '帳號未處於停用狀態',
         
         // 用戶相關
         self::USER_NOT_FOUND => '用戶不存在',
@@ -145,6 +150,7 @@ class ErrorCodes {
         self::RESOURCE_CONFLICT => '資源衝突',
         self::QUOTA_EXCEEDED => '配額已滿',
         self::FEATURE_DISABLED => '功能已停用',
+        self::ACCOUNT_DEACTIVATION_BLOCKED => '有未結束任務，需先完成或取消後才能停用帳號',
         
         // 第三方服務
         self::OAUTH_ERROR => '第三方登入錯誤',
@@ -184,6 +190,7 @@ class ErrorCodes {
         self::ACCOUNT_LOCKED => 403,
         self::ACCOUNT_SUSPENDED => 403,
         self::ACCOUNT_DELETED => 403,
+        self::ACCOUNT_NOT_IN_DEACTIVATED_STATE => 400,
         
         // 用戶相關 - 404 Not Found / 409 Conflict
         self::USER_NOT_FOUND => 404,
@@ -224,6 +231,7 @@ class ErrorCodes {
         self::RESOURCE_CONFLICT => 409,
         self::QUOTA_EXCEEDED => 429,
         self::FEATURE_DISABLED => 503,
+        self::ACCOUNT_DEACTIVATION_BLOCKED => 409,
         
         // 第三方服務 - 502 Bad Gateway / 503 Service Unavailable
         self::OAUTH_ERROR => 502,
@@ -289,5 +297,3 @@ class ErrorCodes {
         }
     }
 }
-?>
-

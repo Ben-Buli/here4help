@@ -14,7 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/utils/image_helper.dart';
 import 'package:here4help/chat/services/chat_service.dart';
 import 'package:here4help/chat/services/socket_service.dart';
-import 'package:image_picker/image_picker.dart';
+
 import 'package:photo_view/photo_view.dart';
 import 'package:here4help/utils/path_mapper.dart';
 import 'package:provider/provider.dart';
@@ -397,28 +397,15 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   /// 選擇圖片並上傳，成功後發送一則圖片訊息（簡化：以 [Photo] 檔名 + URL）
   Future<void> _pickAndSendPhoto() async {
     try {
-      final picker = ImagePicker();
-      final XFile? file = await picker.pickImage(source: ImageSource.gallery);
-      if (file == null) return;
       if (_currentRoomId == null) throw Exception('room 未初始化');
 
-      // Web 需使用 bytes 上傳；原生可用 path。這裡優先走 bytes，失敗再回退 path。
-      Map<String, dynamic> upload;
-      try {
-        final bytes = await file.readAsBytes();
-        upload = await ChatService().uploadAttachment(
-          roomId: _currentRoomId!,
-          bytes: bytes,
-          fileName: file.name,
-        );
-      } catch (_) {
-        upload = await ChatService().uploadAttachment(
-          roomId: _currentRoomId!,
-          filePath: file.path,
-        );
-      }
+      // 使用新的跨平台圖片服務
+      final chatService = ChatService();
+      final upload =
+          await chatService.pickAndUploadFromGallery(_currentRoomId!);
+
       final url = upload['url'] ?? upload['path'] ?? '';
-      final fileName = file.name;
+      final fileName = upload['filename'] ?? upload['name'] ?? 'image';
       final text = url is String && url.isNotEmpty
           ? '[Photo] $fileName\n$url'
           : '[Photo] $fileName';

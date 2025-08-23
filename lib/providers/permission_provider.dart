@@ -148,7 +148,7 @@ class PermissionProvider extends ChangeNotifier {
     return _permission == 0;
   }
 
-  /// 獲取權限狀態描述
+  /// 獲取權限狀態描述 (軟刪除不可登入、停權可登入)
   String getPermissionStatus() {
     switch (_permission) {
       case 0:
@@ -157,12 +157,12 @@ class PermissionProvider extends ChangeNotifier {
         return 'Account verified';
       case 99:
         return 'Administrator';
-      case -1:
-        return 'Account suspended by administrator';
+      // case -1:
+      //   return 'Account suspended by administrator';
       case -2:
         return 'Account removed by administrator';
-      case -3:
-        return 'Account self-suspended';
+      // case -3:
+      //   return 'Account self-suspended';
       case -4:
         return 'Account self-removed';
       default:
@@ -221,5 +221,57 @@ class PermissionProvider extends ChangeNotifier {
     } catch (e) {
       print('❌ 從本地存儲載入權限失敗: $e');
     }
+  }
+
+  /// 同步後端權限狀態
+  /// 當收到後端 API 響應時，確保前端權限狀態與後端一致
+  void syncWithBackendResponse(Map<String, dynamic> apiResponse) {
+    try {
+      // 檢查 API 響應中是否包含權限資訊
+      if (apiResponse.containsKey('permission')) {
+        final backendPermission = apiResponse['permission'] as int?;
+        if (backendPermission != null && backendPermission != _permission) {
+          print('🔄 同步後端權限狀態: $_permission -> $backendPermission');
+          updatePermission(backendPermission);
+        }
+      }
+
+      // 檢查 API 響應中是否包含用戶資料
+      if (apiResponse.containsKey('user_data')) {
+        final userData = apiResponse['user_data'] as Map<String, dynamic>?;
+        if (userData != null) {
+          updateUserData(userData);
+        }
+      }
+
+      // 檢查 API 響應中是否包含用戶資訊（直接包含權限）
+      if (apiResponse.containsKey('user')) {
+        final user = apiResponse['user'] as Map<String, dynamic>?;
+        if (user != null && user.containsKey('permission')) {
+          final userPermission = user['permission'] as int?;
+          if (userPermission != null && userPermission != _permission) {
+            print('🔄 同步用戶權限狀態: $_permission -> $userPermission');
+            updatePermission(userPermission);
+          }
+        }
+      }
+    } catch (e) {
+      print('❌ 同步後端權限狀態失敗: $e');
+    }
+  }
+
+  /// 檢查權限狀態是否與後端一致
+  /// 用於調試和驗證權限同步是否正常
+  bool isPermissionConsistent(int expectedPermission) {
+    return _permission == expectedPermission;
+  }
+
+  /// 強制更新權限狀態（用於特殊情況）
+  /// 通常不建議直接使用，優先使用 syncWithBackendResponse
+  void forceUpdatePermission(int newPermission) {
+    print('⚠️ 強制更新權限狀態: $_permission -> $newPermission');
+    _permission = newPermission;
+    notifyListeners();
+    _savePermissionToStorage();
   }
 }

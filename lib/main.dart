@@ -6,6 +6,7 @@ import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/config/environment_config.dart';
 import 'package:here4help/services/error_reporting_service.dart';
+import 'package:here4help/providers/permission_provider.dart';
 
 class Here4HelpApp extends StatelessWidget {
   const Here4HelpApp({super.key});
@@ -35,6 +36,9 @@ void main() async {
   // 初始化錯誤報告服務
   ErrorReportingService.initialize();
 
+  // 初始化權限狀態
+  await PermissionProvider.instance.initialize();
+
   // 打印環境信息
   EnvironmentConfig.printEnvironmentInfo();
 
@@ -44,6 +48,8 @@ void main() async {
         ChangeNotifierProvider<UserService>(create: (_) => UserService()),
         ChangeNotifierProvider<ThemeConfigManager>(
             create: (_) => ThemeConfigManager()),
+        ChangeNotifierProvider<PermissionProvider>(
+            create: (_) => PermissionProvider.instance),
       ],
       child: const Here4HelpApp(),
     ),

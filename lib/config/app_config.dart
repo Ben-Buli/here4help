@@ -22,7 +22,7 @@ class AppConfig {
   }
 
   static String get profileUrl {
-    return '$apiBaseUrl/backend/api/auth/profile.php';
+    return '$apiBaseUrl/backend/api/account/profile.php';
   }
 
   // 任務相關 API

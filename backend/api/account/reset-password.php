@@ -2,7 +2,18 @@
 require_once __DIR__ . '/../../config/env_loader.php';
 require_once __DIR__ . '/../../utils/Response.php';
 
+// CORS headers
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// Preflight
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    echo json_encode(['success' => true, 'message' => 'OK']);
+    exit;
+}
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

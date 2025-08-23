@@ -301,20 +301,15 @@ CREATE TABLE `task_statuses` (
 ### 4.3 應徵
 ```sql
 CREATE TABLE `task_applications` (
-  `id` BIGINT NOT NULL AUTO_INCREMENT,
-  `task_id` VARCHAR(36) NOT NULL,
-  `user_id` BIGINT UNSIGNED NOT NULL,
-  `status` ENUM('applied','accepted','rejected','pending','completed','cancelled','dispute') NOT NULL DEFAULT 'applied',
-  `accepted_flag` TINYINT AS (CASE WHEN `status`='accepted' THEN 1 ELSE NULL END) STORED,
-  `cover_letter` TEXT,
-  `answers_json` JSON DEFAULT NULL,
-  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uniq_task_user` (`task_id`,`user_id`),
-  UNIQUE KEY `uk_task_one_accept` (`task_id`,`accepted_flag`),
-  CONSTRAINT `fk_app_task` FOREIGN KEY (`task_id`) REFERENCES `tasks` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_app_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+  `id` bigint NOT NULL,
+  `task_id` varchar(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` bigint UNSIGNED NOT NULL,
+  `status` enum('applied','accepted','rejected','pending','completed','cancelled','dispute','withdrawn') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'applied' COMMENT '	•	applied — 已投遞 → task: open\r\n	•	accepted — 已被指派 → task: in_progress\r\n	•	rejected — 已被拒絕（任務發布者拒絕此應徵） → task: open（任務仍在招募中）\r\n	•	pending — 待處理 / 待確認（申請並正在等待發布者審核任務完成） → task: pending cofirmation\r\n	•	completed — 已完成（應徵的任務完成並確認結束） → task: completed\r\n	•	cancelled — 已取消（任務取消，或應徵因外部原因被取消） → task: cancelled\r\n	•	dispute — 爭議中（任務執行中產生爭議，等待仲裁處理） → task: dispute	•	withdrawn — 使用者已撤銷（應徵者主動撤回申請，或因停用/刪帳自動撤回） → task: open（回到待選狀態，其他人仍可應徵）',
+  `cover_letter` text COLLATE utf8mb4_unicode_ci,
+  `answers_json` json DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `accepted_flag` tinyint GENERATED ALWAYS AS ((case when (`status` = _utf8mb4'accepted') then 1 else NULL end)) STORED
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 

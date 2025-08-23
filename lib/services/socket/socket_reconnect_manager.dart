@@ -364,7 +364,7 @@ class SocketReconnectManager extends ChangeNotifier {
     } else if (_isConnecting) {
       return 'Socket 連接中...';
     } else if (_isReconnecting) {
-      return 'Socket 重連中... (${_reconnectAttempts}/$maxReconnectAttempts)';
+      return 'Socket 重連中... ($_reconnectAttempts/$maxReconnectAttempts)';
     } else {
       return 'Socket 未連接';
     }

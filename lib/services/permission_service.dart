@@ -102,7 +102,22 @@ class PermissionService {
   }
 
   /// 檢查頁面訪問權限
+  /// 權限邏輯：
+  /// - 權限 0, -1, -3 都可以訪問基本頁面（permission = 0）
+  /// - 只有權限 >= 1 才能訪問需要認證的頁面（permission >= 1）
+  /// - 被刪除的用戶（-2, -4）完全無法訪問
   static bool canAccessPage(int permission, int requiredPermission) {
+    // 被刪除的用戶無法訪問任何頁面
+    if (permission <= SELF_SOFT_DELETED) {
+      return false;
+    }
+
+    // 權限 0, -1, -3 可以訪問基本頁面（permission = 0），但無法訪問需要認證的頁面（permission >= 1）
+    if (permission <= SELF_SUSPENDED) {
+      return requiredPermission <= NEW_USER; // 只能訪問 permission 0 的頁面
+    }
+
+    // 其他情況使用基本邏輯
     return permission >= requiredPermission;
   }
 

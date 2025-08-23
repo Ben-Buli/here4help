@@ -2,18 +2,37 @@
 require_once __DIR__ . '/../../config/env_loader.php';
 require_once __DIR__ . '/../../utils/Response.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
+require_once __DIR__ . '/../../utils/UserActiveLogger.php';
 
+// CORS headers
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// Preflight
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    echo json_encode(['success' => true, 'message' => 'OK']);
+    exit;
+}
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         throw new Exception('Method not allowed');
     }
 
-    // 驗證 JWT token
+    // 驗證 JWT token - 支持多源讀取（Authorization header 和查詢參數）
     $jwtManager = new JWTManager();
+    
+    // 嘗試從 Authorization header 讀取
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
     $token = str_replace('Bearer ', '', $authHeader);
+    
+    // 如果 header 中沒有 token，嘗試從查詢參數讀取（MAMP 兼容性）
+    if (!$token) {
+        $token = $_GET['token'] ?? $_POST['token'] ?? '';
+    }
     
     if (!$token) {
         throw new Exception('Token is required');
@@ -95,22 +114,8 @@ try {
     ");
     
     $updateStmt->execute([$hashedNewPassword, $userId]);
-    
-    // 記錄操作日誌
-    $logSql = "
-        INSERT INTO user_activity_logs (user_id, action, details, ip_address, created_at)
-        VALUES (?, 'password_changed', ?, ?, NOW())
-    ";
-    
-    $logStmt = $pdo->prepare($logSql);
-    $logStmt->execute([
-        $userId, 
-        json_encode([
-            'timestamp' => date('Y-m-d H:i:s'),
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
-        ]),
-        $_SERVER['REMOTE_ADDR'] ?? 'unknown'
-    ]);
+
+    UserActiveLogger::logAction($pdo, $userId, 'password_changed', 'password', null, null, 'User changed password');
     
     $response = [
         'success' => true,

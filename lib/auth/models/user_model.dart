@@ -74,7 +74,9 @@ class UserModel {
       about_me: json['about_me'],
       school: json['school'],
       language_requirement: json['language_requirement'],
-      is_permanent_address: json['is_permanent_address'] == 1,
+      is_permanent_address: json['is_permanent_address'] == 1 ||
+          json['is_permanent_address'] == '1' ||
+          json['is_permanent_address'] == true,
     );
   }
 

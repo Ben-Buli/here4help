@@ -208,7 +208,7 @@ class _NotificationPreferencesPageState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               '全域設定',
               style: TextStyle(
                 fontSize: 20,
@@ -258,7 +258,7 @@ class _NotificationPreferencesPageState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               '靜音時段',
               style: TextStyle(
                 fontSize: 20,
@@ -336,7 +336,7 @@ class _NotificationPreferencesPageState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           '分類偏好',
           style: TextStyle(
             fontSize: 20,
@@ -372,7 +372,7 @@ class _NotificationPreferencesPageState
           children: [
             Text(
               categoryName,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: AppColors.primary,

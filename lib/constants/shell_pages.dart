@@ -40,6 +40,9 @@ import 'package:here4help/home/pages/home_page.dart';
 // ==================== pay 模組 ====================
 import 'package:here4help/pay/pages/pay_setting_page.dart';
 
+// ==================== system 模組 ====================
+import 'package:here4help/system/pages/permission_denied_page.dart';
+
 // ==================== task 模組 ====================
 import 'package:here4help/task/pages/task_create_page.dart';
 import 'package:here4help/task/pages/task_list_page.dart';
@@ -339,5 +342,14 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'permission': 1, // 需要已認證用戶才能設定支付
+  },
+  {
+    'path': '/permission-denied',
+    'child': const PermissionDeniedPage(),
+    'title': 'Permission Denied',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'permission': -4, // 任何狀態都可訪問權限不足頁面
   },
 ];

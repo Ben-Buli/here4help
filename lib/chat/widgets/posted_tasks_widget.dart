@@ -347,14 +347,14 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
         _applicationsByTask[taskId] = applicants;
 
-        debugPrint(
-            '🔍 [Posted Tasks] 任務 $taskId 處理後應徵者數量: ${applicants.length}');
+        // debugPrint(
+        //     '🔍 [Posted Tasks] 任務 $taskId 處理後應徵者數量: ${applicants.length}');
 
         // 調試：顯示應徵者詳細信息
         for (int i = 0; i < applicants.length; i++) {
           final applicant = applicants[i];
-          debugPrint(
-              '  - 應徵者 $i: ${applicant['applier_name']} (ID: ${applicant['user_id']})');
+          // debugPrint(
+          //     '  - 應徵者 $i: ${applicant['applier_name']} (ID: ${applicant['user_id']})');
           // debugPrint('    - 評分: ${applicant['avg_rating']}');
           // debugPrint('    - 評論數: ${applicant['review_count']}');
           // debugPrint('    - 聊天室ID: ${applicant['chat_room_id']}');
@@ -375,6 +375,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         debugPrint('  - 任務 $taskId: ${applicants.length} 個應徵者');
 
         // 檢查每個應徵者的必要欄位
+        final List<Map<String, dynamic>> applicantData = [];
         for (int i = 0; i < applicants.length; i++) {
           final applicant = applicants[i];
           final requiredFields = [
@@ -389,11 +390,15 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               .toList();
 
           if (missingFields.isNotEmpty) {
-            debugPrint('    ⚠️ 應徵者 $i 缺少欄位: $missingFields');
+            applicantData[i] = {
+              'missingFields': '❌ 應徵者 $i 缺少欄位: $missingFields',
+              'ApplicantDataComplete': false
+            };
           } else {
-            debugPrint('    ✅ 應徵者 $i 資料完整');
+            applicantData[i] = {'ApplicantDataComplete': true};
           }
         }
+        debugPrint('🔍 [Posted Tasks] 應徵者資料載入完成: $applicantData');
       }
     } catch (e) {
       debugPrint('❌ [Posted Tasks] 載入應徵者數據失敗: $e');
@@ -531,25 +536,25 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       // 應用篩選
       final filteredTasks = _filterTasks(_allTasks, chatProvider);
       debugPrint('🔍 [Posted Tasks] [_applyFiltersAndSort()] 篩選完成:');
-      debugPrint('  - 篩選後任務數: ${filteredTasks.length}');
+      // debugPrint('  - 篩選後任務數: ${filteredTasks.length}');
 
       // 應用排序
       final sortedTasks = _sortTasks(filteredTasks, chatProvider);
       debugPrint('🔍 [Posted Tasks] [_applyFiltersAndSort()] 排序完成:');
-      debugPrint('  - 排序後任務數: ${sortedTasks.length}');
+      // debugPrint('  - 排序後任務數: ${sortedTasks.length}');
 
       debugPrint('🔍 [Posted Tasks] [_applyFiltersAndSort()] 篩選和排序完成:');
-      debugPrint('  - 原始任務數: ${_allTasks.length}');
-      debugPrint('  - 篩選後任務數: ${filteredTasks.length}');
-      debugPrint('  - 排序後任務數: ${sortedTasks.length}');
+      // debugPrint('  - 原始任務數: ${_allTasks.length}');
+      // debugPrint('  - 篩選後任務數: ${filteredTasks.length}');
+      // debugPrint('  - 排序後任務數: ${sortedTasks.length}');
 
       // 更新狀態
       setState(() {
         _filteredTasks = filteredTasks;
         _sortedTasks = sortedTasks;
         debugPrint('🔍 [Posted Tasks] [_applyFiltersAndSort()] 狀態已更新');
-        debugPrint('  - _filteredTasks 長度: ${_filteredTasks.length}');
-        debugPrint('  - _sortedTasks 長度: ${_sortedTasks.length}');
+        // debugPrint('  - _filteredTasks 長度: ${_filteredTasks.length}');
+        // debugPrint('  - _sortedTasks 長度: ${_sortedTasks.length}');
       });
     } catch (e) {
       debugPrint('❌ [Posted Tasks] [_applyFiltersAndSort()] 篩選和排序失敗: $e');
@@ -877,12 +882,12 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           chatProvider.sortAscending ? comparison : -comparison;
 
       // 調試排序結果
-      if (finalComparison != 0) {
-        final aTitle = a['title'] ?? 'Unknown';
-        final bTitle = b['title'] ?? 'Unknown';
-        debugPrint(
-            '  🔄 排序: "$aTitle" ${finalComparison > 0 ? ">" : "<"} "$bTitle"');
-      }
+      // if (finalComparison != 0) {
+      //   final aTitle = a['title'] ?? 'Unknown';
+      //   final bTitle = b['title'] ?? 'Unknown';
+      // debugPrint(
+      //     '  🔄 排序: "$aTitle" ${finalComparison > 0 ? ">" : "<"} "$bTitle"');
+      // }
 
       return finalComparison;
     });
@@ -1026,10 +1031,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     final applicants = _applicationsByTask[taskId] ?? [];
 
     // 添加調試信息
-    debugPrint('🔍 [Posted Tasks] 建構任務卡片 $taskId');
+    // debugPrint('🔍 [Posted Tasks] 建構任務卡片 $taskId');
     debugPrint('  - 任務標題: ${task['title']}');
-    debugPrint('  - 應徵者數量: ${applicants.length}');
-    debugPrint('  - 應徵者數據: $applicants');
+    // debugPrint('  - 應徵者數量: ${applicants.length}');
+    // debugPrint('  - 應徵者數據: $applicants');
 
     if (applicants.isEmpty) {
       debugPrint('⚠️ [Posted Tasks] 任務 $taskId 沒有應徵者數據');
@@ -1039,9 +1044,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         final applicant = applicants[i];
         debugPrint(
             '    - 應徵者 $i: ${applicant['applier_name']} (ID: ${applicant['user_id']})');
-        debugPrint('      - 評分: ${applicant['avg_rating']}');
-        debugPrint('      - 評論數: ${applicant['review_count']}');
-        debugPrint('      - 聊天室ID: ${applicant['chat_room_id']}');
+        // debugPrint('      - 評分: ${applicant['avg_rating']}');
+        // debugPrint('      - 評論數: ${applicant['review_count']}');
+        // debugPrint('      - 聊天室ID: ${applicant['chat_room_id']}');
       }
     }
 

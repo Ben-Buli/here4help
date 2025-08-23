@@ -628,4 +628,66 @@ class JWTManager {
         
         return $payload;
     }
+    
+    /**
+     * 驗證請求中的 JWT Token
+     * 支援多種 Token 來源：Authorization header、GET 參數、POST 參數
+     * 
+     * @return array 包含 valid (bool) 和 payload/message 的陣列
+     */
+    public static function validateRequest() {
+        try {
+            // 嘗試從多個來源獲取 token
+            $token = null;
+            
+            // 1. 從 Authorization header 獲取
+            if (function_exists('getAuthorizationHeader')) {
+                $authHeader = getAuthorizationHeader();
+                if ($authHeader && strpos($authHeader, 'Bearer ') === 0) {
+                    $token = trim(substr($authHeader, 7));
+                }
+            }
+            
+            // 2. 從 $_SERVER 直接獲取
+            if (!$token && isset($_SERVER['HTTP_AUTHORIZATION'])) {
+                $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
+                if (strpos($authHeader, 'Bearer ') === 0) {
+                    $token = trim(substr($authHeader, 7));
+                }
+            }
+            
+            // 3. 從 GET/POST 參數獲取 (MAMP 兼容)
+            if (!$token) {
+                $token = $_GET['token'] ?? $_POST['token'] ?? '';
+            }
+            
+            if (empty($token)) {
+                return [
+                    'valid' => false,
+                    'message' => 'Token is required'
+                ];
+            }
+            
+            // 驗證 token
+            $payload = self::validateTokenWithBlacklist($token);
+            if (!$payload) {
+                return [
+                    'valid' => false,
+                    'message' => 'Invalid or expired token'
+                ];
+            }
+            
+            return [
+                'valid' => true,
+                'payload' => $payload
+            ];
+            
+        } catch (Exception $e) {
+            error_log("JWT request validation failed: " . $e->getMessage());
+            return [
+                'valid' => false,
+                'message' => 'Token validation error'
+            ];
+        }
+    }
 }

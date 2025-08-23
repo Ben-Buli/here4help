@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:here4help/services/permission_service.dart';
 import 'package:here4help/providers/permission_provider.dart';
+import 'package:here4help/services/permission_service.dart';
 import 'package:here4help/constants/shell_pages.dart';
-import 'package:here4help/system/pages/permission_denied_page.dart';
+
+import 'package:here4help/layout/app_scaffold.dart' show AppScaffold;
 
 /// 統一權限守衛
 /// 整合現有的權限系統，提供路由級和元件級權限控制
@@ -47,7 +48,7 @@ class PermissionGuard {
       final userPermission = permissionProvider.permission;
 
       // 根據用戶狀態返回不同的處理
-      if (userPermission <= -2) {
+      if (userPermission == -2 || userPermission == -4) {
         // 帳號已刪除，導向登入頁
         WidgetsBinding.instance.addPostFrameCallback((_) {
           context.go('/login');
@@ -55,61 +56,50 @@ class PermissionGuard {
         return const SizedBox.shrink();
       }
 
-      if (userPermission == -1 || userPermission == -3) {
-        // 帳號被停權，顯示權限拒絕頁面
-        return PermissionDeniedPage(
-          message: PermissionService.getPermissionStatus(userPermission),
-          currentPath: path,
-        );
-      }
-
-      if (userPermission == 0) {
-        // 未認證用戶，顯示提示對話框
+      // 權限 0, -1, -3 訪問需要認證的頁面時，重定向到權限拒絕頁面
+      if (userPermission <= PermissionService.SELF_SUSPENDED &&
+          userPermission != -2 &&
+          userPermission != -4) {
+        // 重定向到權限拒絕頁面，並傳遞被阻擋的路徑和上一頁路徑
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showVerificationRequiredDialog(context, path);
+          _redirectToPermissionDenied(context, path);
         });
         return const SizedBox.shrink();
       }
 
       // 其他權限不足情況
-      return PermissionDeniedPage(
-        message: 'You do not have permission to access this page.',
-        currentPath: path,
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _redirectToPermissionDenied(context, path);
+      });
+      return const SizedBox.shrink();
     }
 
     return page;
   }
 
-  /// 顯示需要驗證的對話框
-  static void _showVerificationRequiredDialog(
-      BuildContext context, String path) {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Account Verification Required'),
-          content: const Text(
-              'Please complete your account verification to access this feature.'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.go('/home'); // 返回首頁
-              },
-              child: const Text('Later'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                context.go('/signup/student-id'); // 導向身份驗證頁面
-              },
-              child: const Text('Verify Now'),
-            ),
-          ],
-        );
-      },
+  /// 重定向到權限拒絕頁面，帶上被阻擋的路徑和上一頁路徑
+  static void _redirectToPermissionDenied(
+      BuildContext context, String blockedPath) {
+    // 從 AppScaffold 獲取上一個有效的路由路徑
+    String? previousPath = AppScaffold.getPreviousValidRoute();
+
+    // 構建查詢參數
+    final queryParams = <String, String>{
+      'blocked': blockedPath, // 被阻擋的頁面
+    };
+
+    if (previousPath != null && previousPath != blockedPath) {
+      queryParams['from'] = previousPath; // 真正的上一頁
+    }
+
+    // 構建完整的 URL
+    final uri = Uri(
+      path: '/permission-denied',
+      queryParameters: queryParams,
     );
+
+    debugPrint('🚫 權限拒絕重定向: 被阻擋頁面=$blockedPath, 上一頁=$previousPath');
+    context.go(uri.toString());
   }
 
   /// 檢查並處理功能權限（用於元件級控制）

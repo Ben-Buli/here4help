@@ -132,4 +132,3 @@ class Response {
         CorsConfig::setCorsHeaders();
     }
 }
-?> 

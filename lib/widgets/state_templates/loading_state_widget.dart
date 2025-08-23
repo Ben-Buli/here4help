@@ -51,7 +51,7 @@ class LoadingStateWidget extends StatelessWidget {
           children: [
             // 載入指示器
             _buildLoadingIndicator(theme),
-            
+
             // 載入訊息
             if (message != null) ...[
               const SizedBox(height: 16),
@@ -64,7 +64,7 @@ class LoadingStateWidget extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
             ],
-            
+
             // 進度指示器
             if (showProgress && progress != null) ...[
               const SizedBox(height: 16),
@@ -72,7 +72,7 @@ class LoadingStateWidget extends StatelessWidget {
                 width: 200,
                 child: LinearProgressIndicator(
                   value: progress,
-                  backgroundColor: theme.colorScheme.surfaceVariant,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
                   valueColor: AlwaysStoppedAnimation<Color>(
                     color ?? theme.colorScheme.primary,
                   ),
@@ -193,7 +193,7 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
@@ -206,9 +206,9 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
               colors: [
-                theme.colorScheme.surfaceVariant,
-                theme.colorScheme.surfaceVariant.withOpacity(0.5),
-                theme.colorScheme.surfaceVariant,
+                theme.colorScheme.surfaceContainerHighest,
+                theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                theme.colorScheme.surfaceContainerHighest,
               ],
               stops: [
                 (_animation.value - 0.3).clamp(0.0, 1.0),
@@ -226,21 +226,21 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
 /// 骨架載入建構器
 class SkeletonBuilder {
   static Widget buildTaskCardSkeleton() {
-    return Card(
+    return const Card(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SkeletonLoader(width: double.infinity, height: 20),
-            const SizedBox(height: 8),
-            const SkeletonLoader(width: 200, height: 16),
-            const SizedBox(height: 12),
+            SkeletonLoader(width: double.infinity, height: 20),
+            SizedBox(height: 8),
+            SkeletonLoader(width: 200, height: 16),
+            SizedBox(height: 12),
             Row(
               children: [
-                const SkeletonLoader(width: 60, height: 16),
-                const SizedBox(width: 16),
-                const SkeletonLoader(width: 80, height: 16),
+                SkeletonLoader(width: 60, height: 16),
+                SizedBox(width: 16),
+                SkeletonLoader(width: 80, height: 16),
               ],
             ),
           ],
@@ -250,23 +250,23 @@ class SkeletonBuilder {
   }
 
   static Widget buildChatMessageSkeleton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          const SkeletonLoader(
+          SkeletonLoader(
             width: 40,
             height: 40,
             borderRadius: BorderRadius.all(Radius.circular(20)),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SkeletonLoader(width: 100, height: 14),
-                const SizedBox(height: 4),
-                const SkeletonLoader(width: double.infinity, height: 16),
+                SkeletonLoader(width: 100, height: 14),
+                SizedBox(height: 4),
+                SkeletonLoader(width: double.infinity, height: 16),
               ],
             ),
           ),

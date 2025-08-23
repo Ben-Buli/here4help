@@ -52,6 +52,11 @@ class AppScaffold extends StatefulWidget {
 
   @override
   State<AppScaffold> createState() => _AppScaffoldState();
+
+  /// 獲取上一個有效的路由路徑
+  static String? getPreviousValidRoute() {
+    return _AppScaffoldState.getPreviousValidRoute();
+  }
 }
 
 class _AppScaffoldState extends State<AppScaffold> {
@@ -63,6 +68,49 @@ class _AppScaffoldState extends State<AppScaffold> {
     '/task/apply',
     '/chat/detail',
   };
+
+  // 靜態方法來獲取當前的路由歷史
+  static _AppScaffoldState? _currentInstance;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentInstance = this;
+  }
+
+  @override
+  void dispose() {
+    if (_currentInstance == this) {
+      _currentInstance = null;
+    }
+    super.dispose();
+  }
+
+  /// 獲取當前的路由歷史
+  static List<String> getCurrentRouteHistory() {
+    return _currentInstance?._routeHistory ?? [];
+  }
+
+  /// 獲取上一個有效的路由路徑
+  static String? getPreviousValidRoute() {
+    final history = getCurrentRouteHistory();
+    if (history.length < 2) return null;
+
+    final instance = _currentInstance;
+    if (instance == null) return null;
+
+    // 從倒數第二個開始查找（跳過當前路徑）
+    for (int i = history.length - 2; i >= 0; i--) {
+      final path = history[i];
+      // 跳過不可返回的路由和權限拒絕頁面
+      if (!instance._nonReturnableRoutes.contains(path) &&
+          !path.contains('/permission-denied')) {
+        return path;
+      }
+    }
+
+    return null;
+  }
 
   // 新增：統一的導覽列項目配置
   static const List<NavigationItem> _navigationItems = [
@@ -127,6 +175,13 @@ class _AppScaffoldState extends State<AppScaffold> {
         return;
       }
 
+      // 特殊處理：如果在權限拒絕頁面，需要智能返回
+      final currentState = GoRouterState.of(context);
+      if (currentState.uri.path.contains('/permission-denied')) {
+        _handlePermissionDeniedBack();
+        return;
+      }
+
       // 原有的返回邏輯
       if (_routeHistory.length > 1) {
         // 找到最近的可返回路徑
@@ -158,6 +213,35 @@ class _AppScaffoldState extends State<AppScaffold> {
       debugPrint('❌ 返回操作失敗: $e');
       Navigator.of(context).maybePop();
     }
+  }
+
+  /// 處理權限拒絕頁面的返回邏輯
+  void _handlePermissionDeniedBack() {
+    final state = GoRouterState.of(context);
+    final fromPath = state.uri.queryParameters['from']; // 真正的上一頁
+    final blockedPath = state.uri.queryParameters['blocked']; // 被阻擋的頁面
+
+    debugPrint(
+        '🔙 AppScaffold 返回: fromPath=$fromPath, blockedPath=$blockedPath');
+
+    if (fromPath != null && fromPath.isNotEmpty) {
+      // 檢查上一頁是否為基本頁面（permission = 0）
+      if (_isBasicPage(fromPath)) {
+        debugPrint('🔙 AppScaffold 返回到基本頁面: $fromPath');
+        context.go(fromPath);
+        return;
+      }
+    }
+
+    // 如果沒有有效的上一頁，返回首頁
+    debugPrint('🔙 AppScaffold 返回到首頁');
+    context.go('/home');
+  }
+
+  /// 檢查是否為基本頁面（permission = 0）
+  bool _isBasicPage(String path) {
+    final basicPages = ['/home', '/account', '/task'];
+    return basicPages.contains(path);
   }
 
   // 將完整 URI 正規化為純路徑（忽略 query 參數，支援 hash 路由）

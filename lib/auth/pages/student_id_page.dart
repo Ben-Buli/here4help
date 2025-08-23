@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'dart:io';
-import 'package:image_picker/image_picker.dart';
 import 'package:here4help/constants/app_colors.dart';
 import 'package:here4help/config/app_config.dart';
+import 'package:here4help/services/media/cross_platform_image_service.dart';
 
 class StudentIdPage extends StatefulWidget {
   const StudentIdPage({super.key});
@@ -21,8 +18,8 @@ class _StudentIdPageState extends State<StudentIdPage> {
   final TextEditingController studentNameController = TextEditingController();
   final TextEditingController studentIdController = TextEditingController();
 
-  File? _selectedImage;
-  final ImagePicker _picker = ImagePicker();
+  ImageResult? _selectedImage;
+  final _imageService = CrossPlatformImageService();
   bool isLoading = false;
   bool hasAllData = false;
 
@@ -146,8 +143,9 @@ class _StudentIdPageState extends State<StudentIdPage> {
                   if (_selectedImage != null) ...[
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        _selectedImage!,
+                      child: Image(
+                        image:
+                            _imageService.createImageProvider(_selectedImage!),
                         height: 200,
                         width: double.infinity,
                         fit: BoxFit.cover,
@@ -158,7 +156,7 @@ class _StudentIdPageState extends State<StudentIdPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         ElevatedButton.icon(
-                          onPressed: _pickImage,
+                          onPressed: _showImageSourceDialog,
                           icon: const Icon(Icons.edit),
                           label: const Text('Change'),
                           style: ElevatedButton.styleFrom(
@@ -202,7 +200,7 @@ class _StudentIdPageState extends State<StudentIdPage> {
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
-                      onPressed: _pickImage,
+                      onPressed: _showImageSourceDialog,
                       icon: const Icon(Icons.upload),
                       label: const Text('Select Image'),
                       style: ElevatedButton.styleFrom(
@@ -237,23 +235,74 @@ class _StudentIdPageState extends State<StudentIdPage> {
     );
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _showImageSourceDialog() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Take Photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickFromCamera();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickFromGallery();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.cancel),
+                title: const Text('Cancel'),
+                onTap: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickFromCamera() async {
     try {
-      final XFile? image = await _picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 80,
+      final image = await _imageService.pickFromCamera(
+        config: ImageValidationConfig.studentId,
       );
 
       if (image != null) {
         setState(() {
-          _selectedImage = File(image.path);
+          _selectedImage = image;
         });
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking image: $e')),
+        SnackBar(content: Text('選擇相機圖片失敗: $e')),
+      );
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    try {
+      final image = await _imageService.pickFromGallery(
+        config: ImageValidationConfig.studentId,
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImage = image;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('選擇相簿圖片失敗: $e')),
       );
     }
   }
@@ -340,37 +389,21 @@ class _StudentIdPageState extends State<StudentIdPage> {
 
   Future<bool> _uploadStudentIdImage(Map<String, dynamic> studentIdData) async {
     try {
-      // Create multipart request
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse(AppConfig.uploadStudentIdUrl),
+      if (_selectedImage == null) {
+        throw Exception('No image selected');
+      }
+
+      // 使用跨平台圖片服務上傳
+      final result = await _imageService.uploadImage(
+        image: _selectedImage!,
+        uploadUrl: AppConfig.uploadStudentIdUrl,
+        token: '', // 學生證上傳不需要 token
+        fieldName: 'student_id_image',
+        additionalFields:
+            studentIdData.map((key, value) => MapEntry(key, value.toString())),
       );
 
-      // Add text fields
-      studentIdData.forEach((key, value) {
-        request.fields[key] = value.toString();
-      });
-
-      // Add image file
-      if (_selectedImage != null) {
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'student_id_image',
-            _selectedImage!.path,
-          ),
-        );
-      }
-
-      // Send request
-      final response = await request.send();
-      final responseData = await response.stream.bytesToString();
-      final jsonResponse = jsonDecode(responseData);
-
-      if (response.statusCode == 200 && jsonResponse['success']) {
-        return true;
-      } else {
-        throw Exception(jsonResponse['message'] ?? 'Upload failed');
-      }
+      return result['success'] == true;
     } catch (e) {
       throw Exception('Network error: $e');
     }

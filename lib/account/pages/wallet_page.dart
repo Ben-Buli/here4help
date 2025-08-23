@@ -22,7 +22,7 @@ class _WalletPageState extends State<WalletPage> {
     super.initState();
     final userService = Provider.of<UserService>(context, listen: false);
     final currentUser = userService.currentUser;
-    userName = currentUser?.name ?? 'Guest';
+    userName = currentUser?.nickname ?? currentUser?.name ?? 'User';
     points = currentUser?.points ?? 0;
   }
 
