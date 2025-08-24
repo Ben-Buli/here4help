@@ -1,0 +1,308 @@
+{
+    "feature": "Ratings & Feedback (3 tabs: Posted | Accepted | Not Selected)",
+    "plan_progress_track_document": "docs/優先執行/rating_feedback_進度追蹤.md",
+    "ui_spec": {
+      "page": "RatingsPage",
+      "tabs": [
+        "Posted",
+        "Accepted",
+        "Not Selected"
+      ],
+      "card_layout": {
+        "axis": "horizontal",
+        "sections": [
+          "icon",
+          "task_info",
+          "action_area"
+        ],
+        "task_info": [
+          "title (tasks.title)",
+          "date (tasks.task_date)",
+          "reward_point (tasks.reward_point)"
+        ],
+        "action_area_rules": {
+          "Posted": {
+            "role": "任務發布者 (tasks.creator_id = current_user)",
+            "query": "SELECT tasks WHERE creator_id = current_user",
+            "unfinished_statuses": [1, 2, 3, 4, 6],
+            "if_status_in_unfinished": "show pill -> task_statuses.display_name",
+            "if_status_completed(=5)": {
+              "if_has_rating(task_ratings exists WHERE rater_id=creator_id AND tasker_id=participant_id)": "show ⭐ x (integer), tap => dialog(show stars via flutter_rating_bar + review text + rater avatar/name with '(You)' label if current user)",
+              "else_no_rating": "show button 'Awaiting review' (tap => open rate dialog (1-5 required) + review(required), submit => POST /api/tasks/{task_id}/ratings)"
+            },
+            "excluded_statuses": [7, 8]
+          },
+          "Accepted": {
+            "role": "任務應徵者 (task_applications.user_id = current_user AND status = 'accepted')",
+            "query": "SELECT tasks JOIN task_applications ON tasks.id = task_applications.task_id WHERE task_applications.user_id = current_user AND task_applications.status = 'accepted'",
+            "action": {
+              "if_completed_and_has_rating_by_creator": "tap card => dialog shows rating the creator gave me",
+              "if_completed_but_no_rating_by_creator": "show 'Awaiting review' badge",
+              "else_in_progress": "show status pill from task_statuses.display_name"
+            }
+          },
+          "Not Selected": {
+            "role": "任務應徵者 (task_applications.user_id = current_user AND status NOT IN ('accepted'))",
+            "query": "SELECT tasks JOIN task_applications ON tasks.id = task_applications.task_id WHERE task_applications.user_id = current_user AND task_applications.status IN ('rejected','cancelled','withdrawn')",
+            "tap": "open dialog with task summary (title/date/reward_point/description)"
+          }
+        },
+        "visual": {
+          "icon": "calendar_today_outlined",
+          "pill_style": { "shape": "stadium", "bg": "#F3F4F6", "fg": "#374151" },
+          "rating_style": { "icon": "star", "color": "amber", "precision": 0.5 }
+        }
+      }
+    },
+    "db": {
+      "tables": {
+        "tasks": [
+          "id VARCHAR(36) PK",
+          "creator_id FK users.id -- 任務發布者",
+          "participant_id FK users.id NULL -- 最終執行者",
+          "title VARCHAR(255)",
+          "task_date DATE",
+          "reward_point VARCHAR(10) -- 現有欄位名稱",
+          "status_id INT -- 關聯 task_statuses.id",
+          "created_at TIMESTAMP",
+          "updated_at TIMESTAMP"
+        ],
+        "task_statuses": [
+          "id INT (1=open, 2=in_progress, 3=pending_confirmation, 4=dispute, 5=completed, 6=applying, 7=rejected, 8=canceled)",
+          "code VARCHAR(64)",
+          "display_name VARCHAR(128)"
+        ],
+        "task_ratings": [
+          "id BIGINT UNSIGNED PK",
+          "task_id VARCHAR(36) FK tasks.id",
+          "rater_id BIGINT UNSIGNED FK users.id",
+          "tasker_id BIGINT UNSIGNED FK users.id -- 被評分者", 
+          "rating TINYINT UNSIGNED -- 1-5 整數評分",
+          "comment TEXT",
+          "created_at TIMESTAMP"
+        ],
+        "task_applications": [
+          "id BIGINT PK",
+          "task_id VARCHAR(36) FK tasks.id",
+          "user_id BIGINT UNSIGNED FK users.id -- 應徵者",
+          "status ENUM('applied','accepted','rejected','pending','completed','cancelled','dispute','withdrawn')",
+          "created_at TIMESTAMP",
+          "updated_at TIMESTAMP"
+        ]
+      },
+      "indexes": [
+        "CREATE INDEX idx_tasks_creator_status ON tasks(creator_id,status_id,task_date DESC,id DESC);",
+        "CREATE INDEX idx_tasks_participant_status ON tasks(participant_id,status_id,task_date DESC,id DESC);",
+        "CREATE INDEX idx_task_ratings_task_tasker ON task_ratings(task_id,tasker_id);",
+        "CREATE INDEX idx_applications_user_status ON task_applications(user_id,status,created_at DESC,id DESC);"
+      ]
+    },
+    "api": {
+      "auth": {
+        "jwt": "Authorization: Bearer <token>",
+        "errors": { "401": "UNAUTHORIZED", "403": "FORBIDDEN" }
+      },
+      "endpoints": [
+        {
+          "name": "List Posted tasks (with rating state)",
+          "method": "GET",
+          "path": "/api/ratings/posted",
+          "query": { "page": "int=1", "per_page": "int=20" },
+          "sql": [
+            "SELECT t.id,t.title,t.task_date,t.reward_point,t.status_id,ts.display_name AS status_name,",
+            "  (SELECT AVG(rating) FROM task_ratings r WHERE r.task_id=t.id AND r.tasker_id=t.participant_id) AS avg_rating_for_participant,",
+            "  EXISTS(SELECT 1 FROM task_ratings r WHERE r.task_id=t.id AND r.rater_id=t.creator_id) AS creator_already_rated",
+            "FROM tasks t",
+            "JOIN task_statuses ts ON ts.id=t.status_id",
+            "WHERE t.creator_id = :uid AND t.status_id NOT IN (7,8)",
+            "ORDER BY t.task_date DESC,t.id DESC",
+            "LIMIT :per OFFSET :off"
+          ],
+          "response": {
+            "success": true,
+            "data": {
+              "items": [
+                {
+                  "task_id": "123e4567-e89b-12d3-a456-426614174000",
+                  "title": "Open Bank Account",
+                  "task_date": "2025-02-15",
+                  "reward_point": "1500",
+                  "status_id": 5,
+                  "status_name": "Completed",
+                  "has_rating_from_creator": true,
+                  "creator_rating": { "rating": 4, "comment": "Great Service" }
+                }
+              ],
+              "pagination": { "page": 1, "per_page": 20, "total": 48 }
+            }
+          }
+        },
+        {
+          "name": "List Accepted tasks (as worker)",
+          "method": "GET",
+          "path": "/api/ratings/accepted",
+          "query": { "page": "int=1", "per_page": "int=20" },
+          "sql": [
+            "SELECT t.id,t.title,t.task_date,t.reward_point,t.status_id,ts.display_name AS status_name,",
+            "  (SELECT AVG(rating) FROM task_ratings r WHERE r.task_id=t.id AND r.tasker_id=t.creator_id) AS avg_rating_for_creator,",
+            "  EXISTS(SELECT 1 FROM task_ratings r WHERE r.task_id=t.id AND r.rater_id=ta.user_id) AS participant_already_rated",
+            "FROM tasks t",
+            "JOIN task_applications ta ON t.id=ta.task_id AND ta.status='accepted'",
+            "JOIN task_statuses ts ON ts.id=t.status_id",
+            "WHERE ta.user_id = :uid",
+            "ORDER BY t.task_date DESC,t.id DESC",
+            "LIMIT :per OFFSET :off"
+          ],
+          "response": {
+            "success": true,
+            "data": {
+              "items": [
+                {
+                  "task_id": "456e7890-e89b-12d3-a456-426614174001",
+                  "title": "Document translate",
+                  "task_date": "2024-01-20",
+                  "reward_point": "900",
+                  "status_id": 5,
+                  "status_name": "Completed",
+                  "has_rating_from_participant": true,
+                  "participant_rating": { "rating": 4, "comment": "Super great service" }
+                }
+              ],
+              "pagination": { "page": 1, "per_page": 20, "total": 17 }
+            }
+          }
+        },
+        {
+          "name": "List Not Selected applications",
+          "method": "GET",
+          "path": "/api/ratings/not-selected",
+          "query": { "page": "int=1", "per_page": "int=20" },
+          "sql": [
+            "SELECT a.id AS application_id,t.id AS task_id,t.title,t.task_date,t.reward_point,a.status",
+            "FROM task_applications a",
+            "JOIN tasks t ON t.id=a.task_id",
+            "WHERE a.user_id = :uid AND a.status IN ('rejected','cancelled','withdrawn')",
+            "ORDER BY a.created_at DESC,a.id DESC",
+            "LIMIT :per OFFSET :off"
+          ],
+          "response": {
+            "success": true,
+            "data": {
+              "items": [
+                {
+                  "application_id": 789,
+                  "task_id": "123e4567-e89b-12d3-a456-426614174002",
+                  "title": "Campus Pickup",
+                  "task_date": "2025-03-01",
+                  "reward_point": "300",
+                  "application_status": "rejected"
+                }
+              ],
+              "pagination": { "page": 1, "per_page": 20, "total": 9 }
+            }
+          }
+        },
+        {
+          "name": "Create rating",
+          "method": "POST",
+          "path": "/api/tasks/{task_id}/ratings",
+          "body": { "rating": "integer 1-5 (required)", "comment": "string (required)" },
+          "rules": [
+            "creator can rate participant when task.status_id=5 and creator_id=auth_user",
+            "participant can rate creator when task.status_id=5 and participant_id=auth_user (via task_applications.user_id)",
+            "one rater per task per counterparty (prevent duplicates)"
+          ],
+          "sql": [
+            "INSERT INTO task_ratings(task_id,rater_id,tasker_id,rating,comment,created_at)",
+            "VALUES(:task_id,:rater_id,:tasker_id,:rating,:comment,NOW())"
+          ],
+          "response": { "success": true, "message": "Rating created" }
+        }
+      ],
+      "standard_error": {
+        "format": {
+          "success": false,
+          "code": "E_VALIDATION|E_DUPLICATE|E_FORBIDDEN|E_SERVER",
+          "message": "human readable",
+          "field_errors": { "rating": "must be 1-5" },
+          "traceId": "uuid",
+          "timestamp": "ISO8601"
+        }
+      }
+    },
+    "frontend": {
+      "models": [
+        {
+          "TaskCard": {
+            "task_id": "string (UUID)",
+            "title": "string",
+            "task_date": "DateTime",
+            "reward_point": "string",
+            "status_id": "int",
+            "status_name": "string",
+            "rating": { "rating": "int|null (1-5)", "comment": "string|null", "rater": { "id": "int", "name": "string", "avatar_url": "string|null", "is_you": "bool" } },
+            "application_id": "int|null",
+            "application_status": "string|null"
+          }
+        }
+      ],
+      "service": {
+        "class": "RatingsService",
+        "methods": [
+          "Future<Paged<TaskCard>> fetchPosted(int page)",
+          "Future<Paged<TaskCard>> fetchAccepted(int page)",
+          "Future<Paged<TaskCard>> fetchNotSelected(int page)",
+          "Future<void> createRating(String taskId, int rating, String comment)"
+        ],
+        "http": {
+          "base": "HttpClientService",
+          "headers": { "Authorization": "Bearer <jwt>" },
+          "timeouts": { "connect": 15000, "read": 20000 }
+        }
+      },
+      "ui_logic": {
+        "ratings_page.dart": {
+          "tab_controller": "2 tabs + 1 (Not Selected) => length: 3",
+          "list_builders": "each tab uses ListView.builder with TaskCard",
+          "action_area": {
+            "posted": [
+              "if status_id in [1,2,3,4,6] => show pill status_name",
+              "if status_id == 5 && rating!=null => show star + integer value; tap => dialog read-only with flutter_rating_bar",
+              "if status_id == 5 && rating==null => button 'Awaiting review' => open rating dialog (required rating 1-5 & comment)"
+            ],
+            "accepted": [
+              "if status_id in [1,2,3,4,6] => status pill",
+              "if status_id==5 => if creator rated me => star; else => 'Awaiting review' badge"
+            ],
+            "not_selected": "status pill by application_status; tap => show task info dialog"
+          },
+          "dialogs": {
+            "read_only_rating_dialog": "shows stars (flutter_rating_bar readOnly=true), comment, rater avatar/name (append '(You)' if rater_id==me)",
+            "write_rating_dialog": "flutter_rating_bar integer 1-5; comment TextField; validation => both required; submit => RatingsService.createRating"
+          },
+          "errors": "map ApiError to inline red text in dialog or snack for generic failures"
+        }
+      }
+    },
+    "integration": {
+      "contracts": {
+        "date_format": "YYYY-MM-DD",
+        "rating_precision": "integer (server returns AVG(rating) as integer 1-5)",
+        "pagination": { "page": "int", "per_page": "int", "total": "int" }
+      },
+      "security": {
+        "auth": "JWT in Authorization header",
+        "authorization": [
+          "POST /tasks/{id}/ratings: server checks ownership (creator or participant via task_applications) and status_id=5"
+        ]
+      }
+    },
+    "step_by_step": [
+      "DB: ensure tables and indexes exist; task_statuses already has (1-8), task_ratings exists with correct structure.",
+      "Backend: implement 3 list endpoints + createRating with validation & auth; use existing Response class format.",
+      "Frontend: create models (TaskCard/Paged), RatingsService with 4 methods; wire HttpClientService with JWT header.",
+      "UI: create ratings_page.dart with 3 tabs; card layout icon | info | action; add read-only & write rating dialogs using flutter_rating_bar.",
+      "QA: verify field mapping (title/task_date/reward_point/status_name), rating display (integer 1-5), pagination, and all action rules.",
+      "Error handling: simulate 401/409/validation errors; ensure dialogs show inline messages and lists show retry."
+    ]
+  }
