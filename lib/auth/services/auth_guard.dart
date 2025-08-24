@@ -29,7 +29,7 @@ bool isAuthorized(BuildContext context, String? routeName) {
   if (currentUser == null) return false; // 如果沒有登入使用者，返回 false
 
   final int requiredLevel = routePermissions[routeName] ?? 1;
-  return (currentUser.permission_level ?? 0) >= requiredLevel;
+  return (currentUser.permission ?? 0) >= requiredLevel;
 }
 
 /// ✅ 路由守衛，用於 GoRouter 中的 `builder` 呼叫
@@ -50,12 +50,12 @@ Widget guardRoute(BuildContext context, GoRouterState state, Widget page) {
     final int requiredLevel = routePermissions[routeName] ?? 1;
 
     // 權限足夠 → 進入目標頁
-    if (currentUser != null && currentUser.permission_level >= requiredLevel) {
+    if (currentUser != null && currentUser.permission >= requiredLevel) {
       return page;
     }
 
     // 被封鎖 → 顯示封鎖頁面
-    if (currentUser != null && currentUser.permission_level == -2) {
+    if (currentUser != null && currentUser.permission == -2) {
       return const BannedPage();
     }
 

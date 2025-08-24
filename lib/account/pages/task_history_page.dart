@@ -70,7 +70,7 @@ class _TaskHistoryPageState extends State<TaskHistoryPage>
               ),
               Tab(
                 icon: Icon(Icons.check),
-                text: 'Accepted',
+                text: 'Applied',
               ),
             ],
           ),
@@ -81,8 +81,8 @@ class _TaskHistoryPageState extends State<TaskHistoryPage>
             children: const [
               // Posted 任務歷史
               _TaskHistoryList(type: 'posted'),
-              // Accepted 任務歷史
-              _TaskHistoryList(type: 'accepted'),
+              // Applied 任務歷史
+              _TaskHistoryList(type: 'applied'),
             ],
           ),
         ),
@@ -211,7 +211,7 @@ class _TaskHistoryListState extends State<_TaskHistoryList> {
             Text(
               widget.type == 'posted'
                   ? 'No posted tasks yet'
-                  : 'No accepted tasks yet',
+                  : 'No applied tasks yet',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey[600],
@@ -374,12 +374,12 @@ class _TaskHistoryCard extends StatelessWidget {
                   Icon(Icons.person, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 4),
                   Text(
-                    'Accepted by: ${task['acceptor_name']}',
+                    'Applied by: ${task['acceptor_name']}',
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                 ],
               )
-            else if (type == 'accepted' && task['poster_name'] != null)
+            else if (type == 'applied' && task['poster_name'] != null)
               Row(
                 children: [
                   Icon(Icons.person, size: 16, color: Colors.grey[600]),

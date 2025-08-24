@@ -108,8 +108,8 @@ class _HomePageState extends State<HomePage> {
                                       return null;
                                     }
 
-                                    final status = getPermissionStatus(
-                                        user?.permission_level);
+                                    final status =
+                                        getPermissionStatus(user?.permission);
                                     if (status != null) {
                                       return Row(
                                         children: [

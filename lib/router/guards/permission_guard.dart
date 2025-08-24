@@ -10,6 +10,26 @@ import 'package:here4help/layout/app_scaffold.dart' show AppScaffold;
 /// 統一權限守衛
 /// 整合現有的權限系統，提供路由級和元件級權限控制
 class PermissionGuard {
+  // 與 PermissionService 常數語義對齊
+  static const permissionValues = {
+    'admin_soft_deleted': -2, // 管理員軟刪
+    'self_deleted': -4, // 自刪（自主軟刪）
+    'admin_suspended': -1, // 管理員停權
+    'self_suspended': -3, // 自主停權
+    'unverified': 0, // 帳號尚未驗證
+  };
+
+  // 被刪除（不可登入/不可訪問任何受保護頁）
+  static final permissionDeleted = [
+    permissionValues['admin_soft_deleted']!,
+    permissionValues['self_deleted']!,
+  ];
+  // 停權（可登入僅基本頁，受保護頁導向權限不足頁）
+  static final permissionSuspended = [
+    permissionValues['admin_suspended']!,
+    permissionValues['self_suspended']!,
+  ];
+
   /// 檢查路由權限
   static bool canAccessRoute(BuildContext context, String path) {
     final permissionProvider =
@@ -48,7 +68,7 @@ class PermissionGuard {
       final userPermission = permissionProvider.permission;
 
       // 根據用戶狀態返回不同的處理
-      if (userPermission == -2 || userPermission == -4) {
+      if (permissionDeleted.contains(userPermission)) {
         // 帳號已刪除，導向登入頁
         WidgetsBinding.instance.addPostFrameCallback((_) {
           context.go('/login');
@@ -56,13 +76,19 @@ class PermissionGuard {
         return const SizedBox.shrink();
       }
 
-      // 權限 0, -1, -3 訪問需要認證的頁面時，重定向到權限拒絕頁面
-      if (userPermission <= PermissionService.SELF_SUSPENDED &&
-          userPermission != -2 &&
-          userPermission != -4) {
+      // 權限  -1, -3 訪問需要認證的頁面時，重定向到權限拒絕頁面
+      if (permissionSuspended.contains(userPermission)) {
         // 重定向到權限拒絕頁面，並傳遞被阻擋的路徑和上一頁路徑
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _redirectToPermissionDenied(context, path);
+        });
+        return const SizedBox.shrink();
+      }
+
+      if (userPermission == permissionValues['unverified']) {
+        debugPrint('🚫 權限拒絕重定向: 帳號權限：($userPermission)未驗證');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          context.go('/permission-unverified?from=$path');
         });
         return const SizedBox.shrink();
       }

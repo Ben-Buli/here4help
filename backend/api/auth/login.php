@@ -44,9 +44,9 @@ try {
     // 建立資料庫連線
     $db = Database::getInstance();
     
-    // 查詢用戶
+    // 查詢用戶（統一以 permission 做登入判斷，不再依賴 status）
     $stmt = $db->query(
-        "SELECT * FROM users WHERE email = ? AND status = 'active'",
+        "SELECT * FROM users WHERE email = ?",
         [$email]
     );
     
@@ -61,11 +61,18 @@ try {
         throw new Exception('Invalid email or password');
     }
     
+    // 統一使用 permission 作為登入判斷：permission > 0 才允許登入
+    $userPermission = (int)($user['permission'] ?? 0);
+    if ($userPermission <= 0) {
+        throw new Exception('Account is not allowed to login (permission)');
+    }
+    
     // 生成 JWT Token
     $payload = [
         'user_id' => $user['id'],
         'email' => $user['email'],
         'name' => $user['name'],
+        'permission' => $userPermission,
         'iat' => time(),
         'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
     ];

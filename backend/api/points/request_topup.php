@@ -6,6 +6,7 @@
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/JWTManager.php';
 
 Response::setCorsHeaders();
 
@@ -14,6 +15,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
+    // 先驗證 JWT，缺 Token 應回 401 而不是 500
+    $jwt = JWTManager::validateRequest();
+    if (!$jwt['valid']) {
+        Response::unauthorized($jwt['message'] ?? 'Unauthorized');
+    }
+    $tokenUserId = (int)($jwt['payload']['user_id'] ?? 0);
+
     $db = Database::getInstance();
     
     // 獲取 JSON 數據
@@ -22,19 +30,23 @@ try {
         $input = $_POST; // 支援 form-data
     }
     
-    $userId = $input['user_id'] ?? null;
-    $amount = $input['amount'] ?? null;
+    // user_id 以 Token 為準，避免偽造
+    $userId = $tokenUserId ?: ($input['user_id'] ?? null);
+    $amount = (int)($input['amount'] ?? null);
     $bankAccountLast5 = $input['bank_account_last5'] ?? '';
-    $note = $input['note'] ?? '';
     
     // 驗證必填欄位
     $errors = [];
     if (!$userId) {
         $errors['user_id'] = 'User ID is required';
     }
+    // 檢查金額是否為正整數，且小於 10000
     if (!$amount || !is_numeric($amount) || $amount <= 0) {
-        $errors['amount'] = 'Valid amount is required';
+        $errors['amount'] = 'Valid amount is required.';
+    } else if ((int)$amount > 9999) {
+        $errors['amount'] = 'The amount must be less than 10,000.';
     }
+
     if (empty($bankAccountLast5) || !preg_match('/^\d{5}$/', $bankAccountLast5)) {
         $errors['bank_account_last5'] = 'Bank account last 5 digits required (numeric only)';
     }
@@ -49,29 +61,37 @@ try {
         Response::error('User not found', 404);
     }
     
-    // 檢查是否有待審核的申請
-    $pendingRequest = $db->fetch("
-        SELECT id FROM user_point_reviews 
-        WHERE user_id = ? AND status = 'pending'
-    ", [$userId]);
-    
-    if ($pendingRequest) {
-        Response::error('You already have a pending topup request. Please wait for approval.', 409);
+     /// #region 檢查是否重複申請中（末五碼、金額重複）
+     $isPendingDuplicateRequest = $db->fetch(
+        "SELECT id FROM point_deposit_requests 
+        WHERE user_id = ? AND bank_account_last5 = ? AND amount_points = ? AND status = 'pending'", [$userId, $bankAccountLast5, $amount]);
+    if ($isPendingDuplicateRequest) {
+        Response::error('The same amount and bank account last 5 digits already have a pending topup request. Please wait for approval.', 409);
     }
+    // #endregion   
+
+    // #region 檢查是否有待審核的申請
+    // 檢查是否有待審核的申請
+    // $pendingRequest = $db->fetch("
+    //     SELECT id FROM point_deposit_requests 
+    //     WHERE user_id = ? AND status = 'pending'
+    // ", [$userId]);
     
-    // 建立點數儲值申請
-    $reasonText = $note ? 
-        "銀行匯款 - 帳號末五碼: {$bankAccountLast5} | 備註: {$note}" : 
-        "銀行匯款 - 帳號末五碼: {$bankAccountLast5}";
-        
-    $sql = "INSERT INTO user_point_reviews (
-        user_id, points, reason, status, created_at, updated_at
-    ) VALUES (?, ?, ?, 'pending', NOW(), NOW())";
+    // // 檢查是否有待審核的申請
+    // if ($pendingRequest) {
+    //     Response::error('You already have a pending topup request. Please wait for approval.', 409);
+    // }
+   // #endregion
+
+    // 新增申請記錄
+    $sql = "INSERT INTO point_deposit_requests (
+        user_id, amount_points, bank_account_last5, status
+    ) VALUES (?, ?, ?, 'pending')";
     
     $db->query($sql, [
         $userId,
         (int)$amount,
-        $reasonText
+        $bankAccountLast5
     ]);
     
     $requestId = $db->lastInsertId();
@@ -79,29 +99,27 @@ try {
     // 獲取剛建立的申請記錄
     $request = $db->fetch("
         SELECT 
-            pr.id,
-            pr.user_id,
-            pr.points,
-            pr.reason,
-            pr.status,
-            pr.created_at,
+            pdr.id,
+            pdr.user_id,
+            pdr.amount_points,
+            pdr.bank_account_last5,
+            pdr.approver_reply_description,
+            pdr.status,
+            pdr.created_at,
             u.name as user_name,
             u.email as user_email
-        FROM user_point_reviews pr
-        JOIN users u ON pr.user_id = u.id
-        WHERE pr.id = ?
+        FROM point_deposit_requests pdr
+        JOIN users u ON pdr.user_id = u.id
+        WHERE pdr.id = ?
     ", [$requestId]);
     
+    // Fetch official bank account info
+    $bankInfo = $db->fetch("SELECT bank_name, account_number, account_holder FROM official_bank_accounts WHERE is_active = 1 LIMIT 1");
     Response::success([
         'request_id' => $requestId,
-        'message' => 'Point topup request submitted successfully',
+        'message' => 'Point topup request submitted successfully!',
         'request' => $request,
-        'bank_info' => [
-            'bank_name' => '台灣銀行',
-            'account_number' => '123-456-789-012',
-            'account_holder' => 'Here4Help Co., Ltd.',
-            'note' => 'Please include your account last 5 digits in transfer memo'
-        ]
+        'bank_info' => $bankInfo ?: null
     ], 'Point topup request created');
     
 } catch (Exception $e) {

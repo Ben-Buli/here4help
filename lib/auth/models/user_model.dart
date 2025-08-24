@@ -14,7 +14,7 @@ class UserModel {
   final String? referral_code;
   final String? google_id;
   final String primary_language;
-  final int permission_level;
+  final int permission;
   final String? date_of_birth;
   final String? gender;
   final String? country;
@@ -33,13 +33,13 @@ class UserModel {
     required this.points,
     required this.avatar_url,
     required this.status,
+    required this.permission,
     required this.provider,
     required this.created_at,
     required this.updated_at,
     this.referral_code,
     this.google_id,
     required this.primary_language,
-    required this.permission_level,
     this.date_of_birth,
     this.gender,
     this.country,
@@ -66,7 +66,7 @@ class UserModel {
       referral_code: json['referral_code'],
       google_id: json['google_id'],
       primary_language: json['primary_language'] ?? 'English',
-      permission_level: json['permission'] ?? 0,
+      permission: json['permission'] ?? 0,
       date_of_birth: json['date_of_birth'],
       gender: json['gender'],
       country: json['country'],
@@ -96,7 +96,7 @@ class UserModel {
       'referral_code': referral_code,
       'google_id': google_id,
       'primary_language': primary_language,
-      'permission': permission_level,
+      'permission': permission,
       'date_of_birth': date_of_birth,
       'gender': gender,
       'country': country,
@@ -123,7 +123,7 @@ class UserModel {
     String? referral_code,
     String? google_id,
     String? primary_language,
-    int? permission_level,
+    int? permission,
     String? date_of_birth,
     String? gender,
     String? country,
@@ -148,7 +148,7 @@ class UserModel {
       referral_code: referral_code ?? this.referral_code,
       google_id: google_id ?? this.google_id,
       primary_language: primary_language ?? this.primary_language,
-      permission_level: permission_level ?? this.permission_level,
+      permission: permission ?? this.permission,
       date_of_birth: date_of_birth ?? this.date_of_birth,
       gender: gender ?? this.gender,
       country: country ?? this.country,

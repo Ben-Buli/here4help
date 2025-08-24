@@ -41,11 +41,21 @@ class PermissionProvider extends ChangeNotifier {
       if (token != null && userDataString != null) {
         final userData = jsonDecode(userDataString) as Map<String, dynamic>;
         _userData = userData;
-        _permission = userData['permission'] ?? 0;
+        // 優先取 user_data.permission，若缺失則回退到 user_permission（備援）
+        _permission = (userData['permission'] ??
+            prefs.getInt('user_permission') ??
+            0) as int;
 
         print('🔐 權限狀態初始化完成: $_permission');
       } else {
-        print('🔐 未找到登入資訊，使用預設權限: $_permission');
+        // 未登入或 user_data 缺失，嘗試從備援欄位載入權限
+        final fallbackPermission = prefs.getInt('user_permission');
+        if (fallbackPermission != null) {
+          _permission = fallbackPermission;
+          print('🔐 從備援欄位載入權限: $_permission');
+        } else {
+          print('🔐 未找到登入資訊，使用預設權限: $_permission');
+        }
       }
 
       _isInitialized = true;

@@ -138,7 +138,7 @@ class UserService extends ChangeNotifier {
         referral_code: prefs.getString('user_referral_code'),
         google_id: prefs.getString('user_google_id'),
         primary_language: prefs.getString('user_primaryLang') ?? 'English',
-        permission_level: permissionLevel ?? 0,
+        permission: permissionLevel ?? 0,
       );
       debugPrint('✅ 從 SharedPreferences 載入用戶資訊成功: ${_currentUser?.name}');
       debugPrint(
@@ -159,7 +159,7 @@ class UserService extends ChangeNotifier {
       await prefs.setInt('user_points', user.points);
       await prefs.setString('user_avatarUrl', user.avatar_url);
       await prefs.setString('user_primaryLang', user.primary_language);
-      await prefs.setInt('user_permission', user.permission_level);
+      await prefs.setInt('user_permission', user.permission);
       debugPrint('✅ 用戶資訊已保存到 SharedPreferences');
       debugPrint('✅ 保存的 avatar_url: ${user.avatar_url}');
     } catch (e) {
@@ -304,7 +304,7 @@ class UserService extends ChangeNotifier {
         referral_code: userData['referral_code'] as String?,
         google_id: userData['google_id'] as String?,
         primary_language: userData['primary_language'] as String? ?? 'English',
-        permission_level: userData['permission'] as int? ?? 0,
+        permission: userData['permission'] as int? ?? 0,
       );
 
       debugPrint('🔍 創建的 UserModel avatar_url: "${user.avatar_url}"');
@@ -323,7 +323,7 @@ class UserService extends ChangeNotifier {
       return 0; // Default permission level for unauthenticated users
     }
     // Fetch the permission level from the current user
-    return _currentUser?.permission_level ?? 0;
+    return _currentUser?.permission ?? 0;
   }
 
   bool get isLoggedIn => _currentUser != null;

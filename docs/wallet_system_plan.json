@@ -1,0 +1,636 @@
+{
+  "version": "1.0",
+  "project": "Here4Help - 完整錢包系統",
+  "description": "建置完整的錢包系統頁面，包含點數統計、手續費計算、銀行帳戶管理、點數歷史記錄等功能",
+  "milestones": [
+    {
+      "id": "M-WALLET-CORE",
+      "title": "錢包核心功能",
+      "description": "實作錢包頁面的核心功能：點數統計、可用點數計算、手續費系統",
+      "scope": ["點數統計", "可用點數計算", "手續費系統", "錢包卡片優化"],
+      "timeline": "預計3天完成",
+      "tasks": [
+        {
+          "id": "T1-BE-WALLET-API",
+          "todo_ref": "wallet-core-api",
+          "owner": "backend",
+          "goal": "建立錢包核心 API：點數統計、可用點數計算、手續費查詢",
+          "steps": [
+            "GET /api/wallet/summary - 返回總點數、可用點數、發布中點數",
+            "GET /api/wallet/fee-settings - 返回當前手續費設定",
+            "實現點數計算邏輯：可用點數 = users.points - SUM(tasks.reward_point WHERE creator_id = user_id AND status_id IN (1,2,3))",
+            "實現手續費計算：從 task_completion_points_fee_settings 取得 active rate"
+          ],
+          "commands": [
+            "php -l backend/api/wallet/summary.php",
+            "php -l backend/api/wallet/fee-settings.php",
+            "curl -s 'http://localhost:8888/here4help/backend/api/wallet/summary.php?user_id=1'"
+          ],
+          "touch_files": [
+            "backend/api/wallet/summary.php",
+            "backend/api/wallet/fee-settings.php"
+          ],
+          "acceptance": [
+            "API 正確返回點數統計",
+            "可用點數計算準確",
+            "手續費設定正確讀取"
+          ],
+          "rollback": "移除 wallet API 檔案",
+          "estimate_hours": 6,
+          "deps": []
+        },
+        {
+          "id": "T2-FE-WALLET-CARD",
+          "todo_ref": "wallet-card-optimization",
+          "owner": "flutter",
+          "goal": "優化錢包卡片：雙行點數顯示、格式化數字、主題配色",
+          "steps": [
+            "修改 WalletPage 卡片結構：第一行總點數，第二行可用點數（縮排+次要顏色）",
+            "實現數字格式化：千位逗號分隔",
+            "整合 WalletService 調用後端 API",
+            "添加載入狀態和錯誤處理"
+          ],
+          "commands": [
+            "flutter analyze",
+            "flutter test --plain-name wallet"
+          ],
+          "touch_files": [
+            "lib/account/pages/wallet_page.dart",
+            "lib/services/wallet_service.dart"
+          ],
+          "acceptance": [
+            "雙行點數正確顯示",
+            "數字格式化正確",
+            "主題配色一致"
+          ],
+          "rollback": "恢復原始 wallet_page.dart",
+          "estimate_hours": 4,
+          "deps": ["T1-BE-WALLET-API"]
+        }
+      ]
+    },
+    {
+      "id": "M-BANK-ACCOUNT",
+      "title": "銀行帳戶管理系統",
+      "description": "建立官方銀行帳戶管理系統，支援多帳戶但僅一個啟用",
+      "scope": ["銀行帳戶資料表", "帳戶管理API", "前端顯示與複製功能"],
+      "timeline": "預計2天完成",
+      "tasks": [
+        {
+          "id": "T3-BE-BANK-SCHEMA",
+          "todo_ref": "bank-account-schema",
+          "owner": "backend",
+          "goal": "建立銀行帳戶資料表和管理API",
+          "steps": [
+            "建立 official_bank_accounts 資料表",
+            "實現唯一啟用帳戶約束（trigger 或 unique index）",
+            "建立 CRUD API：GET /api/wallet/bank-accounts, POST/PUT/DELETE",
+            "實現帳戶啟用/停用邏輯"
+          ],
+          "commands": [
+            "mysql -u root -p hero4helpdemofhs_hero4help < backend/database/migrations/create_official_bank_accounts.sql",
+            "php -l backend/api/wallet/bank-accounts.php"
+          ],
+          "touch_files": [
+            "backend/database/migrations/create_official_bank_accounts.sql",
+            "backend/api/wallet/bank-accounts.php"
+          ],
+          "acceptance": [
+            "資料表建立成功",
+            "唯一啟用約束生效",
+            "API CRUD 功能正常"
+          ],
+          "rollback": "DROP TABLE official_bank_accounts",
+          "estimate_hours": 5,
+          "deps": []
+        },
+        {
+          "id": "T4-FE-BANK-DISPLAY",
+          "todo_ref": "bank-account-display",
+          "owner": "flutter",
+          "goal": "前端顯示銀行帳戶資訊並支援複製功能",
+          "steps": [
+            "從後端 API 載入啟用的銀行帳戶資訊",
+            "替換硬編碼的銀行資訊",
+            "實現帳號複製功能：點擊小按鈕複製帳號",
+            "添加複製成功 tooltip 提示"
+          ],
+          "commands": [
+            "flutter analyze",
+            "flutter test --plain-name bank_account"
+          ],
+          "touch_files": [
+            "lib/account/pages/wallet_page.dart",
+            "lib/services/wallet_service.dart",
+            "lib/widgets/copyable_text.dart"
+          ],
+          "acceptance": [
+            "銀行資訊動態載入",
+            "複製功能正常",
+            "tooltip 提示正確"
+          ],
+          "rollback": "恢復硬編碼銀行資訊",
+          "estimate_hours": 3,
+          "deps": ["T3-BE-BANK-SCHEMA"]
+        }
+      ]
+    },
+    {
+      "id": "M-POINT-HISTORY",
+      "title": "點數歷史記錄系統",
+      "description": "實作完整的點數收支歷史記錄功能",
+      "scope": ["點數交易記錄表", "歷史記錄API", "前端歷史頁面"],
+      "timeline": "預計3天完成",
+      "tasks": [
+        {
+          "id": "T5-BE-POINT-TRANSACTIONS",
+          "todo_ref": "point-transactions-schema",
+          "owner": "backend",
+          "goal": "建立點數交易記錄系統",
+          "steps": [
+            "建立 point_transactions 資料表",
+            "定義交易類型：earn, spend, deposit, fee, refund, adjustment",
+            "實現歷史記錄 API：GET /api/wallet/transactions",
+            "支援分頁、篩選、排序功能"
+          ],
+          "commands": [
+            "mysql -u root -p hero4helpdemofhs_hero4help < backend/database/migrations/create_point_transactions.sql",
+            "php -l backend/api/wallet/transactions.php"
+          ],
+          "touch_files": [
+            "backend/database/migrations/create_point_transactions.sql",
+            "backend/api/wallet/transactions.php"
+          ],
+          "acceptance": [
+            "資料表建立成功",
+            "API 支援分頁篩選",
+            "交易類型完整"
+          ],
+          "rollback": "DROP TABLE point_transactions",
+          "estimate_hours": 6,
+          "deps": []
+        },
+        {
+          "id": "T6-FE-POINT-HISTORY",
+          "todo_ref": "point-history-ui",
+          "owner": "flutter",
+          "goal": "實作點數歷史頁面UI",
+          "steps": [
+            "建立 PointHistoryPage 頁面",
+            "實現交易記錄列表顯示",
+            "添加篩選功能：交易類型、日期範圍",
+            "實現下拉刷新和分頁載入",
+            "在 WalletPage 添加歷史記錄入口"
+          ],
+          "commands": [
+            "flutter analyze",
+            "flutter test --plain-name point_history"
+          ],
+          "touch_files": [
+            "lib/account/pages/point_history_page.dart",
+            "lib/account/pages/wallet_page.dart",
+            "lib/widgets/transaction_list_item.dart"
+          ],
+          "acceptance": [
+            "歷史頁面正常顯示",
+            "篩選功能正常",
+            "分頁載入正確"
+          ],
+          "rollback": "移除歷史頁面相關檔案",
+          "estimate_hours": 5,
+          "deps": ["T5-BE-POINT-TRANSACTIONS"]
+        }
+      ]
+    },
+    {
+      "id": "M-WALLET-INTEGRATION",
+      "title": "錢包系統整合",
+      "description": "整合現有系統，確保點數流轉正確記錄",
+      "scope": ["任務系統整合", "儲值系統整合", "手續費計算整合"],
+      "timeline": "預計2天完成",
+      "tasks": [
+        {
+          "id": "T7-BE-SYSTEM-INTEGRATION",
+          "todo_ref": "wallet-system-integration",
+          "owner": "backend",
+          "goal": "整合現有系統的點數流轉記錄",
+          "steps": [
+            "修改任務完成邏輯：記錄 point_transactions",
+            "修改儲值審核邏輯：記錄 point_transactions",
+            "實現手續費扣除：任務完成時計算並記錄手續費",
+            "確保所有點數變動都有記錄"
+          ],
+          "commands": [
+            "php -l backend/api/tasks/complete.php",
+            "php -l backend/api/points/approve_topup.php"
+          ],
+          "touch_files": [
+            "backend/api/tasks/complete.php",
+            "backend/api/points/approve_topup.php",
+            "backend/utils/PointTransactionLogger.php"
+          ],
+          "acceptance": [
+            "任務完成記錄正確",
+            "儲值記錄正確",
+            "手續費計算準確"
+          ],
+          "rollback": "恢復原始邏輯",
+          "estimate_hours": 8,
+          "deps": ["T5-BE-POINT-TRANSACTIONS"]
+        },
+        {
+          "id": "T8-FE-WALLET-POLISH",
+          "todo_ref": "wallet-ui-polish",
+          "owner": "flutter",
+          "goal": "錢包頁面最終優化和測試",
+          "steps": [
+            "隱藏 Coupons 選項（暫時不做）",
+            "優化載入狀態和錯誤處理",
+            "添加下拉刷新功能",
+            "確保所有功能正常運作"
+          ],
+          "commands": [
+            "flutter analyze",
+            "flutter test --plain-name wallet"
+          ],
+          "touch_files": [
+            "lib/account/pages/wallet_page.dart"
+          ],
+          "acceptance": [
+            "Coupons 選項已隱藏",
+            "載入狀態正確",
+            "所有功能正常"
+          ],
+          "rollback": "恢復原始狀態",
+          "estimate_hours": 3,
+          "deps": ["T6-FE-POINT-HISTORY"]
+        }
+      ]
+    },
+    {
+      "id": "M-ADMIN-WALLET",
+      "title": "管理員後台錢包模組",
+      "description": "為管理員後台整合完整的錢包管理功能，包含儲值審核、手續費管理、點數記錄查詢",
+      "scope": ["後台UI整合", "儲值審核系統", "手續費管理", "點數記錄查詢"],
+      "timeline": "預計4天完成",
+      "tasks": [
+        {
+          "id": "T9-BE-ADMIN-WALLET-API",
+          "todo_ref": "admin-wallet-api",
+          "owner": "backend",
+          "goal": "建立管理員錢包管理相關API",
+          "steps": [
+            "確認並優化 point_deposit_requests API 與後台串接",
+            "新增 GET /api/admin/fees/settings - 手續費費率設定管理",
+            "新增 PUT /api/admin/fees/settings - 更新手續費費率",
+            "新增 GET /api/admin/fees/revenue - 官方手續費總額查詢",
+            "新增 GET /api/admin/users/point-transactions - 所有用戶點數記錄查詢"
+          ],
+          "commands": [
+            "php -l backend/api/admin/fees/settings.php",
+            "php -l backend/api/admin/fees/revenue.php",
+            "php -l backend/api/admin/users/point-transactions.php"
+          ],
+          "touch_files": [
+            "backend/api/admin/fees/settings.php",
+            "backend/api/admin/fees/revenue.php", 
+            "backend/api/admin/users/point-transactions.php"
+          ],
+          "acceptance": [
+            "管理員可查詢手續費設定",
+            "管理員可更新費率設定",
+            "管理員可查看手續費收入統計",
+            "管理員可查詢所有用戶點數記錄"
+          ],
+          "rollback": "移除新增的管理員API",
+          "estimate_hours": 8,
+          "deps": ["T5-BE-POINT-TRANSACTIONS"]
+        },
+        {
+          "id": "T10-FE-ADMIN-WALLET-UI",
+          "todo_ref": "admin-wallet-ui",
+          "owner": "vue",
+          "goal": "實作管理員後台錢包管理UI",
+          "steps": [
+            "調整後台側欄結構，新增 Wallet 折疊選單",
+            "實作儲值審核列表頁面 (DepositApprovalPage)",
+            "實作手續費管理頁面 (FeeManagementPage) - 含記錄與費率設定",
+            "實作官方手續費記錄列表頁面 (FeeRevenuePage)",
+            "實作所有用戶點數記錄列表頁面 (AllUserTransactionsPage)"
+          ],
+          "commands": [
+            "npm run lint",
+            "npm run build"
+          ],
+          "touch_files": [
+            "admin/frontend/src/components/wallet/DepositApprovalPage.vue",
+            "admin/frontend/src/components/wallet/FeeManagementPage.vue",
+            "admin/frontend/src/components/wallet/FeeRevenuePage.vue",
+            "admin/frontend/src/components/wallet/AllUserTransactionsPage.vue",
+            "admin/frontend/src/router/index.js"
+          ],
+          "acceptance": [
+            "後台側欄包含錢包管理選單",
+            "儲值審核頁面功能完整",
+            "手續費管理頁面可設定費率",
+            "手續費記錄頁面正確顯示",
+            "用戶點數記錄頁面支援篩選"
+          ],
+          "rollback": "移除錢包管理相關頁面",
+          "estimate_hours": 12,
+          "deps": ["T9-BE-ADMIN-WALLET-API"]
+        }
+      ]
+    }
+  ],
+  "apis_to_add": [
+    {
+      "name": "POST /api/fees/record",
+      "purpose": "在『任務完成』的原子化交易內，同步記一筆手續費入帳到 fee_revenue_ledger。",
+      "input": {
+        "task_id": "number",
+        "src_transaction_id": "number (point_transactions.id)",
+        "payer_user_id": "number",
+        "rate": "decimal (5,4)",
+        "amount_points": "integer (rounded, >0)",
+        "note": "string optional"
+      },
+      "output": {
+        "success": "boolean",
+        "fee_id": "number"
+      },
+      "rules": [
+        "必須在與任務完成同一個 DB 交易中執行（同 commit / rollback）",
+        "amount_points 需已完成四捨五入且 fee < reward_point。"
+      ],
+      "status": "planned"
+    },
+    {
+      "name": "GET /api/fees/summary",
+      "purpose": "統計所有有效手續費入帳總額（可接受時間區間、fee_type 過濾）",
+      "query": {
+        "from": "string YYYY-MM-DD optional",
+        "to": "string YYYY-MM-DD optional",
+        "fee_type": "string optional (預設 task_completion)"
+      },
+      "output": {
+        "total_points": "integer",
+        "count": "integer"
+      },
+      "status": "planned"
+    },
+    {
+      "name": "GET /api/admin/fees/settings",
+      "purpose": "管理員查詢當前手續費設定，包含歷史設定記錄",
+      "query": {
+        "include_history": "boolean optional (是否包含歷史記錄)"
+      },
+      "output": {
+        "current_settings": "object (當前生效設定)",
+        "history": "array optional (歷史設定記錄)"
+      },
+      "status": "planned"
+    },
+    {
+      "name": "PUT /api/admin/fees/settings",
+      "purpose": "管理員更新手續費費率設定",
+      "input": {
+        "rate": "decimal (5,4) (新費率)",
+        "description": "string (設定說明)",
+        "effective_date": "string YYYY-MM-DD optional (生效日期，預設立即)"
+      },
+      "output": {
+        "success": "boolean",
+        "settings_id": "number",
+        "effective_at": "string"
+      },
+      "status": "planned"
+    },
+    {
+      "name": "GET /api/admin/fees/revenue",
+      "purpose": "管理員查詢官方手續費收入統計",
+      "query": {
+        "from": "string YYYY-MM-DD optional",
+        "to": "string YYYY-MM-DD optional",
+        "group_by": "string optional (day|month|year)"
+      },
+      "output": {
+        "total_revenue": "integer",
+        "period_stats": "array",
+        "top_tasks": "array (手續費最高的任務)"
+      },
+      "status": "planned"
+    },
+    {
+      "name": "GET /api/admin/users/point-transactions",
+      "purpose": "管理員查詢所有用戶的點數交易記錄",
+      "query": {
+        "user_id": "integer optional (特定用戶)",
+        "transaction_type": "string optional",
+        "from": "string YYYY-MM-DD optional",
+        "to": "string YYYY-MM-DD optional",
+        "page": "integer optional",
+        "per_page": "integer optional"
+      },
+      "output": {
+        "transactions": "array",
+        "pagination": "object",
+        "summary": "object (統計資訊)"
+      },
+      "status": "planned"
+    }
+  ],
+  "database_schema": {
+    "official_bank_accounts": {
+      "status": "new",
+      "description": "官方銀行帳戶管理",
+      "fields": {
+        "id": "INT PRIMARY KEY AUTO_INCREMENT",
+        "bank_name": "VARCHAR(100) NOT NULL COMMENT '銀行名稱'",
+        "account_number": "VARCHAR(50) NOT NULL COMMENT '帳號（純數字）'",
+        "account_holder": "VARCHAR(100) NOT NULL COMMENT '戶名'",
+        "is_active": "TINYINT(1) DEFAULT 0 COMMENT '是否啟用（僅一個可為1）'",
+        "admin_id": "INT COMMENT '負責管理員ID'",
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+        "updated_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+      },
+      "constraints": [
+        "UNIQUE KEY uk_active_account (is_active) WHERE is_active = 1"
+      ]
+    },
+    "point_transactions": {
+      "status": "new", 
+      "description": "點數交易記錄",
+      "fields": {
+        "id": "BIGINT PRIMARY KEY AUTO_INCREMENT",
+        "user_id": "BIGINT UNSIGNED NOT NULL COMMENT '用戶ID'",
+        "transaction_type": "ENUM('earn','spend','deposit','fee','refund','adjustment') NOT NULL COMMENT '交易類型'",
+        "amount": "INT NOT NULL COMMENT '金額（正數為收入，負數為支出）'",
+        "description": "VARCHAR(255) NOT NULL COMMENT '交易描述'",
+        "related_task_id": "VARCHAR(36) NULL COMMENT '相關任務ID'",
+        "related_order_id": "INT NULL COMMENT '相關訂單ID'",
+        "status": "ENUM('completed','pending','cancelled') DEFAULT 'completed'",
+        "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+      },
+      "indexes": [
+        "KEY idx_user_created (user_id, created_at)",
+        "KEY idx_type_created (transaction_type, created_at)",
+        "KEY idx_task_id (related_task_id)"
+      ]
+    },
+    "fee_revenue_ledger": {
+      "status": "new",
+      "description": "手續費入帳台帳（目前僅任務完成手續費）",
+      "fields": {
+        "id": "BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT",
+        "fee_type": "ENUM('task_completion') NOT NULL COMMENT '手續費類型'",
+        "src_transaction_id": "BIGINT UNSIGNED NULL COMMENT '對應 point_transactions.id'",
+        "task_id": "BIGINT UNSIGNED NULL",
+        "payer_user_id": "BIGINT UNSIGNED NULL COMMENT '被收取手續費者'",
+        "amount_points": "INT UNSIGNED NOT NULL COMMENT '已四捨五入後的點數'",
+        "rate": "DECIMAL(5,4) NOT NULL COMMENT '當下生效費率'",
+        "note": "VARCHAR(255) NULL",
+        "created_at": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+      },
+      "indexes": [
+        "KEY idx_type_created (fee_type, created_at)",
+        "KEY idx_task (task_id)",
+        "KEY idx_src_tx (src_transaction_id)",
+        "KEY idx_payer (payer_user_id)"
+      ]
+    }
+  },
+  "existing_analysis": {
+    "frontend": {
+      "wallet_page": {
+        "status": "exists",
+        "path": "lib/account/pages/wallet_page.dart",
+        "features": ["基礎錢包卡片", "儲值對話框", "硬編碼銀行資訊"],
+        "missing": ["雙行點數顯示", "動態銀行資訊", "複製功能", "點數歷史入口"]
+      },
+      "wallet_service": {
+        "status": "missing",
+        "path": "lib/services/wallet_service.dart",
+        "needed": ["點數統計API調用", "銀行帳戶API調用", "交易記錄API調用"]
+      }
+    },
+    "backend": {
+      "points_api": {
+        "status": "partial",
+        "path": "backend/api/points/request_topup.php",
+        "features": ["儲值申請"],
+        "missing": ["點數統計", "手續費查詢", "交易記錄"]
+      },
+      "wallet_api": {
+        "status": "missing",
+        "path": "backend/api/wallet/",
+        "needed": ["summary.php", "bank-accounts.php", "transactions.php"]
+      }
+    },
+    "database": {
+      "existing_tables": {
+        "users": "包含 points 欄位",
+        "tasks": "包含 reward_point 欄位",
+        "task_completion_points_fee_settings": "手續費設定表",
+        "point_deposit_requests": "儲值申請表（已存在但名稱不同）"
+      },
+      "missing_tables": {
+        "official_bank_accounts": "官方銀行帳戶管理",
+        "point_transactions": "點數交易記錄"
+      }
+    }
+  },
+  "pr_breakdown": [
+    {
+      "id": "PR1",
+      "title": "錢包核心功能實作",
+      "scope": ["T1-BE-WALLET-API", "T2-FE-WALLET-CARD"],
+      "files": [
+        "backend/api/wallet/summary.php",
+        "backend/api/wallet/fee-settings.php", 
+        "lib/account/pages/wallet_page.dart",
+        "lib/services/wallet_service.dart"
+      ],
+      "acceptance": "錢包卡片正確顯示雙行點數，數字格式化正確"
+    },
+    {
+      "id": "PR2", 
+      "title": "銀行帳戶管理系統",
+      "scope": ["T3-BE-BANK-SCHEMA", "T4-FE-BANK-DISPLAY"],
+      "files": [
+        "backend/database/migrations/create_official_bank_accounts.sql",
+        "backend/api/wallet/bank-accounts.php",
+        "lib/widgets/copyable_text.dart"
+      ],
+      "acceptance": "銀行資訊動態載入，複製功能正常運作"
+    },
+    {
+      "id": "PR3",
+      "title": "點數歷史記錄系統", 
+      "scope": ["T5-BE-POINT-TRANSACTIONS", "T6-FE-POINT-HISTORY"],
+      "files": [
+        "backend/database/migrations/create_point_transactions.sql",
+        "backend/api/wallet/transactions.php",
+        "lib/account/pages/point_history_page.dart"
+      ],
+      "acceptance": "點數歷史頁面正常顯示，支援篩選和分頁"
+    },
+    {
+      "id": "PR4",
+      "title": "錢包系統整合優化",
+      "scope": ["T7-BE-SYSTEM-INTEGRATION", "T8-FE-WALLET-POLISH"],
+      "files": [
+        "backend/utils/PointTransactionLogger.php",
+        "backend/api/tasks/complete.php"
+      ],
+      "acceptance": "所有點數流轉正確記錄，錢包功能完整"
+    }
+  ],
+  "open_questions": [
+    "管理員後台權限控制：哪些管理員角色可以修改手續費設定？",
+    "手續費設定生效時機：新費率是否立即生效還是僅對新任務生效？",
+    "儲值審核流程：是否需要多級審核機制？",
+    "點數記錄查詢性能：大量數據時是否需要額外的索引優化？",
+    "管理員操作日誌：是否需要記錄所有管理員對錢包系統的操作？",
+    "手續費收入統計：是否需要支援匯出功能？",
+    "用戶點數異常監控：是否需要自動警報機制？"
+  ],
+  "suggestions": [
+    "建議實現點數變動的即時通知功能",
+    "建議添加點數統計的圖表顯示",
+    "建議實現點數預警功能（餘額不足時提醒）",
+    "建議添加交易記錄的匯出功能",
+    "建議實現手續費的階梯式計算（不同金額不同費率）"
+  ],
+  "testing_plan": {
+    "unit_tests": [
+      "點數統計計算邏輯",
+      "手續費計算邏輯", 
+      "銀行帳戶唯一啟用約束",
+      "點數交易記錄功能"
+    ],
+    "integration_tests": [
+      "錢包頁面載入流程",
+      "儲值流程整合測試",
+      "任務完成點數流轉測試",
+      "手續費扣除流程測試"
+    ],
+    "e2e_tests": [
+      "完整錢包功能操作流程",
+      "點數歷史查看和篩選",
+      "銀行帳戶資訊複製功能",
+      "跨頁面點數數據一致性"
+    ]
+  },
+  "rollback_plan": {
+    "database": [
+      "DROP TABLE IF EXISTS official_bank_accounts",
+      "DROP TABLE IF EXISTS point_transactions"
+    ],
+    "code": [
+      "恢復原始 wallet_page.dart",
+      "移除新增的 wallet API 檔案",
+      "移除點數歷史相關檔案"
+    ]
+  }
+}

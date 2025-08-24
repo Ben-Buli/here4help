@@ -44,6 +44,8 @@ dependencies:
   awesome_dialog: ^3.2.1
   device_info_plus: ^9.1.2
   package_info_plus: ^4.2.0
+  # 評分機制
+  flutter_rating_bar: ^4.0.1
 
 dev_dependencies:
   flutter_test:

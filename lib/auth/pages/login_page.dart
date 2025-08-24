@@ -92,7 +92,7 @@ class _LoginPageState extends State<LoginPage> {
         email: user['email'],
         phone: user['phone'] ?? '',
         points: user['points'] ?? 0,
-        avatar_url: user['avatar'] ?? '',
+        avatar_url: user['avatar_url'] ?? '',
         status: user['status'] ?? 'active',
         provider: user['provider'] ?? 'email',
         created_at: user['created_at'] ?? '',
@@ -100,7 +100,7 @@ class _LoginPageState extends State<LoginPage> {
         referral_code: user['referral_code'],
         google_id: user['google_id'],
         primary_language: user['primary_language'] ?? 'English',
-        permission_level: user['permission'] ?? 0,
+        permission: user['permission'] ?? 0,
       ));
 
       // 同步 PermissionProvider 權限狀態
@@ -223,7 +223,7 @@ class _LoginPageState extends State<LoginPage> {
             referral_code: userData['referral_code'],
             google_id: userData['google_id'],
             primary_language: userData['primary_language'] ?? 'English',
-            permission_level: userData['permission'] ?? 0,
+            permission: userData['permission'] ?? 0,
           ));
 
           ScaffoldMessenger.of(context).showSnackBar(
@@ -306,7 +306,7 @@ class _LoginPageState extends State<LoginPage> {
             referral_code: userData['referral_code'],
             google_id: userData['google_id'],
             primary_language: userData['primary_language'] ?? 'English',
-            permission_level: userData['permission'] ?? 0,
+            permission: userData['permission'] ?? 0,
           ));
 
           ScaffoldMessenger.of(context).showSnackBar(
@@ -389,7 +389,7 @@ class _LoginPageState extends State<LoginPage> {
             referral_code: userData['referral_code'],
             google_id: userData['google_id'],
             primary_language: userData['primary_language'] ?? 'English',
-            permission_level: userData['permission'] ?? 0,
+            permission: userData['permission'] ?? 0,
           ));
 
           ScaffoldMessenger.of(context).showSnackBar(

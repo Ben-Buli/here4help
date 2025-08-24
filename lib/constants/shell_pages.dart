@@ -17,6 +17,7 @@ import 'package:here4help/account/pages/support_page.dart';
 import 'package:here4help/account/pages/task_history_page.dart';
 import 'package:here4help/account/pages/theme_settings_page.dart';
 import 'package:here4help/account/pages/wallet_page.dart';
+import 'package:here4help/account/pages/point_history_page.dart';
 
 // ==================== auth 模組 ====================
 import 'package:here4help/auth/pages/login_page.dart';
@@ -42,6 +43,7 @@ import 'package:here4help/pay/pages/pay_setting_page.dart';
 
 // ==================== system 模組 ====================
 import 'package:here4help/system/pages/permission_denied_page.dart';
+import 'package:here4help/system/pages/permission_unvertified_page.dart';
 
 // ==================== task 模組 ====================
 import 'package:here4help/task/pages/task_create_page.dart';
@@ -235,6 +237,16 @@ final List<Map<String, dynamic>> shellPages = [
     'permission': 1, // 需要已認證用戶才能訪問錢包
   },
   {
+    'path': '/account/wallet/point_history',
+    'child': const PointHistoryPage(),
+    'title': 'Point History',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'icon': Icons.history,
+    'permission': 1, // 需要已認證用戶才能查看點數歷史
+  },
+  {
     'path': '/account/wallet/point_policy',
     'child': const PointPolicyPage(),
     'title': 'Pont Policy',
@@ -351,5 +363,14 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'permission': -4, // 任何狀態都可訪問權限不足頁面
+  },
+  {
+    'path': '/permission-unverified',
+    'child': const PermissionUnverifiedPage(),
+    'title': 'User Unverified',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'permission': 0, // 新用戶可訪問權限不足頁面
   },
 ];

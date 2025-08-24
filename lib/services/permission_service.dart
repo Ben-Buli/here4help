@@ -52,7 +52,8 @@ class PermissionService {
 
   /// 檢查帳號是否有效（可以登入）
   static bool isAccountValid(int permission) {
-    return permission >= SELF_SOFT_DELETED;
+    // 與後端一致：僅 permission >= VERIFIED_USER 才視為可登入
+    return permission >= VERIFIED_USER;
   }
 
   /// 檢查帳號是否被停權
