@@ -408,7 +408,7 @@ class TaskService extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        debugPrint('🔍 TaskService loadMyApplications: 解析後的資料: $data');
+        // debugPrint('🔍 TaskService loadMyApplications: 解析後的資料: $data');
 
         if (data['success'] == true) {
           final payload = data['data'];

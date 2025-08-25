@@ -54,7 +54,7 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
         Navigator.of(context).pop(true); // 檢舉成功，返回 true
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('檢舉已提交！我們會盡快審核。'),
+            content: Text('Report submitted! We will review it soon.'),
             backgroundColor: Colors.green,
           ),
         );
@@ -64,7 +64,7 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
       widget.onReportSubmitted?.call();
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('TaskReportDialog: 檢舉提交失敗: $e');
+        debugPrint('TaskReportDialog: Report submission failed: $e');
       }
 
       if (mounted) {
@@ -73,7 +73,7 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('檢舉提交失敗: $e'),
+            content: Text('Report submission failed: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -88,7 +88,7 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
         children: [
           Icon(Icons.report, color: Colors.red),
           SizedBox(width: 8),
-          Text('檢舉任務'),
+          Text('Report Task'),
         ],
       ),
       content: SingleChildScrollView(
@@ -109,7 +109,7 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      '檢舉任務：',
+                      'Report Task:',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
@@ -131,7 +131,7 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
 
               // 檢舉原因選擇
               const Text(
-                '檢舉原因 *',
+                'Reason *',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                 ),
@@ -141,9 +141,9 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
                 value: _selectedReason,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
-                  hintText: '請選擇檢舉原因',
+                  hintText: 'Please select a reason',
                 ),
-                items: TaskReportsApi.reportReasons.map((reason) {
+                items: TaskReportsApi.getReportReasons().map((reason) {
                   return DropdownMenuItem<String>(
                     value: reason['value'],
                     child: Text(reason['label']!),
@@ -156,7 +156,7 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
                 },
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return '請選擇檢舉原因';
+                    return 'Please select a reason';
                   }
                   return null;
                 },
@@ -166,7 +166,7 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
 
               // 詳細說明
               const Text(
-                '詳細說明 *',
+                'Detailed Description *',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                 ),
@@ -178,14 +178,14 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
                 maxLength: 500,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
-                  hintText: '請詳細描述檢舉原因...',
+                  hintText: 'Please describe the reason for the report...',
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return '請輸入詳細說明';
+                    return 'Please enter a detailed description';
                   }
                   if (value.trim().length < 10) {
-                    return '說明至少需要10個字元';
+                    return 'Description must be at least 10 characters';
                   }
                   return null;
                 },
@@ -212,7 +212,7 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '請確保檢舉內容真實有效。虛假檢舉可能導致帳號受限。',
+                        'Please ensure the report content is real and valid. False reports may result in account restrictions.',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.amber,
@@ -229,7 +229,7 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
       actions: [
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('取消'),
+          child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: _isLoading ? null : _submitReport,
@@ -246,7 +246,7 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 )
-              : const Text('提交檢舉'),
+              : const Text('Submit Report'),
         ),
       ],
     );
@@ -305,4 +305,3 @@ class TaskReportButton extends StatelessWidget {
     );
   }
 }
-

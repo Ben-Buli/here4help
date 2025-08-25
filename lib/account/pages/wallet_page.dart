@@ -197,8 +197,8 @@ class _WalletPageState extends State<WalletPage> {
   // The state (copied flags) is stored in the _WalletPageState.
   // We'll use a Map<String, bool> to keep track of which row is copied.
 
-  Map<String, bool> _bankInfoCopied = {};
-  Map<String, int> _bankInfoCopyTimers = {};
+  final Map<String, bool> _bankInfoCopied = {};
+  final Map<String, int> _bankInfoCopyTimers = {};
 
   void _handleBankInfoCopy(String key, String value) async {
     await Clipboard.setData(ClipboardData(text: value));
@@ -371,7 +371,7 @@ class _WalletPageState extends State<WalletPage> {
               margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: Color(0xFFFFF8E1), // 淺黃色
+                color: const Color(0xFFFFF8E1), // 淺黃色
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(

@@ -1,4 +1,6 @@
 // home_page.dart
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
@@ -8,6 +10,9 @@ import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/constants/app_colors.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/utils/image_helper.dart';
+import 'package:here4help/providers/rating_provider.dart';
+import 'package:here4help/services/rating_service.dart';
+import 'package:here4help/providers/achievement_provider.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -29,6 +34,12 @@ class _HomePageState extends State<HomePage> {
         _scrollController.animateTo(0,
             duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
       }
+    });
+
+    // 載入評分統計和成就數據
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<RatingProvider>().loadUserRatingStats();
+      context.read<AchievementProvider>().loadUserAchievements();
     });
   }
 
@@ -82,7 +93,7 @@ class _HomePageState extends State<HomePage> {
                             Row(
                               children: [
                                 Builder(
-                                  // 使用 Builder 來確保 user 顯示名稱 有值
+                                  // 使用 Builder 來確保 user 顯示名稱(顯示順序: nickname -> name -> User)
                                   builder: (context) {
                                     final displayName = [
                                       user?.nickname,
@@ -104,6 +115,8 @@ class _HomePageState extends State<HomePage> {
                                     String? getPermissionStatus(int? level) {
                                       if (level == -1 || level == -3) {
                                         return 'Suspended';
+                                      } else if (level == 0) {
+                                        return 'Unverified';
                                       }
                                       return null;
                                     }
@@ -138,18 +151,52 @@ class _HomePageState extends State<HomePage> {
                             Text(
                                 '${NumberFormat.decimalPattern().format(user?.points ?? 0)} points',
                                 style: const TextStyle(fontSize: 16)),
-                            const Row(
-                              children: [
-                                Icon(Icons.star, color: Colors.amber, size: 16),
-                                Icon(Icons.star, color: Colors.amber, size: 16),
-                                Icon(Icons.star, color: Colors.amber, size: 16),
-                                Icon(Icons.star, color: Colors.amber, size: 16),
-                                Icon(Icons.star, color: Colors.amber, size: 16),
-                                SizedBox(width: 4),
-                                Text('5 (16 comments)',
-                                    style: TextStyle(
-                                        fontSize: 12, color: Colors.grey))
-                              ],
+                            Consumer<RatingProvider>(
+                              builder: (context, ratingProvider, child) {
+                                final stats = ratingProvider.userRatingStats;
+
+                                if (ratingProvider.isLoading) {
+                                  return const Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text('Loading ratings...',
+                                          style: TextStyle(
+                                              fontSize: 12, color: Colors.grey))
+                                    ],
+                                  );
+                                }
+
+                                if (stats == null || stats.totalReviews == 0) {
+                                  return const Row(
+                                    children: [
+                                      Icon(Icons.star_border,
+                                          color: Colors.grey, size: 16),
+                                      SizedBox(width: 4),
+                                      Text('No ratings yet',
+                                          style: TextStyle(
+                                              fontSize: 12, color: Colors.grey))
+                                    ],
+                                  );
+                                }
+
+                                return Row(
+                                  children: [
+                                    ...RatingService.buildStarRating(
+                                        stats.avgRating,
+                                        size: 16),
+                                    const SizedBox(width: 4),
+                                    Text(RatingService.formatRatingText(stats),
+                                        style: const TextStyle(
+                                            fontSize: 12, color: Colors.grey))
+                                  ],
+                                );
+                              },
                             )
                           ],
                         ),
@@ -180,15 +227,45 @@ class _HomePageState extends State<HomePage> {
                         style: TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 18)),
                     const SizedBox(height: 12),
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _AchievementBox(label: 'Total Coins', value: '1200'),
-                        _AchievementBox(label: 'Task Completed', value: '20'),
-                        _AchievementBox(
-                            label: 'Five-Star Ratings', value: '10'),
-                        _AchievementBox(label: 'Avg Rating', value: '4.5'),
-                      ],
+                    Consumer<AchievementProvider>(
+                      builder: (context, achievementProvider, child) {
+                        if (achievementProvider.isLoading) {
+                          return const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _AchievementBox(
+                                  label: 'Total Coins', value: '...'),
+                              _AchievementBox(
+                                  label: 'Task Completed', value: '...'),
+                              _AchievementBox(
+                                  label: 'Five-Star Ratings', value: '...'),
+                              _AchievementBox(
+                                  label: 'Avg Rating', value: '...'),
+                            ],
+                          );
+                        }
+
+                        final formatted =
+                            achievementProvider.getFormattedAchievements();
+
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _AchievementBox(
+                                label: 'Total Coins',
+                                value: formatted['total_coins']!),
+                            _AchievementBox(
+                                label: 'Task Completed',
+                                value: formatted['tasks_completed']!),
+                            _AchievementBox(
+                                label: 'Five-Star Ratings',
+                                value: formatted['five_star_ratings']!),
+                            _AchievementBox(
+                                label: 'Avg Rating',
+                                value: formatted['avg_rating']!),
+                          ],
+                        );
+                      },
                     ),
 
                     /// 以下成就系統先隱藏不做
@@ -305,7 +382,7 @@ class _AchievementBox extends StatelessWidget {
                   child: Container(
                     width: 60,
                     height: 60,
-                    color: Colors.black,
+                    color: themeManager.currentTheme.onSecondary,
                   ),
                 ),
                 ClipPath(
@@ -316,17 +393,8 @@ class _AchievementBox extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          // 若為 pink theme，使用粉藍-白-粉紅漸層
-                          if (themeManager.currentTheme.name
-                              .startsWith('pink_theme')) ...[
-                            const Color(0xFF89CFF0),
-                            const Color(0xFFFFFFFF),
-                            const Color(0xFFF8A1C4),
-                          ] else ...[
-                            themeManager.currentTheme.primary,
-                            themeManager.currentTheme.secondary,
-                            themeManager.currentTheme.accent,
-                          ]
+                          themeManager.currentTheme.secondary,
+                          themeManager.currentTheme.primary,
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
@@ -337,7 +405,6 @@ class _AchievementBox extends StatelessWidget {
                       value,
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.bold,
                         foreground: Paint()
                           ..style = PaintingStyle.stroke
                           ..strokeWidth = 1.5
@@ -354,10 +421,10 @@ class _AchievementBox extends StatelessWidget {
                     alignment: Alignment.center,
                     child: Text(
                       value,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: themeManager.currentTheme.onPrimary,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -373,36 +440,25 @@ class _AchievementBox extends StatelessWidget {
   }
 }
 
-// 正六角形 - 上下左右長度一致
+// 上下平的六邊形 - 類似圖片中的形狀
 class HexagonClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
     final double w = size.width;
-    final double h = size.height;
 
-    // 計算正六角形的邊長
-    final double side = w / 2;
-    final double centerX = w / 2;
-    final double centerY = h / 2;
+    // 正六邊形公式：高度 = sqrt(3)/2 * width
+    final double hexHeight = (sqrt(3) / 2) * w;
 
-    // 正六角形的六個頂點
     final List<Offset> points = [
-      Offset(centerX, centerY - side), // 頂點
-      Offset(centerX + side * 0.866, centerY - side * 0.5), // 右上
-      Offset(centerX + side * 0.866, centerY + side * 0.5), // 右下
-      Offset(centerX, centerY + side), // 底點
-      Offset(centerX - side * 0.866, centerY + side * 0.5), // 左下
-      Offset(centerX - side * 0.866, centerY - side * 0.5), // 左上
+      Offset(w * 0.25, 0), // 左上
+      Offset(w * 0.75, 0), // 右上
+      Offset(w, hexHeight / 2), // 右中
+      Offset(w * 0.75, hexHeight), // 右下
+      Offset(w * 0.25, hexHeight), // 左下
+      Offset(0, hexHeight / 2), // 左中
     ];
 
-    return Path()
-      ..moveTo(points[0].dx, points[0].dy)
-      ..lineTo(points[1].dx, points[1].dy)
-      ..lineTo(points[2].dx, points[2].dy)
-      ..lineTo(points[3].dx, points[3].dy)
-      ..lineTo(points[4].dx, points[4].dy)
-      ..lineTo(points[5].dx, points[5].dy)
-      ..close();
+    return Path()..addPolygon(points, true);
   }
 
   @override

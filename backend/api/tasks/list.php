@@ -43,6 +43,7 @@ try {
     // 建立查詢條件
     $whereConditions = [];
     $params = [];
+
     
     if ($status) {
         // 支援傳入 code 或 id
@@ -96,7 +97,7 @@ try {
               WHERE (b.user_id = ? AND b.target_user_id = u.id) 
                  OR (b.user_id = u.id AND b.target_user_id = ?)
             )" : "") . "
-            ORDER BY t.created_at DESC 
+            ORDER BY t.updated_at DESC 
             LIMIT ? OFFSET ?";
     if ($currentUserId) {
         $params[] = $currentUserId;
@@ -107,11 +108,19 @@ try {
     
     $tasks = $db->fetchAll($sql, $params);
     
-    // 為每個任務獲取相關的申請問題
+    // 為每個任務獲取相關的申請問題和應徵人數
     foreach ($tasks as &$task) {
         $questionsSql = "SELECT * FROM application_questions WHERE task_id = ?";
         $questions = $db->fetchAll($questionsSql, [$task['id']]);
         $task['application_questions'] = $questions;
+        
+        // 獲取應徵人數統計
+        $applicationCountSql = "SELECT COUNT(*) as count FROM task_applications WHERE task_id = ?";
+        $applicationCount = $db->fetch($applicationCountSql, [$task['id']]);
+        $task['application_count'] = (int)($applicationCount['count'] ?? 0);
+        
+        // 為了兼容前端邏輯，創建一個虛擬的 applications 陣列
+        $task['applications'] = array_fill(0, $task['application_count'], []);
         
         // 將 hashtags 字串轉換為陣列
         if ($task['hashtags']) {

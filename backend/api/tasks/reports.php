@@ -12,6 +12,7 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../auth_helper.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -26,8 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 try {
     // JWT 認證
-    $headers = getallheaders();
-    $authHeader = $headers['Authorization'] ?? '';
+    $authHeader = getAuthorizationHeader();
     
     if (!$authHeader || !preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
         Response::error('Missing or invalid authorization header', 401);
@@ -47,7 +47,12 @@ try {
     // 根據 HTTP 方法分發處理
     switch ($_SERVER['REQUEST_METHOD']) {
         case 'GET':
-            handleGetReports($db, $userId);
+            // 檢查是否有 task_id 參數，如果有則檢查該任務的檢舉狀態
+            if (isset($_GET['task_id']) && isset($_GET['check_status'])) {
+                handleCheckReportStatus($db, $userId, $_GET['task_id']);
+            } else {
+                handleGetReports($db, $userId);
+            }
             break;
         case 'POST':
             handleSubmitReport($db, $userId);
@@ -59,6 +64,46 @@ try {
 } catch (Exception $e) {
     error_log("Task Reports API Error: " . $e->getMessage());
     Response::error('Internal server error: ' . $e->getMessage(), 500);
+}
+
+/**
+ * 檢查用戶是否已檢舉過指定任務
+ */
+function handleCheckReportStatus($db, $userId, $taskId) {
+    try {
+        // 檢查是否已經檢舉過
+        $stmt = $db->prepare("
+            SELECT id, reason, description, status, created_at, updated_at
+            FROM task_reports 
+            WHERE reporter_id = ? AND task_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+        ");
+        $stmt->execute([$userId, $taskId]);
+        $report = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($report) {
+            Response::success([
+                'has_reported' => true,
+                'report' => [
+                    'id' => $report['id'],
+                    'reason' => $report['reason'],
+                    'description' => $report['description'],
+                    'status' => $report['status'],
+                    'created_at' => $report['created_at'],
+                    'updated_at' => $report['updated_at']
+                ]
+            ]);
+        } else {
+            Response::success([
+                'has_reported' => false,
+                'report' => null
+            ]);
+        }
+        
+    } catch (Exception $e) {
+        throw $e;
+    }
 }
 
 /**
@@ -169,7 +214,16 @@ function handleSubmitReport($db, $userId) {
     }
     
     // 驗證檢舉原因
-    $validReasons = ['inappropriate', 'spam', 'fake', 'dangerous', 'other'];
+    $validReasons = [
+        'spam_advertising',
+        'fraud_scam', 
+        'misleading_false_info',
+        'illegal_activity',
+        'abusive_offensive_content',
+        'duplicate_repeated_posting',
+        'unreasonable_reward_conditions',
+        'other'
+    ];
     if (!in_array($reason, $validReasons)) {
         Response::error('Invalid reason. Must be one of: ' . implode(', ', $validReasons), 400);
     }
@@ -192,7 +246,7 @@ function handleSubmitReport($db, $userId) {
         // 檢查是否已經檢舉過
         $checkStmt = $db->prepare("
             SELECT id FROM task_reports 
-            WHERE reporter_id = ? AND task_id = ? AND status IN ('pending', 'reviewed')
+            WHERE reporter_id = ? AND task_id = ? AND status IN ('pending', 'reviewed', 'resolved')
         ");
         $checkStmt->execute([$userId, $taskId]);
         
@@ -212,7 +266,7 @@ function handleSubmitReport($db, $userId) {
                 updated_at
             ) VALUES (?, ?, ?, ?, 'pending', NOW(), NOW())
         ");
-        $insertStmt->execute([$taskId, $userId, $reason, $description]);
+        $insertStmt->execute([$taskId, $userId, $reason, $description, 'pending', date('Y-m-d H:i:s'), date('Y-m-d H:i:s')]);
         
         $reportId = $db->lastInsertId();
         
@@ -229,7 +283,7 @@ function handleSubmitReport($db, $userId) {
         $logStmt->execute([
             $taskId,
             $userId,
-            "用戶檢舉任務：原因 - $reason，說明 - $description"
+            "用戶檢舉任務：原因 - {$reason}，說明 - {$description}"
         ]);
         
         Response::success([

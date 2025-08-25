@@ -61,9 +61,10 @@ try {
         throw new Exception('Invalid email or password');
     }
     
-    // 統一使用 permission 作為登入判斷：permission > 0 才允許登入
-    $userPermission = (int)($user['permission'] ?? 0);
-    if ($userPermission <= 0) {
+    // 統一使用 permission 作為登入判斷：permission >= 0 才允許登入
+    $userPermission = (int)($user['permission']);
+    error_log("User permission: " . $userPermission);
+    if ($userPermission < 0) {
         throw new Exception('Account is not allowed to login (permission)');
     }
     

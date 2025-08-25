@@ -5,7 +5,7 @@ import 'package:here4help/services/http_client_service.dart';
 
 /// 任務收藏 API 服務
 class TaskFavoritesApi {
-  static String get _baseUrl => '${AppConfig.apiBaseUrl}/tasks';
+  static String get _baseUrl => '${AppConfig.apiBaseUrl}/backend/api/tasks';
 
   /// 獲取用戶收藏列表
   static Future<Map<String, dynamic>> getFavorites({
@@ -66,6 +66,7 @@ class TaskFavoritesApi {
 
       if (kDebugMode) {
         debugPrint('TaskFavoritesApi: 收藏任務回應: ${response.statusCode}');
+        debugPrint('TaskFavoritesApi: 回應內容: ${response.body}');
       }
 
       if (response.statusCode == 200) {
@@ -79,8 +80,13 @@ class TaskFavoritesApi {
           throw Exception(data['message'] ?? '收藏任務失敗');
         }
       } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? '收藏任務失敗');
+        try {
+          final errorData = json.decode(response.body);
+          throw Exception(
+              errorData['message'] ?? '收藏任務失敗 (HTTP ${response.statusCode})');
+        } catch (jsonError) {
+          throw Exception('收藏任務失敗 (HTTP ${response.statusCode})');
+        }
       }
     } catch (e) {
       if (kDebugMode) {
@@ -108,6 +114,7 @@ class TaskFavoritesApi {
 
       if (kDebugMode) {
         debugPrint('TaskFavoritesApi: 取消收藏任務回應: ${response.statusCode}');
+        debugPrint('TaskFavoritesApi: 回應內容: ${response.body}');
       }
 
       if (response.statusCode == 200) {
@@ -121,8 +128,13 @@ class TaskFavoritesApi {
           throw Exception(data['message'] ?? '取消收藏任務失敗');
         }
       } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? '取消收藏任務失敗');
+        try {
+          final errorData = json.decode(response.body);
+          throw Exception(
+              errorData['message'] ?? '取消收藏任務失敗 (HTTP ${response.statusCode})');
+        } catch (jsonError) {
+          throw Exception('取消收藏任務失敗 (HTTP ${response.statusCode})');
+        }
       }
     } catch (e) {
       if (kDebugMode) {
@@ -150,4 +162,3 @@ class TaskFavoritesApi {
     }
   }
 }
-

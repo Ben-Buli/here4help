@@ -69,7 +69,7 @@ class UserService extends ChangeNotifier {
   /// 從資料庫獲取用戶資訊
   Future<void> _loadUserFromDatabase() async {
     try {
-      debugPrint('🔍 嘗試從資料庫獲取用戶資訊...');
+      // debugPrint('🔍 嘗試從資料庫獲取用戶資訊...');
       final userData = await AuthService.getProfile();
 
       debugPrint('🔍 從資料庫獲取的原始資料: $userData');
@@ -161,7 +161,6 @@ class UserService extends ChangeNotifier {
       await prefs.setString('user_primaryLang', user.primary_language);
       await prefs.setInt('user_permission', user.permission);
       debugPrint('✅ 用戶資訊已保存到 SharedPreferences');
-      debugPrint('✅ 保存的 avatar_url: ${user.avatar_url}');
     } catch (e) {
       debugPrint('❌ 保存用戶資訊到 SharedPreferences 失敗: $e');
     }

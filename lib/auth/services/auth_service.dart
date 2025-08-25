@@ -10,28 +10,28 @@ class AuthService {
   static const String _userKey = 'user_data';
 
   // 測試網路連線
-  static Future<bool> testConnection() async {
-    try {
-      print('🔍 測試網路連線...');
-      final response = await http
-          .post(
-            Uri.parse('${AppConfig.apiBaseUrl}/backend/api/auth/login.php'),
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: jsonEncode(
-                {'email': 'test@example.com', 'password': 'test123'}),
-          )
-          .timeout(const Duration(seconds: 10));
+  // static Future<bool> testConnection() async {
+  //   try {
+  //     print('🔍 測試網路連線...');
+  //     final response = await http
+  //         .post(
+  //           Uri.parse('${AppConfig.apiBaseUrl}/backend/api/auth/login.php'),
+  //           headers: {
+  //             'Content-Type': 'application/json',
+  //           },
+  //           body: jsonEncode(
+  //               {'email': 'test@example.com', 'password': 'test123'}),
+  //         )
+  //         .timeout(const Duration(seconds: 10));
 
-      print('📡 連線測試狀態碼: ${response.statusCode}');
-      // 任何回應都表示連線正常，包括認證失敗
-      return response.statusCode >= 200 && response.statusCode < 600;
-    } catch (e) {
-      print('❌ 連線測試失敗: $e');
-      return false;
-    }
-  }
+  //     print('📡 連線測試狀態碼: ${response.statusCode}');
+  //     // 任何回應都表示連線正常，包括認證失敗
+  //     return response.statusCode >= 200 && response.statusCode < 600;
+  //   } catch (e) {
+  //     print('❌ 連線測試失敗: $e');
+  //     return false;
+  //   }
+  // }
 
   // 登入
   static Future<Map<String, dynamic>> login(
@@ -148,7 +148,7 @@ class AuthService {
       );
 
       debugPrint('🔍 API 回應狀態碼: ${response.statusCode}');
-      debugPrint('🔍 API 回應內容: ${response.body}');
+      // debugPrint('🔍 API 回應內容: ${response.body}');
 
       final data = jsonDecode(response.body);
 

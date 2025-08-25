@@ -7,6 +7,8 @@ import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/config/environment_config.dart';
 import 'package:here4help/services/error_reporting_service.dart';
 import 'package:here4help/providers/permission_provider.dart';
+import 'package:here4help/providers/rating_provider.dart';
+import 'package:here4help/providers/achievement_provider.dart';
 
 class Here4HelpApp extends StatelessWidget {
   const Here4HelpApp({super.key});
@@ -50,6 +52,9 @@ void main() async {
             create: (_) => ThemeConfigManager()),
         ChangeNotifierProvider<PermissionProvider>(
             create: (_) => PermissionProvider.instance),
+        ChangeNotifierProvider<RatingProvider>(create: (_) => RatingProvider()),
+        ChangeNotifierProvider<AchievementProvider>(
+            create: (_) => AchievementProvider()),
       ],
       child: const Here4HelpApp(),
     ),

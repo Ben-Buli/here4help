@@ -61,12 +61,12 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       // 先測試網路連線
-      print('🔍 開始測試網路連線...');
-      final isConnected = await AuthService.testConnection();
-      if (!isConnected) {
-        throw Exception('無法連接到伺服器，請檢查網路連線');
-      }
-      print('✅ 網路連線正常');
+      // print('🔍 開始測試網路連線...');
+      // final isConnected = await AuthService.testConnection();
+      // if (!isConnected) {
+      //   throw Exception('無法連接到伺服器，請檢查網路連線');
+      // }
+      // print('✅ 網路連線正常');
 
       // 執行登入
       final authData = await AuthService.login(email, password);

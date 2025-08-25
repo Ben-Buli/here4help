@@ -13,6 +13,7 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../auth_helper.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -27,8 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 try {
     // JWT 認證
-    $headers = getallheaders();
-    $authHeader = $headers['Authorization'] ?? '';
+    $authHeader = getAuthorizationHeader();
     
     if (!$authHeader || !preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
         Response::error('Missing or invalid authorization header', 401);
@@ -82,16 +82,15 @@ function handleGetFavorites($db, $userId) {
                 t.id as task_id,
                 t.title,
                 t.description,
-                t.reward_points,
-                t.status_code,
+                t.reward_point,
                 ts.display_name as status_display,
                 u.name as creator_name,
                 u.avatar_url as creator_avatar,
                 t.created_at as task_created_at,
-                t.deadline
+                t.task_date
             FROM task_favorites tf
             INNER JOIN tasks t ON tf.task_id = t.id
-            LEFT JOIN task_statuses ts ON t.status_code = ts.code
+            LEFT JOIN task_statuses ts ON t.status_id = ts.id
             LEFT JOIN users u ON t.creator_id = u.id
             WHERE tf.user_id = ?
             ORDER BY tf.created_at DESC
@@ -141,7 +140,7 @@ function handleAddFavorite($db, $userId) {
     
     try {
         // 檢查任務是否存在
-        $taskStmt = $db->prepare("SELECT id, creator_id, status_code FROM tasks WHERE id = ?");
+        $taskStmt = $db->prepare("SELECT id, creator_id, status_id FROM tasks WHERE id = ?");
         $taskStmt->execute([$taskId]);
         $task = $taskStmt->fetch(PDO::FETCH_ASSOC);
         

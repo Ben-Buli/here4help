@@ -9,8 +9,9 @@ import 'package:provider/provider.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/task/services/language_service.dart';
 import 'package:here4help/widgets/range_slider_widget.dart';
-import 'package:here4help/widgets/multi_select_search_dropdown.dart';
+
 import 'package:here4help/services/api/task_favorites_api.dart';
+import 'package:here4help/services/api/task_reports_api.dart';
 
 class TaskListPage extends StatefulWidget {
   const TaskListPage({super.key});
@@ -31,7 +32,7 @@ class _TaskListPageState extends State<TaskListPage> {
   Set<String> selectedStatuses = {};
 
   // 排序狀態變數
-  String _currentSortBy = 'updated_time';
+  String _currentSortBy = 'update';
   bool _sortAscending = false; // 預設 Z-A (降序)
 
   // 獎勵範圍篩選
@@ -40,6 +41,15 @@ class _TaskListPageState extends State<TaskListPage> {
 
   // 收藏狀態
   Set<String> _favoriteTaskIds = <String>{};
+
+  // 任務類型篩選 (radio group)
+  String _taskTypeFilter = 'all'; // all, favorites, my_tasks
+
+  // 臨時篩選狀態 (apply 前的選擇)
+  String _tempTaskTypeFilter = 'all';
+  String? _tempSelectedLocation;
+  String? _tempSelectedLanguage;
+  String? _tempSelectedStatus;
 
   // 滾動控制器
   final ScrollController _scrollController = ScrollController();
@@ -98,53 +108,98 @@ class _TaskListPageState extends State<TaskListPage> {
   Future<void> _toggleFavorite(String taskId) async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
+    // 檢查是否為自己的任務
+    final userService = Provider.of<UserService>(context, listen: false);
+    final currentUserId = userService.currentUser?.id;
+    final task = tasks.firstWhere((t) => t['id'] == taskId, orElse: () => {});
+    final taskCreatorId = task['creator_id']?.toString();
+
+    if (currentUserId?.toString() == taskCreatorId) {
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text('You cannot favorite your own task'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // 記錄原始狀態
+    final wasOriginallyFavorited = _favoriteTaskIds.contains(taskId);
+
+    // 先樂觀更新 UI
+    setState(() {
+      if (wasOriginallyFavorited) {
+        _favoriteTaskIds.remove(taskId);
+      } else {
+        _favoriteTaskIds.add(taskId);
+      }
+    });
+
     try {
-      if (_favoriteTaskIds.contains(taskId)) {
+      if (wasOriginallyFavorited) {
         // 取消收藏
         await TaskFavoritesApi.removeFavorite(taskId: taskId);
-        setState(() {
-          _favoriteTaskIds.remove(taskId);
-        });
 
         if (mounted) {
           scaffoldMessenger.showSnackBar(
             const SnackBar(
-              content: Text('已取消收藏'),
+              content: Text('Unfavorited🥺'),
               duration: Duration(seconds: 1),
+              backgroundColor: Color.fromARGB(255, 107, 113, 117),
             ),
           );
         }
       } else {
         // 添加收藏
         await TaskFavoritesApi.addFavorite(taskId: taskId);
-        setState(() {
-          _favoriteTaskIds.add(taskId);
-        });
 
         if (mounted) {
           scaffoldMessenger.showSnackBar(
             const SnackBar(
-              content: Text('已加入收藏'),
+              content: Text('Collected!🥳'),
               duration: Duration(seconds: 1),
+              backgroundColor: Color.fromARGB(255, 111, 84, 4),
             ),
           );
         }
       }
     } catch (e) {
-      // 如果 API 操作失敗，恢復原狀態
+      // API 操作失敗，恢復原始狀態
       setState(() {
-        if (_favoriteTaskIds.contains(taskId)) {
-          _favoriteTaskIds.remove(taskId);
-        } else {
+        if (wasOriginallyFavorited) {
           _favoriteTaskIds.add(taskId);
+        } else {
+          _favoriteTaskIds.remove(taskId);
         }
       });
+
+      // 顯示用戶友好的錯誤訊息
+      String errorMessage;
+      if (e.toString().contains('ClientException')) {
+        errorMessage =
+            'Network connection failed, please check your network status';
+      } else if (e.toString().contains('401')) {
+        errorMessage = 'Please log in again and try again';
+      } else if (e.toString().contains('404')) {
+        errorMessage = 'Task does not exist or has been deleted';
+      } else if (e.toString().contains('already')) {
+        errorMessage = wasOriginallyFavorited
+            ? 'Task is already in the favorites list'
+            : 'Task has been removed from favorites';
+      } else {
+        errorMessage = wasOriginallyFavorited
+            ? 'Failed to remove from favorites, please try again later'
+            : 'Failed to add to favorites, please try again later';
+      }
 
       if (mounted) {
         scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text('操作失敗: $e'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -176,15 +231,26 @@ class _TaskListPageState extends State<TaskListPage> {
   /// 重置所有篩選條件
   void _resetFilters() {
     setState(() {
-      _searchController.clear();
-      searchQuery = '';
       selectedLocations.clear();
       selectedLanguages.clear();
       selectedStatuses.clear();
-      _currentSortBy = 'updated_time';
+      _currentSortBy = 'update';
       _sortAscending = false;
       _minReward = 0;
       _maxReward = null;
+      _taskTypeFilter = 'all';
+      _tempTaskTypeFilter = 'all';
+      _tempSelectedLocation = null;
+      _tempSelectedLanguage = null;
+      _tempSelectedStatus = null;
+    });
+  }
+
+  /// 重置搜尋
+  void _resetSearch() {
+    setState(() {
+      _searchController.clear();
+      searchQuery = '';
     });
   }
 
@@ -193,9 +259,9 @@ class _TaskListPageState extends State<TaskListPage> {
       selectedLocations.isNotEmpty ||
       selectedLanguages.isNotEmpty ||
       selectedStatuses.isNotEmpty ||
-      searchQuery.isNotEmpty ||
       _minReward != null ||
-      _maxReward != null;
+      _maxReward != null ||
+      _taskTypeFilter != 'all';
 
   /// 排序功能
   void _setSortOrder(String sortBy) {
@@ -219,7 +285,7 @@ class _TaskListPageState extends State<TaskListPage> {
       int comparison = 0;
 
       switch (_currentSortBy) {
-        case 'updated_time':
+        case 'update':
           final timeA =
               DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
           final timeB =
@@ -227,9 +293,22 @@ class _TaskListPageState extends State<TaskListPage> {
           comparison = timeA.compareTo(timeB);
           break;
 
-        case 'applicants':
-          final countA = (a['applications'] as List<dynamic>?)?.length ?? 0;
-          final countB = (b['applications'] as List<dynamic>?)?.length ?? 0;
+        case 'task_time':
+          final timeA =
+              DateTime.parse(a['task_date'] ?? DateTime.now().toString());
+          final timeB =
+              DateTime.parse(b['task_date'] ?? DateTime.now().toString());
+          comparison = timeA.compareTo(timeB);
+          break;
+
+        case 'popular':
+          // 計算應徵人數 - 從 applications 或 appliers 陣列
+          final countA = (a['applications'] as List<dynamic>?)?.length ??
+              (a['appliers'] as List<dynamic>?)?.length ??
+              0;
+          final countB = (b['applications'] as List<dynamic>?)?.length ??
+              (b['appliers'] as List<dynamic>?)?.length ??
+              0;
           comparison = countA.compareTo(countB);
           break;
 
@@ -264,7 +343,11 @@ class _TaskListPageState extends State<TaskListPage> {
           selectedLocations.isEmpty || selectedLocations.contains(location);
 
       // 語言篩選
-      final language = (task['language_requirement'] ?? '').toString();
+      final language =
+          ((task['language_requirement'] as String?)?.trim().isNotEmpty ??
+                  false)
+              ? (task['language_requirement'] as String).trim()
+              : '-';
       final matchLanguage =
           selectedLanguages.isEmpty || selectedLanguages.contains(language);
 
@@ -279,12 +362,26 @@ class _TaskListPageState extends State<TaskListPage> {
       final matchMinReward = _minReward == null || reward >= _minReward!;
       final matchMaxReward = _maxReward == null || reward <= _maxReward!;
 
+      // 任務類型篩選
+      bool matchTaskType = true;
+      final taskId = task['id']?.toString() ?? '';
+      final taskCreatorId = task['creator_id']?.toString();
+
+      if (_taskTypeFilter == 'favorites') {
+        matchTaskType = _favoriteTaskIds.contains(taskId);
+      } else if (_taskTypeFilter == 'my_tasks') {
+        final userService = Provider.of<UserService>(context, listen: false);
+        final currentUserId = userService.currentUser?.id.toString();
+        matchTaskType = currentUserId == taskCreatorId;
+      }
+
       return matchQuery &&
           matchLocation &&
           matchLanguage &&
           matchStatus &&
           matchMinReward &&
-          matchMaxReward;
+          matchMaxReward &&
+          matchTaskType;
     }).toList();
   }
 
@@ -298,8 +395,6 @@ class _TaskListPageState extends State<TaskListPage> {
 
     return Consumer<ThemeConfigManager>(
       builder: (context, themeManager, child) {
-        final theme = themeManager.effectiveTheme;
-
         return MouseRegion(
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
@@ -307,12 +402,17 @@ class _TaskListPageState extends State<TaskListPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: isActive ? theme.primary : Colors.transparent,
+                color: isActive
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isActive
-                      ? theme.primary
-                      : theme.outlineVariant.withValues(alpha: 0.3),
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context)
+                          .colorScheme
+                          .outlineVariant
+                          .withOpacity(0.3),
                   width: 1,
                 ),
               ),
@@ -322,7 +422,9 @@ class _TaskListPageState extends State<TaskListPage> {
                   Icon(
                     icon,
                     size: 14,
-                    color: isActive ? theme.onPrimary : theme.onSurface,
+                    color: isActive
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -330,7 +432,9 @@ class _TaskListPageState extends State<TaskListPage> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                      color: isActive ? theme.onPrimary : theme.onSurface,
+                      color: isActive
+                          ? Theme.of(context).colorScheme.onPrimary
+                          : Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -341,7 +445,9 @@ class _TaskListPageState extends State<TaskListPage> {
                             : Icons.arrow_downward)
                         : Icons.unfold_more,
                     size: 12,
-                    color: isActive ? theme.onPrimary : theme.onSurface,
+                    color: isActive
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : Theme.of(context).colorScheme.onSurface,
                   ),
                 ],
               ),
@@ -356,13 +462,12 @@ class _TaskListPageState extends State<TaskListPage> {
   Widget _buildScrollToTopButton() {
     return Consumer<ThemeConfigManager>(
       builder: (context, themeManager, child) {
-        final theme = themeManager.effectiveTheme;
         return AnimatedOpacity(
           opacity: _showScrollToTop ? 1.0 : 0.0,
           duration: const Duration(milliseconds: 300),
           child: FloatingActionButton(
-            backgroundColor: theme.primary,
-            foregroundColor: theme.onPrimary,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
             onPressed: _scrollToTop,
             child: const Icon(Icons.keyboard_arrow_up, size: 24),
           ),
@@ -381,13 +486,13 @@ class _TaskListPageState extends State<TaskListPage> {
     return (codeOrLegacy ?? '').toString();
   }
 
-  /// 判斷是否為新任務（發布未滿一週）
+  /// 判斷是否為新任務（更新未滿一週）
   bool _isNewTask(Map<String, dynamic> task) {
     try {
-      final createdAt =
-          DateTime.parse(task['created_at'] ?? DateTime.now().toString());
+      final updatedAt =
+          DateTime.parse(task['updated_at'] ?? DateTime.now().toString());
       final now = DateTime.now();
-      final difference = now.difference(createdAt);
+      final difference = now.difference(updatedAt);
       return difference.inDays < 7;
     } catch (e) {
       return false;
@@ -400,16 +505,16 @@ class _TaskListPageState extends State<TaskListPage> {
     return applications.length > 1;
   }
 
-  /// 獲取任務發布時間的距離描述
+  /// 獲取任務更新時間的距離描述
   String _getTimeAgo(Map<String, dynamic> task) {
     try {
-      final createdAt =
-          DateTime.parse(task['created_at'] ?? DateTime.now().toString());
+      final updatedAt =
+          DateTime.parse(task['updated_at'] ?? DateTime.now().toString());
       final now = DateTime.now();
-      final difference = now.difference(createdAt);
+      final difference = now.difference(updatedAt);
 
       if (difference.inDays > 30) {
-        return DateFormat('MM/dd').format(createdAt);
+        return DateFormat('MM/dd').format(updatedAt);
       } else if (difference.inDays > 0) {
         return '${difference.inDays} days ago';
       } else if (difference.inHours > 0) {
@@ -425,95 +530,219 @@ class _TaskListPageState extends State<TaskListPage> {
   }
 
   /// 顯示檢舉對話框
-  void _showReportDialog(Map<String, dynamic> task) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Consumer<ThemeConfigManager>(
-          builder: (context, themeManager, child) {
-            final theme = themeManager.effectiveTheme;
-            return DraggableScrollableSheet(
-              initialChildSize: 0.7,
-              minChildSize: 0.5,
-              maxChildSize: 0.9,
-              expand: true,
-              builder: (context, scrollController) {
-                return Container(
-                  decoration: BoxDecoration(
-                    color: theme.surface,
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(20)),
-                  ),
-                  child: Column(
-                    children: [
-                      // 拖拽指示器
-                      Container(
-                        margin: const EdgeInsets.only(top: 8),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
+  void _showReportDialog(Map<String, dynamic> task) async {
+    final taskId = task['id']?.toString() ?? '';
+
+    if (taskId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task ID not found')),
+      );
+      return;
+    }
+
+    // 檢查是否為自己的任務
+    final userService = Provider.of<UserService>(context, listen: false);
+    final currentUserId = userService.currentUser?.id;
+    final taskCreatorId = task['creator_id']?.toString();
+
+    if (currentUserId?.toString() == taskCreatorId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You cannot report your own task'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // 先檢查是否已經檢舉過
+    try {
+      final reportStatus =
+          await TaskReportsApi.checkReportStatus(taskId: taskId);
+      final hasReported = reportStatus['has_reported'] ?? false;
+      final existingReport = reportStatus['report'] as TaskReport?;
+
+      if (!mounted) return;
+
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) {
+          return Consumer<ThemeConfigManager>(
+            builder: (context, themeManager, child) {
+              final theme = themeManager.effectiveTheme;
+              return DraggableScrollableSheet(
+                initialChildSize: 0.7,
+                minChildSize: 0.5,
+                maxChildSize: 0.9,
+                expand: true,
+                builder: (context, scrollController) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    child: Column(
+                      children: [
+                        // 拖拽指示器
+                        Container(
+                          margin: const EdgeInsets.only(top: 8),
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Report Task',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Task: ${task['title'] ?? 'Untitled'}',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 16),
-                            // 檢舉選項
-                            const Text('Reason for report:'),
-                            const SizedBox(height: 8),
-                            // TODO: 實現檢舉選項列表
-                            const Text('Report functionality coming soon...'),
-                            const SizedBox(height: 16),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('Cancel'),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      // TODO: 實現檢舉提交邏輯
-                                      Navigator.pop(context);
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                            content: Text('Report submitted')),
-                                      );
-                                    },
-                                    child: const Text('Submit Report'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                        Expanded(
+                          child: SingleChildScrollView(
+                            controller: scrollController,
+                            padding: const EdgeInsets.all(16),
+                            child: hasReported && existingReport != null
+                                ? _buildExistingReportView(
+                                    task, existingReport, theme)
+                                : _buildReportFormView(task, taskId, theme),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error checking report status: $e')),
+        );
+      }
+    }
+  }
+
+  /// 構建已檢舉的顯示視圖
+  Widget _buildExistingReportView(
+      Map<String, dynamic> task, TaskReport report, dynamic theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Report Status',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Task: ${task['title'] ?? 'Untitled'}',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+                color: Theme.of(context).colorScheme.outline.withOpacity(0.2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'You have already reported this task!',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildInfoRow('Reason:', report.reasonDisplayText, theme),
+              const SizedBox(height: 8),
+              _buildInfoRow('Status:', report.statusDisplayText, theme),
+              const SizedBox(height: 8),
+              _buildInfoRow(
+                  'Time:',
+                  DateFormat('yyyy-MM-dd HH:mm').format(report.createdAt),
+                  theme),
+              const SizedBox(height: 12),
+              Text(
+                'Description:',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                report.description,
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.secondary,
+                    fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, dynamic theme) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 構建檢舉表單視圖
+  Widget _buildReportFormView(
+      Map<String, dynamic> task, String taskId, dynamic theme) {
+    return _ReportFormWidget(
+      task: task,
+      taskId: taskId,
+      theme: theme,
+      onSubmitted: () {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Report submitted successfully')),
         );
       },
     );
@@ -521,6 +750,17 @@ class _TaskListPageState extends State<TaskListPage> {
 
   /// 顯示篩選選項
   void _showFilterOptions() {
+    // 初始化臨時篩選狀態為當前狀態
+    setState(() {
+      _tempTaskTypeFilter = _taskTypeFilter;
+      _tempSelectedLocation =
+          selectedLocations.isNotEmpty ? selectedLocations.first : null;
+      _tempSelectedLanguage =
+          selectedLanguages.isNotEmpty ? selectedLanguages.first : null;
+      _tempSelectedStatus =
+          selectedStatuses.isNotEmpty ? selectedStatuses.first : null;
+    });
+
     // 獲取可用的選項
     final locationOptions = tasks
         .map((e) => (e['location'] ?? '').toString())
@@ -559,125 +799,289 @@ class _TaskListPageState extends State<TaskListPage> {
       builder: (ctx) {
         return Consumer<ThemeConfigManager>(
           builder: (context, themeManager, child) {
-            final theme = themeManager.effectiveTheme;
-
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-                left: 16,
-                right: 16,
-                top: 12,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Filter options',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: theme.onSurface,
-                    ),
+            return StatefulBuilder(
+              builder: (context, setModalState) {
+                return Container(
+                  height: MediaQuery.of(ctx).size.height * 0.8, // 限制最大高度
+                  padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+                    left: 16,
+                    right: 16,
+                    top: 12,
                   ),
-                  const SizedBox(height: 16),
-
-                  // Location 多選下拉選單
-                  MultiSelectSearchDropdown(
-                    options: locationOptions,
-                    selectedValues: selectedLocations,
-                    onChanged: (values) {
-                      setState(() {
-                        selectedLocations = values;
-                      });
-                    },
-                    label: 'Location',
-                    hint: 'All locations',
-                    searchHint: 'Search locations...',
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Language 多選下拉選單
-                  MultiSelectSearchDropdown(
-                    options: languageOptions,
-                    selectedValues: selectedLanguages,
-                    onChanged: (values) {
-                      setState(() {
-                        selectedLanguages = values;
-                      });
-                    },
-                    label: 'Language',
-                    hint: 'All languages',
-                    searchHint: 'Search languages...',
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Status 多選下拉選單
-                  MultiSelectSearchDropdown(
-                    options: statusOptions,
-                    selectedValues: selectedStatuses,
-                    onChanged: (values) {
-                      setState(() {
-                        selectedStatuses = values;
-                      });
-                    },
-                    label: 'Status',
-                    hint: 'All statuses',
-                    searchHint: 'Search statuses...',
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 獎勵範圍選擇器
-                  RangeSliderWidget(
-                    minValue: minReward,
-                    maxValue: maxReward,
-                    currentMin: _minReward,
-                    currentMax: _maxReward,
-                    onChanged: (min, max) {
-                      setState(() {
-                        _minReward = min;
-                        _maxReward = max;
-                      });
-                    },
-                    label: 'Reward Range',
-                    minLabel: 'Min Reward',
-                    maxLabel: 'Max Reward',
-                  ),
-
-                  const SizedBox(height: 24),
-                  Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.of(ctx).pop();
-                            _resetFilters();
-                          },
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Reset'),
+                      Text(
+                        'Filter options',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(height: 16),
+
+                      // 可滾動的篩選內容
                       Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.of(ctx).pop();
-                            setState(() {
-                              // 篩選條件已經在 onChanged 中應用
-                            });
-                          },
-                          icon: const Icon(Icons.check),
-                          label: const Text('Apply'),
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // 任務類型篩選 (Radio Group)
+                              Text(
+                                'Task Type',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+
+                              RadioListTile<String>(
+                                title: const Text('All Tasks'),
+                                value: 'all',
+                                groupValue: _tempTaskTypeFilter,
+                                onChanged: (value) {
+                                  setModalState(() {
+                                    _tempTaskTypeFilter = value ?? 'all';
+                                  });
+                                },
+                                contentPadding: EdgeInsets.zero,
+                              ),
+
+                              RadioListTile<String>(
+                                title: const Text('My Favorites'),
+                                value: 'favorites',
+                                groupValue: _tempTaskTypeFilter,
+                                onChanged: (value) {
+                                  setModalState(() {
+                                    _tempTaskTypeFilter = value ?? 'all';
+                                  });
+                                },
+                                contentPadding: EdgeInsets.zero,
+                              ),
+
+                              RadioListTile<String>(
+                                title: const Text('My Tasks'),
+                                value: 'my_tasks',
+                                groupValue: _tempTaskTypeFilter,
+                                onChanged: (value) {
+                                  setModalState(() {
+                                    _tempTaskTypeFilter = value ?? 'all';
+                                  });
+                                },
+                                contentPadding: EdgeInsets.zero,
+                              ),
+
+                              const SizedBox(height: 24),
+
+                              // Location 單選下拉選單
+                              Text(
+                                'Location',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                value: _tempSelectedLocation,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                ),
+                                hint: const Text('All locations'),
+                                items: [
+                                  const DropdownMenuItem<String>(
+                                    value: null,
+                                    child: Text('All locations'),
+                                  ),
+                                  ...locationOptions.map(
+                                      (location) => DropdownMenuItem<String>(
+                                            value: location,
+                                            child: Text(location),
+                                          )),
+                                ],
+                                onChanged: (value) {
+                                  setModalState(() {
+                                    _tempSelectedLocation = value;
+                                  });
+                                },
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // Language 單選下拉選單
+                              Text(
+                                'Language',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                value: _tempSelectedLanguage,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                ),
+                                hint: const Text('All languages'),
+                                items: [
+                                  const DropdownMenuItem<String>(
+                                    value: null,
+                                    child: Text('All languages'),
+                                  ),
+                                  ...languageOptions.map(
+                                      (language) => DropdownMenuItem<String>(
+                                            value: language,
+                                            child: Text(language),
+                                          )),
+                                ],
+                                onChanged: (value) {
+                                  setModalState(() {
+                                    _tempSelectedLanguage = value;
+                                  });
+                                },
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // Status 單選下拉選單
+                              Text(
+                                'Status',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                value: _tempSelectedStatus,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                ),
+                                hint: const Text('All statuses'),
+                                items: [
+                                  const DropdownMenuItem<String>(
+                                    value: null,
+                                    child: Text('All statuses'),
+                                  ),
+                                  ...statusOptions
+                                      .map((status) => DropdownMenuItem<String>(
+                                            value: status,
+                                            child: Text(status),
+                                          )),
+                                ],
+                                onChanged: (value) {
+                                  setModalState(() {
+                                    _tempSelectedStatus = value;
+                                  });
+                                },
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // 獎勵範圍選擇器
+                              RangeSliderWidget(
+                                minValue: minReward,
+                                maxValue: maxReward,
+                                currentMin: _minReward,
+                                currentMax: _maxReward,
+                                onChanged: (min, max) {
+                                  setModalState(() {
+                                    _minReward = min;
+                                    _maxReward = max;
+                                  });
+                                },
+                                label: 'Reward Range',
+                                minLabel: 'Min Reward',
+                                maxLabel: 'Max Reward',
+                              ),
+                            ],
+                          ),
                         ),
                       ),
+
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                setModalState(() {
+                                  _tempTaskTypeFilter = 'all';
+                                  _tempSelectedLocation = null;
+                                  _tempSelectedLanguage = null;
+                                  _tempSelectedStatus = null;
+                                  _minReward = null;
+                                  _maxReward = null;
+                                });
+                              },
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Reset'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                // 重置搜尋
+                                _resetSearch();
+
+                                // 應用篩選條件
+                                setState(() {
+                                  _taskTypeFilter = _tempTaskTypeFilter;
+                                  selectedLocations.clear();
+                                  selectedLanguages.clear();
+                                  selectedStatuses.clear();
+
+                                  if (_tempSelectedLocation != null) {
+                                    selectedLocations
+                                        .add(_tempSelectedLocation!);
+                                  }
+                                  if (_tempSelectedLanguage != null) {
+                                    selectedLanguages
+                                        .add(_tempSelectedLanguage!);
+                                  }
+                                  if (_tempSelectedStatus != null) {
+                                    selectedStatuses.add(_tempSelectedStatus!);
+                                  }
+                                });
+
+                                Navigator.of(ctx).pop();
+                              },
+                              icon: const Icon(Icons.check),
+                              label: const Text('Apply'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                ],
-              ),
+                );
+              },
             );
           },
         );
@@ -767,7 +1171,6 @@ class _TaskListPageState extends State<TaskListPage> {
 
   /// 彈出任務詳情對話框
   void _showTaskDetailDialog(Map<String, dynamic> task) {
-    final taskPrimaryLanguage = task['language_requirement'] ?? '-';
     final userService = Provider.of<UserService>(context, listen: false);
     final currentUserId = userService.currentUser?.id;
     final taskService = TaskService();
@@ -778,231 +1181,394 @@ class _TaskListPageState extends State<TaskListPage> {
       final aid = (app['id'] ?? app['task_id']).toString();
       return aid == taskId;
     });
-    final bool canApply = !isOwner && !alreadyApplied;
+
+    // 檢查任務狀態是否為 open (status_id = 1)
+    final taskStatusId = task['status_id']?.toString() ?? '';
+    final isTaskOpen = taskStatusId == '1';
+
+    final bool canApply = !isOwner && !alreadyApplied && isTaskOpen;
 
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return Consumer<ThemeConfigManager>(
           builder: (context, themeManager, child) {
-            final theme = themeManager.effectiveTheme;
             return Dialog(
-              insetPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-              backgroundColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[50], // 整體灰白色背景
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 標題區塊（主題色背景）
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: theme.primary,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(20),
-                          topRight: Radius.circular(20),
+                insetPadding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+                backgroundColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50], // 整體灰白色背景
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.8,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 標題區塊（主題色背景）
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(20),
+                            topRight: Radius.circular(20),
+                          ),
+                        ),
+                        child: Text(
+                          task['title'] ?? 'Task Details',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
                         ),
                       ),
-                      child: Text(
-                        task['title'] ?? 'Task Details',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                      // 內容
+                      Flexible(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Task Description',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface)),
+                              Text(task['description'] ?? 'No description.',
+                                  style: TextStyle(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface)),
+                              const SizedBox(height: 12),
+                              Text('Application Question',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface)),
+                              ...((task['application_question'] ?? '')
+                                  .toString()
+                                  .split('|')
+                                  .where((q) => q.trim().isNotEmpty)
+                                  .toList()
+                                  .asMap()
+                                  .entries
+                                  .map((entry) => Text(
+                                      '${entry.key + 1}. ${entry.value.trim()}',
+                                      style: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)))
+                                  .toList()),
+                              if ((task['application_question'] ?? '')
+                                  .toString()
+                                  .trim()
+                                  .isEmpty)
+                                Text('No questions.',
+                                    style: TextStyle(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface)),
+                              const SizedBox(height: 12),
+                              Text.rich(TextSpan(
+                                children: [
+                                  TextSpan(
+                                      text: 'Reward: \n',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)),
+                                  TextSpan(
+                                      text:
+                                          '💰 ${task['reward_point'] ?? task['salary'] ?? "0"}',
+                                      style: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)),
+                                ],
+                              )),
+                              const SizedBox(height: 8),
+                              Text.rich(TextSpan(
+                                children: [
+                                  TextSpan(
+                                      text: 'Request Language: \n',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)),
+                                  TextSpan(
+                                      text: ((task['language_requirement']
+                                                      as String?)
+                                                  ?.trim()
+                                                  .isNotEmpty ??
+                                              false)
+                                          ? (task['language_requirement']
+                                                  as String)
+                                              .trim()
+                                          : '-',
+                                      style: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)),
+                                ],
+                              )),
+                              const SizedBox(height: 8),
+                              Text.rich(TextSpan(
+                                children: [
+                                  TextSpan(
+                                      text: 'Location: \n',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)),
+                                  TextSpan(
+                                      text: task['location'] ?? '-',
+                                      style: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)),
+                                ],
+                              )),
+                              const SizedBox(height: 8),
+                              Text.rich(TextSpan(
+                                children: [
+                                  TextSpan(
+                                      text: 'Task Date: \n',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)),
+                                  TextSpan(
+                                      text: task['task_date'] ?? '-',
+                                      style: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)),
+                                ],
+                              )),
+                              const SizedBox(height: 8),
+                              Text.rich(TextSpan(
+                                children: [
+                                  TextSpan(
+                                      text: 'Posted by: \n',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)),
+                                  TextSpan(
+                                      text:
+                                          'UserName: ${task['creator_name'] ?? 'N/A'}${isOwner ? ' (You)' : ''}\n',
+                                      style: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)),
+                                  TextSpan(
+                                      text: 'Rating: ⭐️ 4.7 (18 reviews)',
+                                      style: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface)),
+                                ],
+                              )),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    // 內容
-                    Flexible(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      const SizedBox(height: 8),
+
+                      // 權限說明文字
+                      Consumer<UserService>(
+                        builder: (context, userService, child) {
+                          final userPermission =
+                              userService.currentUser?.permission ?? 0;
+
+                          // 優先檢查任務狀態
+                          if (!isTaskOpen) {
+                            return Container(
+                              margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: Colors.grey.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.lock_outline,
+                                      color: Colors.grey.shade600, size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'This task recruitment has ended.',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          if (userPermission == 0) {
+                            return Container(
+                              margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: Colors.orange.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.info_outline,
+                                      color: Colors.orange, size: 20),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'You can apply for tasks after account verification is completed.',
+                                      style: TextStyle(
+                                        color: Colors.orange[700],
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          } else if (userPermission < 0) {
+                            return Container(
+                              margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: Colors.red.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.block,
+                                      color: Colors.red, size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'You currently do not have posting permissions.',
+                                      style: TextStyle(
+                                        color: Colors.red.shade700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+
+                      // 底部按鈕
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Task Description',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.onSurface)),
-                            Text(task['description'] ?? 'No description.',
-                                style: TextStyle(color: theme.onSurface)),
-                            const SizedBox(height: 12),
-                            Text('Application Question',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.onSurface)),
-                            ...((task['application_question'] ?? '')
-                                .toString()
-                                .split('|')
-                                .where((q) => q.trim().isNotEmpty)
-                                .toList()
-                                .asMap()
-                                .entries
-                                .map((entry) => Text(
-                                    '${entry.key + 1}. ${entry.value.trim()}',
-                                    style: TextStyle(color: theme.onSurface)))
-                                .toList()),
-                            if ((task['application_question'] ?? '')
-                                .toString()
-                                .trim()
-                                .isEmpty)
-                              Text('No questions.',
-                                  style: TextStyle(color: theme.onSurface)),
-                            const SizedBox(height: 12),
-                            Text.rich(TextSpan(
-                              children: [
-                                TextSpan(
-                                    text: 'Reward: \n',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: theme.onSurface)),
-                                TextSpan(
-                                    text:
-                                        '💰 ${task['reward_point'] ?? task['salary'] ?? "0"}',
-                                    style: TextStyle(color: theme.onSurface)),
-                              ],
-                            )),
-                            const SizedBox(height: 8),
-                            Text.rich(TextSpan(
-                              children: [
-                                TextSpan(
-                                    text: 'Request Language: \n',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: theme.onSurface)),
-                                TextSpan(
-                                    text: (task['language_requirement'] ?? '-')
-                                        .toString(),
-                                    style: TextStyle(color: theme.onSurface)),
-                              ],
-                            )),
-                            const SizedBox(height: 8),
-                            Text.rich(TextSpan(
-                              children: [
-                                TextSpan(
-                                    text: 'Location: \n',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: theme.onSurface)),
-                                TextSpan(
-                                    text: task['location'] ?? '-',
-                                    style: TextStyle(color: theme.onSurface)),
-                              ],
-                            )),
-                            const SizedBox(height: 8),
-                            Text.rich(TextSpan(
-                              children: [
-                                TextSpan(
-                                    text: 'Task Date: \n',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: theme.onSurface)),
-                                TextSpan(
-                                    text: task['task_date'] ?? '-',
-                                    style: TextStyle(color: theme.onSurface)),
-                              ],
-                            )),
-                            const SizedBox(height: 8),
-                            Text.rich(TextSpan(
-                              children: [
-                                TextSpan(
-                                    text: 'Posted by: \n',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: theme.onSurface)),
-                                TextSpan(
-                                    text:
-                                        'UserName: ${task['creator_name'] ?? 'N/A'}${isOwner ? ' (You)' : ''}\n',
-                                    style: TextStyle(color: theme.onSurface)),
-                                TextSpan(
-                                    text: 'Rating: ⭐️ 4.7 (18 reviews)',
-                                    style: TextStyle(color: theme.onSurface)),
-                              ],
-                            )),
+                            OutlinedButton(
+                              onPressed: () {
+                                if (Navigator.canPop(dialogContext)) {
+                                  Navigator.pop(dialogContext);
+                                }
+                              },
+                              child: const Text('CLOSE'),
+                            ),
+                            Consumer<UserService>(
+                              builder: (context, userService, child) {
+                                final userPermission =
+                                    userService.currentUser?.permission ?? 0;
+                                final canApplyWithPermission =
+                                    canApply && userPermission > 0;
+
+                                return ElevatedButton(
+                                  onPressed: canApplyWithPermission
+                                      ? () async {
+                                          final userService =
+                                              Provider.of<UserService>(context,
+                                                  listen: false);
+                                          await userService.ensureUserLoaded();
+                                          final userId =
+                                              userService.currentUser?.id;
+                                          if (userId == null) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                  content: Text(
+                                                      'User not logged in.')),
+                                            );
+                                            return;
+                                          }
+                                          debugPrint(
+                                              'APPLY button pressed for userId: $userId');
+                                          final data = {
+                                            'userId': userId,
+                                            'taskId': task['id'],
+                                          };
+                                          debugPrint(
+                                              'Navigating to TaskApplyPage with data: $data');
+                                          if (task['id'] != null) {
+                                            if (Navigator.canPop(
+                                                dialogContext)) {
+                                              Navigator.pop(dialogContext);
+                                            }
+                                            context.push('/task/apply',
+                                                extra: data);
+                                          } else {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                    'Task ID not found. Please check.'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      : null,
+                                  child: Text(
+                                    isOwner
+                                        ? 'POSTED BY YOU'
+                                        : (alreadyApplied
+                                            ? 'APPLIED'
+                                            : 'APPLY NOW'),
+                                  ),
+                                );
+                              },
+                            ),
                           ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    // 底部按鈕
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          OutlinedButton(
-                            onPressed: () {
-                              debugPrint('CLOSE button pressed');
-                              if (Navigator.canPop(dialogContext)) {
-                                Navigator.pop(dialogContext);
-                              }
-                            },
-                            child: const Text('CLOSE'),
-                          ),
-                          ElevatedButton(
-                            onPressed: canApply
-                                ? () async {
-                                    final userService =
-                                        Provider.of<UserService>(context,
-                                            listen: false);
-                                    await userService.ensureUserLoaded();
-                                    final userId = userService.currentUser?.id;
-                                    if (userId == null) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                            content:
-                                                Text('User not logged in.')),
-                                      );
-                                      return;
-                                    }
-                                    debugPrint(
-                                        'APPLY button pressed for userId: $userId');
-                                    final data = {
-                                      'userId': userId,
-                                      'taskId': task['id'],
-                                    };
-                                    debugPrint(
-                                        'Navigating to TaskApplyPage with data: $data');
-                                    if (task['id'] != null) {
-                                      if (Navigator.canPop(dialogContext)) {
-                                        Navigator.pop(dialogContext);
-                                      }
-                                      context.push('/task/apply', extra: data);
-                                    } else {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                              'Task ID not found. Please check.'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                : null,
-                            child: Text(
-                              isOwner
-                                  ? 'POSTED BY YOU'
-                                  : (alreadyApplied ? 'APPLIED' : 'APPLY NOW'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
+                    ],
+                  ),
+                ));
           },
         );
       },
@@ -1017,9 +1583,8 @@ class _TaskListPageState extends State<TaskListPage> {
 
     return Consumer<ThemeConfigManager>(
       builder: (context, themeManager, child) {
-        final theme = themeManager.effectiveTheme;
         return Scaffold(
-          backgroundColor: theme.background,
+          backgroundColor: Theme.of(context).colorScheme.background,
           body: Column(
             children: [
               // 搜尋欄 + 排序功能
@@ -1034,6 +1599,10 @@ class _TaskListPageState extends State<TaskListPage> {
                       onChanged: (value) {
                         setState(() {
                           searchQuery = value.toLowerCase();
+                          // 當搜尋時重設篩選條件
+                          if (value.isNotEmpty) {
+                            _resetFilters();
+                          }
                         });
                       },
                       onEditingComplete: () {
@@ -1059,13 +1628,14 @@ class _TaskListPageState extends State<TaskListPage> {
                             IconButton(
                               icon: Icon(Icons.filter_list,
                                   color: _hasActiveFilters
-                                      ? theme.primary
+                                      ? Theme.of(context).colorScheme.primary
                                       : IconTheme.of(context).color),
                               tooltip: 'Filter options',
                               onPressed: _showFilterOptions,
                             ),
                             IconButton(
-                              icon: Icon(Icons.refresh, color: theme.primary),
+                              icon: Icon(Icons.refresh,
+                                  color: Theme.of(context).colorScheme.primary),
                               tooltip: 'Reset',
                               onPressed: _resetFilters,
                             ),
@@ -1085,17 +1655,25 @@ class _TaskListPageState extends State<TaskListPage> {
                         children: [
                           // 更新時間排序
                           _buildCompactSortChip(
-                            label: 'Time',
-                            sortBy: 'updated_time',
+                            label: 'Update',
+                            sortBy: 'update',
                             icon: Icons.update,
                           ),
                           const SizedBox(width: 8),
 
-                          // 應徵人數排序
+                          // 任務時間排序
                           _buildCompactSortChip(
-                            label: 'Applicants',
-                            sortBy: 'applicants',
-                            icon: Icons.people,
+                            label: 'Task Time',
+                            sortBy: 'task_time',
+                            icon: Icons.schedule,
+                          ),
+                          const SizedBox(width: 8),
+
+                          // 熱門程度排序（應徵人數）
+                          _buildCompactSortChip(
+                            label: 'Popular',
+                            sortBy: 'popular',
+                            icon: Icons.trending_up,
                           ),
                           const SizedBox(width: 8),
 
@@ -1165,27 +1743,48 @@ class _TaskListPageState extends State<TaskListPage> {
                                         ),
                                       ),
                                       // trailing menu, no extra SizedBox/Align so it uses the same 16px card padding
-                                      PopupMenuButton<String>(
-                                        padding: EdgeInsets.zero,
-                                        icon: const Icon(Icons.more_vert,
-                                            size: 20),
-                                        onSelected: (value) {
-                                          if (value == 'report') {
-                                            _showReportDialog(task);
+                                      Consumer<UserService>(
+                                        builder: (context, userService, child) {
+                                          final userPermission = userService
+                                                  .currentUser?.permission ??
+                                              0;
+                                          final currentUserId =
+                                              userService.currentUser?.id;
+                                          final taskCreatorId =
+                                              task['creator_id']?.toString();
+                                          final isOwnTask =
+                                              currentUserId?.toString() ==
+                                                  taskCreatorId;
+
+                                          // 不顯示檢舉按鈕的條件：權限不足或是自己的任務
+                                          if (userPermission <= 0 ||
+                                              isOwnTask) {
+                                            return const SizedBox.shrink();
                                           }
+
+                                          return PopupMenuButton<String>(
+                                            padding: EdgeInsets.zero,
+                                            icon: const Icon(Icons.more_vert,
+                                                size: 20),
+                                            onSelected: (value) {
+                                              if (value == 'report') {
+                                                _showReportDialog(task);
+                                              }
+                                            },
+                                            itemBuilder: (context) => const [
+                                              PopupMenuItem(
+                                                value: 'report',
+                                                child: Row(
+                                                  children: [
+                                                    Icon(Icons.flag_outlined),
+                                                    SizedBox(width: 8),
+                                                    Text('Report'),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          );
                                         },
-                                        itemBuilder: (context) => const [
-                                          PopupMenuItem(
-                                            value: 'report',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.flag_outlined),
-                                                SizedBox(width: 8),
-                                                Text('Report'),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
                                       ),
                                     ],
                                   ),
@@ -1208,15 +1807,42 @@ class _TaskListPageState extends State<TaskListPage> {
                                                     color: Colors.grey[600]),
                                                 const SizedBox(width: 4),
                                                 Expanded(
-                                                  child: Text(
-                                                    task['creator_name'] ??
-                                                        'Unknown User',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: theme.primary,
-                                                    ),
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
+                                                  child: Consumer<UserService>(
+                                                    builder: (context,
+                                                        userService, child) {
+                                                      final currentUserId =
+                                                          userService
+                                                              .currentUser?.id;
+                                                      final taskCreatorId =
+                                                          task['creator_id']
+                                                              ?.toString();
+                                                      final isOwnTask =
+                                                          currentUserId
+                                                                  ?.toString() ==
+                                                              taskCreatorId;
+                                                      final creatorName = task[
+                                                              'creator_name'] ??
+                                                          'Unknown User';
+
+                                                      return Text(
+                                                        isOwnTask
+                                                            ? '$creatorName (YOU)'
+                                                            : creatorName,
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color:
+                                                              Theme.of(context)
+                                                                  .colorScheme
+                                                                  .primary,
+                                                          fontWeight: isOwnTask
+                                                              ? FontWeight.w600
+                                                              : FontWeight
+                                                                  .normal,
+                                                        ),
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      );
+                                                    },
                                                   ),
                                                 ),
                                               ],
@@ -1232,10 +1858,12 @@ class _TaskListPageState extends State<TaskListPage> {
                                                 Expanded(
                                                   child: Text(
                                                     task['location'] ??
-                                                        'Unknown Location',
+                                                        'No assigned',
                                                     style: TextStyle(
                                                       fontSize: 12,
-                                                      color: theme.primary,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .primary,
                                                     ),
                                                     overflow:
                                                         TextOverflow.ellipsis,
@@ -1253,11 +1881,19 @@ class _TaskListPageState extends State<TaskListPage> {
                                                 const SizedBox(width: 4),
                                                 Expanded(
                                                   child: Text(
-                                                    task['language_requirement'] ??
-                                                        'No Requirement',
+                                                    (task['language_requirement'] !=
+                                                                null &&
+                                                            task['language_requirement']
+                                                                .toString()
+                                                                .isNotEmpty)
+                                                        ? task[
+                                                            'language_requirement']
+                                                        : '-',
                                                     style: TextStyle(
                                                       fontSize: 12,
-                                                      color: theme.primary,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .primary,
                                                     ),
                                                     overflow:
                                                         TextOverflow.ellipsis,
@@ -1286,12 +1922,13 @@ class _TaskListPageState extends State<TaskListPage> {
                                                   DateFormat('MM/dd').format(
                                                     DateTime.parse(
                                                         task['task_date'] ??
-                                                            DateTime.now()
-                                                                .toString()),
+                                                            'No assigned'),
                                                   ),
                                                   style: TextStyle(
                                                     fontSize: 12,
-                                                    color: theme.primary,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .primary,
                                                   ),
                                                 ),
                                               ],
@@ -1308,12 +1945,14 @@ class _TaskListPageState extends State<TaskListPage> {
                                                 const SizedBox(width: 4),
                                                 Expanded(
                                                   child: Text(
-                                                    '${task['reward_point'] ?? task['salary'] ?? 0}',
+                                                    '${NumberFormat('#,###').format(int.tryParse((task['reward_point'] ?? task['salary'] ?? '0').toString()) ?? 0)}',
                                                     style: TextStyle(
                                                       fontSize: 12,
                                                       fontWeight:
                                                           FontWeight.w500,
-                                                      color: theme.primary,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .primary,
                                                     ),
                                                     overflow:
                                                         TextOverflow.ellipsis,
@@ -1379,19 +2018,37 @@ class _TaskListPageState extends State<TaskListPage> {
                             Positioned(
                               right: 16,
                               bottom: 8,
-                              child: IconButton(
-                                icon: Icon(
-                                  isFavorite
-                                      ? Icons.bookmark
-                                      : Icons.bookmark_border,
-                                  size: 22,
-                                  color: isFavorite ? Colors.amber : null,
-                                ),
-                                onPressed: () async =>
-                                    await _toggleFavorite(taskId),
-                                tooltip: isFavorite
-                                    ? 'Remove from favorites'
-                                    : 'Add to favorites',
+                              child: Consumer<UserService>(
+                                builder: (context, userService, child) {
+                                  final userPermission =
+                                      userService.currentUser?.permission ?? 0;
+                                  final currentUserId =
+                                      userService.currentUser?.id;
+                                  final taskCreatorId =
+                                      task['creator_id']?.toString();
+                                  final isOwnTask = currentUserId?.toString() ==
+                                      taskCreatorId;
+
+                                  // 不顯示收藏按鈕的條件：權限不足或是自己的任務
+                                  if (userPermission <= 0 || isOwnTask) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  return IconButton(
+                                    icon: Icon(
+                                      isFavorite
+                                          ? Icons.bookmark
+                                          : Icons.bookmark_border,
+                                      size: 22,
+                                      color: isFavorite ? Colors.amber : null,
+                                    ),
+                                    onPressed: () async =>
+                                        await _toggleFavorite(taskId),
+                                    tooltip: isFavorite
+                                        ? 'Remove from favorites'
+                                        : 'Add to favorites',
+                                  );
+                                },
                               ),
                             ),
                           ],
@@ -1407,6 +2064,172 @@ class _TaskListPageState extends State<TaskListPage> {
           floatingActionButton: _buildScrollToTopButton(),
         );
       },
+    );
+  }
+}
+
+/// 檢舉表單組件
+class _ReportFormWidget extends StatefulWidget {
+  final Map<String, dynamic> task;
+  final String taskId;
+  final dynamic theme;
+  final VoidCallback onSubmitted;
+
+  const _ReportFormWidget({
+    required this.task,
+    required this.taskId,
+    required this.theme,
+    required this.onSubmitted,
+  });
+
+  @override
+  State<_ReportFormWidget> createState() => _ReportFormWidgetState();
+}
+
+class _ReportFormWidgetState extends State<_ReportFormWidget> {
+  String? _selectedReason;
+  final TextEditingController _descriptionController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitReport() async {
+    if (_selectedReason == null || _descriptionController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Please select a reason and provide description')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await TaskReportsApi.submitReport(
+        taskId: widget.taskId,
+        reason: _selectedReason!,
+        description: _descriptionController.text.trim(),
+      );
+
+      if (mounted) {
+        widget.onSubmitted();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error submitting report: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reasons = TaskReportsApi.getReportReasons();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Report Task',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Task: ${widget.task['title'] ?? 'Untitled'}',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Reason for report:',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Radio 選項
+        ...reasons.map((reason) => RadioListTile<String>(
+              title: Text(
+                reason['label']!,
+                style:
+                    TextStyle(color: Theme.of(context).colorScheme.onSurface),
+              ),
+              value: reason['value']!,
+              groupValue: _selectedReason,
+              onChanged: (value) {
+                setState(() {
+                  _selectedReason = value;
+                });
+              },
+              contentPadding: EdgeInsets.zero,
+            )),
+        const SizedBox(height: 24),
+        Text(
+          'Description (required):',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _descriptionController,
+          maxLines: 4,
+          decoration: InputDecoration(
+            hintText: 'Please provide details about the issue...',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: _isSubmitting ? null : _submitReport,
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Submit Report'),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
