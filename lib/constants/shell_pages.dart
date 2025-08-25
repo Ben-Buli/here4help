@@ -44,6 +44,7 @@ import 'package:here4help/pay/pages/pay_setting_page.dart';
 // ==================== system 模組 ====================
 import 'package:here4help/system/pages/permission_denied_page.dart';
 import 'package:here4help/system/pages/permission_unvertified_page.dart';
+import 'package:here4help/system/pages/not_found_page.dart';
 
 // ==================== task 模組 ====================
 import 'package:here4help/task/pages/task_create_page.dart';
@@ -355,10 +356,11 @@ final List<Map<String, dynamic>> shellPages = [
     'showBackArrow': true,
     'permission': 1, // 需要已認證用戶才能設定支付
   },
+  // #region 權限不足頁面
   {
     'path': '/permission-denied',
     'child': const PermissionDeniedPage(),
-    'title': 'Permission Denied',
+    'title': 'Permission Denied', // 403
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
@@ -367,10 +369,31 @@ final List<Map<String, dynamic>> shellPages = [
   {
     'path': '/permission-unverified',
     'child': const PermissionUnverifiedPage(),
-    'title': 'User Unverified',
+    'title': 'User Unverified', // 未驗證
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
     'permission': 0, // 新用戶可訪問權限不足頁面
   },
+  {
+    'path': '/page-not-found',
+    'builder': (context, extra) {
+      final requestedPath = extra is String ? extra : null;
+      return NotFoundPage(requestedPath: requestedPath);
+    },
+    'title': 'Page Not Found', // 404
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'permission': -4, // 任何狀態都可訪問 404 頁面
+  },
+  // #endregion
 ];
+
+/// 檢查路徑是否存在於 shell pages 中
+bool isValidShellPage(String path) {
+  // 移除查詢參數，只檢查路徑
+  final cleanPath = Uri.parse(path).path;
+
+  return shellPages.any((page) => page['path'] == cleanPath);
+}

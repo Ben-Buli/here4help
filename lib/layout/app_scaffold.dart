@@ -10,6 +10,7 @@ import 'package:here4help/chat/services/chat_session_manager.dart';
 import 'dart:ui';
 import 'dart:math';
 import 'package:here4help/services/scroll_event_bus.dart';
+import 'package:here4help/constants/shell_pages.dart';
 
 // 新增：導覽列項目資料結構
 class NavigationItem {
@@ -152,6 +153,20 @@ class _AppScaffoldState extends State<AppScaffold> {
       final raw = GoRouterState.of(context).uri.toString();
       final currentPath = _normalizeRoute(raw);
 
+      // 檢查當前路徑是否為有效的 shell page
+      if (currentPath.isNotEmpty && !_isSystemPage(currentPath)) {
+        if (!isValidShellPage(currentPath)) {
+          debugPrint('🚫 無效路徑檢測到: $currentPath，重定向到 404');
+          // 延遲執行重定向，避免在 build 過程中修改路由
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              context.go('/page-not-found', extra: currentPath);
+            }
+          });
+          return;
+        }
+      }
+
       if (currentPath.isNotEmpty) {
         if (_routeHistory.isEmpty || _routeHistory.last != currentPath) {
           _routeHistory.add(currentPath);
@@ -240,8 +255,26 @@ class _AppScaffoldState extends State<AppScaffold> {
 
   /// 檢查是否為基本頁面（permission = 0）
   bool _isBasicPage(String path) {
-    final basicPages = ['/home', '/account', '/task'];
+    final basicPages = [
+      '/home',
+      '/account',
+      '/task',
+      '/account/profile',
+      '/account/security',
+    ];
     return basicPages.contains(path);
+  }
+
+  /// 檢查是否為系統頁面（不需要 404 檢查）
+  bool _isSystemPage(String path) {
+    final systemPages = [
+      '/page-not-found',
+      '/permission-denied',
+      '/permission-unverified',
+      '/login',
+      '/signup',
+    ];
+    return systemPages.any((systemPath) => path.startsWith(systemPath));
   }
 
   // 將完整 URI 正規化為純路徑（忽略 query 參數，支援 hash 路由）
