@@ -693,8 +693,59 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     }).toList();
   }
 
-  /// 排序任務列表
+  /// 排序任務列表（簡化版：統一使用 status_id 優先級排序）
   List<Map<String, dynamic>> _sortTasks(
+      List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
+    debugPrint('🔄 [My Works] 開始排序任務: ${tasks.length} 個任務');
+    debugPrint('  - 排序方式: ${chatProvider.currentSortBy}');
+    debugPrint('  - 排序方向: ${chatProvider.sortAscending ? "升序" : "降序"}');
+
+    // 簡化邏輯：統一使用 status_id 優先級排序
+    if (chatProvider.currentSortBy == 'status_id') {
+      debugPrint('✅ [My Works] 使用預設 status_id 排序');
+      return _sortByStatusId(tasks, chatProvider);
+    }
+
+    // 用戶選擇其他排序時
+    debugPrint('⚠️ [My Works] 用戶選擇排序: ${chatProvider.currentSortBy}');
+    return _sortByUserChoice(tasks, chatProvider);
+  }
+
+  /// status_id 優先級排序（預設）
+  List<Map<String, dynamic>> _sortByStatusId(
+      List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
+    final sortedTasks = List<Map<String, dynamic>>.from(tasks);
+
+    sortedTasks.sort((a, b) {
+      // 主鍵：status_id 升序（1,2,3...）
+      final statusIdA = int.tryParse(a['status_id']?.toString() ?? '0') ?? 0;
+      final statusIdB = int.tryParse(b['status_id']?.toString() ?? '0') ?? 0;
+      int comparison = statusIdA.compareTo(statusIdB);
+
+      // 次鍵：updated_at 降序（最新的在前）
+      if (comparison == 0) {
+        final timeA =
+            DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
+        final timeB =
+            DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
+        comparison = timeB.compareTo(timeA);
+      }
+
+      // 三次鍵：id 降序（穩定排序）
+      if (comparison == 0) {
+        final idA = a['id']?.toString() ?? '';
+        final idB = b['id']?.toString() ?? '';
+        comparison = idB.compareTo(idA);
+      }
+
+      return comparison;
+    });
+
+    return sortedTasks;
+  }
+
+  /// 用戶自選排序
+  List<Map<String, dynamic>> _sortByUserChoice(
       List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
     final sortedTasks = List<Map<String, dynamic>>.from(tasks);
 
@@ -702,20 +753,6 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       int comparison = 0;
 
       switch (chatProvider.currentSortBy) {
-        case 'status_order':
-          final soA = (a['sort_order'] as num?)?.toInt() ?? 999;
-          final soB = (b['sort_order'] as num?)?.toInt() ?? 999;
-          if (soA != soB) {
-            comparison = soA.compareTo(soB);
-            break;
-          }
-          // 次序：updated_at DESC
-          final timeA =
-              DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
-          final timeB =
-              DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
-          comparison = timeB.compareTo(timeA);
-          break;
         case 'updated_time':
           final timeA =
               DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
@@ -724,23 +761,9 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
           comparison = timeA.compareTo(timeB);
           break;
 
-        case 'status_id':
-          // 使用 status_id 進行數值排序
-          final statusIdA =
-              int.tryParse(a['status_id']?.toString() ?? '0') ?? 0;
-          final statusIdB =
-              int.tryParse(b['status_id']?.toString() ?? '0') ?? 0;
-          comparison = statusIdA.compareTo(statusIdB);
-          break;
-
-        case 'status_code':
-          // 使用 status_code 進行字串排序（備用）
-          final statusA = a['status_code'] ?? '';
-          final statusB = b['status_code'] ?? '';
-          comparison = statusA.compareTo(statusB);
-          break;
-
         default:
+          // 其他排序選項暫時不支援，使用預設比較
+          debugPrint('⚠️ [My Works] 不支援的排序選項: ${chatProvider.currentSortBy}');
           comparison = 0;
       }
 
@@ -814,12 +837,6 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     // 未讀（by_room）
     final roomId = (task['chat_room_id'] ?? '').toString();
     final provider = context.read<ChatListProvider>();
-    int unreadCount = 0;
-    try {
-      unreadCount = roomId.isEmpty ? 0 : provider.unreadForRoom(roomId);
-    } catch (_) {
-      unreadCount = 0;
-    }
 
     return Card(
       key: ValueKey('myworks-task-$roomId'), // My Works 任務卡片綁定 room id
@@ -974,26 +991,6 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            // Emoji 狀態列
-                            // Emoji 狀態列（popular > new，與 Posted Tasks 一致）
-                            Builder(builder: (_) {
-                              final isPopular =
-                                  TaskCardUtils.isPopularTask(task, {});
-                              final isNew = TaskCardUtils.isNewTask(task);
-                              final String? emoji =
-                                  isPopular ? '🔥' : (isNew ? '🌱' : null);
-                              return emoji == null
-                                  ? const SizedBox.shrink()
-                                  : Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(emoji,
-                                            style:
-                                                const TextStyle(fontSize: 16)),
-                                        const SizedBox(width: 4),
-                                      ],
-                                    );
-                            }),
                           ],
                         ),
                         const SizedBox(height: 4),

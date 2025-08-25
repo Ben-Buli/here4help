@@ -6,11 +6,49 @@ import 'package:here4help/auth/models/user_model.dart';
 import 'auth_service.dart';
 import 'package:here4help/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import '../../chat/services/socket_service.dart';
+
+class UnauthorizedException implements Exception {
+  final String message;
+  UnauthorizedException([this.message = 'Unauthorized']);
+  @override
+  String toString() => 'UnauthorizedException: $message';
+}
 
 class UserService extends ChangeNotifier {
   UserModel? _currentUser;
   UserModel? get currentUser => _currentUser;
   bool isLoading = true;
+
+  String get displayName => _currentUser?.name?.trim().isNotEmpty == true
+      ? _currentUser!.name!
+      : (_currentUser?.nickname?.trim().isNotEmpty == true
+          ? _currentUser!.nickname!
+          : 'User');
+
+  /// First initial for avatar badges; always safe.
+  String get displayInitial {
+    final n = _currentUser?.name ?? _currentUser?.nickname ?? '';
+    return n.trim().isEmpty ? 'U' : n.trim()[0].toUpperCase();
+  }
+
+  String? get avatarUrl => _currentUser?.avatar_url;
+
+  bool _isSameUser(UserModel a, UserModel b) {
+    try {
+      // If IDs differ, treat as different immediately
+      if ((a.id ?? -1) != (b.id ?? -2)) return false;
+      // Shallow important fields compare to avoid expensive JSON when possible
+      if ((a.name ?? '') != (b.name ?? '')) return false;
+      if ((a.avatar_url ?? '') != (b.avatar_url ?? '')) return false;
+      if ((a.permission ?? 0) != (b.permission ?? 0)) return false;
+      // Fallback deep compare
+      return jsonEncode(a.toJson()) == jsonEncode(b.toJson());
+    } catch (_) {
+      return false;
+    }
+  }
 
   UserService() {
     _initializeUser();
@@ -26,8 +64,14 @@ class UserService extends ChangeNotifier {
       await _loadUserFromDatabase();
     } catch (e) {
       debugPrint('❌ 從資料庫獲取用戶資訊失敗: $e');
-      // 如果資料庫獲取失敗，則從 SharedPreferences 載入
-      await _loadUserFromPreferences();
+      if (e is UnauthorizedException || (e.toString().contains('401'))) {
+        // Unauthorized, clear current user to force relogin
+        clearUser();
+        await _loadUserFromPreferences();
+      } else {
+        // 如果資料庫獲取失敗，則從 SharedPreferences 載入
+        await _loadUserFromPreferences();
+      }
     } finally {
       isLoading = false;
       notifyListeners();
@@ -72,39 +116,18 @@ class UserService extends ChangeNotifier {
       // debugPrint('🔍 嘗試從資料庫獲取用戶資訊...');
       final userData = await AuthService.getProfile();
 
+      if (userData.isEmpty) {
+        throw Exception('No user data returned from database');
+      }
+
       debugPrint('🔍 從資料庫獲取的原始資料: $userData');
       debugPrint('🔍 avatar_url 欄位值: ${userData['avatar_url']}');
 
-      if (userData.isNotEmpty) {
-        _currentUser = UserModel.fromJson(userData);
-        debugPrint('✅ 從資料庫成功獲取用戶資訊: ${_currentUser?.name}');
-        debugPrint('✅ 用戶頭像 URL: ${_currentUser?.avatar_url}');
-
-        // 如果 avatar_url 是空的，設置默認值
-        if (_currentUser?.avatar_url.isEmpty == true) {
-          debugPrint('⚠️ avatar_url 是空的，保持為空讓 ImageHelper 處理默認頭像');
-          // 不需要手動設置，讓 ImageHelper.getAvatarImage() 自動處理
-        }
-
-        // 同時更新 SharedPreferences 作為備用
-        await _saveUserToPreferences(_currentUser!);
-
-        // 初始化未讀中心（確保 App 冷啟已登入時也會建立連線與快照）
-        try {
-          final svc = SocketNotificationService();
-          await svc.init(userId: _currentUser!.id.toString());
-          await NotificationCenter().use(svc);
-          await svc.refreshSnapshot();
-        } catch (e) {
-          // 降級為 0 佔位
-          final placeholder = NotificationServicePlaceholder();
-          await placeholder.init(userId: 'placeholder');
-          await NotificationCenter().use(placeholder);
-        }
-      } else {
-        throw Exception('No user data returned from database');
-      }
+      await setUser(UserModel.fromJson(userData));
     } catch (e) {
+      if (e.toString().contains('401')) {
+        throw UnauthorizedException();
+      }
       debugPrint('❌ 從資料庫獲取用戶資訊失敗: $e');
       rethrow;
     }
@@ -113,36 +136,18 @@ class UserService extends ChangeNotifier {
   /// 從 SharedPreferences 載入用戶資訊（備用方案）
   Future<void> _loadUserFromPreferences() async {
     final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString('user_email');
-    final permissionLevel = prefs.getInt('user_permission');
-    final avatarUrl = prefs.getString('user_avatarUrl');
+    final userJson = prefs.getString('user_json');
 
-    debugPrint(
-        '🔍 從 SharedPreferences 載入用戶資訊: email=$email, avatarUrl=$avatarUrl');
-
-    if (email != null) {
-      _currentUser = UserModel(
-        id: prefs.getInt('user_id') ?? 0,
-        name: prefs.getString('user_name') ?? '',
-        nickname: prefs.getString('user_nickname') ??
-            prefs.getString('user_name') ??
-            '',
-        email: email,
-        phone: prefs.getString('user_phone') ?? '',
-        points: prefs.getInt('user_points') ?? 0,
-        avatar_url: avatarUrl ?? '',
-        status: prefs.getString('user_status') ?? 'active',
-        provider: prefs.getString('user_provider') ?? 'email',
-        created_at: prefs.getString('user_created_at') ?? '',
-        updated_at: prefs.getString('user_updated_at') ?? '',
-        referral_code: prefs.getString('user_referral_code'),
-        google_id: prefs.getString('user_google_id'),
-        primary_language: prefs.getString('user_primaryLang') ?? 'English',
-        permission: permissionLevel ?? 0,
-      );
-      debugPrint('✅ 從 SharedPreferences 載入用戶資訊成功: ${_currentUser?.name}');
-      debugPrint(
-          '✅ 從 SharedPreferences 載入的 avatar_url: ${_currentUser?.avatar_url}');
+    if (userJson != null && userJson.isNotEmpty) {
+      try {
+        final Map<String, dynamic> userMap = json.decode(userJson);
+        _currentUser = UserModel.fromJson(userMap);
+        debugPrint('✅ 從 SharedPreferences 載入用戶資訊成功: ${_currentUser?.name}');
+        debugPrint(
+            '✅ 從 SharedPreferences 載入的 avatar_url: ${_currentUser?.avatar_url}');
+      } catch (e) {
+        debugPrint('❌ 從 SharedPreferences 解析用戶資訊失敗: $e');
+      }
     } else {
       debugPrint('ℹ️ SharedPreferences 中沒有用戶資訊');
     }
@@ -152,14 +157,8 @@ class UserService extends ChangeNotifier {
   Future<void> _saveUserToPreferences(UserModel user) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('user_id', user.id);
-      await prefs.setString('user_name', user.name);
-      await prefs.setString('user_nickname', user.nickname);
-      await prefs.setString('user_email', user.email);
-      await prefs.setInt('user_points', user.points);
-      await prefs.setString('user_avatarUrl', user.avatar_url);
-      await prefs.setString('user_primaryLang', user.primary_language);
-      await prefs.setInt('user_permission', user.permission);
+      final userJson = json.encode(user.toJson());
+      await prefs.setString('user_json', userJson);
       debugPrint('✅ 用戶資訊已保存到 SharedPreferences');
     } catch (e) {
       debugPrint('❌ 保存用戶資訊到 SharedPreferences 失敗: $e');
@@ -193,14 +192,7 @@ class UserService extends ChangeNotifier {
 
       // 清除 SharedPreferences 中的用戶資訊
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('user_id');
-      await prefs.remove('user_name');
-      await prefs.remove('user_nickname');
-      await prefs.remove('user_email');
-      await prefs.remove('user_points');
-      await prefs.remove('user_avatarUrl');
-      await prefs.remove('user_primaryLang');
-      await prefs.remove('user_permission');
+      await prefs.remove('user_json');
 
       // 清除其他可能的用戶相關緩存
       await prefs.remove('user_phone');
@@ -216,9 +208,13 @@ class UserService extends ChangeNotifier {
 
       // 清除 Flutter 圖片緩存
       if (context.mounted) {
-        PaintingBinding.instance.imageCache.clear();
-        PaintingBinding.instance.imageCache.clearLiveImages();
-        debugPrint('✅ 已清除 Flutter 圖片緩存');
+        try {
+          PaintingBinding.instance.imageCache.clear();
+          PaintingBinding.instance.imageCache.clearLiveImages();
+          debugPrint('✅ 已清除 Flutter 圖片緩存');
+        } catch (_) {
+          debugPrint('⚠️ 清除圖片緩存失敗（可能在 Web 環境）');
+        }
       }
 
       // 重置未讀中心為 0
@@ -240,18 +236,48 @@ class UserService extends ChangeNotifier {
 
   /// 設置用戶資訊（登入時使用）
   Future<void> setUser(UserModel user) async {
+    // If same user data, skip heavy work
+    if (_currentUser != null && _isSameUser(_currentUser!, user)) {
+      debugPrint('ℹ️ setUser skipped: same user, no changes');
+      return;
+    }
+
     debugPrint('🔍 setUser called with ${user.id}');
     debugPrint('🔍 setUser avatar_url: ${user.avatar_url}');
 
     // 清除舊的圖片緩存（避免顯示前一個用戶的頭像）
-    PaintingBinding.instance.imageCache.clear();
-    PaintingBinding.instance.imageCache.clearLiveImages();
-    debugPrint('✅ 已清除圖片緩存以避免顯示舊用戶頭像');
+    try {
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+      debugPrint('✅ 已清除圖片緩存以避免顯示舊用戶頭像');
+    } catch (_) {
+      debugPrint('⚠️ 清除圖片緩存失敗（可能在 Web 環境）');
+    }
 
     _currentUser = user;
 
     // 保存到 SharedPreferences 作為備用
     await _saveUserToPreferences(user);
+
+    // 保存 user_id 供 Socket 使用
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('user_id', user.id ?? 0);
+      debugPrint('✅ Saved user_id ${user.id} for Socket');
+    } catch (e) {
+      debugPrint('⚠️ Failed to save user_id for Socket: $e');
+    }
+
+    // 重新連接 Socket 以使用新用戶的 token
+    try {
+      final socketService = SocketService();
+      socketService.disconnect(); // 先斷開舊連線
+      await Future.delayed(const Duration(milliseconds: 500)); // 等待斷線完成
+      await socketService.connect(); // 重新連接
+      debugPrint('✅ Socket reconnected for new user ${user.id}');
+    } catch (e) {
+      debugPrint('⚠️ Failed to reconnect socket for new user: $e');
+    }
 
     // 初始化未讀中心（Socket + 冷啟快照）
     try {
@@ -270,6 +296,7 @@ class UserService extends ChangeNotifier {
   }
 
   void clearUser() {
+    if (_currentUser == null) return;
     _currentUser = null;
     notifyListeners();
   }

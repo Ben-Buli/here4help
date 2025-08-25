@@ -88,7 +88,7 @@ class PermissionGuard {
       if (userPermission == permissionValues['unverified']) {
         debugPrint('🚫 權限拒絕重定向: 帳號權限：($userPermission)未驗證');
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          context.go('/permission-unverified?from=$path');
+          context.go('/permission-unverified?blocked=$path&from=$path');
         });
         return const SizedBox.shrink();
       }

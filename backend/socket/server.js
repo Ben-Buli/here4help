@@ -94,9 +94,9 @@ async function initDatabase() {
 
 // 驗證 JWT Token
 function validateJWT(token, traceId) {
-  console.log("JWT_SECRET: ", JWT_SECRET);
-  console.log("token: ", token);
-  console.log("traceId: ", traceId);
+  // console.log("JWT_SECRET: ", JWT_SECRET);
+  // console.log("token: ", token);
+  // console.log("traceId: ", traceId);
   try {
     // 使用與 PHP 相同的 JWT 驗證邏輯
     const payload = jwt.verify(token, JWT_SECRET, {

@@ -132,8 +132,8 @@ class RatingService {
       }
 
       print('🔍 RatingService: Token found, length: ${token.length}');
-      print(
-          '🔍 RatingService: Token preview: ${token.substring(0, token.length > 20 ? 20 : token.length)}...');
+      // print(
+      // '🔍 RatingService: Token preview: ${token.substring(0, token.length > 20 ? 20 : token.length)}...');
 
       final uri =
           Uri.parse('$userStatsUrl${userId != null ? '?user_id=$userId' : ''}');

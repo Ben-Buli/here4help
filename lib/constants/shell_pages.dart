@@ -14,7 +14,6 @@ import 'package:here4help/account/pages/profile_page.dart';
 import 'package:here4help/account/pages/ratings_page.dart';
 import 'package:here4help/account/pages/security_page.dart';
 import 'package:here4help/account/pages/support_page.dart';
-import 'package:here4help/account/pages/task_history_page.dart';
 import 'package:here4help/account/pages/theme_settings_page.dart';
 import 'package:here4help/account/pages/wallet_page.dart';
 import 'package:here4help/account/pages/point_history_page.dart';
@@ -257,20 +256,21 @@ final List<Map<String, dynamic>> shellPages = [
     'icon': Icons.stars,
     'permission': 1, // 需要已認證用戶才能查看點數政策
   },
-  {
-    'path': '/account/ratings',
-    'child': const RatingsPage(),
-    'title': 'Ratings and Feedback',
-    'showAppBar': true,
-    'showBottomNav': false,
-    'showBackArrow': true,
-    'icon': Icons.star_rate,
-    'permission': 1, // 需要已認證用戶才能查看評價
-  },
+  // {
+  //   'path': '/account/ratings',
+  //   'child': const RatingsPage(),
+  //   'title': 'Ratings and Feedback',
+  //   'showAppBar': true,
+  //   'showBottomNav': false,
+  //   'showBackArrow': true,
+  //   'icon': Icons.star_rate,
+  //   'permission': 1, // 需要已認證用戶才能查看評價
+  // },
   {
     'path': '/account/task_history',
-    'child': const TaskHistoryPage(),
-    'title': 'Task History',
+    'child': const RatingsPage(),
+    // 'child': const TaskHistoryPage(),
+    'title': 'Task History & Feedback',
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,

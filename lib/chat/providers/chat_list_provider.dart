@@ -34,12 +34,12 @@ class ChatListProvider extends ChangeNotifier {
 
   // 排序狀態 - 分頁獨立
   final Map<int, String> _currentSortBy = {
-    TAB_POSTED_TASKS: 'updated_time', // 改為 updated_time 作為預設
-    TAB_MY_WORKS: 'updated_time'
+    TAB_POSTED_TASKS: 'status_id', // 改為 status_id，與後端 SQL 排序一致
+    TAB_MY_WORKS: 'status_id' // 統一使用狀態優先級排序
   };
   final Map<int, bool> _sortAscending = {
-    TAB_POSTED_TASKS: false,
-    TAB_MY_WORKS: false
+    TAB_POSTED_TASKS: true, // status_id 使用升序排序（1,2,3...）
+    TAB_MY_WORKS: true // 與後端 ASC 排序一致
   };
 
   // 相關性搜尋狀態
@@ -561,12 +561,12 @@ class ChatListProvider extends ChangeNotifier {
           debugPrint('🔍 [ChatListProvider] 用戶已手動選擇排序，保持當前選擇');
         }
       } else if (query.trim().isEmpty && currentSortBy == 'relevance') {
-        // 搜尋清空時，如果當前是 relevance，則切換回 updated_time
-        _currentSortBy[_currentTabIndex] = 'updated_time';
-        _sortAscending[_currentTabIndex] = false;
+        // 搜尋清空時，如果當前是 relevance，則切換回 status_id
+        _currentSortBy[_currentTabIndex] = 'status_id';
+        _sortAscending[_currentTabIndex] = true;
         // 重置手動覆蓋標記
         _hasManualSortOverride[_currentTabIndex] = false;
-        debugPrint('�� [ChatListProvider] 搜尋清空，切換到時間排序');
+        debugPrint('🔍 [ChatListProvider] 搜尋清空，切換到狀態優先級排序');
       }
 
       _emit('search_changed');
@@ -631,8 +631,8 @@ class ChatListProvider extends ChangeNotifier {
     _searchQueries[_currentTabIndex] = '';
     _selectedLocations[_currentTabIndex]?.clear();
     _selectedStatuses[_currentTabIndex]?.clear();
-    _currentSortBy[_currentTabIndex] = 'updated_time';
-    _sortAscending[_currentTabIndex] = false;
+    _currentSortBy[_currentTabIndex] = 'status_id'; // 重置為狀態優先級排序
+    _sortAscending[_currentTabIndex] = true; // 狀態ID升序
     _hasManualSortOverride[_currentTabIndex] = false; // 重置手動覆蓋標記
     _emit('criteria');
   }

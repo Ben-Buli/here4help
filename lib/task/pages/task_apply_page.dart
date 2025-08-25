@@ -6,6 +6,11 @@ import 'package:go_router/go_router.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/chat/services/chat_service.dart';
 import 'package:here4help/chat/services/socket_service.dart';
+import 'package:here4help/utils/image_helper.dart';
+import 'package:here4help/task/models/resume_data.dart';
+import 'package:here4help/config/app_config.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 /// 任務投遞應徵履歷表單頁面
 class TaskApplyPage extends StatefulWidget {
@@ -23,12 +28,14 @@ class TaskApplyPage extends StatefulWidget {
 class _TaskApplyPageState extends State<TaskApplyPage> {
   final _formKey = GlobalKey<FormState>();
   final _selfIntroController = TextEditingController();
-  final _englishController = TextEditingController();
+  final List<TextEditingController> _questionControllers = [];
 
   @override
   void dispose() {
     _selfIntroController.dispose();
-    _englishController.dispose();
+    for (var controller in _questionControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -63,7 +70,13 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
 
           final task = snapshot.data ?? {};
           final taskTitle = task['title'] ?? '';
-          final applicationQuestion = task['application_question'];
+          final applicationQuestions = List<Map<String, dynamic>>.from(
+              task['application_questions'] ?? []);
+
+          // 確保有足夠的控制器
+          while (_questionControllers.length < applicationQuestions.length) {
+            _questionControllers.add(TextEditingController());
+          }
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -74,18 +87,19 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                 children: [
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 30,
-                        backgroundImage: currentUser.avatar_url.isNotEmpty
-                            ? (currentUser.avatar_url.startsWith('http')
-                                ? NetworkImage(currentUser.avatar_url)
-                                : AssetImage(currentUser.avatar_url)
-                                    as ImageProvider)
-                            : null,
-                        child: currentUser.avatar_url.isEmpty
-                            ? const Icon(Icons.person, size: 40)
-                            : null,
-                      ),
+                      currentUser.avatar_url.isNotEmpty
+                          ? CircleAvatar(
+                              radius: 30,
+                              backgroundImage: ImageHelper.getAvatarImage(
+                                  currentUser.avatar_url),
+                              onBackgroundImageError: (exception, stackTrace) {
+                                debugPrint('頭像載入錯誤: $exception');
+                              },
+                            )
+                          : const CircleAvatar(
+                              radius: 30,
+                              child: Icon(Icons.person, size: 40),
+                            ),
                       const SizedBox(width: 16),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,30 +218,47 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8)),
                     ),
+                    // 自我介紹改為非必填
                   ),
                   const SizedBox(height: 16),
-                  if (applicationQuestion != null) ...[
-                    Text(
-                      applicationQuestion,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _englishController,
-                      decoration: InputDecoration(
-                        hintText: 'Write your answer to the poster',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+
+                  // 動態生成所有 application_questions
+                  ...applicationQuestions.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final question = entry.value;
+                    final questionText = question['application_question'] ?? '';
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          questionText,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'This field is required';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _questionControllers[index],
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            hintText: 'Write your answer to the poster',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'This field is required';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    );
+                  }).toList(),
                   const SizedBox(height: 16),
                   Consumer<ThemeConfigManager>(
                     builder: (context, themeManager, child) {
@@ -259,13 +290,22 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
 
                             final taskService = TaskService();
                             final intro = _selfIntroController.text.trim();
-                            final q1 = _englishController.text.trim();
+
                             // 組裝新格式 answers：以「問題原文」為鍵
                             final Map<String, String> answers = {};
-                            if (applicationQuestion != null &&
-                                applicationQuestion.trim().isNotEmpty &&
-                                q1.isNotEmpty) {
-                              answers[applicationQuestion.trim()] = q1;
+                            for (int i = 0;
+                                i < applicationQuestions.length;
+                                i++) {
+                              final question = applicationQuestions[i];
+                              final questionText =
+                                  question['application_question'] ?? '';
+                              final answer =
+                                  _questionControllers[i].text.trim();
+
+                              if (questionText.isNotEmpty &&
+                                  answer.isNotEmpty) {
+                                answers[questionText] = answer;
+                              }
                             }
 
                             await taskService.applyForTask(
@@ -290,23 +330,43 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                             final roomData = roomResult['room'];
                             final roomId = roomData['id'].toString();
 
-                            // 應徵成功後，主動發送第一則訊息（使用 cover_letter 與可用回答摘要）
+                            // 應徵成功後，發送結構化的 Resume 訊息
                             try {
-                              final String answersSummary = (answers.isNotEmpty)
-                                  ? answers.entries
-                                      .map((e) => '${e.key}: ${e.value}')
-                                      .join('\n')
-                                  : '';
-                              final String autoMessage = [
-                                if (intro.isNotEmpty) intro,
-                                if (answersSummary.isNotEmpty) answersSummary,
-                              ].join('\n\n');
+                              // 建立 Resume 資料結構
+                              final List<ApplyResponse> applyResponses = [];
+                              for (int i = 0;
+                                  i < applicationQuestions.length;
+                                  i++) {
+                                final question = applicationQuestions[i];
+                                final questionText =
+                                    question['application_question'] ?? '';
+                                final answer =
+                                    _questionControllers[i].text.trim();
 
-                              if (autoMessage.trim().isNotEmpty) {
+                                if (questionText.isNotEmpty &&
+                                    answer.isNotEmpty) {
+                                  applyResponses.add(ApplyResponse(
+                                    applyQuestion: questionText,
+                                    applyReply: answer,
+                                  ));
+                                }
+                              }
+
+                              final resumeData = ResumeData(
+                                applyIntroduction: intro,
+                                applyResponses: applyResponses,
+                              );
+
+                              // 只有在有內容時才發送 Resume 訊息
+                              if (!resumeData.isEmpty) {
+                                final resumeJsonString =
+                                    resumeData.toJsonString();
+
                                 final sendRes = await chatService.sendMessage(
                                   roomId: roomId,
-                                  message: autoMessage.trim(),
+                                  message: resumeJsonString,
                                   taskId: taskId,
+                                  kind: 'resume', // 指定為 resume 類型
                                 );
 
                                 // 透過 Socket.IO 同步推播（若可用）
@@ -315,14 +375,15 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                                   await socket.connect();
                                   socket.sendMessage(
                                     roomId: roomId,
-                                    text: autoMessage.trim(),
+                                    text: resumeJsonString,
                                     messageId:
                                         sendRes['message_id']?.toString(),
                                   );
                                 } catch (_) {}
                               }
                             } catch (e) {
-                              // 自動訊息失敗不阻擋流程
+                              // Resume 訊息失敗不阻擋流程
+                              debugPrint('❌ 發送 Resume 訊息失敗: $e');
                             }
 
                             if (mounted) {
@@ -375,8 +436,42 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
   }
 
   Future<Map<String, dynamic>> _loadTask(String taskId) async {
-    final taskService = TaskService();
-    await taskService.loadTasks();
-    return taskService.getTaskById(taskId) ?? {};
+    try {
+      // 使用 TaskService 載入任務資料（list.php 已包含 application_questions）
+      final taskService = TaskService();
+      await taskService.loadTasks();
+      final task = taskService.getTaskById(taskId);
+
+      if (task != null) {
+        debugPrint('✅ 從 TaskService 載入任務: ${task['title']}');
+        debugPrint('✅ Application questions: ${task['application_questions']}');
+        return task;
+      }
+
+      // 備用方案：使用專門的 API
+      debugPrint('⚠️ TaskService 中找不到任務，嘗試使用 task_edit_data API');
+      final response = await http.get(
+        Uri.parse(
+            '${AppConfig.apiBaseUrl}/backend/api/tasks/task_edit_data.php?id=$taskId'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          debugPrint('✅ 從 task_edit_data API 載入任務資料');
+          return Map<String, dynamic>.from(data['data']);
+        } else {
+          throw Exception(data['message'] ?? 'Failed to load task');
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: Failed to load task');
+      }
+    } catch (e) {
+      debugPrint('❌ 載入任務資料失敗: $e');
+      return {};
+    }
   }
 }

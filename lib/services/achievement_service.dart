@@ -142,7 +142,7 @@ class AchievementService {
       );
 
       print('🔍 AchievementService: Response status: ${response.statusCode}');
-      print('🔍 AchievementService: Response body: ${response.body}');
+      // print('🔍 AchievementService: Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);

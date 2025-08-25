@@ -119,15 +119,24 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
   void _returnToBlockedPage(BuildContext context) {
     final state = GoRouterState.of(context);
     final blockedPath = state.uri.queryParameters['blocked']; // 被阻擋的頁面
+    final fromPath = state.uri.queryParameters['from']; // 來源頁面
 
-    debugPrint('🔙 返回到被阻擋的頁面: $blockedPath');
+    debugPrint('🔍 [PermissionUnverified] 當前 URL: ${state.uri}');
+    debugPrint('🔍 [PermissionUnverified] 查詢參數: ${state.uri.queryParameters}');
+    debugPrint('🔙 [PermissionUnverified] blocked 參數: $blockedPath');
+    debugPrint('🔙 [PermissionUnverified] from 參數: $fromPath');
 
-    if (blockedPath != null && blockedPath.isNotEmpty) {
-      debugPrint('🔙 導航到原本想要進入的頁面: $blockedPath');
-      context.go(blockedPath);
+    // 優先使用 blocked 參數，其次使用 from 參數
+    final targetPath = blockedPath ?? fromPath;
+
+    if (targetPath != null &&
+        targetPath.isNotEmpty &&
+        targetPath != '/permission-unverified') {
+      debugPrint('🔙 導航到目標頁面: $targetPath');
+      context.go(targetPath);
     } else {
-      // 如果沒有被阻擋的頁面資訊，返回首頁
-      debugPrint('🔙 沒有被阻擋頁面資訊，返回首頁');
+      // 如果沒有有效的目標頁面，返回首頁
+      debugPrint('🔙 沒有有效的目標頁面資訊，返回首頁');
       context.go('/home');
     }
   }

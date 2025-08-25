@@ -547,31 +547,31 @@ class _RatingsPageState extends State<RatingsPage>
     // 保持原有的架構，只回傳內容，不包 AppScaffold
     return Column(
       children: [
-        Container(
-          color: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: const Row(
-            children: [
-              Text(
-                'Credit Score',
-                style: TextStyle(
-                  color: Color(0xFF2563EB),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              Spacer(),
-              Text(
-                '4.9',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                ),
-              ),
-            ],
-          ),
-        ),
+        // Container(
+        //   color: Colors.white,
+        //   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        //   child: const Row(
+        //     children: [
+        //       Text(
+        //         'Credit Score',
+        //         style: TextStyle(
+        //           color: Color(0xFF2563EB),
+        //           fontWeight: FontWeight.bold,
+        //           fontSize: 16,
+        //         ),
+        //       ),
+        //       Spacer(),
+        //       Text(
+        //         '4.9',
+        //         style: TextStyle(
+        //           color: AppColors.primary,
+        //           fontWeight: FontWeight.bold,
+        //           fontSize: 22,
+        //         ),
+        //       ),
+        //     ],
+        //   ),
+        // ),
         Container(
           color: Colors.white,
           child: TabBar(

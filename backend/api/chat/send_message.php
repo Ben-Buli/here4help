@@ -36,6 +36,15 @@ try {
   // task_id 目前未參與訊息寫入，但保留參數以利前後端一致（UUID 字串）
   $task_id = isset($input['task_id']) ? (string)$input['task_id'] : null;
   $message = trim((string)($input['message'] ?? ''));
+  // 新增：支援 kind 參數
+  $kind = isset($input['kind']) ? (string)$input['kind'] : 'text';
+  
+  // 驗證 kind 值
+  $validKinds = ['text', 'image', 'file', 'system', 'resume'];
+  if (!in_array($kind, $validKinds)) {
+    $kind = 'text';
+  }
+  
   if ($room_id <= 0 || $message === '') {
     Response::validationError(['room_id' => 'required', 'message' => 'required']);
   }
@@ -94,29 +103,12 @@ try {
     }
   }
 
-  // Insert message（相容舊欄位 content）
+  // Insert message（使用實際的 content 欄位，並支援 kind）
   try {
-    // 檢查是否存在 content 欄位（部分舊資料庫尚未移除）
-    $hasContentCol = false;
-    try {
-      $col = $db->fetch("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chat_messages' AND COLUMN_NAME = 'content' LIMIT 1");
-      $hasContentCol = !empty($col);
-    } catch (Exception $e) {
-      // 忽略檢查失敗，預設為無 content 欄位
-    }
-
-    if ($hasContentCol) {
-      // 同步寫入 content 與 message，避免 NOT NULL 無預設值造成失敗
-      $db->query(
-        "INSERT INTO chat_messages (room_id, from_user_id, content) VALUES (?, ?, ?)",
-        [$room_id, $user_id, $message, $message]
-      );
-    } else {
-      $db->query(
-        "INSERT INTO chat_messages (room_id, from_user_id, content) VALUES (?, ?, ?)",
-        [$room_id, $user_id, $message]
-      );
-    }
+    $db->query(
+      "INSERT INTO chat_messages (room_id, from_user_id, content, kind) VALUES (?, ?, ?, ?)",
+      [$room_id, $user_id, $message, $kind]
+    );
   } catch (Exception $e) {
     error_log('send_message insert error: ' . $e->getMessage());
     throw $e;
@@ -132,6 +124,8 @@ try {
     'room_id' => $room_id,
     'from_user_id' => $user_id,
     'message' => $message,
+    'content' => $message, // 兼容性：同時提供兩個欄位名稱
+    'kind' => $kind, // 回傳訊息類型
   ], 'Message saved');
 } catch (Exception $e) {
   Response::error('Server error: ' . $e->getMessage(), 500);

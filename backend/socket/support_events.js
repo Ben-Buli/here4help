@@ -50,6 +50,7 @@ class SupportEventHandler {
       try {
         const { token } = data;
         const decoded = jwt.verify(token, process.env.JWT_SECRET || 'here4help_jwt_secret_key_2025_development_environment_secure_random_string');
+        console.log("JWT_SECRET: ", process.env.JWT_SECRET);
         
         socket.userId = decoded.user_id;
         socket.userRole = decoded.role || 'user';
@@ -75,11 +76,26 @@ class SupportEventHandler {
       console.log(`📥 Support Events: 用戶 ${socket.userId} 加入聊天室 ${chatRoomId} 事件監聽`);
     });
 
-    // 離開聊天室事件監聽
-    socket.on('leave_room', (data) => {
-      const { chatRoomId } = data;
-      socket.leave(`support_events_${chatRoomId}`);
-      console.log(`📤 Support Events: 用戶 ${socket.userId} 離開聊天室 ${chatRoomId} 事件監聽`);
+    // 進入聊天室事件監聽（校正參數名稱為 roomId）
+    socket.on('join_room', (data = {}) => {
+      const { roomId } = data;
+      if (!roomId) return;
+      console.log(`📥 Support Events: 用戶 ${socket.user?.id} 進入聊天室 ${roomId} 事件監聽`);
+    });
+
+    // 離開聊天室事件監聽（校正參數名稱為 roomId）
+    socket.on('leave_room', (data = {}) => {
+      const { roomId } = data;
+      if (!roomId) return;
+      socket.leave(`support_events_${roomId}`);
+      console.log(`📤 Support Events: 用戶 ${socket.user?.id} 離開聊天室 ${roomId} 事件監聽`);
+    });
+
+    // 標記已讀事件監聽（協助追蹤先 read 後 join 的情況）
+    socket.on('read_room', (data = {}) => {
+      const { roomId } = data;
+      if (!roomId) return;
+      console.log(`✅ Support Events: 用戶 ${socket.user?.id} 標記聊天室 ${roomId} 已讀`);
     });
 
     // 處理斷線

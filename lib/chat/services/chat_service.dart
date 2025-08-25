@@ -110,6 +110,7 @@ class ChatService {
     required String roomId,
     required String message,
     String? taskId,
+    String kind = 'text', // 新增 kind 參數
   }) async {
     try {
       final token = await AuthService.getToken();
@@ -126,6 +127,7 @@ class ChatService {
         body: json.encode({
           'room_id': roomId,
           'message': message,
+          'kind': kind, // 傳送 kind 參數
           if (taskId != null) 'task_id': taskId,
         }),
       );

@@ -24,7 +24,7 @@ try {
     $location = $_GET['location'] ?? null;
     $language = $_GET['language'] ?? null;
     $creator_id = $_GET['creator_id'] ?? null; // 添加 creator_id 過濾
-    $limit = (int)($_GET['limit'] ?? 20);
+    $limit = (int)($_GET['limit'] ?? 50);
     $offset = (int)($_GET['offset'] ?? 0);
     
     // 嘗試從 Authorization 取出目前使用者（用於封鎖過濾）

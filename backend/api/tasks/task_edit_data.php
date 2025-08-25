@@ -40,7 +40,9 @@ try {
                      FROM application_questions WHERE task_id = ? ORDER BY sort_order ASC";
     try {
         $questions = $db->fetchAll($questionsSql, [$taskId]);
+        error_log($questionsSql);
     } catch (Exception $e) {
+        error_log($e);
         $questions = [];
     }
     $task['application_questions'] = $questions;

@@ -262,7 +262,9 @@ class _HomePageState extends State<HomePage> {
                                 value: formatted['five_star_ratings']!),
                             _AchievementBox(
                                 label: 'Avg Rating',
-                                value: formatted['avg_rating']!),
+                                value: formatted['avg_rating']! == 'N/A'
+                                    ? '0.0'
+                                    : formatted['avg_rating']!),
                           ],
                         );
                       },

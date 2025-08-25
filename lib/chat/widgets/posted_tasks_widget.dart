@@ -622,30 +622,30 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         offset: 0,
       );
 
-      debugPrint('🔍 [Posted Tasks] [_fetchAllTasks()] API 返回結果:');
-      debugPrint('  - 任務數量: ${result.tasks.length}');
-      debugPrint('  - 是否有更多: ${result.hasMore}');
+      // debugPrint('🔍 [Posted Tasks] [_fetchAllTasks()] API 返回結果:');
+      // debugPrint('  - 任務數量: ${result.tasks.length}');
+      // debugPrint('  - 是否有更多: ${result.hasMore}');
       if (result.tasks.isNotEmpty) {
-        debugPrint('  - 第一個任務 ID: ${result.tasks.first['id']}');
-        debugPrint('  - 第一個任務標題: ${result.tasks.first['title']}');
+        // debugPrint('  - 第一個任務 ID: ${result.tasks.first['id']}');
+        // debugPrint('  - 第一個任務標題: ${result.tasks.first['title']}');
 
         // 檢查第一個任務的應徵者數據
         final firstTask = result.tasks.first;
         final firstTaskApplicants = firstTask['applicants'] ?? [];
-        debugPrint('  - 第一個任務應徵者數量: ${firstTaskApplicants.length}');
+        // debugPrint('  - 第一個任務應徵者數量: ${firstTaskApplicants.length}');
 
         if (firstTaskApplicants.isNotEmpty) {
-          debugPrint('  - 第一個任務應徵者詳細信息:');
+          // debugPrint('  - 第一個任務應徵者詳細信息:');
           for (int i = 0; i < firstTaskApplicants.length; i++) {
             final applicant = firstTaskApplicants[i];
             debugPrint('    - 應徵者 $i:');
             debugPrint('      - 用戶ID: ${applicant['user_id']}');
-            debugPrint('      - 姓名: ${applicant['applier_name']}');
-            debugPrint('      - 評分: ${applicant['avg_rating']}');
-            debugPrint('      - 評論數: ${applicant['review_count']}');
-            debugPrint('      - 聊天室ID: ${applicant['chat_room_id']}');
-            debugPrint('      - 申請狀態: ${applicant['application_status']}');
-            debugPrint('      - 所有欄位: ${applicant.keys.toList()}');
+            // debugPrint('      - 姓名: ${applicant['applier_name']}');
+            // debugPrint('      - 評分: ${applicant['avg_rating']}');
+            // debugPrint('      - 評論數: ${applicant['review_count']}');
+            // debugPrint('      - 聊天室ID: ${applicant['chat_room_id']}');
+            // debugPrint('      - 申請狀態: ${applicant['application_status']}');
+            // debugPrint('      - 所有欄位: ${applicant.keys.toList()}');
           }
         } else {
           debugPrint('  - 第一個任務沒有應徵者');
@@ -697,10 +697,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       final rawQuery = chatProvider.searchQuery.trim();
       final hasSearchQuery = rawQuery.isNotEmpty;
 
-      final title = (task['title'] ?? '').toString();
-      final description = (task['description'] ?? '').toString();
-      final location = (task['location'] ?? '').toString();
-      final language = (task['language_requirement'] ?? '').toString();
+      final title = (task['title'] ?? '-').toString();
+      final description = (task['description'] ?? '-').toString();
+      final location = (task['location'] ?? '-').toString();
+      final language = (task['language_requirement'] ?? '-').toString();
       final statusDisplay = _displayStatus(task);
       final hashtags = (task['hashtags'] is List)
           ? (task['hashtags'] as List).join(' ')
@@ -778,56 +778,73 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     return filteredTasks;
   }
 
-  /// 排序任務列表
+  /// 排序任務列表（簡化版：優先使用後端排序）
   List<Map<String, dynamic>> _sortTasks(
       List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
-    // debugPrint('🔄 [Posted Tasks] 開始排序任務: ${tasks.length} 個任務');
-    // debugPrint('  - 排序方式: ${chatProvider.currentSortBy}');
-    // debugPrint('  - 排序方向: ${chatProvider.sortAscending ? "升序" : "降序"}');
+    debugPrint('🔄 [Posted Tasks] 開始排序任務: ${tasks.length} 個任務');
+    debugPrint('  - 排序方式: ${chatProvider.currentSortBy}');
+    debugPrint('  - 排序方向: ${chatProvider.sortAscending ? "升序" : "降序"}');
 
+    // 簡化邏輯：只有搜尋相關性需要前端排序，其他使用後端排序
+    if (chatProvider.searchQuery.isNotEmpty &&
+        chatProvider.currentSortBy == 'relevance') {
+      debugPrint('🔍 [Posted Tasks] 使用前端相關性排序');
+      return _sortByRelevance(tasks, chatProvider);
+    }
+
+    // 其他情況直接使用後端排序（後端已按 status_id ASC, updated_at DESC, id ASC 排序）
+    debugPrint('✅ [Posted Tasks] 使用後端排序，跳過前端重排序');
+
+    // 如果用戶選擇了非預設排序，才進行前端排序
+    if (chatProvider.currentSortBy != 'status_id') {
+      debugPrint(
+          '⚠️ [Posted Tasks] 用戶選擇非預設排序，執行前端排序: ${chatProvider.currentSortBy}');
+      return _sortByUserChoice(tasks, chatProvider);
+    }
+
+    return tasks; // 直接使用後端排序結果
+  }
+
+  /// 搜尋相關性排序
+  List<Map<String, dynamic>> _sortByRelevance(
+      List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
+    final sortedTasks = List<Map<String, dynamic>>.from(tasks);
+
+    sortedTasks.sort((a, b) {
+      final relevanceA = a['_relevance'] ?? 0;
+      final relevanceB = b['_relevance'] ?? 0;
+      int comparison = relevanceB.compareTo(relevanceA); // 相關性降序
+
+      // 相關性相同時，使用 updated_at 作為次鍵
+      if (comparison == 0) {
+        final timeA =
+            DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
+        final timeB =
+            DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
+        comparison = timeB.compareTo(timeA); // 時間降序
+      }
+
+      return comparison;
+    });
+
+    return sortedTasks;
+  }
+
+  /// 用戶自選排序
+  List<Map<String, dynamic>> _sortByUserChoice(
+      List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
     final sortedTasks = List<Map<String, dynamic>>.from(tasks);
 
     sortedTasks.sort((a, b) {
       int comparison = 0;
 
       switch (chatProvider.currentSortBy) {
-        case 'relevance':
-          // 相關性排序：只有有搜尋時才有效
-          if (chatProvider.searchQuery.isNotEmpty) {
-            final relevanceA = a['_relevance'] ?? 0;
-            final relevanceB = b['_relevance'] ?? 0;
-            comparison = relevanceB.compareTo(relevanceA); // 降序
-
-            // 如果相關性相同，使用 updated_at 作為次鍵
-            if (comparison == 0) {
-              final timeA =
-                  DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
-              final timeB =
-                  DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
-              comparison = timeB.compareTo(timeA); // 降序
-            }
-          } else {
-            // 沒有搜尋時，fallback 到 updated_time
-            final timeA =
-                DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
-            final timeB =
-                DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
-            comparison = timeB.compareTo(timeA); // 降序
-          }
-          break;
-
         case 'updated_time':
           final timeA =
               DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
           final timeB =
               DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
-          comparison = timeB.compareTo(timeA); // 降序
-          break;
-
-        case 'status_order':
-          final soA = (a['sort_order'] as num?)?.toInt() ?? 999;
-          final soB = (b['sort_order'] as num?)?.toInt() ?? 999;
-          comparison = soA.compareTo(soB);
+          comparison = timeA.compareTo(timeB);
           break;
 
         case 'applicant_count':
@@ -838,61 +855,14 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           comparison = countA.compareTo(countB);
           break;
 
-        case 'status_id':
-          // 使用 status_id 進行數值排序
-          final statusIdA =
-              int.tryParse(a['status_id']?.toString() ?? '0') ?? 0;
-          final statusIdB =
-              int.tryParse(b['status_id']?.toString() ?? '0') ?? 0;
-          comparison = statusIdA.compareTo(statusIdB);
-          break;
-
-        case 'status_code':
-          // 使用 status_code 進行字串排序（備用）
-          final statusA = a['status_code'] ?? '';
-          final statusB = b['status_code'] ?? '';
-          comparison = statusA.compareTo(statusB);
-          break;
-
         default:
-          comparison = 0;
+          // 其他排序選項暫時不支援，使用預設排序
+          return 0;
       }
 
-      // 穩定次序：如果主鍵比較相等，使用 tie-breakers
-      if (comparison == 0) {
-        // 次鍵 1：updated_at desc（如果主鍵已經用了就跳過）
-        if (chatProvider.currentSortBy != 'updated_time' &&
-            chatProvider.currentSortBy != 'relevance') {
-          final timeA =
-              DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
-          final timeB =
-              DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
-          comparison = timeB.compareTo(timeA); // 降序
-        }
-
-        // 次鍵 2：id desc
-        if (comparison == 0) {
-          final idA = a['id']?.toString() ?? '';
-          final idB = b['id']?.toString() ?? '';
-          comparison = idB.compareTo(idA); // 降序
-        }
-      }
-
-      final finalComparison =
-          chatProvider.sortAscending ? comparison : -comparison;
-
-      // 調試排序結果
-      // if (finalComparison != 0) {
-      //   final aTitle = a['title'] ?? 'Unknown';
-      //   final bTitle = b['title'] ?? 'Unknown';
-      // debugPrint(
-      //     '  🔄 排序: "$aTitle" ${finalComparison > 0 ? ">" : "<"} "$bTitle"');
-      // }
-
-      return finalComparison;
+      return chatProvider.sortAscending ? comparison : -comparison;
     });
 
-    debugPrint('🔄 [Posted Tasks] 排序完成');
     return sortedTasks;
   }
 
@@ -1175,25 +1145,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                                     overflow: TextOverflow.visible,
                                   ),
                                 ),
-                                // Emoji 狀態列（popular > new）
-                                Builder(builder: (_) {
-                                  final isPopular = TaskCardUtils.isPopularTask(
-                                      task, _applicationsByTask);
-                                  final isNew = TaskCardUtils.isNewTask(task);
-                                  final String? emoji =
-                                      isPopular ? '🔥' : (isNew ? '🌱' : null);
-                                  return emoji == null
-                                      ? const SizedBox.shrink()
-                                      : Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(emoji,
-                                                style: const TextStyle(
-                                                    fontSize: 16)),
-                                            const SizedBox(width: 4),
-                                          ],
-                                        );
-                                }),
                               ],
                             ),
                             const SizedBox(height: 4),
@@ -1952,11 +1903,17 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         fontWeight: FontWeight.bold,
         color: theme.onSurface,
       ),
-      desc: _buildTaskDescription(task),
-      descTextStyle: TextStyle(
-        fontSize: 14,
-        color: theme.onSurface.withValues(alpha: 0.8),
-        height: 1.4,
+      body: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          _buildTaskDescription(task),
+          textAlign: TextAlign.left,
+          style: TextStyle(
+            fontSize: 14,
+            color: theme.onSurface.withValues(alpha: 0.8),
+            height: 1.4,
+          ),
+        ),
       ),
       btnOkColor: theme.primary,
       btnOkText: 'Close',

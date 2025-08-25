@@ -13,6 +13,7 @@ class SocketService {
   bool _isConnected = false;
   String? _currentUserId;
   final Set<String> _pendingJoinRooms = <String>{};
+  String? _lastRoomIdToJoin;
 
   // 監聽器
   Function(Map<String, dynamic>)? onMessageReceived;
@@ -58,15 +59,23 @@ class SocketService {
       // 連接事件
       _socket!.onConnect((_) {
         _isConnected = true;
-        debugPrint('✅ Socket connected for user $_currentUserId');
+        debugPrint('✅ Socket connected for user $_currentUserId, url: ' +
+            AppConfig.socketUrl);
 
         // Auto-join any rooms that were queued before connection
         if (_pendingJoinRooms.isNotEmpty) {
           for (final roomId in _pendingJoinRooms) {
             _socket!.emit('join_room', {'roomId': roomId});
-            debugPrint('🏠 Auto-joined queued room: $roomId');
+            debugPrint('🏠 Auto-joined queued room: ' + roomId);
           }
           _pendingJoinRooms.clear();
+        }
+
+        // 保險：若有最後一次想加入的房間，再強制補送一次 join
+        if (_lastRoomIdToJoin != null && _lastRoomIdToJoin!.isNotEmpty) {
+          _socket!.emit('join_room', {'roomId': _lastRoomIdToJoin});
+          debugPrint(
+              '🏠 Force-joined last requested room: ' + _lastRoomIdToJoin!);
         }
       });
 
@@ -150,12 +159,14 @@ class SocketService {
     if (!_isConnected || _socket == null) {
       // Queue the room join until we connect
       _pendingJoinRooms.add(roomId);
-      debugPrint('⏳ Socket not connected, queued join for room: $roomId');
+      _lastRoomIdToJoin = roomId;
+      debugPrint('⏳ Socket not connected, queued join for room: ' + roomId);
       return;
     }
 
     _socket!.emit('join_room', <String, String>{'roomId': roomId});
-    debugPrint('🏠 Joined room: $roomId');
+    _lastRoomIdToJoin = roomId;
+    debugPrint('🏠 Joined room: ' + roomId);
   }
 
   /// 離開聊天室
@@ -199,12 +210,18 @@ class SocketService {
 
   /// 標記聊天室為已讀
   void markRoomAsRead(String roomId) {
+    // 先保險確保已加入房間（若未連線會排佇列，連上後會強制補送 join）
+    try {
+      joinRoom(roomId);
+    } catch (_) {}
+
     if (!_isConnected || _socket == null) {
+      debugPrint('⏳ Socket not connected, queued read for room: ' + roomId);
       return;
     }
 
     _socket!.emit('read_room', <String, String>{'roomId': roomId});
-    debugPrint('✅ Marked room $roomId as read');
+    debugPrint('✅ Marked room ' + roomId + ' as read');
   }
 
   /// 發送打字狀態
@@ -230,7 +247,17 @@ class SocketService {
     }
     _isConnected = false;
     _currentUserId = null;
-    debugPrint('🔌 Socket disconnected');
+
+    // 清除所有待處理的房間和狀態
+    _pendingJoinRooms.clear();
+    _lastRoomIdToJoin = null;
+
+    // 清除監聽器
+    onMessageReceived = null;
+    onUnreadUpdate = null;
+    onTypingUpdate = null;
+
+    debugPrint('🔌 Socket disconnected and state cleared');
   }
 
   /// 檢查連接狀態

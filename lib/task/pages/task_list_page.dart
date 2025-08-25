@@ -1440,9 +1440,9 @@ class _TaskListPageState extends State<TaskListPage> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.info_outline,
+                                  const Icon(Icons.info_outline,
                                       color: Colors.orange, size: 20),
-                                  SizedBox(width: 8),
+                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       'You can apply for tasks after account verification is completed.',
@@ -1467,7 +1467,7 @@ class _TaskListPageState extends State<TaskListPage> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.block,
+                                  const Icon(Icons.block,
                                       color: Colors.red, size: 20),
                                   const SizedBox(width: 8),
                                   Expanded(
@@ -1584,7 +1584,7 @@ class _TaskListPageState extends State<TaskListPage> {
     return Consumer<ThemeConfigManager>(
       builder: (context, themeManager, child) {
         return Scaffold(
-          backgroundColor: Theme.of(context).colorScheme.background,
+          backgroundColor: Theme.of(context).colorScheme.surface,
           body: Column(
             children: [
               // 搜尋欄 + 排序功能
@@ -1945,7 +1945,14 @@ class _TaskListPageState extends State<TaskListPage> {
                                                 const SizedBox(width: 4),
                                                 Expanded(
                                                   child: Text(
-                                                    '${NumberFormat('#,###').format(int.tryParse((task['reward_point'] ?? task['salary'] ?? '0').toString()) ?? 0)}',
+                                                    NumberFormat('#,###').format(
+                                                        int.tryParse((task[
+                                                                        'reward_point'] ??
+                                                                    task[
+                                                                        'salary'] ??
+                                                                    '0')
+                                                                .toString()) ??
+                                                            0),
                                                     style: TextStyle(
                                                       fontSize: 12,
                                                       fontWeight:

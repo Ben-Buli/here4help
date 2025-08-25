@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import '../../config/app_config.dart';
 import '../../utils/debug_helper.dart';
+import '../../chat/services/socket_service.dart';
 
 class AuthService {
   static const String _tokenKey = 'auth_token';
@@ -167,9 +168,20 @@ class AuthService {
 
   // 登出
   static Future<void> logout() async {
+    // 先斷開 Socket 連線
+    try {
+      final SocketService socketService = SocketService();
+      socketService.disconnect();
+      debugPrint('✅ Socket disconnected during logout');
+    } catch (e) {
+      debugPrint('⚠️ Failed to disconnect socket during logout: $e');
+    }
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_userKey);
+    // 清除 Socket 相關的 SharedPreferences
+    await prefs.remove('user_id');
   }
 
   // 檢查是否已登入

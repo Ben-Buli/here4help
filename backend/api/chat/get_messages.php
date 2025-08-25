@@ -73,6 +73,10 @@ try {
       cm.room_id,
       cm.from_user_id,
       cm.content as message,
+      cm.content,
+      cm.kind,
+      cm.media_url,
+      cm.mime_type,
       cm.created_at,
       u.name as sender_name,
       u.avatar_url as sender_avatar
