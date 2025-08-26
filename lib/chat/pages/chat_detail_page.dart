@@ -27,6 +27,13 @@ import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/chat/services/chat_storage_service.dart';
 import 'package:here4help/widgets/dispute_dialog.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:here4help/chat/models/image_tray_item.dart';
+import 'package:here4help/chat/models/pending_image_message.dart';
+import 'package:here4help/chat/services/image_upload_manager.dart';
+import 'package:here4help/chat/services/image_processing_service.dart';
+import 'package:here4help/chat/widgets/image_tray.dart';
+import 'package:here4help/chat/widgets/pending_image_message.dart';
+import 'package:here4help/utils/error_message_mapper.dart';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, this.data});
@@ -73,6 +80,15 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   // Socket.IO 服務
   final SocketService _socketService = SocketService();
   String? _currentRoomId;
+
+  // 圖片托盤相關
+  ImageUploadManager? _imageUploadManager;
+  final ImageProcessingService _imageProcessingService =
+      ImageProcessingService();
+  List<ImageTrayItem> _imageTrayItems = [];
+
+  // 暫存圖片訊息相關
+  List<PendingImageMessage> _pendingImageMessages = [];
 
   // 對方頭像與名稱（相對於當前使用者的聊天室對象）快取
   String? _opponentAvatarUrlCached;
@@ -363,14 +379,21 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   int _findUnreadSeparatorIndex() {
     if (_myLastReadMessageId == null || _chatMessages.isEmpty) return -1;
 
-    // 找到第一個未讀訊息的位置
+    // 找到第一個對方發送的未讀訊息的位置
     for (int i = 0; i < _chatMessages.length; i++) {
-      final messageId = _chatMessages[i]['id'];
+      final message = _chatMessages[i];
+      final messageId = message['id'];
       final msgId =
           (messageId is int) ? messageId : int.tryParse('$messageId') ?? 0;
 
-      if (msgId > (_myLastReadMessageId ?? 0)) {
+      // 只有對方發送的訊息才算未讀
+      final isFromMe =
+          _currentUserId != null && message['from_user_id'] == _currentUserId;
+
+      if (msgId > (_myLastReadMessageId ?? 0) && !isFromMe) {
         // 返回分隔線的索引（在第一個未讀訊息之前）
+        debugPrint(
+            '🔍 找到未讀分隔線位置: index=$i, messageId=$msgId, isFromMe=$isFromMe');
         return i;
       }
     }
@@ -382,17 +405,23 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   bool _hasUnreadMessages() {
     if (_myLastReadMessageId == null || _chatMessages.isEmpty) return false;
 
-    // 檢查是否有訊息 ID 大於我的最後已讀 ID
+    // 檢查是否有訊息 ID 大於我的最後已讀 ID，且不是我發送的訊息
     return _chatMessages.any((message) {
       final messageId = message['id'];
       final msgId =
           (messageId is int) ? messageId : int.tryParse('$messageId') ?? 0;
-      return msgId > (_myLastReadMessageId ?? 0);
+
+      // 只有對方發送的訊息才算未讀
+      final isFromMe =
+          _currentUserId != null && message['from_user_id'] == _currentUserId;
+
+      return msgId > (_myLastReadMessageId ?? 0) && !isFromMe;
     });
   }
 
   /// 建立未讀分隔線 UI
   Widget _buildUnreadSeparator() {
+    debugPrint('🔍 渲染未讀分隔線 UI');
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
@@ -564,30 +593,237 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     });
   }
 
-  /// 選擇圖片並上傳，成功後發送一則圖片訊息（簡化：以 [Photo] 檔名 + URL）
-  Future<void> _pickAndSendPhoto() async {
+  /// 初始化圖片上傳管理器
+  void _initImageUploadManager() {
+    if (_currentRoomId == null) return;
+
+    _imageUploadManager?.dispose();
+    _imageUploadManager = ImageUploadManager(_currentRoomId!);
+
+    // 設置回調
+    _imageUploadManager!.onItemsUpdated = (items) {
+      if (mounted) {
+        setState(() {
+          _imageTrayItems = items;
+        });
+      }
+    };
+
+    _imageUploadManager!.onItemError = (item, error) {
+      if (mounted) {
+        // 更新暫存訊息為失敗狀態
+        setState(() {
+          final index = _pendingImageMessages
+              .indexWhere((msg) => msg.localId == item.localId);
+          if (index != -1) {
+            _pendingImageMessages[index] =
+                _pendingImageMessages[index].copyWith(
+              status: PendingImageStatus.failed,
+              errorMessage: error,
+            );
+          }
+        });
+
+        // 根據錯誤類型顯示不同的提示
+        final String errorMessage = getImageUploadErrorMessage(error);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: '重試',
+              textColor: Colors.white,
+              onPressed: () => _retryImageUpload(item.localId),
+            ),
+          ),
+        );
+      }
+    };
+
+    _imageUploadManager!.onItemSuccess = (item) {
+      debugPrint('✅ 圖片上傳成功: ${item.localId}');
+      // 圖片上傳成功後，移除暫存訊息並重新載入聊天訊息
+      if (mounted) {
+        setState(() {
+          _pendingImageMessages
+              .removeWhere((msg) => msg.localId == item.localId);
+        });
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _loadChatMessagesFromDatabase();
+        });
+      }
+    };
+
+    _imageUploadManager!.onProgressUpdate = (localId, progress) {
+      if (mounted) {
+        setState(() {
+          final index =
+              _pendingImageMessages.indexWhere((msg) => msg.localId == localId);
+          if (index != -1) {
+            _pendingImageMessages[index] =
+                _pendingImageMessages[index].copyWith(
+              uploadProgress: progress,
+            );
+          }
+        });
+      }
+    };
+  }
+
+  /// 選擇並添加圖片到托盤
+  Future<void> _pickAndAddImages() async {
     try {
-      if (_currentRoomId == null) throw Exception('room 未初始化');
+      if (_imageUploadManager == null) {
+        throw Exception('圖片管理器未初始化');
+      }
 
-      // 使用新的跨平台圖片服務
-      final chatService = ChatService();
-      final upload =
-          await chatService.pickAndUploadFromGallery(_currentRoomId!);
-
-      final url = upload['url'] ?? upload['path'] ?? '';
-      final fileName = upload['filename'] ?? upload['name'] ?? 'image';
-      final text = url is String && url.isNotEmpty
-          ? '[Photo] $fileName\n$url'
-          : '[Photo] $fileName';
-      _controller.text = text;
-      await _sendMessage();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('選取圖片失敗: $e')),
+      final items = await _imageProcessingService.pickMultipleImages(
+        maxImages: 9 - _imageTrayItems.length,
       );
+
+      if (items.isNotEmpty) {
+        final files = items.map((item) => item.originalFile).toList();
+        await _imageUploadManager!.addImages(files);
+      }
+    } catch (e) {
+      if (mounted) {
+        final errorMessage = getImageUploadErrorMessage(e.toString());
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
+
+  /// 從托盤移除圖片
+  void _removeImageFromTray(String localId) {
+    _imageUploadManager?.removeImage(localId);
+  }
+
+  /// 重試圖片上傳
+  Future<void> _retryImageUpload(String localId) async {
+    try {
+      // 更新暫存訊息為上傳中狀態
+      setState(() {
+        final index =
+            _pendingImageMessages.indexWhere((msg) => msg.localId == localId);
+        if (index != -1) {
+          _pendingImageMessages[index] = _pendingImageMessages[index].copyWith(
+            status: PendingImageStatus.uploading,
+            uploadProgress: 0.0,
+            errorMessage: null,
+          );
+        }
+      });
+
+      final item = _imageTrayItems.firstWhere(
+        (item) => item.localId == localId,
+        orElse: () => throw Exception('找不到指定的圖片'),
+      );
+
+      await _imageUploadManager?.retryUpload(item);
+    } catch (e) {
+      debugPrint('❌ 重試上傳失敗: $e');
+      if (mounted) {
+        // 更新暫存訊息為失敗狀態
+        setState(() {
+          final index =
+              _pendingImageMessages.indexWhere((msg) => msg.localId == localId);
+          if (index != -1) {
+            _pendingImageMessages[index] =
+                _pendingImageMessages[index].copyWith(
+              status: PendingImageStatus.failed,
+              errorMessage: e.toString(),
+            );
+          }
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(getImageUploadErrorMessage(e.toString())),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  /// 刪除暫存圖片訊息
+  void _deletePendingImageMessage(String localId) {
+    setState(() {
+      _pendingImageMessages.removeWhere((msg) => msg.localId == localId);
+    });
+  }
+
+  /// 發送訊息（包含圖片和文字的順序處理）
+  Future<void> _sendMessageWithImages() async {
+    final text = _controller.text.trim();
+
+    // 先清空輸入框
+    _controller.clear();
+
+    try {
+      // 1. 先創建暫存圖片訊息
+      if (_imageTrayItems.isNotEmpty) {
+        setState(() {
+          for (final item in _imageTrayItems) {
+            final pendingMessage = PendingImageMessage.fromImageTrayItem(item);
+            _pendingImageMessages.add(pendingMessage);
+          }
+        });
+
+        // 開始批量上傳
+        final uploadedMessageIds =
+            await _imageUploadManager!.startBatchUpload();
+        debugPrint('✅ 批量上傳完成，訊息 IDs: $uploadedMessageIds');
+
+        // 更新我的最後已讀訊息 ID（我發送的圖片訊息自動標記為已讀）
+        if (uploadedMessageIds.isNotEmpty) {
+          final lastUploadedId = uploadedMessageIds.last;
+          final msgId = int.tryParse(lastUploadedId) ?? 0;
+          if (msgId > 0 && msgId > (_myLastReadMessageId ?? 0)) {
+            setState(() {
+              _myLastReadMessageId = msgId;
+            });
+            debugPrint('✅ 更新我的最後已讀訊息 ID (圖片): $_myLastReadMessageId');
+          }
+        }
+
+        // 清空托盤
+        _imageUploadManager!.clearAll();
+
+        // 重新載入聊天訊息以顯示新上傳的圖片
+        if (mounted) {
+          await _loadChatMessagesFromDatabase();
+        }
+      }
+
+      // 2. 最後發送文字訊息（如果有）
+      if (text.isNotEmpty) {
+        await _sendMessage(textOverride: text);
+      }
+    } catch (e) {
+      debugPrint('❌ 發送訊息失敗: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('發送失敗: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // 已移除 _pickAndSendPhoto - 使用新的圖片上傳邏輯
 
   /// 初始化聊天室
   Future<void> _initializeChat() async {
@@ -621,6 +857,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           _userRole = chatData['user_role'] ?? 'participant';
           _currentRoomId = roomId;
         });
+
+        // 初始化圖片上傳管理器
+        _initImageUploadManager();
 
         // 提前嘗試加入房間（即便尚未連上 socket，會先排入佇列）
         try {
@@ -1045,19 +1284,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
-  /// 獲取當前用戶資訊
-  Future<Map<String, dynamic>?> _getCurrentUserInfo() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      return {
-        'name': prefs.getString('user_name') ?? 'Me',
-        'avatar_url': prefs.getString('user_avatarUrl') ?? '',
-      };
-    } catch (e) {
-      debugPrint('❌ 無法獲取當前用戶資訊: $e');
-      return null;
-    }
-  }
+  // 已移除 _getCurrentUserInfo - 使用 UserService 替代
 
   void _onTick(Duration elapsed) {
     final now = DateTime.now();
@@ -1097,8 +1324,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   }
 
   /// 發送訊息到聊天室（保存到資料庫）
-  Future<void> _sendMessage() async {
-    final text = _controller.text.trim();
+  Future<void> _sendMessage({String? textOverride}) async {
+    final text = textOverride ?? _controller.text.trim();
     if (text.isEmpty || !mounted) return;
 
     try {
@@ -1113,8 +1340,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         return;
       }
 
-      // 清空輸入框
-      _controller.clear();
+      // 只在沒有 textOverride 時才清空輸入框
+      if (textOverride == null) {
+        _controller.clear();
+      }
 
       // 創建本地暫存訊息
       final pendingMessage = {
@@ -1168,6 +1397,18 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             'created_at': DateTime.now().toIso8601String(),
           };
           _chatMessages.add(realMessage);
+
+          // 更新我的最後已讀訊息 ID（我發送的訊息自動標記為已讀）
+          final messageId = result['message_id'];
+          if (messageId != null) {
+            final msgId = (messageId is int)
+                ? messageId
+                : int.tryParse('$messageId') ?? 0;
+            if (msgId > 0) {
+              _myLastReadMessageId = msgId;
+              debugPrint('✅ 更新我的最後已讀訊息 ID: $_myLastReadMessageId');
+            }
+          }
         });
 
         // 滾動到底部
@@ -1214,36 +1455,15 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
     _controller.dispose();
     _focusNode.dispose();
+
+    // 清理圖片上傳管理器
+    _imageUploadManager?.dispose();
+
     // 移除狀態 Bar 相關清理
     super.dispose();
   }
 
-  /// 獲取應徵者的應徵資料
-  Future<Map<String, dynamic>?> _getApplicationData(
-      String taskId, int applicantId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('${AppConfig.taskApplicantsUrl}?task_id=$taskId'),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success']) {
-          final applications = data['data']['applications'] as List;
-          // 找到指定應徵者的應徵資料
-          final application = applications.firstWhere(
-            (app) => app['user_id'] == applicantId,
-            orElse: () => null,
-          );
-          return application;
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching application data: $e');
-    }
-    return null;
-  }
+  // 已移除 _getApplicationData - 使用聚合 API 數據
 
   /// 顯示新的結構化 Resume 對話框
   void _showResumeDialog(ResumeData resumeData) {
@@ -1678,314 +1898,21 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     int totalItemCount = (hasViewResumeMessage ? 1 : 0) +
         _chatMessages.length +
         (_pendingMessages.length) +
+        _pendingImageMessages.length + // 加入暫存圖片訊息
         (hasUnreadSeparator ? 1 : 0); // 加入未讀分隔線
 
     debugPrint(
-        '🔍 Total messages: $totalItemCount (hasViewResume: ${hasViewResumeMessage ? 1 : 0}, chatMessages: ${_chatMessages.length}, unreadSeparator: ${hasUnreadSeparator ? 1 : 0})');
+        '🔍 Total messages: $totalItemCount (hasViewResume: ${hasViewResumeMessage ? 1 : 0}, chatMessages: ${_chatMessages.length}, pendingMessages: ${_pendingMessages.length}, pendingImageMessages: ${_pendingImageMessages.length}, unreadSeparator: ${hasUnreadSeparator ? 1 : 0})');
+    debugPrint(
+        '🔍 未讀分隔線調試: _myLastReadMessageId=$_myLastReadMessageId, _currentUserId=$_currentUserId');
+    debugPrint(
+        '🔍 未讀分隔線調試: unreadSeparatorIndex=$unreadSeparatorIndex, hasUnreadSeparator=$hasUnreadSeparator');
 
-    Widget buildQuestionReplyBubble(String text) {
-      final (avgRating, reviewsCount) = _getOpponentRating();
+    // 已移除 buildQuestionReplyBubble - 使用 _buildViewResumeBubble 替代
 
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundImage: _opponentAvatarUrlCached != null
-                      ? ImageHelper.getAvatarImage(_opponentAvatarUrlCached!)
-                      : null,
-                  backgroundColor:
-                      Theme.of(context).colorScheme.secondary.withOpacity(0.35),
-                  child: _opponentAvatarUrlCached == null
-                      ? Text(
-                          _opponentNameCached.isNotEmpty
-                              ? _opponentNameCached[0].toUpperCase()
-                              : 'U',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSecondary,
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          constraints: const BoxConstraints(maxWidth: 250),
-                          decoration: BoxDecoration(
-                            color:
-                                Theme.of(context).colorScheme.primaryContainer,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // 1. 頭像置中
-                              CircleAvatar(
-                                radius: 28,
-                                backgroundImage:
-                                    _opponentAvatarUrlCached != null
-                                        ? ImageHelper.getAvatarImage(
-                                            _opponentAvatarUrlCached!)
-                                        : null,
-                                backgroundColor: Theme.of(context)
-                                    .colorScheme
-                                    .secondary
-                                    .withOpacity(0.35),
-                                child: _opponentAvatarUrlCached == null
-                                    ? Text(
-                                        _opponentNameCached.isNotEmpty
-                                            ? _opponentNameCached[0]
-                                                .toUpperCase()
-                                            : 'U',
-                                        style: TextStyle(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSecondary,
-                                            fontSize: 18),
-                                      )
-                                    : null,
-                              ),
-                              const SizedBox(height: 8),
-                              // 2. 名字（無 nickname 則全名）
-                              Text(
-                                _opponentNameCached,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 6),
-                              // 3. 五星評分與評論數
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.star,
-                                      color: Colors.amber, size: 16),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${avgRating > 0 ? avgRating.toStringAsFixed(1) : '0.0'}  (${reviewsCount > 0 ? '$reviewsCount comments' : '0 comments'})',
-                                    style: const TextStyle(
-                                        color: Colors.black54, fontSize: 12),
-                                  )
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              const Divider(height: 16),
-                              // 4. View Resume 按鈕置中
-                              Align(
-                                alignment: Alignment.center,
-                                child: FilledButton.icon(
-                                  icon: const Icon(Icons.visibility),
-                                  label: const Text('View Resume'),
-                                  onPressed: () => _showApplierResumeDialog(),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        joinTime,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Theme.of(context).colorScheme.secondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    }
+    // 已移除 buildOpponentBubble - 使用 _buildTextMessage 替代
 
-    Widget buildOpponentBubble(String text, int? opponentUserId,
-        {String? senderName, String? messageTime}) {
-      // 先前的 opponentInfo 已不再使用，頭像/名稱以快取為準
-
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundImage: _opponentAvatarUrlCached != null
-                      ? ImageHelper.getAvatarImage(_opponentAvatarUrlCached!)
-                      : null,
-                  backgroundColor:
-                      Theme.of(context).colorScheme.secondary.withOpacity(0.35),
-                  child: _opponentAvatarUrlCached == null
-                      ? Text(
-                          _opponentNameCached.isNotEmpty
-                              ? _opponentNameCached[0].toUpperCase()
-                              : 'U',
-                          style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSecondary),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          constraints: const BoxConstraints(maxWidth: 300),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.secondary,
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(4),
-                              topRight: Radius.circular(16),
-                              bottomLeft: Radius.circular(16),
-                              bottomRight: Radius.circular(16),
-                            ),
-                          ),
-                          child: DefaultTextStyle.merge(
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSecondary,
-                            ),
-                            child: _buildMessageContent(text),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        messageTime != null
-                            ? _formatMessageTime(messageTime)
-                            : joinTime,
-                        style:
-                            const TextStyle(fontSize: 10, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-
-    Widget buildMyMessageBubble(Map<String, String> message,
-        {bool showAvatar = false}) {
-      final text = message['text'] ?? '';
-      final time =
-          message['time'] ?? DateFormat('HH:mm').format(DateTime.now());
-
-      debugPrint(
-          '🔍 [My Works] buildMyMessageBubble: text="$text", message=$message');
-
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            // 訊息氣泡 + 已讀標記
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    constraints: const BoxConstraints(maxWidth: 300),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(4),
-                        bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(16),
-                      ),
-                    ),
-                    child: DefaultTextStyle.merge(
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
-                      child: Text(
-                        text,
-                        style: const TextStyle(fontSize: 14),
-                        softWrap: true,
-                        overflow: TextOverflow.visible,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        time,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      // 已讀標記：先不做
-                      // 狀態圖示：read 顯示雙勾(藍)，sent 顯示單勾(灰)
-                      // Builder(builder: (_) {
-                      //   final status = (message['status'] ?? '').toString();
-                      //   final bool isRead =
-                      //       status == 'read' || (message['read'] == 'true');
-                      //   final cs = Theme.of(context).colorScheme;
-                      //   return Icon(
-                      //     isRead ? Icons.done_all : Icons.done,
-                      //     size: 14,
-                      //     color: isRead ? cs.primary : cs.secondary,
-                      //   );
-                      // }),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // 可選的我方頭像（用於對稱設計）
-            if (showAvatar) ...[
-              const SizedBox(width: 8),
-              FutureBuilder<Map<String, dynamic>?>(
-                future: _getCurrentUserInfo(),
-                builder: (context, snapshot) {
-                  final userInfo = snapshot.data ?? {};
-                  return CircleAvatar(
-                    radius: 16,
-                    backgroundImage:
-                        ImageHelper.getAvatarImage(userInfo['avatar_url']),
-                    child: (userInfo['avatar_url'] == null ||
-                            userInfo['avatar_url'].isEmpty)
-                        ? Text(
-                            (userInfo['name'] ?? 'Me')[0].toUpperCase(),
-                            style: const TextStyle(color: Colors.white),
-                          )
-                        : null,
-                  );
-                },
-              ),
-            ],
-          ],
-        ),
-      );
-    }
+    // 已移除 buildMyMessageBubble - 使用 _buildTextMessage 替代
 
     final isInputDisabled = _task?['status']?['code'] == 'completed' ||
         _task?['status']?['code'] == 'rejected_tasker' ||
@@ -2094,8 +2021,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                 itemCount: totalItemCount,
                 itemBuilder: (context, index) {
                   if (hasViewResumeMessage && index == 0) {
-                    return buildQuestionReplyBubble(
-                        _chatMessages[0]['message']?.toString() ?? '');
+                    // 使用統一的訊息渲染邏輯
+                    return _buildMessageItem(_chatMessages[0]);
                   }
 
                   int adjustedIndex = index - (hasViewResumeMessage ? 1 : 0);
@@ -2122,8 +2049,29 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     debugPrint(
                         '🔍 [Chat Detail] 訊息來源: messageFromUserId=${messageData['from_user_id']}, currentUserId=$_currentUserId');
 
+                    // 檢查是否為我發送的訊息
+                    final isFromMe = _currentUserId != null &&
+                        messageData['from_user_id'] == _currentUserId;
+                    debugPrint('🔍 [Chat Detail] 是否為我的訊息: $isFromMe');
+
                     // 使用新的統一訊息渲染方法
                     return _buildMessageItem(messageData);
+                  }
+
+                  // 檢查是否為暫存圖片訊息
+                  final pendingImageIndex =
+                      adjustedIndex - _chatMessages.length;
+                  if (pendingImageIndex >= 0 &&
+                      pendingImageIndex < _pendingImageMessages.length) {
+                    final pendingMessage =
+                        _pendingImageMessages[pendingImageIndex];
+                    return PendingImageMessageBubble(
+                      message: pendingMessage,
+                      isFromMe: true, // 暫存訊息都是自己發送的
+                      onRetry: () => _retryImageUpload(pendingMessage.localId),
+                      onDelete: () =>
+                          _deletePendingImageMessage(pendingMessage.localId),
+                    );
                   }
 
                   return const SizedBox.shrink();
@@ -2258,80 +2206,108 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                   filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                   child: Container(
                     decoration: BoxDecoration(color: _glassNavColor(context)),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // plus 與 photo 置於最左側，位於輸入框之前
-                        IconTheme(
-                          data: IconThemeData(color: fg),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                tooltip: _showActionBar ? 'Less' : 'More',
-                                icon: Icon(
-                                  _showActionBar
-                                      ? Icons.remove_circle_outline
-                                      : Icons.add_circle_outline,
-                                ),
-                                onPressed:
-                                    isInputDisabled ? null : _toggleActionBar,
-                              ),
-                              IconButton(
-                                tooltip: 'Photo',
-                                icon: const Icon(Icons.photo_outlined),
-                                onPressed:
-                                    isInputDisabled ? null : _pickAndSendPhoto,
-                              ),
-                            ],
-                          ),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      // 圖片托盤
+                      if (_imageTrayItems.isNotEmpty) ...[
+                        ImageTray(
+                          items: _imageTrayItems,
+                          onAddImages: _pickAndAddImages,
+                          onRemoveImage: _removeImageFromTray,
+                          onRetryUpload: _retryImageUpload,
+                          isUploading:
+                              _imageUploadManager?.isUploading ?? false,
                         ),
-                        Expanded(
-                          child: Container(
-                            // 固定高度以與 IconButton (預設 48) 視覺中心對齊
-                            height: 48,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: bg.withOpacity(0.08),
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            child: TextField(
-                              controller: _controller,
-                              focusNode: _focusNode,
-                              enabled: !isInputDisabled,
-                              textInputAction: TextInputAction.send,
-                              onSubmitted: (value) {
-                                if (!isInputDisabled) _sendMessage();
-                              },
-                              onEditingComplete: () {
-                                FocusScope.of(context).unfocus();
-                              },
-                              onTapOutside: (_) {
-                                FocusScope.of(context).unfocus();
-                              },
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                // 調整內邊距：左側加 8，並垂直置中
-                                contentPadding: EdgeInsets.only(
-                                    left: 8, top: 12, bottom: 12),
-                                hintText: 'Type a message',
-                              ),
-                              style: TextStyle(color: fg),
-                              cursorColor: fg,
-                            ),
-                          ),
-                        ),
-                        IconTheme(
-                          data: IconThemeData(color: fg),
-                          child: IconButton(
-                            icon: const Icon(Icons.send),
-                            onPressed: isInputDisabled ? null : _sendMessage,
-                          ),
+                        // 托盤統計信息
+                        ImageTrayStats(
+                          items: _imageTrayItems,
+                          isUploading:
+                              _imageUploadManager?.isUploading ?? false,
                         ),
                       ],
-                    ),
+                      // 輸入區域
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // plus 與 photo 置於最左側，位於輸入框之前
+                            IconTheme(
+                              data: IconThemeData(color: fg),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    tooltip: _showActionBar ? 'Less' : 'More',
+                                    icon: Icon(
+                                      _showActionBar
+                                          ? Icons.remove_circle_outline
+                                          : Icons.add_circle_outline,
+                                    ),
+                                    onPressed: isInputDisabled
+                                        ? null
+                                        : _toggleActionBar,
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Photo',
+                                    icon: const Icon(Icons.photo_outlined),
+                                    onPressed: isInputDisabled
+                                        ? null
+                                        : _pickAndAddImages,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: Container(
+                                // 固定高度以與 IconButton (預設 48) 視覺中心對齊
+                                height: 48,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 12),
+                                decoration: BoxDecoration(
+                                  color: bg.withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: TextField(
+                                  controller: _controller,
+                                  focusNode: _focusNode,
+                                  enabled: !isInputDisabled,
+                                  textInputAction: TextInputAction.send,
+                                  onSubmitted: (value) {
+                                    if (!isInputDisabled)
+                                      _sendMessageWithImages();
+                                  },
+                                  onEditingComplete: () {
+                                    FocusScope.of(context).unfocus();
+                                  },
+                                  onTapOutside: (_) {
+                                    FocusScope.of(context).unfocus();
+                                  },
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    // 調整內邊距：左側加 8，並垂直置中
+                                    contentPadding: EdgeInsets.only(
+                                        left: 8, top: 12, bottom: 12),
+                                    hintText: 'Type a message',
+                                  ),
+                                  style: TextStyle(color: fg),
+                                  cursorColor: fg,
+                                ),
+                              ),
+                            ),
+                            IconTheme(
+                              data: IconThemeData(color: fg),
+                              child: IconButton(
+                                icon: const Icon(Icons.send),
+                                onPressed: isInputDisabled
+                                    ? null
+                                    : _sendMessageWithImages,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ]),
                   ),
                 ),
               ));
@@ -2548,7 +2524,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
-  /// 舊的 Action Bar 構建方法（保留用於向後相容）
+  // 已移除 _buildActionButtonsByStatus - 使用 DynamicActionBar 替代
+
+  // 保留方法簽名以避免編譯錯誤，但標記為已棄用
+  @deprecated
   List<Widget> _buildActionButtonsByStatus() {
     final status = (_task?['status']?['code'] ?? '').toString();
     final isCreator = _userRole == 'creator';
@@ -3344,7 +3323,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     return name[0].toUpperCase();
   }
 
-  // 狀態欄輔助方法
+  // 已移除狀態欄輔助方法 - 使用 DynamicActionBar 替代
+  @deprecated
   Color _getStatusBarColor() {
     final statusCode = _task?['status']?['code'];
     switch (statusCode) {
@@ -3364,6 +3344,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
+  @deprecated
   IconData _getStatusBarIcon() {
     final statusCode = _task?['status']?['code'];
     switch (statusCode) {
@@ -3603,15 +3584,29 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   // 渲染新的圖片訊息氣泡（基於 kind='image'）
   Widget _buildImageBubble(Map<String, dynamic> message) {
-    final imageUrl = message['media_url'] ?? '';
     final isFromMe =
         _currentUserId != null && message['from_user_id'] == _currentUserId;
 
-    // 如果沒有圖片 URL，嘗試從 content 中解析
-    String finalImageUrl = imageUrl;
-    if (finalImageUrl.isEmpty) {
-      final content = message['content'] ?? message['message'] ?? '';
+    // 優先從 content 獲取圖片 URL（圖片上傳後 URL 存儲在 content 中）
+    String finalImageUrl = '';
+    final content = message['content'] ?? message['message'] ?? '';
+
+    // 如果是 kind='image' 的訊息，content 就是圖片 URL
+    if (message['kind'] == 'image') {
+      finalImageUrl = content;
+    } else {
+      // 否則嘗試從 content 中解析圖片 URL
       finalImageUrl = _extractFirstImageUrl(content) ?? '';
+    }
+
+    // 如果還是沒有，嘗試從 media_url 獲取
+    if (finalImageUrl.isEmpty) {
+      finalImageUrl = message['media_url'] ?? '';
+    }
+
+    // 使用 PathMapper 處理圖片 URL
+    if (finalImageUrl.isNotEmpty) {
+      finalImageUrl = PathMapper.mapDatabasePathToUrl(finalImageUrl);
     }
 
     if (finalImageUrl.isEmpty) {
@@ -3759,7 +3754,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           ? message['id']
           : int.tryParse('${message['id']}') ?? 0;
       final int opponentReadId = (resultOpponentLastReadId ?? 0);
-      final String status = opponentReadId >= msgId ? 'read' : 'sent';
+      // 已讀狀態暫時不使用
+      // final String status = opponentReadId >= msgId ? 'read' : 'sent';
 
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 3.0),
@@ -3779,9 +3775,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                       color: Theme.of(context).colorScheme.primaryContainer,
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(16),
-                        topRight: Radius.circular(4),
+                        topRight: Radius.circular(16),
                         bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(16),
+                        bottomRight: Radius.circular(4),
                       ),
                     ),
                     child: Text(

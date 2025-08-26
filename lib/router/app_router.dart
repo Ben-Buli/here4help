@@ -21,6 +21,7 @@ import 'package:here4help/constants/shell_pages.dart';
 // ===== Debug 模組 =====
 import 'package:here4help/debug/unread_api_test_page.dart';
 import 'package:here4help/debug/unread_timing_test_page.dart';
+import 'package:here4help/debug/image_upload_test_page.dart';
 
 // 定義 Account 模組的路由與對應頁面
 class AccountRouteItem {
@@ -248,6 +249,9 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
         path: '/debug/unread-timing',
         builder: (_, __) => const UnreadTimingTestPage()),
+    GoRoute(
+        path: '/debug/image-upload',
+        builder: (_, __) => const ImageUploadTestPage()),
     // ... 其他 routes ...
   ],
   // ❌ 找不到路由或錯誤時顯示的備援頁面

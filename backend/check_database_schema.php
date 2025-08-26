@@ -30,7 +30,7 @@ try {
         [
             'name' => 'task_applications.status ENUM',
             'sql' => "SHOW COLUMNS FROM task_applications LIKE 'status'",
-            'expected' => 'status 欄位為 ENUM("applied","accepted","rejected")',
+            'expected' => 'status 欄位為 ENUM("applied","accepted","rejected","pending","completed","cancelled","dispute", "withdrawn")',
             'critical' => true
         ],
         [

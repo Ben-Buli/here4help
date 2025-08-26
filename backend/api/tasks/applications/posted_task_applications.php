@@ -217,7 +217,7 @@ try {
                 AND cr.participant_id = ta.user_id 
                 AND cr.creator_id = ?
             )
-            WHERE ta.task_id = ?
+            WHERE ta.task_id = ? AND ta.status != 'withdrawn' -- 排除已撤回的應徵
             ORDER BY ta.created_at DESC
         ";
         

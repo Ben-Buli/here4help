@@ -1,7 +1,8 @@
 import 'dart:convert';
-import 'dart:html' as html;
+// import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import '../services/third_party_auth_service.dart';
+import 'package:flutter/foundation.dart'; // 如需判斷 kIsWeb
 
 class AuthCallbackPage extends StatefulWidget {
   const AuthCallbackPage({Key? key}) : super(key: key);
@@ -12,7 +13,7 @@ class AuthCallbackPage extends StatefulWidget {
 
 class _AuthCallbackPageState extends State<AuthCallbackPage> {
   bool _isProcessing = true;
-  String _status = '處理中...';
+  String _status = 'Processing...';
   String? _errorMessage;
   Map<String, dynamic>? _userData;
   String? _token;
@@ -27,10 +28,14 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
   Future<void> _handleCallback() async {
     try {
       // 獲取 URL 參數
-      final uri = Uri.parse(html.window.location.href);
+      final Uri uri =
+          Uri.base; // Web 等同 window.location.href；行動裝置是 app 的 base URI
+      final qp = uri.queryParameters;
+      final code = qp['code'];
+      final state = qp['state'];
+      final error = qp['error'];
       final success = uri.queryParameters['success'] == 'true';
       final provider = uri.queryParameters['provider'] ?? '';
-      final error = uri.queryParameters['error'] ?? '';
 
       print('🔐 OAuth 回調處理開始');
       print('   Provider: $provider');
@@ -42,7 +47,7 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
         await _handleLoginSuccess(uri);
       } else {
         // 處理登入失敗
-        await _handleLoginError(error);
+        await _handleLoginError(error ?? '');
       }
     } catch (e) {
       print('❌ 回調處理錯誤: $e');
@@ -157,13 +162,17 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
   void _redirectToMainPage() {
     debugPrint('🔄 重定向到主頁...');
     // 重定向到主頁或儀表板
-    html.window.location.href = '/home';
+    if (mounted) {
+      Navigator.of(context).pushReplacementNamed('/home');
+    }
   }
 
   void _redirectToLoginPage() {
     debugPrint('🔄 重定向到登入頁面...');
     // 重定向到登入頁面
-    html.window.location.href = '/login';
+    if (mounted) {
+      Navigator.of(context).pushReplacementNamed('/login');
+    }
   }
 
   void _redirectToSignupPage(String oauthToken, String provider) {
@@ -171,8 +180,10 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
     debugPrint('   OAuth Token: ${oauthToken.substring(0, 8)}...');
     debugPrint('   Provider: $provider');
     // 重定向到註冊頁面並帶上 OAuth token
-    html.window.location.href =
-        '/signup?oauth_token=$oauthToken&provider=$provider';
+    if (mounted) {
+      Navigator.of(context).pushReplacementNamed(
+          '/signup?oauth_token=$oauthToken&provider=$provider');
+    }
   }
 
   void _retryLogin() {
@@ -186,7 +197,7 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('登入處理中'),
+        title: const Text('Login Processing'),
         automaticallyImplyLeading: false,
       ),
       body: Center(

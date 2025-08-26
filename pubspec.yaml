@@ -46,12 +46,15 @@ dependencies:
   package_info_plus: ^4.2.0
   # 評分機制
   flutter_rating_bar: ^4.0.1
+  # 圖片壓縮和處理
+  flutter_image_compress: ^1.1.3
+  uuid: ^4.3.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.13.1 
 
 flutter_icons:
   android: true
