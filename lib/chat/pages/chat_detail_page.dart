@@ -26,6 +26,8 @@ import 'dart:ui';
 import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/chat/services/chat_storage_service.dart';
 import 'package:here4help/widgets/dispute_dialog.dart';
+import 'package:here4help/chat/widgets/disagree_completion_dialog.dart';
+import 'package:here4help/chat/widgets/confirm_completion_dialog.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:here4help/chat/models/image_tray_item.dart';
 import 'package:here4help/chat/models/pending_image_message.dart';
@@ -88,7 +90,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   List<ImageTrayItem> _imageTrayItems = [];
 
   // 暫存圖片訊息相關
-  List<PendingImageMessage> _pendingImageMessages = [];
+  final List<PendingImageMessage> _pendingImageMessages = [];
 
   // 對方頭像與名稱（相對於當前使用者的聊天室對象）快取
   String? _opponentAvatarUrlCached;
@@ -351,7 +353,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       }
 
       // 計算分隔線的大概位置（每個 item 平均高度約 80px）
-      final estimatedItemHeight = 80.0;
+      const estimatedItemHeight = 80.0;
       final targetOffset = unreadSeparatorIndex * estimatedItemHeight;
 
       // 獲取螢幕高度的一半，讓分隔線顯示在中央
@@ -2274,8 +2276,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                                   enabled: !isInputDisabled,
                                   textInputAction: TextInputAction.send,
                                   onSubmitted: (value) {
-                                    if (!isInputDisabled)
+                                    if (!isInputDisabled) {
                                       _sendMessageWithImages();
+                                    }
                                   },
                                   onEditingComplete: () {
                                     FocusScope.of(context).unfocus();
@@ -2423,21 +2426,52 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   /// 處理接受應徵
   Future<void> _handleAcceptApplication() async {
-    if (_task != null) {
-      await TaskService().updateTaskStatus(
-        _task!['id'].toString(),
-        TaskStatusConstants.TaskStatus.statusString['in_progress']!,
-        statusCode: 'in_progress',
+    if (_task == null) return;
+
+    try {
+      // 確保當前用戶ID已載入
+      if (_currentUserId == null) {
+        await _loadCurrentUserId();
+      }
+
+      if (_currentUserId == null) {
+        throw Exception('Unable to get current user ID');
+      }
+
+      // 獲取對手用戶ID（應徵者）
+      final opponentId = _getOpponentUserId();
+      if (opponentId == null) {
+        throw Exception('Unable to get opponent user ID');
+      }
+
+      // 呼叫新的 Application Accept API
+      final result = await TaskService().acceptApplication(
+        taskId: _task!['id'].toString(),
+        userId: opponentId?.toString(),
+        posterId: _currentUserId.toString(),
       );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Task assigned to ${result['assigned_user']?['username'] ?? 'user'}. Task is now in progress.'),
+          ),
+        );
+      }
+
       // 關閉其他申請聊天室
       GlobalChatRoom().removeRoomsByTaskIdExcept(
         _task!['id'].toString(),
         _currentRoomId ?? '',
       );
-      if (mounted) setState(() {});
+
+      // 刷新頁面資料
+      await _initializeChat();
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Task accepted. Now in progress.')),
+          SnackBar(content: Text('Failed to accept application: $e')),
         );
       }
     }
@@ -2485,42 +2519,65 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   /// 處理確認完成
   Future<void> _handleConfirmCompletion() async {
-    try {
-      if (_task != null) {
-        await TaskService().confirmCompletion(taskId: _task!['id'].toString());
-        if (mounted) setState(() {});
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Task confirmed and paid.')),
+    if (_task == null) return;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => ConfirmCompletionDialog(
+        taskId: _task!['id'].toString(),
+        taskTitle: _task!['title']?.toString() ?? 'Unknown Task',
+        onPreview: () => TaskService().confirmCompletion(
+          taskId: _task!['id'].toString(),
+          preview: true,
+        ),
+        onConfirm: () async {
+          await TaskService().confirmCompletion(
+            taskId: _task!['id'].toString(),
+            preview: false,
           );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Confirm failed: $e')),
-        );
-      }
+          if (mounted) setState(() {});
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Task confirmed and paid.')),
+            );
+          }
+        },
+      ),
+    );
+
+    if (result == true) {
+      // 確認完成成功，刷新頁面資料
+      await _initializeChat();
     }
   }
 
   /// 處理不同意完成
   Future<void> _handleDisagreeCompletion() async {
-    try {
-      if (_task != null) {
-        await TaskService().disagreeCompletion(taskId: _task!['id'].toString());
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Disagree submitted.')),
+    if (_task == null) return;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => DisagreeCompletionDialog(
+        taskId: _task!['id'].toString(),
+        taskTitle: _task!['title']?.toString() ?? 'Unknown Task',
+        onDisagreeSubmitted: (String reason) async {
+          await TaskService().disagreeCompletion(
+            taskId: _task!['id'].toString(),
+            reason: reason,
           );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Disagree failed: $e')),
-        );
-      }
+          if (mounted) setState(() {});
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Disagree submitted.')),
+            );
+          }
+        },
+      ),
+    );
+
+    if (result == true) {
+      // 駁回完成成功，刷新頁面資料
+      await _initializeChat();
     }
   }
 

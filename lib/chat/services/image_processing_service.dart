@@ -75,9 +75,8 @@ class ImageProcessingService {
         return [failedItem];
       }
     } catch (e) {
-      debugPrint('❌ 選擇圖片失敗[image_processing_service]: ${e}');
-      throw ImageProcessingException(
-          '❌ 選擇圖片失敗[image_processing_service]: ${e}');
+      debugPrint('❌ 選擇圖片失敗[image_processing_service]: $e');
+      throw ImageProcessingException('❌ 選擇圖片失敗[image_processing_service]: $e');
     }
   }
 
@@ -95,7 +94,7 @@ class ImageProcessingService {
 
       return await _processImage(image);
     } catch (e) {
-      debugPrint('❌ 選擇圖片失敗[image_processing_service]: ${e}');
+      debugPrint('❌ 選擇圖片失敗[image_processing_service]: $e');
       throw Exception('選擇圖片失敗: $e');
     }
   }

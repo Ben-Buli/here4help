@@ -59,14 +59,14 @@ class SocketService {
       // 連接事件
       _socket!.onConnect((_) {
         _isConnected = true;
-        debugPrint('✅ Socket connected for user $_currentUserId, url: ' +
-            AppConfig.socketUrl);
+        debugPrint(
+            '✅ Socket connected for user $_currentUserId, url: ${AppConfig.socketUrl}');
 
         // Auto-join any rooms that were queued before connection
         if (_pendingJoinRooms.isNotEmpty) {
           for (final roomId in _pendingJoinRooms) {
             _socket!.emit('join_room', {'roomId': roomId});
-            debugPrint('🏠 Auto-joined queued room: ' + roomId);
+            debugPrint('🏠 Auto-joined queued room: $roomId');
           }
           _pendingJoinRooms.clear();
         }
@@ -75,7 +75,7 @@ class SocketService {
         if (_lastRoomIdToJoin != null && _lastRoomIdToJoin!.isNotEmpty) {
           _socket!.emit('join_room', {'roomId': _lastRoomIdToJoin});
           debugPrint(
-              '🏠 Force-joined last requested room: ' + _lastRoomIdToJoin!);
+              '🏠 Force-joined last requested room: ${_lastRoomIdToJoin!}');
         }
       });
 
@@ -160,13 +160,13 @@ class SocketService {
       // Queue the room join until we connect
       _pendingJoinRooms.add(roomId);
       _lastRoomIdToJoin = roomId;
-      debugPrint('⏳ Socket not connected, queued join for room: ' + roomId);
+      debugPrint('⏳ Socket not connected, queued join for room: $roomId');
       return;
     }
 
     _socket!.emit('join_room', <String, String>{'roomId': roomId});
     _lastRoomIdToJoin = roomId;
-    debugPrint('🏠 Joined room: ' + roomId);
+    debugPrint('🏠 Joined room: $roomId');
   }
 
   /// 離開聊天室
@@ -216,12 +216,12 @@ class SocketService {
     } catch (_) {}
 
     if (!_isConnected || _socket == null) {
-      debugPrint('⏳ Socket not connected, queued read for room: ' + roomId);
+      debugPrint('⏳ Socket not connected, queued read for room: $roomId');
       return;
     }
 
     _socket!.emit('read_room', <String, String>{'roomId': roomId});
-    debugPrint('✅ Marked room ' + roomId + ' as read');
+    debugPrint('✅ Marked room $roomId as read');
   }
 
   /// 發送打字狀態

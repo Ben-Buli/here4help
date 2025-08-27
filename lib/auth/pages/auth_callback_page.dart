@@ -2,7 +2,7 @@ import 'dart:convert';
 // import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import '../services/third_party_auth_service.dart';
-import 'package:flutter/foundation.dart'; // 如需判斷 kIsWeb
+// 如需判斷 kIsWeb
 
 class AuthCallbackPage extends StatefulWidget {
   const AuthCallbackPage({Key? key}) : super(key: key);

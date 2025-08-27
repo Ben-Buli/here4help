@@ -112,7 +112,7 @@ class PendingImageMessageBubble extends StatelessWidget {
             value: message.uploadProgress,
             strokeWidth: 3,
             backgroundColor: Colors.white.withOpacity(0.3),
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
           ),
         ),
         const SizedBox(height: 8),

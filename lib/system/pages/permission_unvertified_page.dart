@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/providers/permission_provider.dart';
-import 'package:here4help/services/permission_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
 
 class PermissionUnverifiedPage extends StatefulWidget {

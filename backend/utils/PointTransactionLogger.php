@@ -52,9 +52,9 @@ class PointTransactionLogger
         // 插入交易記錄
         $insertQuery = "
             INSERT INTO point_transactions (
-                user_id, transaction_type, amount, description,
+                user_id, transaction_type, amount, balance_after, description,
                 related_task_id, related_order_id, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?,  ?, NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ";
         
         $db->execute($insertQuery, [

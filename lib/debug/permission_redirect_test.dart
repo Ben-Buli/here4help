@@ -12,7 +12,7 @@ class PermissionRedirectTest {
     const testPath = '/chat';
 
     // 構建重定向 URL（模擬 PermissionGuard 的行為）
-    final redirectUrl =
+    const redirectUrl =
         '/permission-unverified?blocked=$testPath&from=$testPath';
 
     debugPrint('🧪 [測試] 重定向 URL: $redirectUrl');
@@ -29,7 +29,7 @@ class PermissionRedirectTest {
     const testPath = '/task';
 
     // 構建重定向 URL（模擬 PermissionGuard 的行為）
-    final redirectUrl = '/permission-denied?blocked=$testPath&from=/home';
+    const redirectUrl = '/permission-denied?blocked=$testPath&from=/home';
 
     debugPrint('🧪 [測試] 重定向 URL: $redirectUrl');
 

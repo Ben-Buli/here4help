@@ -219,12 +219,17 @@ class TaskService extends ChangeNotifier {
   /// Poster 確認完成（自動轉點與異動紀錄由後端處理）
   Future<Map<String, dynamic>> confirmCompletion({
     required String taskId,
+    bool preview = false,
   }) async {
+    final body = {
+      'task_id': taskId,
+      if (preview) 'preview': 1,
+    };
     final resp = await http
         .post(
           Uri.parse(AppConfig.taskConfirmCompletionUrl),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'task_id': taskId}),
+          body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 30));
     if (resp.statusCode == 200) {
@@ -298,6 +303,40 @@ class TaskService extends ChangeNotifier {
       throw Exception(data['message'] ?? 'Pay & Review failed');
     } else {
       throw Exception('HTTP ${resp.statusCode}: Pay & Review failed');
+    }
+  }
+
+  /// 接受應徵者
+  Future<Map<String, dynamic>> acceptApplication({
+    required String taskId,
+    String? applicationId,
+    String? userId,
+    required String posterId,
+  }) async {
+    final body = {
+      'task_id': taskId,
+      'poster_id': posterId,
+      if (applicationId != null) 'application_id': applicationId,
+      if (userId != null) 'user_id': userId,
+    };
+
+    final resp = await http
+        .post(
+          Uri.parse(
+              '${AppConfig.apiBaseUrl}/backend/api/tasks/applications/accept.php'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 30));
+
+    if (resp.statusCode == 200) {
+      final data = jsonDecode(resp.body);
+      if (data['success'] == true) {
+        return Map<String, dynamic>.from(data['data'] ?? {});
+      }
+      throw Exception(data['message'] ?? 'Accept application failed');
+    } else {
+      throw Exception('HTTP ${resp.statusCode}: Accept application failed');
     }
   }
 

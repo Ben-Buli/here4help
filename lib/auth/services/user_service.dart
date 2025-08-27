@@ -21,10 +21,10 @@ class UserService extends ChangeNotifier {
   UserModel? get currentUser => _currentUser;
   bool isLoading = true;
 
-  String get displayName => _currentUser?.name?.trim().isNotEmpty == true
-      ? _currentUser!.name!
-      : (_currentUser?.nickname?.trim().isNotEmpty == true
-          ? _currentUser!.nickname!
+  String get displayName => _currentUser?.name.trim().isNotEmpty == true
+      ? _currentUser!.name
+      : (_currentUser?.nickname.trim().isNotEmpty == true
+          ? _currentUser!.nickname
           : 'User');
 
   /// First initial for avatar badges; always safe.
