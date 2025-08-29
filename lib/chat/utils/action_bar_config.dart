@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:here4help/chat/widgets/payment_dialog.dart';
 
 /// Action Bar 動作定義
 class ActionBarAction {
@@ -86,23 +87,31 @@ class ActionBarConfigManager {
     required TaskStatus status,
     required UserRole userRole,
     required Map<String, VoidCallback> actionCallbacks,
+    String? applicationStatus, // 新增：應徵狀態參數
   }) {
     final actions = <ActionBarAction>[];
 
     switch (status) {
       case TaskStatus.open:
         if (userRole == UserRole.creator) {
-          actions.addAll([
-            ActionBarAction(
-              id: 'accept',
-              label: 'Accept',
-              icon: Icons.check,
-              onTap: actionCallbacks['accept'] ?? () {},
-            ).withConfirmation(
-              title: 'Accept Application',
-              content:
-                  'Are you sure you want to assign this applicant to this task?',
-            ),
+          // 檢查應徵狀態，只有非 withdrawn 狀態才顯示 Accept 按鈕
+          if (applicationStatus == null ||
+              applicationStatus.toLowerCase() != 'withdrawn') {
+            actions.add(
+              ActionBarAction(
+                id: 'accept',
+                label: 'Accept',
+                icon: Icons.check,
+                onTap: actionCallbacks['accept'] ?? () {},
+              ).withConfirmation(
+                title: 'Accept Application',
+                content:
+                    'Are you sure you want to assign this applicant to this task?',
+              ),
+            );
+          }
+
+          actions.add(
             ActionBarAction(
               id: 'block',
               label: 'Block',
@@ -113,7 +122,7 @@ class ActionBarConfigManager {
                   content:
                       'Block this user from applying your tasks in the future?',
                 ),
-          ]);
+          );
         } else {
           actions.add(
             ActionBarAction(

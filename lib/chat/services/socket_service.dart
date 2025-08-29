@@ -19,6 +19,9 @@ class SocketService {
   Function(Map<String, dynamic>)? onMessageReceived;
   Function(Map<String, dynamic>)? onUnreadUpdate;
   Function(Map<String, dynamic>)? onTypingUpdate;
+  // 新增：任務狀態變化監聽器
+  Function(Map<String, dynamic>)? onTaskStatusUpdate;
+  Function(Map<String, dynamic>)? onApplicationStatusUpdate;
 
   /// 初始化並連接 Socket.IO
   Future<void> connect() async {
@@ -152,6 +155,32 @@ class SocketService {
         }
       }
     });
+
+    // 任務狀態更新
+    _socket!.on('task_status_update', (data) {
+      debugPrint('📋 Task status update: $data');
+      if (onTaskStatusUpdate != null) {
+        try {
+          final statusData = Map<String, dynamic>.from(data as Map);
+          onTaskStatusUpdate!(statusData);
+        } catch (e) {
+          debugPrint('❌ Error parsing task status data: $e');
+        }
+      }
+    });
+
+    // 應徵狀態更新
+    _socket!.on('application_status_update', (data) {
+      debugPrint('📝 Application status update: $data');
+      if (onApplicationStatusUpdate != null) {
+        try {
+          final applicationData = Map<String, dynamic>.from(data as Map);
+          onApplicationStatusUpdate!(applicationData);
+        } catch (e) {
+          debugPrint('❌ Error parsing application status data: $e');
+        }
+      }
+    });
   }
 
   /// 加入聊天室
@@ -256,6 +285,8 @@ class SocketService {
     onMessageReceived = null;
     onUnreadUpdate = null;
     onTypingUpdate = null;
+    onTaskStatusUpdate = null;
+    onApplicationStatusUpdate = null;
 
     debugPrint('🔌 Socket disconnected and state cleared');
   }

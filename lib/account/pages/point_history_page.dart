@@ -467,6 +467,7 @@ class _PointHistoryPageState extends State<PointHistoryPage>
     return Column(
       children: [
         ListTile(
+          isThreeLine: true,
           leading: CircleAvatar(
             backgroundColor: color.withOpacity(0.1),
             child: Icon(
@@ -718,28 +719,48 @@ class _PointHistoryPageState extends State<PointHistoryPage>
     return Column(
       children: [
         ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           leading: CircleAvatar(
+            radius: 16,
             backgroundColor: statusColor.withOpacity(0.1),
             child: Icon(
               statusIcon,
               color: statusColor,
-              size: 20,
+              size: 16,
             ),
           ),
-          title: Text(
-            'Deposit Request #${request.id}',
-            style: const TextStyle(fontWeight: FontWeight.w500),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Deposit Request #${request.id}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w500, fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                request.formattedAmount,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: statusColor,
+                ),
+              ),
+            ],
           ),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Removed amount from subtitle.
               Text(
                 'Bank Account: ***${request.bankAccountLast5}',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[600],
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
               if (request.approverReplyDescription != null)
                 Text(
@@ -748,45 +769,38 @@ class _PointHistoryPageState extends State<PointHistoryPage>
                     fontSize: 11,
                     color: Colors.grey[500],
                   ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
-              const SizedBox(height: 2),
-              Text(
-                _formatDate(request.createdAt),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[500],
-                ),
-              ),
-            ],
-          ),
-          trailing: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                request.formattedAmount,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: statusColor,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: statusColor.withOpacity(0.3)),
-                ),
-                child: Text(
-                  request.statusDisplay,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: statusColor,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _formatDate(request.createdAt),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[500],
+                      ),
+                    ),
                   ),
-                ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: statusColor.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      request.statusDisplay,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: statusColor,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

@@ -439,6 +439,93 @@ app.get('/health', (req, res) => {
   });
 });
 
+// 新增：任務狀態和應徵狀態通知端點
+app.post('/api/notify', async (req, res) => {
+  try {
+    // 驗證請求
+    const authHeader = req.headers.authorization;
+    const expectedToken = process.env.SOCKET_SERVER_TOKEN || 'your-socket-server-token';
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authorization header required' });
+    }
+    
+    const token = authHeader.substring(7);
+    if (token !== expectedToken) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    
+    // 解析請求數據
+    const { event, data, userIds } = req.body;
+    
+    if (!event || !data || !Array.isArray(userIds)) {
+      return res.status(400).json({ error: 'Invalid request data' });
+    }
+    
+    console.log(`📋 Received notification: ${event} for users: ${userIds.join(', ')}`);
+    
+    // 向指定用戶發送事件
+    let sentCount = 0;
+    for (const userId of userIds) {
+      const userRoom = getUserRoom(userId);
+      const sockets = await io.in(userRoom).fetchSockets();
+      
+      if (sockets.length > 0) {
+        io.to(userRoom).emit(event, data);
+        sentCount++;
+        console.log(`✅ Sent ${event} to user ${userId}`);
+      } else {
+        console.log(`⚠️ User ${userId} not connected, skipping notification`);
+      }
+    }
+    
+    res.json({
+      success: true,
+      event,
+      totalUsers: userIds.length,
+      sentCount,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Notification error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 新增：獲取用戶連接狀態的端點
+app.get('/api/users/status', async (req, res) => {
+  try {
+    const { userIds } = req.query;
+    
+    if (!userIds) {
+      return res.status(400).json({ error: 'userIds parameter required' });
+    }
+    
+    const userIdArray = userIds.split(',').map(id => id.trim());
+    const status = {};
+    
+    for (const userId of userIdArray) {
+      const userRoom = getUserRoom(userId);
+      const sockets = await io.in(userRoom).fetchSockets();
+      status[userId] = {
+        connected: sockets.length > 0,
+        socketCount: sockets.length
+      };
+    }
+    
+    res.json({
+      success: true,
+      status,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ User status error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // 暴露客服事件處理器給外部使用（供 PHP API 調用）
 global.supportEventHandler = supportEventHandler;
 

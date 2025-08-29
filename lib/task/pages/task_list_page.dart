@@ -12,6 +12,7 @@ import 'package:here4help/widgets/range_slider_widget.dart';
 
 import 'package:here4help/services/api/task_favorites_api.dart';
 import 'package:here4help/services/api/task_reports_api.dart';
+import 'package:here4help/task/utils/question_display_helper.dart';
 
 class TaskListPage extends StatefulWidget {
   const TaskListPage({super.key});
@@ -1251,35 +1252,19 @@ class _TaskListPageState extends State<TaskListPage> {
                                           .colorScheme
                                           .onSurface)),
                               const SizedBox(height: 12),
-                              Text('Application Question',
+                              Text('Application Questions',
                                   style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       color: Theme.of(context)
                                           .colorScheme
                                           .onSurface)),
-                              ...((task['application_question'] ?? '')
-                                  .toString()
-                                  .split('|')
-                                  .where((q) => q.trim().isNotEmpty)
-                                  .toList()
-                                  .asMap()
-                                  .entries
-                                  .map((entry) => Text(
-                                      '${entry.key + 1}. ${entry.value.trim()}',
-                                      style: TextStyle(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onSurface)))
-                                  .toList()),
-                              if ((task['application_question'] ?? '')
-                                  .toString()
-                                  .trim()
-                                  .isEmpty)
-                                Text('No questions.',
-                                    style: TextStyle(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface)),
+                              ...QuestionDisplayHelper.buildQuestionWidgets(
+                                task,
+                                questionStyle: TextStyle(
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                ),
+                              ),
                               const SizedBox(height: 12),
                               Text.rich(TextSpan(
                                 children: [
@@ -1651,39 +1636,43 @@ class _TaskListPageState extends State<TaskListPage> {
                     Container(
                       height: 32,
                       margin: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        children: [
-                          // 更新時間排序
-                          _buildCompactSortChip(
-                            label: 'Update',
-                            sortBy: 'update',
-                            icon: Icons.update,
-                          ),
-                          const SizedBox(width: 8),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Row(
+                          children: [
+                            // 更新時間排序
+                            _buildCompactSortChip(
+                              label: 'Update',
+                              sortBy: 'update',
+                              icon: Icons.update,
+                            ),
+                            const SizedBox(width: 8),
 
-                          // 任務時間排序
-                          _buildCompactSortChip(
-                            label: 'Task Time',
-                            sortBy: 'task_time',
-                            icon: Icons.schedule,
-                          ),
-                          const SizedBox(width: 8),
+                            // 任務時間排序
+                            _buildCompactSortChip(
+                              label: 'Task Time',
+                              sortBy: 'task_time',
+                              icon: Icons.schedule,
+                            ),
+                            const SizedBox(width: 8),
 
-                          // 熱門程度排序（應徵人數）
-                          _buildCompactSortChip(
-                            label: 'Popular',
-                            sortBy: 'popular',
-                            icon: Icons.trending_up,
-                          ),
-                          const SizedBox(width: 8),
+                            // 熱門程度排序（應徵人數）
+                            _buildCompactSortChip(
+                              label: 'Popular',
+                              sortBy: 'popular',
+                              icon: Icons.trending_up,
+                            ),
+                            const SizedBox(width: 8),
 
-                          // 任務狀態排序
-                          _buildCompactSortChip(
-                            label: 'Status',
-                            sortBy: 'status',
-                            icon: Icons.sort_by_alpha,
-                          ),
-                        ],
+                            // 任務狀態排序
+                            _buildCompactSortChip(
+                              label: 'Status',
+                              sortBy: 'status',
+                              icon: Icons.sort_by_alpha,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

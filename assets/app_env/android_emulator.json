@@ -1,5 +1,5 @@
 {
-  "environment": "development",
+  "environment": "android_emulator",
   "public": {
     "api_base_url": "http://10.0.2.2:8888/here4help",
     "socket_url": "http://10.0.2.2:3001",

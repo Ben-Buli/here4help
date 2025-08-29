@@ -1051,6 +1051,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       // 設置事件監聽器
       _socketService.onMessageReceived = _onMessageReceived;
       _socketService.onUnreadUpdate = _onUnreadUpdate;
+      _socketService.onTaskStatusUpdate = _onTaskStatusUpdate;
+      _socketService.onApplicationStatusUpdate = _onApplicationStatusUpdate;
 
       // 加入當前聊天室（保險：立即與延時重試）
       if (_currentRoomId != null) {
@@ -1164,6 +1166,36 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   void _onUnreadUpdate(Map<String, dynamic> unreadData) {
     // debugPrint('🔔 Unread update: $unreadData');
     // 這裡可以更新 UI 中的未讀徽章
+  }
+
+  /// 處理任務狀態更新
+  void _onTaskStatusUpdate(Map<String, dynamic> data) {
+    debugPrint('📋 Task status update received: $data');
+
+    // 檢查是否為當前聊天室的任務
+    final roomId = data['room_id']?.toString();
+    final taskId = data['task_id']?.toString();
+
+    if (roomId == _currentRoomId || taskId == _task?['id']?.toString()) {
+      debugPrint('🔄 Refreshing chat data due to task status update');
+      // 重新載入聊天室數據
+      _initializeChat();
+    }
+  }
+
+  /// 處理應徵狀態更新
+  void _onApplicationStatusUpdate(Map<String, dynamic> data) {
+    debugPrint('📝 Application status update received: $data');
+
+    // 檢查是否為當前聊天室的應徵
+    final roomId = data['room_id']?.toString();
+    final taskId = data['task_id']?.toString();
+
+    if (roomId == _currentRoomId || taskId == _task?['id']?.toString()) {
+      debugPrint('🔄 Refreshing chat data due to application status update');
+      // 重新載入聊天室數據
+      _initializeChat();
+    }
   }
 
   /// 格式化訊息時間
@@ -2573,7 +2605,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-                'Congratulations! You’ve been selected as the tasker for this task. Let’s get started!'),
+                'Congratulations! You\'ve been selected as the tasker for this task. Let\'s get started!'),
           ),
         );
       }
@@ -3660,21 +3692,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           if (!isFromMe) ...[
             CircleAvatar(
               radius: 16,
-              backgroundImage: _opponentAvatarUrlCached != null
-                  ? ImageHelper.getAvatarImage(_opponentAvatarUrlCached!)
-                  : null,
               backgroundColor:
                   Theme.of(context).colorScheme.secondary.withOpacity(0.35),
-              child: _opponentAvatarUrlCached == null
-                  ? Text(
-                      _opponentNameCached.isNotEmpty
-                          ? _opponentNameCached[0].toUpperCase()
-                          : 'U',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSecondary,
-                      ),
-                    )
-                  : null,
+              child: Icon(
+                Icons.notifications,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSecondary,
+              ),
             ),
             const SizedBox(width: 8),
           ],
@@ -4256,21 +4280,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           children: [
             CircleAvatar(
               radius: 16,
-              backgroundImage: _opponentAvatarUrlCached != null
-                  ? ImageHelper.getAvatarImage(_opponentAvatarUrlCached!)
-                  : null,
               backgroundColor:
                   Theme.of(context).colorScheme.secondary.withOpacity(0.35),
-              child: _opponentAvatarUrlCached == null
-                  ? Text(
-                      _opponentNameCached.isNotEmpty
-                          ? _opponentNameCached[0].toUpperCase()
-                          : 'U',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSecondary,
-                      ),
-                    )
-                  : null,
+              child: Icon(
+                Icons.notifications,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSecondary,
+              ),
             ),
             const SizedBox(width: 8),
             Flexible(

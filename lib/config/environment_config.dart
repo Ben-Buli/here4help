@@ -5,17 +5,41 @@ import 'package:flutter/services.dart';
 class EnvironmentConfig {
   static Map<String, dynamic>? _config;
 
+  /// 檢測是否為 Android 模擬器
+  static bool _isAndroidEmulator() {
+    // 檢查環境變數
+    const androidEmulator =
+        bool.fromEnvironment('ANDROID_EMULATOR', defaultValue: false);
+    if (androidEmulator) return true;
+
+    // 檢查是否在 Android 平台上運行且不是 Web
+    if (!kIsWeb) {
+      // 在 Android 平台上，默認使用模擬器配置
+      return true;
+    }
+
+    return false;
+  }
+
   /// 初始化配置
   static Future<void> initialize() async {
     if (_config != null) return;
 
     try {
-      const environment = String.fromEnvironment(
+      String environment = String.fromEnvironment(
         'ENVIRONMENT',
         defaultValue: 'development',
       );
 
-      const configFile = 'assets/app_env/$environment.json';
+      // 檢測 Android 模擬器並使用相應配置
+      if (_isAndroidEmulator()) {
+        environment = 'android_emulator';
+        if (kDebugMode) {
+          print('🤖 檢測到 Android 模擬器，使用 android_emulator 配置');
+        }
+      }
+
+      final configFile = 'assets/app_env/$environment.json';
       final configString = await rootBundle.loadString(configFile);
       _config = json.decode(configString) as Map<String, dynamic>;
 
@@ -32,9 +56,15 @@ class EnvironmentConfig {
       _config = {
         'environment': 'development',
         'public': {
-          'api_base_url': 'http://localhost:8888/here4help',
-          'socket_url': 'http://localhost:3001',
-          'image_base_url': 'http://localhost:8888/here4help',
+          'api_base_url': _isAndroidEmulator()
+              ? 'http://10.0.2.2:8888/here4help'
+              : 'http://localhost:8888/here4help',
+          'socket_url': _isAndroidEmulator()
+              ? 'http://10.0.2.2:3001'
+              : 'http://localhost:3001',
+          'image_base_url': _isAndroidEmulator()
+              ? 'http://10.0.2.2:8888/here4help'
+              : 'http://localhost:8888/here4help',
           'google_client_id': '',
           'facebook_app_id': '',
           'apple_service_id': '',
@@ -61,16 +91,36 @@ class EnvironmentConfig {
   static bool get isStaging => environment == 'staging';
 
   /// API 基礎 URL
-  static String get apiBaseUrl =>
-      _config?['public']?['api_base_url'] ?? 'http://localhost:8888/here4help';
+  static String get apiBaseUrl {
+    final baseUrl = _config?['public']?['api_base_url'] ??
+        'http://localhost:8888/here4help';
+    // 在 Android 平台上自動替換 localhost 為 10.0.2.2
+    if (!kIsWeb && baseUrl.contains('localhost')) {
+      return baseUrl.replaceAll('localhost', '10.0.2.2');
+    }
+    return baseUrl;
+  }
 
   /// Socket 伺服器 URL
-  static String get socketUrl =>
-      _config?['public']?['socket_url'] ?? 'http://localhost:3001';
+  static String get socketUrl {
+    final socketUrl =
+        _config?['public']?['socket_url'] ?? 'http://localhost:3001';
+    // 在 Android 平台上自動替換 localhost 為 10.0.2.2
+    if (!kIsWeb && socketUrl.contains('localhost')) {
+      return socketUrl.replaceAll('localhost', '10.0.2.2');
+    }
+    return socketUrl;
+  }
 
   /// 圖片基礎 URL
-  static String get imageBaseUrl =>
-      _config?['public']?['image_base_url'] ?? apiBaseUrl;
+  static String get imageBaseUrl {
+    final imageUrl = _config?['public']?['image_base_url'] ?? apiBaseUrl;
+    // 在 Android 平台上自動替換 localhost 為 10.0.2.2
+    if (!kIsWeb && imageUrl.contains('localhost')) {
+      return imageUrl.replaceAll('localhost', '10.0.2.2');
+    }
+    return imageUrl;
+  }
 
   /// 是否啟用調試模式
   static bool get debugMode => _config?['app']?['debug_mode'] ?? true;
@@ -169,5 +219,41 @@ class EnvironmentConfig {
 
       print('🔒 注意：敏感資訊已移至後端環境配置');
     }
+  }
+
+  /// 預設 API 基礎 URL
+  static String _getDefaultApiBaseUrl() {
+    // Web 平台使用 localhost
+    if (kIsWeb) {
+      return 'http://localhost:8888/here4help';
+    }
+
+    // 其他平台使用 localhost
+    return 'http://localhost:8888/here4help';
+  }
+
+  /// 預設 Socket 伺服器 URL
+  static String _getDefaultSocketUrl() {
+    // Web 平台使用 localhost
+    if (kIsWeb) {
+      return 'http://localhost:3001';
+    }
+
+    // 其他平台使用 localhost
+    return 'http://localhost:3001';
+  }
+
+  /// 檢查是否為 Android 模擬器
+  static bool _isAndroidEmulatorFromEnv() {
+    // 簡化檢測，避免複雜邏輯
+    return false;
+  }
+
+  /// 為 Android 模擬器調整 API 基礎 URL
+  static void _adjustForAndroidEmulator() {
+    if (kDebugMode) {
+      print('🔧 為 Android 模擬器調整 API 基礎 URL');
+    }
+    // 暫時不進行調整，使用配置文件來處理
   }
 }

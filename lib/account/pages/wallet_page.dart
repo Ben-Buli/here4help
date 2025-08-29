@@ -468,7 +468,7 @@ class _WalletPageState extends State<WalletPage> {
                     decoration: const InputDecoration(
                       labelText: 'Your Payment Account Last 5 Digits',
                       border: OutlineInputBorder(),
-                      hintText: '00000',
+                      hintText: '12345',
                       counterText: '',
                     ),
                     keyboardType: TextInputType.number,
@@ -487,7 +487,7 @@ class _WalletPageState extends State<WalletPage> {
                     decoration: const InputDecoration(
                       labelText: 'Transferred Amount (NTD)',
                       border: OutlineInputBorder(),
-                      hintText: '100',
+                      hintText: '12345', // < 100,000
                       counterText: '',
                     ),
                     keyboardType: TextInputType.number,

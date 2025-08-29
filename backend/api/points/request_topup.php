@@ -40,11 +40,11 @@ try {
     if (!$userId) {
         $errors['user_id'] = 'User ID is required';
     }
-    // 檢查金額是否為正整數，且小於 10000
+    // 檢查金額是否為正整數，且小於 100,000
     if (!$amount || !is_numeric($amount) || $amount <= 0) {
         $errors['amount'] = 'Valid amount is required.';
-    } else if ((int)$amount > 9999) {
-        $errors['amount'] = 'The amount must be less than 10,000.';
+    } else if ((int)$amount > 99999) {
+        $errors['amount'] = 'The amount must be less than 100,000.';
     }
 
     if (empty($bankAccountLast5) || !preg_match('/^\d{5}$/', $bankAccountLast5)) {

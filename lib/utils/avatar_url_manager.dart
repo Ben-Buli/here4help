@@ -3,7 +3,7 @@ import 'package:here4help/config/app_config.dart';
 
 /// 頭像路徑類型
 enum AvatarPathType {
-  /// Flutter 本地資源 (assets/images/avatar/avatar-1.png)
+  /// Flutter 本地資源 (backend/uploads/avatars/avatar-1.png)
   localAsset,
 
   /// 後端上傳的頭像 (/backend/uploads/avatars/compressed_avatar_2_1755973715.png)
@@ -19,14 +19,8 @@ enum AvatarPathType {
 /// 頭像 URL 管理器
 /// 統一處理不同來源的頭像路徑格式
 class AvatarUrlManager {
-  /// MAMP 開發環境基礎 URL
-  static const String _mampBaseUrl = 'http://localhost:8888/here4help';
-
-  /// 生產環境基礎 URL（需要根據實際部署環境調整）
-  static String get _productionBaseUrl => AppConfig.apiBaseUrl;
-
   /// 獲取當前環境的基礎 URL
-  static String get _baseUrl => kDebugMode ? _mampBaseUrl : _productionBaseUrl;
+  static String get _baseUrl => AppConfig.apiBaseUrl;
 
   /// 判斷頭像路徑類型
   static AvatarPathType getPathType(String? avatarUrl) {
@@ -86,18 +80,17 @@ class AvatarUrlManager {
 
   /// 獲取預設頭像路徑
   static String getDefaultAvatarPath() {
-    return 'assets/images/avatar/default.png';
+    return 'backend/uploads/avatars/avatar-1.png';
   }
 
   /// 獲取隨機預設頭像路徑（用於測試）
   static String getRandomDefaultAvatar() {
     final avatars = [
-      'assets/images/avatar/avatar-1.png',
-      'assets/images/avatar/avatar-2.png',
-      'assets/images/avatar/avatar-3.png',
-      'assets/images/avatar/avatar-4.png',
-      'assets/images/avatar/avatar-5.png',
-      'assets/images/avatar/avatar-6.png',
+      'backend/uploads/avatars/avatar-1.png',
+      'backend/uploads/avatars/avatar-2.png',
+      'backend/uploads/avatars/avatar-3.png',
+      'backend/uploads/avatars/avatar-4.png',
+      'backend/uploads/avatars/avatar-5.png',
     ];
 
     final now = DateTime.now();
@@ -176,10 +169,10 @@ class AvatarUrlManager {
       return getDefaultAvatarPath();
     }
 
-    // 如果是舊的測試頭像路徑，轉換為新的 assets 路徑
+    // 如果是舊的測試頭像路徑，轉換為新的後端路徑
     if (oldPath.contains('test_images/avatar/')) {
       final fileName = oldPath.split('/').last;
-      return 'assets/images/avatar/$fileName';
+      return 'backend/uploads/avatars/$fileName';
     }
 
     // 如果是舊的上傳路徑格式，保持不變

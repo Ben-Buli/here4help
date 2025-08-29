@@ -1,8 +1,9 @@
 import 'package:flutter/foundation.dart';
+import 'package:here4help/config/app_config.dart';
 
 class PathMapper {
-  /// MAMP 的基礎 URL
-  static const String mampBaseUrl = 'http://localhost:8888/here4help';
+  /// 獲取當前環境的基礎 URL
+  static String get baseUrl => AppConfig.apiBaseUrl;
 
   /// 專案實際路徑
   static const String projectPath = '/Users/eliasscott/here4help';
@@ -38,16 +39,16 @@ class PathMapper {
 
     // 檢查是否是後端上傳的圖片路徑
     if (cleanPath.startsWith('backend/uploads/')) {
-      return '$mampBaseUrl/$cleanPath';
+      return '$baseUrl/$cleanPath';
     }
 
     // 檢查是否是測試圖片路徑
     if (cleanPath.startsWith('test_images/')) {
-      return '$mampBaseUrl/$cleanPath';
+      return '$baseUrl/$cleanPath';
     }
 
     // 預設情況：假設是相對於 MAMP 根目錄的路徑
-    return '$mampBaseUrl/$cleanPath';
+    return '$baseUrl/$cleanPath';
   }
 
   /// 將專案路徑映射到 MAMP URL
@@ -61,7 +62,7 @@ class PathMapper {
       projectRelativePath = projectRelativePath.substring('here4help/'.length);
     }
 
-    return '$mampBaseUrl/$projectRelativePath';
+    return '$baseUrl/$projectRelativePath';
   }
 
   /// 檢查路徑是否為 Flutter assets
@@ -84,7 +85,7 @@ class PathMapper {
 
   /// 獲取預設頭像路徑
   static String getDefaultAvatarPath() {
-    return 'assets/images/avatar/default.png';
+    return 'backend/uploads/avatars/avatar-1.png';
   }
 
   /// 調試路徑映射

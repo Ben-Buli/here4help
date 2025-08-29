@@ -4,23 +4,44 @@
  * 銀行帳戶管理API - 獲取啟用的官方銀行帳戶資訊
  */
 
-require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/Response.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
+require_once dirname(__DIR__, 2) . '/config/database.php'; // 因為 database.php 在 /backend/config/，要從 /backend/api/wallet 回到 /backend，需要往上兩層，再拼 /config/database.php 
+require_once dirname(__DIR__, 2) . '/utils/response.php';
+require_once dirname(__DIR__, 2) . '/utils/JWTManager.php';
 
-Response::setCorsHeaders();
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    Response::error('Method not allowed', 405);
+    Response::methodNotAllowed('Only GET method is allowed');
 }
 
 try {
-    // 驗證JWT Token（確保是已登入用戶）
-    $tokenValidation = JWTManager::validateRequest();
-    if (!$tokenValidation['valid']) {
-        Response::error($tokenValidation['message'], 401);
+    // 驗證 JWT
+    $token = $_GET['token'] ?? null;
+    if (!$token) {
+        $headers = getallheaders();
+        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+        if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+            $token = $matches[1];
+        }
     }
-    $tokenData = $tokenValidation['payload'];
+    
+    if (!$token) {
+        Response::unauthorized('No token provided');
+    }
+    
+    $userData = JWTManager::validateToken($token);
+    
+    if (!$userData) {
+        Response::unauthorized('Invalid token');
+    }
     
     $db = Database::getInstance();
     
@@ -76,7 +97,6 @@ try {
     ], 'Active bank account retrieved successfully');
     
 } catch (Exception $e) {
-    error_log("Bank accounts API error: " . $e->getMessage());
-    Response::error('Failed to retrieve bank account information: ' . $e->getMessage(), 500);
+    Response::serverError('Failed to retrieve bank account information: ' . $e->getMessage());
 }
 ?>

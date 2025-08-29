@@ -9,6 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../utils/TokenValidator.php';
 require_once __DIR__ . '/../../../utils/Response.php';
+require_once __DIR__ . '/../../../utils/socket_notifier.php';
 
 
 const ACCEPT_MESSAGE = "Congratulations! You’ve been selected as the tasker for this task. Let’s get started!";
@@ -99,8 +100,31 @@ try {
     // task_applications.status = 'accepted‘，落選則為'rejected'
     $rejectedApplicationIds = [];
     
+    $assignedApplicationStatus = $db->fetch(
+      "SELECT status FROM task_applications WHERE task_id = ? AND user_id = ? limit 1",
+      [$task_id, $target_user_id]
+    );
+
+   $isApplied = false;
+    $acceptFailedReason = null;
+    switch ($assignedApplicationStatus['status']) {
+      case 'applied':
+        $isApplied = true;
+        break;
+      case 'withdrawn':
+        $isApplied = false;
+        $acceptFailedReason = 'Applicant is withdrawn from the task.'; // 使用者已經退出申請
+        break;
+      default:
+        $isApplied = false;
+        $acceptFailedReason = 'The applicant is on other application status.'; // 使用者狀態異常：應該為open才可以被指派
+        break;
+    }
+
+    
+
     // 接受指定的應徵
-    if ($application_id !== '') {
+    if ($application_id !== '' && $isApplied) {
       $db->query("UPDATE task_applications SET status = 'accepted', updated_at = NOW() WHERE id = ?", [$application_id]);
     } else {
       // 如果沒有指定 application_id，直接創建新的 accepted 應徵記錄
@@ -112,10 +136,10 @@ try {
       ", [$task_id, $target_user_id]);
     }
     
-    // 手動拒絕其他應徵（已移除觸發器）
+    // 手動拒絕其他已投遞（Applied）應徵（已移除觸發器）
     // 取得同任務但不同使用者的其他應徵 id
     $others = $db->fetchAll(
-      "SELECT id FROM task_applications WHERE task_id = ? AND user_id <> ?",
+      "SELECT id FROM task_applications WHERE task_id = ? AND user_id <> ? AND status = 'applied'",
       [$task_id, $target_user_id]
     );
     $rejectedApplicationIds = array_map(fn($r) => (int)$r['id'], $others ?? []);
@@ -194,6 +218,30 @@ try {
 
     // 提交交易
     $db->commit();
+
+    // 發送 Socket 通知
+    try {
+      $socketNotifier = SocketNotifier::getInstance();
+      $userIds = $socketNotifier->getTaskUserIds($task_id);
+      $room = $db->fetch(
+        "SELECT id FROM chat_rooms WHERE task_id = ? AND (creator_id = ? OR participant_id = ?) ORDER BY id DESC LIMIT 1",
+        [$task_id, $actor_id, $target_user_id]
+      );
+      $roomId = $room ? $room['id'] : null;
+      
+      // 通知任務狀態更新
+      $statusData = [
+        'code' => 'in_progress',
+        'display_name' => 'In Progress',
+        'progress_ratio' => 0.3
+      ];
+      $socketNotifier->notifyTaskStatusUpdate($task_id, $roomId, $statusData, $userIds);
+      
+      // 通知應徵狀態更新
+      $socketNotifier->notifyApplicationStatusUpdate($task_id, $roomId, 'accepted', $userIds);
+    } catch (Exception $e) {
+      error_log("Socket notification failed: " . $e->getMessage());
+    }
 
     // 回傳更新後的任務資訊
     $updated = $db->fetch(

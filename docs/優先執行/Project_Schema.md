@@ -20,7 +20,7 @@
 │           ├── avatar-3.png
 │           ├── avatar-4.png
 │           ├── avatar-5.png
-│           └── default.png
+│           └── avatar-1.png
 ├── backend
 │   ├── api
 │   │   ├── auth

@@ -17,6 +17,8 @@ import 'package:here4help/task/services/language_service.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/utils/image_helper.dart';
+import 'package:here4help/services/wallet_service.dart';
+import 'package:here4help/services/http_client_service.dart';
 
 const String kTaskTitleField = 'Task Title';
 const String kRewardPointField = 'Reward Point';
@@ -57,12 +59,22 @@ class _PostFormPageState extends State<TaskCreatePage> {
   bool _showApplicationQuestionErrors =
       false; // 新增：控制是否顯示 application questions 錯誤提示
 
+  // 錢包相關狀態
+  WalletSummary? _walletSummary;
+  BankAccountInfo? _bankAccountInfo;
+  bool _isLoadingWallet = false;
+  String? _walletError;
+  bool _showInsufficientBalance = false;
+
   @override
   void initState() {
     super.initState();
 
     // 初始化表單欄位（若為編輯模式，優先載入 editData）
     _taskDescriptionController = TextEditingController();
+
+    // 載入錢包數據
+    _loadWalletData();
     if (widget.editData != null && widget.editData!.isNotEmpty) {
       final t = widget.editData!;
       _titleController.text = (t['title'] ?? '').toString();
@@ -168,6 +180,40 @@ class _PostFormPageState extends State<TaskCreatePage> {
         ];
         // 設置初始選中的語言
         _selectedLanguages = _getLanguageCodesFromNames(_languageRequirement);
+      });
+    }
+  }
+
+  /// 載入錢包數據
+  Future<void> _loadWalletData() async {
+    try {
+      setState(() {
+        _isLoadingWallet = true;
+        _walletError = null;
+      });
+
+      final userService = Provider.of<UserService>(context, listen: false);
+      await userService.ensureUserLoaded();
+
+      if (userService.currentUser == null) {
+        throw Exception('User not logged in');
+      }
+
+      // 同時載入錢包摘要和銀行帳戶資訊
+      final results = await Future.wait([
+        WalletService.getWalletSummary(userService),
+        WalletService.getBankAccountInfo(userService),
+      ]);
+
+      setState(() {
+        _walletSummary = results[0] as WalletSummary;
+        _bankAccountInfo = results[1] as BankAccountInfo;
+        _isLoadingWallet = false;
+      });
+    } catch (e) {
+      setState(() {
+        _walletError = e.toString();
+        _isLoadingWallet = false;
       });
     }
   }
@@ -340,15 +386,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
   }
 
   Widget _buildPersonalInfoSection() {
-    final userService = Provider.of<UserService>(context, listen: true);
+    final userService = Provider.of<UserService>(context, listen: false);
     final user = userService.currentUser;
     final userName = user?.name ?? 'Unknown User';
     final avatarUrl = user?.avatar_url ?? '';
-
-    // Debug: 打印用戶資訊
-    debugPrint(
-        '🔍 PersonalInfoSection - User: ${user?.name}, Avatar: ${user?.avatar_url}');
-    debugPrint('🔍 PersonalInfoSection - 當前時間: ${DateTime.now()}');
 
     // 如果正在載入用戶資料，顯示載入狀態
     if (userService.isLoading) {
@@ -410,8 +451,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
             key: ValueKey('avatar_${user?.id}_${user?.avatar_url}'),
             radius: 24,
             backgroundColor: Colors.grey[300],
-            backgroundImage: ImageHelper.getAvatarImage(avatarUrl) ??
-                ImageHelper.getDefaultAvatar(),
+            backgroundImage: ImageHelper.getAvatarImage(avatarUrl),
             child: ImageHelper.getAvatarImage(avatarUrl) == null
                 ? Icon(Icons.person, color: Colors.grey[600])
                 : null,
@@ -558,6 +598,18 @@ class _PostFormPageState extends State<TaskCreatePage> {
                     ),
                   ),
                 ),
+                const Spacer(),
+                // 顯示可用餘額
+                if (_walletSummary != null)
+                  Text(
+                    'Usable Points: ${WalletService.formatPoints(_walletSummary!.pointsSummary.availablePoints)}',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 8),
@@ -585,6 +637,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                       keyboardType: TextInputType.number,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(5), // 限制最多5位數
                       ],
                       decoration: const InputDecoration(
                         hintText: '0',
@@ -599,6 +652,24 @@ class _PostFormPageState extends State<TaskCreatePage> {
                         filled: true,
                         fillColor: Colors.white,
                       ),
+                      onChanged: (value) {
+                        // 檢查餘額是否足夠
+                        if (value.isNotEmpty) {
+                          final inputAmount = int.tryParse(value) ?? 0;
+                          final availablePoints =
+                              _walletSummary?.pointsSummary.availablePoints ??
+                                  0;
+
+                          setState(() {
+                            _showInsufficientBalance =
+                                inputAmount > availablePoints;
+                          });
+                        } else {
+                          setState(() {
+                            _showInsufficientBalance = false;
+                          });
+                        }
+                      },
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter a reward point';
@@ -612,6 +683,12 @@ class _PostFormPageState extends State<TaskCreatePage> {
                         if (number <= 0) {
                           return 'Reward point must be greater than 0';
                         }
+                        // 檢查餘額是否足夠
+                        final availablePoints =
+                            _walletSummary?.pointsSummary.availablePoints ?? 0;
+                        if (number > availablePoints) {
+                          return 'Insufficient balance. Available: ${WalletService.formatPoints(availablePoints)}';
+                        }
                         return null;
                       },
                     ),
@@ -621,7 +698,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                         horizontal: 12, vertical: 12),
                     child: Center(
                       child: Text(
-                        'points',
+                        'points |',
                         style: TextStyle(
                           color: theme.primary,
                           fontWeight: FontWeight.w500,
@@ -630,9 +707,68 @@ class _PostFormPageState extends State<TaskCreatePage> {
                       ),
                     ),
                   ),
+                  // 充值按鈕
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoadingWallet ? null : _showAddPointsDialog,
+                      icon: _isLoadingWallet
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.add, size: 18),
+                      label: Text(
+                        _isLoadingWallet ? 'Loading...' : 'Charge',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        minimumSize: const Size(0, 32),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
+            // 餘額不足提醒
+            if (_showInsufficientBalance)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.red.shade600,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Insufficient balance. Please add more points to continue.',
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
         const SizedBox(height: 12),
@@ -1071,9 +1207,97 @@ class _PostFormPageState extends State<TaskCreatePage> {
       icon: Icons.schedule,
       isRequired: true,
       isError: _errorFields.contains(kPostingPeriodField),
-      child: Column(
-        children: [
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 600; // 小螢幕改為直向堆疊
+
+          if (isNarrow) {
+            return Column(
+              children: [
+                _buildDateField(
+                  'Start Date',
+                  _periodStart,
+                  (picked) async {
+                    DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(DateTime.now().year + 1),
+                    );
+                    if (picked != null) {
+                      TimeOfDay? timePicked = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (timePicked != null) {
+                        DateTime combined = DateTime(
+                          picked.year,
+                          picked.month,
+                          picked.day,
+                          timePicked.hour,
+                          timePicked.minute,
+                        );
+                        if (combined.isBefore(DateTime.now())) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                  'Start date cannot be earlier than the current time.'),
+                              backgroundColor: theme.error,
+                            ),
+                          );
+                        } else {
+                          if (mounted) setState(() => _periodStart = combined);
+                        }
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildDateField(
+                  'End Date',
+                  _periodEnd,
+                  (picked) async {
+                    DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now(),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(DateTime.now().year + 1),
+                    );
+                    if (picked != null) {
+                      TimeOfDay? timePicked = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.now(),
+                      );
+                      if (timePicked != null) {
+                        DateTime combined = DateTime(
+                          picked.year,
+                          picked.month,
+                          picked.day,
+                          timePicked.hour,
+                          timePicked.minute,
+                        );
+                        if (_periodStart != null &&
+                            combined.isBefore(_periodStart!)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                  'End date cannot be earlier than or equal to the start date.'),
+                              backgroundColor: theme.error,
+                            ),
+                          );
+                        } else {
+                          if (mounted) setState(() => _periodEnd = combined);
+                        }
+                      }
+                    }
+                  },
+                ),
+              ],
+            );
+          }
+
+          // 寬螢幕：左右並排
+          return Row(
             children: [
               Expanded(
                 child: _buildDateField(
@@ -1108,11 +1332,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                             ),
                           );
                         } else {
-                          if (mounted) {
-                            setState(() {
-                              _periodStart = combined;
-                            });
-                          }
+                          if (mounted) setState(() => _periodStart = combined);
                         }
                       }
                     }
@@ -1156,11 +1376,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                             ),
                           );
                         } else {
-                          if (mounted) {
-                            setState(() {
-                              _periodEnd = combined;
-                            });
-                          }
+                          if (mounted) setState(() => _periodEnd = combined);
                         }
                       }
                     }
@@ -1168,8 +1384,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 ),
               ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -1255,6 +1471,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -1264,19 +1481,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            'Q$labelNumber',
+                            'Question - $labelNumber',
                             style: TextStyle(
                               color: theme.primary,
                               fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Question ${index + 1}',
-                            style: const TextStyle(
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -1394,8 +1602,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
                               const SizedBox(width: 4),
                               Text(
                                 _applicationQuestions[index].length > 500
-                                    ? '字數超限'
-                                    : '接近字數上限',
+                                    ? 'Exceeded character limit'
+                                    : 'Approaching character limit',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color:
@@ -1500,7 +1708,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
             final result = await showModalBottomSheet<List<String>>(
               context: context,
               isScrollControlled: true,
-              backgroundColor: Colors.transparent,
+              // backgroundColor: Colors.transparent,
               builder: (context) {
                 List<String> tempSelected = List.from(_selectedLanguages);
                 TextEditingController searchController =
@@ -1661,7 +1869,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
               borderRadius: BorderRadius.circular(8),
               color: _errorFields.contains('Language Requirement')
                   ? theme.error.withValues(alpha: 0.1)
-                  : theme.surface,
+                  : Colors.grey[50],
             ),
             child: Row(
               children: [
@@ -1804,7 +2012,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
             'end_datetime': _periodEnd != null
                 ? DateFormat('yyyy-MM-dd HH:mm:ss').format(_periodEnd!)
                 : '1970-01-01 01:00:00',
-            'application_question': _applicationQuestions.join(' | '),
+            'application_questions': _applicationQuestions
+                .where((q) => q.trim().isNotEmpty)
+                .map((q) => {'application_question': q.trim()})
+                .toList(),
             'avatar_url': user?.avatar_url ?? '',
             'language_requirement': _selectedLanguages.join(','),
             'creator_id': user?.id ?? 'Unknown',
@@ -2558,6 +2769,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -2567,19 +2779,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            'Q-$labelNumber',
+                            'Question - $labelNumber',
                             style: TextStyle(
                               color: theme.primary,
                               fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Question ${index + 1}',
-                            style: const TextStyle(
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -2768,6 +2971,386 @@ class _PostFormPageState extends State<TaskCreatePage> {
           ),
       ],
     );
+  }
+
+  // 格式化 reward_point，移除格式化字符並返回純數字
+  String _formatRewardPoint(String value) {
+    if (value.isEmpty) return '0';
+    try {
+      // 移除所有非數字字符（除了小數點）
+      final cleanValue = value.replaceAll(RegExp(r'[^\d.]'), '');
+      if (cleanValue.isEmpty) return '0';
+
+      final num = double.tryParse(cleanValue);
+      if (num == null) return '0';
+      return num.toStringAsFixed(0); // 返回整數格式
+    } catch (e) {
+      return '0';
+    }
+  }
+
+  /// 顯示充值對話框
+  void _showAddPointsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final TextEditingController accountController = TextEditingController();
+        final TextEditingController amountController = TextEditingController();
+        bool isSubmitting = false;
+        String? errorText;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Add Points'),
+                  if (errorText != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6.0),
+                      child: Text(
+                        errorText!,
+                        style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 銀行帳戶資訊顯示
+                  if (_bankAccountInfo != null &&
+                      _bankAccountInfo!.hasValidAccount)
+                    _buildBankInfoContainer()
+                  else
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8.0),
+                      child: Text(
+                        'Bank info unavailable. Please try again later.',
+                        style: TextStyle(fontSize: 12, color: Colors.redAccent),
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: accountController,
+                    decoration: const InputDecoration(
+                      labelText: 'Your Payment Account Last 5 Digits',
+                      border: OutlineInputBorder(),
+                      hintText: '12345',
+                      counterText: '',
+                    ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(5),
+                    ],
+                    maxLength: 5,
+                    onChanged: (_) {
+                      if (errorText != null) setState(() => errorText = null);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: amountController,
+                    decoration: const InputDecoration(
+                      labelText: 'Transferred Amount (NTD)',
+                      border: OutlineInputBorder(),
+                      hintText: '12345', // < 100,000
+                      counterText: '',
+                    ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(5),
+                    ],
+                    onChanged: (_) {
+                      if (errorText != null) setState(() => errorText = null);
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          final acc = accountController.text.trim();
+                          final amtStr = amountController.text.trim();
+                          if (acc.length != 5) {
+                            setState(() => errorText =
+                                'Please enter the last 5 digits of your account (numbers only).');
+                            return;
+                          }
+                          if (amtStr.isEmpty) {
+                            setState(() => errorText =
+                                'Please enter the transferred amount.');
+                            return;
+                          }
+                          if (amtStr.length > 5) {
+                            setState(() => errorText =
+                                'Amount too large. Maximum 5 digits.');
+                            return;
+                          }
+                          final amountVal = int.tryParse(amtStr);
+                          if (amountVal == null || amountVal <= 0) {
+                            setState(() => errorText =
+                                'Amount must be a positive number.');
+                            return;
+                          }
+
+                          setState(() => isSubmitting = true);
+
+                          try {
+                            await _submitTopupRequest(acc, amountVal);
+
+                            if (mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Topup request submitted, waiting for admin approval'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              // 重新載入錢包數據
+                              _loadWalletData();
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              String msg = 'Submission failed: $e';
+                              if (e.toString().contains('409')) {
+                                msg =
+                                    'You already have a pending topup request. Please wait for admin approval or check Points History.';
+                              }
+                              setState(() => errorText = msg);
+                            }
+                          } finally {
+                            if (mounted) setState(() => isSubmitting = false);
+                          }
+                        },
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Submit Request'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 銀行帳戶資訊複製相關狀態
+  final Map<String, bool> _bankInfoCopied = {};
+  final Map<String, int> _bankInfoCopyTimers = {};
+
+  void _handleBankInfoCopy(String key, String value) async {
+    await Clipboard.setData(ClipboardData(text: value));
+    setState(() {
+      _bankInfoCopied[key] = true;
+    });
+    // Cancel any previous timer for this key (by incrementing a counter)
+    final int currentTimer = (_bankInfoCopyTimers[key] ?? 0) + 1;
+    _bankInfoCopyTimers[key] = currentTimer;
+    Future.delayed(const Duration(seconds: 3), () {
+      // Only clear if this is the latest timer for this key
+      if (_bankInfoCopyTimers[key] == currentTimer) {
+        setState(() {
+          _bankInfoCopied[key] = false;
+        });
+      }
+    });
+  }
+
+  Widget _buildBankInfoContainer() {
+    if (_bankAccountInfo == null || !_bankAccountInfo!.hasValidAccount) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Bank account info not found.',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            Text(
+              'Please contact admin to add bank account info.',
+              style: TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final bankAccount = _bankAccountInfo!.displayAccount!;
+
+    // Helper to build each card tile row for bank info
+    Widget buildBankInfoTile({
+      required String label,
+      required String value,
+      required String copyKey,
+      IconData? icon,
+    }) {
+      final copied = _bankInfoCopied[copyKey] == true;
+      return ListTile(
+        dense: true,
+        leading: icon != null ? Icon(icon, color: Colors.blueGrey[600]) : null,
+        title: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+        subtitle: Text(
+          value,
+          style: const TextStyle(fontSize: 13),
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: IconButton(
+          icon: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: copied
+                ? const Icon(Icons.check,
+                    key: ValueKey('check'), color: Colors.green)
+                : const Icon(Icons.copy, key: ValueKey('copy')),
+          ),
+          tooltip: copied ? "Copied!" : "Copy",
+          onPressed: () => _handleBankInfoCopy(copyKey, value),
+        ),
+        visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+      );
+    }
+
+    return Card(
+      elevation: 1,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(left: 16, top: 10, bottom: 2),
+              child: Text(
+                'Bank Transfer Info',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+            buildBankInfoTile(
+              label: 'Bank Name',
+              value: bankAccount.bankName,
+              copyKey: 'bankName',
+              icon: Icons.account_balance,
+            ),
+            buildBankInfoTile(
+              label: 'Account',
+              value: bankAccount.accountNumber,
+              copyKey: 'accountNumber',
+              icon: Icons.numbers,
+            ),
+            buildBankInfoTile(
+              label: 'Account Holder',
+              value: bankAccount.accountHolder,
+              copyKey: 'accountHolder',
+              icon: Icons.person,
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1), // 淺黃色
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, color: Color(0xFFFBC02D), size: 18),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'After completing the transfer, enter ',
+                            style: TextStyle(fontSize: 12, color: Colors.brown),
+                          ),
+                          TextSpan(
+                            text: 'last 5 digits of your bank account, ',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.brown,
+                                fontWeight: FontWeight.bold),
+                          ),
+                          TextSpan(
+                            text: 'and the ',
+                            style: TextStyle(fontSize: 12, color: Colors.brown),
+                          ),
+                          TextSpan(
+                            text: 'amount transferred.',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.brown,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                        style: TextStyle(fontSize: 12, color: Colors.brown),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 提交充值請求
+  Future<void> _submitTopupRequest(String bankAccountLast5, int amount) async {
+    final userService = Provider.of<UserService>(context, listen: false);
+    final currentUser = userService.currentUser;
+
+    if (currentUser == null) {
+      throw Exception('User not logged in');
+    }
+
+    final response = await HttpClientService.post(
+      '${AppConfig.apiBaseUrl}/backend/api/points/request_topup.php',
+      useQueryParamToken: true, // MAMP 兼容性
+      body: {
+        'user_id': currentUser.id,
+        'amount': amount,
+        'bank_account_last5': bankAccountLast5,
+      },
+    );
+
+    final responseData = json.decode(response.body);
+
+    if (response.statusCode != 200 || responseData['success'] != true) {
+      throw Exception(responseData['message'] ?? 'Unknown error');
+    }
   }
 }
 

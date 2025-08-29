@@ -6,11 +6,11 @@
 
 ## 支援的頭像格式
 
-### 1. Flutter 本地資源
+### 1. 後端上傳資源
 ```
-assets/images/avatar/avatar-1.png
-assets/images/avatar/avatar-4.png
-assets/images/avatar/default.png
+backend/uploads/avatars/avatar-1.png
+backend/uploads/avatars/avatar-4.png
+backend/uploads/avatars/avatar-1.png
 ```
 
 ### 2. 後端上傳的頭像
@@ -78,9 +78,9 @@ final dbFormat = AvatarUrlManager.formatForDatabase(fullUrl);
 
 ### 本地資源 → 直接使用
 ```
-assets/images/avatar/avatar-1.png
+backend/uploads/avatars/avatar-1.png
 ↓
-AssetImage('assets/images/avatar/avatar-1.png')
+NetworkImage('backend/uploads/avatars/avatar-1.png')
 ```
 
 ### 後端上傳 → 轉換為完整 URL
@@ -103,9 +103,9 @@ NetworkImage('https://example.com/avatar.jpg')
 ```
 null, '', 'invalid/path'
 ↓
-assets/images/avatar/default.png
+backend/uploads/avatars/avatar-1.png
 ↓
-AssetImage('assets/images/avatar/default.png')
+NetworkImage('backend/uploads/avatars/avatar-1.png')
 ```
 
 ## 環境配置
@@ -125,7 +125,7 @@ AssetImage('assets/images/avatar/default.png')
 // 舊的測試圖片路徑
 'test_images/avatar/avatar-1.png'
 ↓
-'assets/images/avatar/avatar-1.png'
+      'backend/uploads/avatars/avatar-1.png'
 
 // 舊的上傳路徑
 'uploads/avatars/old_avatar.jpg'
@@ -139,7 +139,7 @@ AssetImage('assets/images/avatar/default.png')
 ```sql
 -- 更新舊的測試圖片路徑
 UPDATE users 
-SET avatar_url = REPLACE(avatar_url, 'test_images/avatar/', 'assets/images/avatar/') 
+SET avatar_url = REPLACE(avatar_url, 'test_images/avatar/', 'backend/uploads/avatars/') 
 WHERE avatar_url LIKE 'test_images/avatar/%';
 
 -- 更新舊的上傳路徑

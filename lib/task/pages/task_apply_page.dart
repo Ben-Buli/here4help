@@ -202,7 +202,7 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'Self-recommendation (optional)',
+                    'Self-recommendation (required)',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const Text(
@@ -218,7 +218,12 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                       border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8)),
                     ),
-                    // 自我介紹改為非必填
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Self-recommendation is required';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 16),
 

@@ -9,6 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/socket_notifier.php';
 
 try {
   if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -211,6 +212,27 @@ try {
       );
     }
   } catch (Exception $e) {}
+
+  // 發送 Socket 通知
+  try {
+    $socketNotifier = SocketNotifier::getInstance();
+    $userIds = $socketNotifier->getTaskUserIds($task_id);
+    $room = $db->fetch(
+      "SELECT id FROM chat_rooms WHERE task_id = ? AND (creator_id = ? OR participant_id = ?) ORDER BY id DESC LIMIT 1",
+      [$task_id, $actor_id, $actor_id]
+    );
+    $roomId = $room ? $room['id'] : null;
+    
+    $statusData = [
+      'code' => 'completed',
+      'display_name' => 'Completed',
+      'progress_ratio' => 1.0
+    ];
+    
+    $socketNotifier->notifyTaskStatusUpdate($task_id, $roomId, $statusData, $userIds);
+  } catch (Exception $e) {
+    error_log("Socket notification failed: " . $e->getMessage());
+  }
 
   // 回傳
   $updated = $db->fetch(

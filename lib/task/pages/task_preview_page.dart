@@ -8,6 +8,7 @@ import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:provider/provider.dart';
+import 'package:here4help/task/utils/question_display_helper.dart';
 
 class TaskPreviewPage extends StatefulWidget {
   const TaskPreviewPage({super.key});
@@ -210,41 +211,13 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                           'Application Question:',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        ...(() {
-                          final questions =
-                              taskData!['application_question']?.toString() ??
-                                  '';
-                          if (questions.isEmpty || questions.trim().isEmpty) {
-                            return [
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 4),
-                                child: Text(
-                                  'No additional questions',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                              ),
-                            ];
-                          }
-
-                          return questions
-                              .split('|')
-                              .where((q) => q.trim().isNotEmpty)
-                              .toList()
-                              .asMap()
-                              .entries
-                              .map((entry) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 4),
-                                    child: Text(
-                                      '${entry.key + 1}. ${entry.value.trim()}',
-                                      overflow: TextOverflow.visible,
-                                      maxLines: null,
-                                    ),
-                                  ))
-                              .toList();
-                        })(),
+                        ...QuestionDisplayHelper.buildQuestionWidgets(
+                          taskData!,
+                          questionStyle: TextStyle(
+                            color: Colors.grey[600],
+                          ),
+                          padding: const EdgeInsets.only(bottom: 4),
+                        ),
                         const SizedBox(height: 12),
                         RichText(
                           text: TextSpan(
@@ -598,15 +571,15 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                         '   status_code: ${taskDataForApi['status_code']}');
 
                     // 如果有申請問題，添加到數據中
-                    if (taskData!['application_question'] != null &&
-                        taskData!['application_question']
-                            .toString()
-                            .isNotEmpty) {
-                      final questions = taskData!['application_question']
-                          .toString()
-                          .split(' | ');
-                      taskDataForApi['application_questions'] =
-                          questions.where((q) => q.trim().isNotEmpty).toList();
+                    final questions =
+                        taskData!['application_questions'] as List<dynamic>? ??
+                            [];
+                    if (questions.isNotEmpty) {
+                      taskDataForApi['application_questions'] = questions
+                          .map((q) =>
+                              q['application_question']?.toString() ?? '')
+                          .where((q) => q.trim().isNotEmpty)
+                          .toList();
                       debugPrint(
                           '   application_questions: ${taskDataForApi['application_questions']}');
                     }

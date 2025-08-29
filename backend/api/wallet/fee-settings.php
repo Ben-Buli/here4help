@@ -1,92 +1,64 @@
 <?php
-/**
- * GET /api/wallet/fee-settings.php
- * 手續費設定API - 返回當前生效的手續費設定
- */
+require_once dirname(__DIR__, 2) . '/config/database.php'; // 因為 database.php 在 /backend/config/，要從 /backend/api/wallet 回到 /backend，需要往上兩層，再拼 /config/database.php 
+require_once dirname(__DIR__, 2) . '/utils/response.php';
+require_once dirname(__DIR__, 2) . '/utils/JWTManager.php';
 
-require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/Response.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-Response::setCorsHeaders();
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    Response::error('Method not allowed', 405);
+    Response::methodNotAllowed('Only GET method is allowed');
 }
 
 try {
-    // 驗證JWT Token
-    $tokenValidation = JWTManager::validateRequest();
-    if (!$tokenValidation['valid']) {
-        Response::error($tokenValidation['message'], 401);
+    // 驗證 JWT
+    $token = $_GET['token'] ?? null;
+    if (!$token) {
+        $headers = getallheaders();
+        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+        if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+            $token = $matches[1];
+        }
     }
-    $tokenData = $tokenValidation['payload'];
+    
+    if (!$token) {
+        Response::unauthorized('No token provided');
+    }
+    
+    $userData = JWTManager::validateToken($token);
+    
+    if (!$userData) {
+        Response::unauthorized('Invalid token');
+    }
     
     $db = Database::getInstance();
     
-    // 獲取當前生效的手續費設定
-    $feeQuery = "
-        SELECT id, rate, description, is_active, updated_by, created_at, updated_at
-        FROM task_completion_points_fee_settings 
-        WHERE is_active = 1 
-        ORDER BY updated_at DESC 
-        LIMIT 1
-    ";
-    
-    $feeSettings = $db->fetch($feeQuery);
+    // 查詢啟用的手續費設定
+    $sql = "SELECT * FROM task_completion_points_fee_settings WHERE is_active = 1 LIMIT 1";
+    $feeSettings = $db->fetch($sql);
     
     if (!$feeSettings) {
-        // 如果沒有設定，返回預設值（無手續費）
-        Response::success([
-            'fee_enabled' => false,
-            'rate' => 0.0000,
-            'rate_percentage' => '0.00%',
+        // 如果沒有啟用的設定，返回預設值
+        $feeSettings = [
+            'id' => 0,
+            'rate' => 0.0,
+            'is_active' => 0,
             'description' => 'No fee settings configured',
-            'calculation_example' => [
-                'task_reward' => 100,
-                'fee_amount' => 0,
-                'creator_receives' => 100,
-                'acceptor_receives' => 100
-            ]
-        ], 'No active fee settings found - fees disabled');
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
     }
     
-    $rate = (float)$feeSettings['rate'];
-    $ratePercentage = number_format($rate * 100, 2) . '%';
-    
-    // 計算範例
-    $exampleReward = 100;
-    $exampleFee = max(0, round($exampleReward * $rate)); // 四捨五入取整數
-    
-    Response::success([
-        'fee_enabled' => true,
-        'settings' => [
-            'id' => (int)$feeSettings['id'],
-            'rate' => $rate,
-            'rate_percentage' => $ratePercentage,
-            'description' => $feeSettings['description'],
-            'updated_by' => $feeSettings['updated_by'],
-            'created_at' => $feeSettings['created_at'],
-            'updated_at' => $feeSettings['updated_at']
-        ],
-        'calculation_rules' => [
-            'formula' => 'fee = round(reward_points * rate)',
-            'rounding' => 'Round to nearest integer (四捨五入)',
-            'minimum_fee' => 0,
-            'charged_to' => 'Task creator (發布者)'
-        ],
-        'calculation_example' => [
-            'task_reward' => $exampleReward,
-            'fee_rate' => $ratePercentage,
-            'fee_amount' => $exampleFee,
-            'creator_pays' => $exampleReward + $exampleFee,
-            'acceptor_receives' => $exampleReward,
-            'platform_receives' => $exampleFee
-        ]
-    ], 'Fee settings retrieved successfully');
+    Response::success($feeSettings, 'Fee settings retrieved successfully');
     
 } catch (Exception $e) {
-    error_log("Fee settings error: " . $e->getMessage());
-    Response::error('Failed to retrieve fee settings: ' . $e->getMessage(), 500);
+    Response::serverError('Failed to retrieve fee settings: ' . $e->getMessage());
 }
 ?>

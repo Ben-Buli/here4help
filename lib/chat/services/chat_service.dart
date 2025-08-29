@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/auth/services/auth_service.dart';
 import 'package:here4help/services/media/cross_platform_image_service.dart';
+import 'package:flutter/foundation.dart'; // Added for debugPrint
 
 class ChatService {
   static final ChatService _instance = ChatService._internal();
@@ -481,6 +482,60 @@ class ChatService {
       }
     } catch (e) {
       throw Exception('獲取聊天室詳細數據失敗: $e');
+    }
+  }
+
+  /// 檢查聊天室對應的應徵狀態
+  Future<String?> getApplicationStatus({
+    required String roomId,
+    required String taskId,
+    required int participantId,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('未登入');
+      }
+
+      final queryParams = <String, String>{
+        'room_id': roomId,
+        'task_id': taskId,
+        'participant_id': participantId.toString(),
+      };
+
+      final uri = Uri.parse(
+              '$_baseUrl/backend/api/tasks/applications/get_application_status.php')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return data['data']?['status'] as String?;
+        } else {
+          // 如果沒有找到應徵記錄，返回 null
+          if (data['message']?.contains('not found') == true) {
+            return null;
+          }
+          throw Exception(data['message'] ?? '獲取應徵狀態失敗');
+        }
+      } else if (response.statusCode == 404) {
+        // 沒有找到應徵記錄
+        return null;
+      } else {
+        throw Exception('網路錯誤: ${response.statusCode}');
+      }
+    } catch (e) {
+      // 如果發生錯誤，返回 null 讓 Accept 按鈕正常顯示
+      debugPrint('獲取應徵狀態失敗: $e');
+      return null;
     }
   }
 }

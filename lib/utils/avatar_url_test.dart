@@ -25,9 +25,9 @@ class AvatarUrlTest {
     debugPrint('\n📁 測試本地資源路徑:');
 
     final testCases = [
-      'assets/images/avatar/avatar-1.png',
-      'assets/images/avatar/avatar-4.png',
-      'assets/images/avatar/default.png',
+      'backend/uploads/avatars/avatar-1.png',
+      'backend/uploads/avatars/avatar-4.png',
+      'backend/uploads/avatars/avatar-1.png',
     ];
 
     for (final testCase in testCases) {
@@ -120,7 +120,7 @@ class AvatarUrlTest {
 
     final testCases = [
       'http://localhost:8888/here4help/backend/uploads/avatars/avatar.jpg',
-      'assets/images/avatar/avatar-1.png',
+      'backend/uploads/avatars/avatar-1.png',
       '/backend/uploads/avatars/compressed_avatar_2_1755973715.png',
       'backend/uploads/avatars/avatar_123.png',
     ];
@@ -142,7 +142,7 @@ class AvatarUrlTest {
       'test_images/avatar/avatar-1.png',
       'uploads/avatars/old_avatar.jpg',
       '/uploads/avatars/old_avatar.jpg',
-      'assets/images/avatar/avatar-2.png', // 已經是新格式
+      'backend/uploads/avatars/avatar-2.png', // 已經是新格式
     ];
 
     for (final testCase in testCases) {
