@@ -10,6 +10,10 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../utils/TokenValidator.php';
 require_once __DIR__ . '/../../../utils/Response.php';
 
+
+const ACCEPT_MESSAGE = "Congratulations! You’ve been selected as the tasker for this task. Let’s get started!";
+const REJECT_MESSAGE = "Unfortunately, you were not selected as the tasker for this task. Please try again!";
+
 try {
   if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     Response::error('Method not allowed', 405);
@@ -72,7 +76,7 @@ try {
   }
 
   // 驗證目標用戶存在
-  $targetUser = $db->fetch("SELECT id, username FROM users WHERE id = ?", [$target_user_id]);
+  $targetUser = $db->fetch("SELECT id, name FROM users WHERE id = ?", [$target_user_id]);
   if (!$targetUser) {
     Response::error('Target user not found', 404);
   }
@@ -81,40 +85,47 @@ try {
   $db->beginTransaction();
 
   try {
-    // 1. 更新任務狀態為 in_progress 並設定 participant_id
-    $statusRow = $db->fetch("SELECT id FROM task_statuses WHERE code = 'in_progress' LIMIT 1");
-    if ($statusRow && isset($statusRow['id'])) {
-      $db->query("UPDATE tasks SET status_id = ?, participant_id = ?, updated_at = NOW() WHERE id = ?", 
-        [(int)$statusRow['id'], $target_user_id, $task_id]);
-    } else {
-      // fallback
-      $db->query("UPDATE tasks SET status = 'In Progress', participant_id = ?, updated_at = NOW() WHERE id = ?", 
-        [$target_user_id, $task_id]);
-    }
+      // 1. 更新任務狀態為 in_progress 並設定 participant_id
+    // task_statuses.id = 2 = in_progress
+      try { 
+        $db->query("UPDATE tasks SET status_id = ?, participant_id = ?, updated_at = NOW() WHERE id = ?", 
+          [2, $target_user_id, $task_id]);
+      } catch (Exception $e) {
+        Response::error('Failed to update task status to in_progress(id: 2): ' . $e->getMessage(), 500);
+      }
+   
 
-    // 2. 更新應徵狀態
+    // 2. 更新應徵者狀態
+    // task_applications.status = 'accepted‘，落選則為'rejected'
     $rejectedApplicationIds = [];
     
     // 接受指定的應徵
     if ($application_id !== '') {
       $db->query("UPDATE task_applications SET status = 'accepted', updated_at = NOW() WHERE id = ?", [$application_id]);
     } else {
-      // 如果沒有指定 application_id，創建一個新的 accepted 應徵記錄
+      // 如果沒有指定 application_id，直接創建新的 accepted 應徵記錄
+      // 依賴 (task_id, user_id) 唯一鍵避免重複記錄
       $db->query("
         INSERT INTO task_applications (task_id, user_id, status, created_at, updated_at) 
         VALUES (?, ?, 'accepted', NOW(), NOW())
+        ON DUPLICATE KEY UPDATE status = 'accepted', updated_at = NOW()
       ", [$task_id, $target_user_id]);
     }
     
-    // 拒絕其他所有應徵
-    $otherApplications = $db->fetchAll(
-      "SELECT id FROM task_applications WHERE task_id = ? AND user_id != ? AND status != 'accepted'",
+    // 手動拒絕其他應徵（已移除觸發器）
+    // 取得同任務但不同使用者的其他應徵 id
+    $others = $db->fetchAll(
+      "SELECT id FROM task_applications WHERE task_id = ? AND user_id <> ?",
       [$task_id, $target_user_id]
     );
-    
-    foreach ($otherApplications as $app) {
-      $db->query("UPDATE task_applications SET status = 'rejected', updated_at = NOW() WHERE id = ?", [$app['id']]);
-      $rejectedApplicationIds[] = $app['id'];
+    $rejectedApplicationIds = array_map(fn($r) => (int)$r['id'], $others ?? []);
+
+    // 將其他應徵設為 rejected
+    if (!empty($rejectedApplicationIds)) {
+      $db->query(
+        "UPDATE task_applications SET status = 'rejected', updated_at = NOW() WHERE task_id = ? AND user_id <> ?",
+        [$task_id, $target_user_id]
+      );
     }
 
     // 3. 寫入 user_active_log
@@ -130,28 +141,56 @@ try {
       INSERT INTO user_active_log (
         user_id, actor_type, actor_id, action, field, old_value, new_value, 
         reason, metadata, ip, created_at
-      ) VALUES (?, 'user', ?, 'application_accept', 'participant_id', NULL, ?, 
+      ) VALUES (?, 'user', ?, 'Assign to only one participant, and reject other applications.', 'participant_id', NULL, ?, 
         NULL, ?, ?, NOW())
     ", [$actor_id, $actor_id, $target_user_id, $metadata, $ip]);
 
     // 4. 發送系統訊息到聊天室
+    // #region 發送訊息給accepted的用戶
     try {
       $room = $db->fetch(
         "SELECT id FROM chat_rooms WHERE task_id = ? AND (creator_id = ? OR participant_id = ?) ORDER BY id DESC LIMIT 1",
         [$task_id, $actor_id, $target_user_id]
       );
       
+      // 發送系統訊息到任務被指派者的聊天室
       if ($room && isset($room['id'])) {
-        $content = "Task assigned to " . $targetUser['username'] . ". Task is now in progress.";
+        $content = ACCEPT_MESSAGE;
         $db->query(
-          "INSERT INTO chat_messages (room_id, from_user_id, content, kind) VALUES (?, ?, ?, 'system')",
+          "INSERT INTO chat_messages (room_id, from_user_id, content, kind, created_at) VALUES (?, ?, ?, 'system', NOW())",
           [(int)$room['id'], $actor_id, $content]
         );
       }
     } catch (Exception $e) {
       // 不阻斷主流程
-      error_log("Failed to send system message: " . $e->getMessage());
+      error_log("Failed to send system accepted message: " . $e->getMessage());
     }
+    // #endregion
+
+    // #region 發送訊息給rejected的用戶
+    try {
+      $rejected_users = $db->fetchAll(
+        "SELECT user_id FROM task_applications WHERE task_id = ? AND user_id <> ? AND status = 'rejected'",
+        [$task_id, $target_user_id]
+      );
+      foreach ($rejected_users as $rejected_user) {
+        $room = $db->fetch(
+          "SELECT id FROM chat_rooms WHERE task_id = ? AND (creator_id = ? OR participant_id = ?) ORDER BY id DESC LIMIT 1",
+          [$task_id, $actor_id, $rejected_user['user_id']]
+        );
+        if ($room && isset($room['id'])) {
+          $content = REJECT_MESSAGE;
+          $db->query(
+            "INSERT INTO chat_messages (room_id, from_user_id, content, kind, created_at) VALUES (?, ?, ?, 'system', NOW())",
+            [(int)$room['id'], $actor_id, $content]
+          );
+        }
+      }
+    } catch (Exception $e) {
+      // 不阻斷主流程
+      error_log("Failed to send system rejected message: " . $e->getMessage());
+    }
+    // #endregion
 
     // 提交交易
     $db->commit();
@@ -167,7 +206,7 @@ try {
       'task' => $updated,
       'assigned_user' => [
         'id' => $target_user_id,
-        'username' => $targetUser['username']
+        'name' => $targetUser['name']
       ],
       'rejected_count' => count($rejectedApplicationIds),
       'message' => 'Application accepted successfully'

@@ -221,6 +221,13 @@ class TaskService extends ChangeNotifier {
     required String taskId,
     bool preview = false,
   }) async {
+    // 獲取用戶 token
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    if (token == null) {
+      throw Exception('User not authenticated');
+    }
+
     final body = {
       'task_id': taskId,
       if (preview) 'preview': 1,
@@ -228,7 +235,10 @@ class TaskService extends ChangeNotifier {
     final resp = await http
         .post(
           Uri.parse(AppConfig.taskConfirmCompletionUrl),
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 30));
@@ -248,11 +258,21 @@ class TaskService extends ChangeNotifier {
     required String taskId,
     String? reason,
   }) async {
+    // 獲取用戶 token
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    if (token == null) {
+      throw Exception('User not authenticated');
+    }
+
     final body = {'task_id': taskId, if (reason != null) 'reason': reason};
     final resp = await http
         .post(
           Uri.parse(AppConfig.taskDisagreeCompletionUrl),
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 30));
@@ -313,6 +333,13 @@ class TaskService extends ChangeNotifier {
     String? userId,
     required String posterId,
   }) async {
+    // 獲取用戶 token
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    if (token == null) {
+      throw Exception('User not authenticated');
+    }
+
     final body = {
       'task_id': taskId,
       'poster_id': posterId,
@@ -324,13 +351,17 @@ class TaskService extends ChangeNotifier {
         .post(
           Uri.parse(
               '${AppConfig.apiBaseUrl}/backend/api/tasks/applications/accept.php'),
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 30));
 
     if (resp.statusCode == 200) {
       final data = jsonDecode(resp.body);
+      debugPrint('🔍 TaskService acceptApplication: 回應內容: $data');
       if (data['success'] == true) {
         return Map<String, dynamic>.from(data['data'] ?? {});
       }
@@ -348,6 +379,13 @@ class TaskService extends ChangeNotifier {
     required int ratingExperience,
     String? comment,
   }) async {
+    // 獲取用戶 token
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    if (token == null) {
+      throw Exception('User not authenticated');
+    }
+
     final body = {
       'task_id': taskId,
       'ratings': {
@@ -360,7 +398,10 @@ class TaskService extends ChangeNotifier {
     final resp = await http
         .post(
           Uri.parse(AppConfig.taskReviewsSubmitUrl),
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 30));
@@ -487,6 +528,62 @@ class TaskService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('TaskService loadMyApplications error: $e');
+    }
+  }
+
+  /// 後端分頁：取得我的應徵（My Works）清單
+  /// 返回 items 與是否還有下一頁（hasMore）
+  Future<({List<Map<String, dynamic>> items, bool hasMore})>
+      fetchMyWorksApplications({
+    required String userId,
+    required int limit,
+    required int offset,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('未登入');
+      }
+
+      final uri = Uri.parse(
+        '${AppConfig.myWorkApplicationsUrl}?user_id=$userId&limit=$limit&offset=$offset',
+      );
+
+      final resp = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 30));
+
+      if (resp.statusCode != 200) {
+        throw Exception('HTTP ${resp.statusCode}: ${resp.body}');
+      }
+
+      final data = jsonDecode(resp.body);
+      if (data['success'] != true) {
+        throw Exception(data['message'] ?? 'API error');
+      }
+
+      // 後端回傳可能是 data 或 data.applications
+      final payload = data['data'];
+      List<Map<String, dynamic>> items = [];
+      if (payload is List) {
+        items = List<Map<String, dynamic>>.from(payload);
+      } else if (payload is Map && payload['applications'] is List) {
+        items = List<Map<String, dynamic>>.from(payload['applications']);
+      } else if (data['applications'] is List) {
+        items = List<Map<String, dynamic>>.from(data['applications']);
+      }
+
+      // 粗略計算 hasMore：若本頁筆數等於 limit，則可能還有下一頁
+      final bool hasMore = items.length >= limit;
+
+      return (items: items, hasMore: hasMore);
+    } catch (e) {
+      debugPrint('fetchMyWorksApplications error: $e');
+      return (items: <Map<String, dynamic>>[], hasMore: false);
     }
   }
 
@@ -791,7 +888,7 @@ class TaskService extends ChangeNotifier {
 
     final resp = await http
         .post(
-          Uri.parse(AppConfig.applicationApproveUrl),
+          Uri.parse(AppConfig.applicationApproveUrlV2),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode(body),
         )
@@ -886,6 +983,8 @@ class TaskService extends ChangeNotifier {
   }
 
   /// 刪除應徵（軟刪除）
+  /// 軟刪除：將 status 設為 'Cancelled'
+  /// 執行者：Poster
   Future<bool> deleteApplication({
     required String applicationId,
   }) async {

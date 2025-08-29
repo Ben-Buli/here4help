@@ -68,7 +68,7 @@
           "updated_at TIMESTAMP"
         ],
         "task_statuses": [
-          "id INT (1=open, 2=in_progress, 3=pending_confirmation, 4=dispute, 5=completed, 6=applying, 7=rejected, 8=canceled)",
+          "id INT (1=open, 2=in_progress, 3=pending_confirmation, 4=dispute, 5=completed, 6=applying, 7=rejected, 8=cancelled)",
           "code VARCHAR(64)",
           "display_name VARCHAR(128)"
         ],

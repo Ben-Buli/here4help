@@ -18,12 +18,12 @@ class _UpdateStatusIndicatorState extends State<UpdateStatusIndicator>
   @override
   void initState() {
     super.initState();
-    
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -31,7 +31,7 @@ class _UpdateStatusIndicatorState extends State<UpdateStatusIndicator>
       parent: _animationController,
       curve: Curves.easeInOut,
     ));
-    
+
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, -1),
       end: Offset.zero,
@@ -60,7 +60,7 @@ class _UpdateStatusIndicatorState extends State<UpdateStatusIndicator>
         Color backgroundColor;
         Color textColor;
         IconData icon;
-        
+
         if (cacheManager.isUpdating) {
           backgroundColor = Colors.blue;
           textColor = Colors.white;
@@ -108,7 +108,7 @@ class _UpdateStatusIndicatorState extends State<UpdateStatusIndicator>
                     size: 20,
                   ),
                   const SizedBox(width: 8),
-                  
+
                   // 文字
                   Flexible(
                     child: Text(
@@ -120,7 +120,7 @@ class _UpdateStatusIndicatorState extends State<UpdateStatusIndicator>
                       ),
                     ),
                   ),
-                  
+
                   // 如果是更新中，顯示旋轉圖標
                   if (cacheManager.isUpdating) ...[
                     const SizedBox(width: 8),
@@ -151,29 +151,53 @@ class UpdateStatusBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<ChatCacheManager>(
       builder: (context, cacheManager, child) {
+        debugPrint('🔍 [UpdateStatusBanner] build() 開始');
+        debugPrint('  - updateMessage: ${cacheManager.updateMessage}');
+        debugPrint('  - isUpdating: ${cacheManager.isUpdating}');
+        debugPrint('  - hasNewData: ${cacheManager.hasNewData}');
+        debugPrint('  - lastUpdate: ${cacheManager.lastUpdate}');
+        debugPrint('  - isCacheValid: ${cacheManager.isCacheValid}');
+        debugPrint('  - isCacheEmpty: ${cacheManager.isCacheEmpty}');
+
         // 如果沒有更新訊息，不顯示
         if (cacheManager.updateMessage == null) {
+          debugPrint('🔍 [UpdateStatusBanner] 沒有更新訊息，不顯示');
           return const SizedBox.shrink();
         }
+
+        debugPrint('🔍 [UpdateStatusBanner] 準備顯示狀態橫幅');
 
         // 根據更新狀態選擇顏色
         Color backgroundColor;
         Color textColor;
         IconData icon;
-        
-        if (cacheManager.isUpdating) {
-          backgroundColor = Colors.blue.shade100;
-          textColor = Colors.blue.shade800;
-          icon = Icons.sync;
-        } else if (cacheManager.hasNewData) {
-          backgroundColor = Colors.green.shade100;
-          textColor = Colors.green.shade800;
-          icon = Icons.check_circle;
-        } else {
+
+        try {
+          if (cacheManager.isUpdating) {
+            backgroundColor = Colors.blue.shade100;
+            textColor = Colors.blue.shade800;
+            icon = Icons.sync;
+            debugPrint('🔍 [UpdateStatusBanner] 狀態：更新中 (藍色)');
+          } else if (cacheManager.hasNewData) {
+            backgroundColor = Colors.green.shade100;
+            textColor = Colors.green.shade800;
+            icon = Icons.check_circle;
+            debugPrint('🔍 [UpdateStatusBanner] 狀態：有新數據 (綠色)');
+          } else {
+            backgroundColor = Colors.grey.shade100;
+            textColor = Colors.grey.shade800;
+            icon = Icons.info;
+            debugPrint('🔍 [UpdateStatusBanner] 狀態：一般信息 (灰色)');
+          }
+        } catch (e) {
+          debugPrint('❌ [UpdateStatusBanner] 狀態顏色設定失敗: $e');
+          // 使用預設顏色作為後備
           backgroundColor = Colors.grey.shade100;
           textColor = Colors.grey.shade800;
           icon = Icons.info;
         }
+
+        debugPrint('🔍 [UpdateStatusBanner] 開始構建 Container');
 
         return Container(
           width: double.infinity,
@@ -196,28 +220,57 @@ class UpdateStatusBanner extends StatelessWidget {
                 size: 20,
               ),
               const SizedBox(width: 12),
-              
+
               // 文字
               Expanded(
-                child: Text(
-                  cacheManager.updateMessage!,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                child: Builder(
+                  builder: (context) {
+                    try {
+                      final message = cacheManager.updateMessage!;
+                      debugPrint('🔍 [UpdateStatusBanner] 顯示訊息: $message');
+
+                      return Text(
+                        message,
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      );
+                    } catch (e) {
+                      debugPrint('❌ [UpdateStatusBanner] 顯示訊息失敗: $e');
+                      return const Text(
+                        '更新狀態顯示錯誤',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      );
+                    }
+                  },
                 ),
               ),
-              
+
               // 如果是更新中，顯示旋轉圖標
               if (cacheManager.isUpdating)
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(textColor),
-                  ),
+                Builder(
+                  builder: (context) {
+                    try {
+                      debugPrint('🔍 [UpdateStatusBanner] 顯示更新中圖標');
+                      return SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(textColor),
+                        ),
+                      );
+                    } catch (e) {
+                      debugPrint('❌ [UpdateStatusBanner] 顯示更新中圖標失敗: $e');
+                      return const SizedBox(width: 16, height: 16);
+                    }
+                  },
                 ),
             ],
           ),

@@ -98,7 +98,7 @@ try {
             WHERE ta.task_id = t.id AND ta.user_id = ? AND ta.status = 'accepted'
         ))
         AND ts.code NOT IN ('completed', 'cancelled')
-        AND t.deleted_at IS NULL
+        AND t.updated_at IS NULL
     ");
     $activeTasksStmt->execute([$userId, $userId]);
     $activeTasksCount = $activeTasksStmt->fetch(PDO::FETCH_ASSOC)['count'];

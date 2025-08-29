@@ -243,15 +243,10 @@ class ChatCacheManager extends ChangeNotifier {
       'open': 'Open',
       'in progress': 'In Progress',
       'pending confirmation': 'Pending Confirmation',
-      'completed': 'Completed',
       'dispute': 'Dispute',
-      'applying (tasker)': 'Applying (Tasker)',
-      'in progress (tasker)': 'In Progress (Tasker)',
-      'completed (tasker)': 'Completed (Tasker)',
+      'completed': 'Completed',
       'rejected': 'Rejected',
-      'rejected (tasker)': 'Rejected (Tasker)',
       'cancelled': 'Cancelled',
-      'canceled': 'Cancelled',
     };
     return aliases[s] ?? raw;
   }
@@ -301,24 +296,34 @@ class ChatCacheManager extends ChangeNotifier {
 
   /// 輕量檢查更新（進入頁面後調用）
   Future<void> checkForUpdates() async {
-    if (_isUpdating) return;
+    debugPrint('🔍 [ChatCacheManager] checkForUpdates() 開始');
+    debugPrint('  - 當前更新狀態: $_isUpdating');
+    debugPrint('  - 快取有效性: $isCacheValid');
+    debugPrint('  - 快取是否為空: $isCacheEmpty');
+
+    if (_isUpdating) {
+      debugPrint('⚠️ [ChatCacheManager] 已在更新中，跳過此次檢查');
+      return;
+    }
 
     _setUpdating(true);
     _setUpdateMessage('檢查更新中...');
 
     try {
-      debugPrint('🔍 開始輕量檢查更新...');
+      debugPrint('🔍 [ChatCacheManager] 開始輕量檢查更新...');
 
       // 檢查是否有新數據
       final hasUpdates = await _checkForDataUpdates();
+      debugPrint('  - 檢查結果: $hasUpdates');
 
       if (hasUpdates) {
-        debugPrint('🔄 發現新數據，開始更新...');
+        debugPrint('🔄 [ChatCacheManager] 發現新數據，開始更新...');
         await _performIncrementalUpdate();
         _setHasNewData(true);
         _setUpdateMessage('數據已更新');
+        debugPrint('✅ [ChatCacheManager] 更新完成');
       } else {
-        debugPrint('✅ 已是最新數據');
+        debugPrint('✅ [ChatCacheManager] 已是最新數據');
         _setUpdateMessage('已是最新');
         _setHasNewData(false);
       }
@@ -326,14 +331,19 @@ class ChatCacheManager extends ChangeNotifier {
       // 更新最後更新時間
       _lastUpdate = DateTime.now();
       await _saveCacheToStorage();
+      debugPrint('💾 [ChatCacheManager] 快取已保存');
     } catch (e) {
-      debugPrint('❌ 檢查更新失敗: $e');
+      debugPrint('❌ [ChatCacheManager] 檢查更新失敗: $e');
+      debugPrint('  - 錯誤類型: ${e.runtimeType}');
+      debugPrint('  - 錯誤堆疊: ${e.toString()}');
       _setUpdateMessage('檢查更新失敗');
     } finally {
+      debugPrint('🔍 [ChatCacheManager] 更新檢查完成，設置狀態為非更新中');
       _setUpdating(false);
 
       // 3秒後清除更新訊息
       Future.delayed(const Duration(seconds: 3), () {
+        debugPrint('🔍 [ChatCacheManager] 3秒後清除更新訊息');
         _setUpdateMessage(null);
         notifyListeners();
       });
@@ -440,8 +450,18 @@ class ChatCacheManager extends ChangeNotifier {
 
   /// 設置更新訊息
   void _setUpdateMessage(String? message) {
-    _updateMessage = message;
-    notifyListeners();
+    debugPrint('🔍 [ChatCacheManager] _setUpdateMessage() 開始');
+    debugPrint('  - 舊訊息: $_updateMessage');
+    debugPrint('  - 新訊息: $message');
+
+    try {
+      _updateMessage = message;
+      debugPrint('  - 訊息已更新');
+      notifyListeners();
+      debugPrint('  - 已通知監聽器');
+    } catch (e) {
+      debugPrint('❌ [ChatCacheManager] 設置更新訊息失敗: $e');
+    }
   }
 
   /// 手動觸發更新（例如：有人應徵時）

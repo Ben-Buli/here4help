@@ -14,6 +14,7 @@ import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/chat/utils/avatar_error_cache.dart';
 import 'package:here4help/chat/services/smart_refresh_strategy.dart';
+import 'package:here4help/chat/services/chat_navigation_service.dart';
 
 /// My Works 分頁組件
 /// 從原 ChatListPage 中抽取的 My Works 相關功能
@@ -71,18 +72,13 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       'pending confirmation': 'Pending Confirmation',
       'completed': 'Completed',
       'dispute': 'Dispute',
-      'applying (tasker)': 'Applying (Tasker)',
-      'in progress (tasker)': 'In Progress (Tasker)',
-      'completed (tasker)': 'Completed (Tasker)',
       'rejected': 'Rejected',
-      'rejected (tasker)': 'Rejected (Tasker)',
       'cancelled': 'Cancelled',
-      'canceled': 'Cancelled',
     };
     return aliases[s] ?? raw;
   }
 
-  static const int _pageSize = 10;
+  static const int _pageSize = 20;
   final PagingController<int, Map<String, dynamic>> _pagingController =
       PagingController(firstPageKey: 0);
 
@@ -335,41 +331,28 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       debugPrint('🔍 [My Works] TaskService 實例: $taskService');
 
       if (currentUserId != null) {
-        debugPrint('🔍 [My Works] 開始載入用戶應徵資料...');
-
-        // 檢查快取數據
-        if (chatProvider.isCacheReadyForTab(ChatListProvider.TAB_MY_WORKS)) {
-          debugPrint('✅ [My Works] 使用快取數據');
-          // 從快取載入 My Works 數據
-          final cachedData = chatProvider.cacheManager.myWorksCache;
-          debugPrint('📋 [My Works] 快取數據: ${cachedData.length} 個應徵記錄');
-
-          // 將快取數據載入到 TaskService 的 myApplications
-          if (cachedData.isNotEmpty) {
-            debugPrint('✅ [My Works] 快取數據已載入，將在 _composeMyWorks 中使用');
-          }
+        debugPrint('📡 [My Works] 後端分頁載入: offset=$offset, limit=$_pageSize');
+        final page = await taskService.fetchMyWorksApplications(
+          userId: currentUserId.toString(),
+          limit: _pageSize,
+          offset: offset,
+        );
+        final converted = _processApplicationsFromService(page.items);
+        if (!mounted) return;
+        if (page.hasMore && converted.isNotEmpty) {
+          _pagingController.appendPage(converted, offset + _pageSize);
+          debugPrint('✅ [My Works] 追加分頁，下一頁 key: ${offset + _pageSize}');
         } else {
-          debugPrint('📡 [My Works] 調用 API 載入應徵資料...');
-          await taskService.loadMyApplications(currentUserId);
-          debugPrint('🔍 [My Works] 應徵資料載入完成');
+          _pagingController.appendLastPage(converted);
+          debugPrint('✅ [My Works] 最後一頁，筆數: ${converted.length}');
         }
-
-        // 強制檢查並重新載入數據（如果快取中沒有數據）
-        if (chatProvider.myWorksApplications.isEmpty &&
-            chatProvider.cacheManager.myWorksCache.isEmpty &&
-            taskService.myApplications.isEmpty) {
-          debugPrint('🔄 [My Works] 所有快取都為空，強制重新載入數據');
-          chatProvider.checkAndTriggerTabLoad(ChatListProvider.TAB_MY_WORKS);
-
-          // 等待一下讓 Provider 載入完成
-          await Future.delayed(const Duration(milliseconds: 500));
-
-          // 再次檢查 TaskService 數據
-          if (taskService.myApplications.isEmpty) {
-            debugPrint('📡 [My Works] Provider 載入後仍無數據，再次調用 API');
-            await taskService.loadMyApplications(currentUserId);
-          }
-        }
+        // 資料載入完成後更新未讀標記
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _updateMyWorksTabUnreadFlag();
+        });
+        debugPrint('✅ [My Works] _fetchMyWorksPage 完成');
+        return;
       } else {
         debugPrint('❌ [My Works] 當前用戶 ID 為空');
         _pagingController.appendLastPage([]);
@@ -542,12 +525,12 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     }
 
     // 添加詳細的除錯資訊
-    debugPrint('🔍 [My Works] _composeMyWorks 開始');
+    // debugPrint('🔍 [My Works] _composeMyWorks 開始');
     debugPrint('🔍 [My Works] currentUserId: $currentUserId');
     debugPrint(
-        '🔍 [My Works] 數據來源: ${chatProvider.isCacheReadyForTab(ChatListProvider.TAB_MY_WORKS) ? "快取" : "API"}');
-    debugPrint('🔍 [My Works] 應徵記錄長度: ${apps.length}');
-    debugPrint('🔍 [My Works] 應徵記錄內容: $apps');
+        '🔍 [My Works][_composeMyWorks] 數據來源: ${chatProvider.isCacheReadyForTab(ChatListProvider.TAB_MY_WORKS) ? "快取" : "API"}');
+    // debugPrint('🔍 [My Works] 應徵記錄長度: ${apps.length}');
+    debugPrint('🔍 [My Works][_composeMyWorks] 應徵記錄內容: ${apps.length} 個應徵記錄');
 
     // 如果沒有應徵數據，返回空列表
     if (apps.isEmpty) {
@@ -625,7 +608,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     }).toList();
 
     debugPrint('✅ [My Works] _composeMyWorks 完成，返回 ${result.length} 個任務');
-    debugPrint('🔍 [My Works] 轉換後的任務列表: $result');
+    // debugPrint('🔍 [My Works] 轉換後的任務列表: $result');
 
     return result;
   }
@@ -872,75 +855,34 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
               if (taskId.isEmpty || creatorId <= 0 || participantId <= 0) {
                 debugPrint(
                     '❌ [My Works] ensure_room 參數不足．\ntaskId: $taskId, \ncreatorId: $creatorId, \nparticipantId: $participantId');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('聊天室參數不足'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
                 return;
               }
 
-              try {
-                String realRoomId = '';
+              // 使用統一的導航服務
+              final success = await ChatNavigationService.ensureRoomAndNavigate(
+                context: context,
+                taskId: taskId,
+                creatorId: creatorId,
+                participantId: participantId,
+                existingRoomId: task['chat_room_id']?.toString(),
+                type: 'application',
+              );
 
-                // 檢查是否已經有現成的 chat_room_id
-                if (task['chat_room_id'] != null &&
-                    task['chat_room_id'].toString().isNotEmpty) {
-                  realRoomId = task['chat_room_id'].toString();
-                  debugPrint('✅ [My Works] 使用現有的 chat_room_id: $realRoomId');
-                } else {
-                  // 沒有現成的 chat_room_id，需要調用 ensure_room 創建
-                  debugPrint(
-                      '📡 [My Works] 沒有現成的 chat_room_id，調用 ensure_room 創建');
-
-                  final chatService = ChatService();
-                  final roomResult = await chatService.ensureRoom(
-                    taskId: taskId,
-                    creatorId: creatorId,
-                    participantId: participantId,
-                    type: 'application',
-                  );
-
-                  final roomData = roomResult['room'] ?? {};
-                  realRoomId = roomData['id']?.toString() ?? '';
-
-                  if (realRoomId.isEmpty) {
-                    debugPrint('❌ [My Works] ensure_room 未取得 room_id');
-                    return;
-                  }
-
-                  debugPrint('✅ [My Works] ensure_room 成功創建聊天室: $realRoomId');
-                }
-
-                // 載入聊天室詳細數據
-                debugPrint('🔍 [My Works] 載入聊天室數據，room_id: $realRoomId');
-                final chatService = ChatService();
-                final chatData =
-                    await chatService.getChatDetailData(roomId: realRoomId);
-
-                // 保存到本地儲存
-                await ChatStorageService.savechatRoomData(
-                  roomId: realRoomId,
-                  room: chatData['room'] ?? {},
-                  task: chatData['task'] ?? {},
-                  userRole: chatData['user_role'] ?? 'participant',
-                  chatPartnerInfo: chatData['chat_partner_info'],
+              if (!success && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('無法進入聊天室'),
+                    backgroundColor: Colors.red,
+                  ),
                 );
-
-                // 設置為當前會話
-                await ChatSessionManager.setCurrentChatSession(
-                  roomId: realRoomId,
-                  room: chatData['room'] ?? {},
-                  task: chatData['task'] ?? {},
-                  userRole: chatData['user_role'] ?? 'participant',
-                  chatPartnerInfo: chatData['chat_partner_info'] ?? {},
-                );
-
-                // 導航到聊天室
-                debugPrint('🔍 [My Works] 準備導航到聊天室，room_id: $realRoomId');
-                context.go('/chat/detail?room_id=$realRoomId');
-              } catch (e) {
-                debugPrint('❌ [My Works] 進入聊天室失敗: $e');
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('無法進入聊天室: $e')),
-                  );
-                }
               }
             },
             borderRadius: BorderRadius.circular(12),

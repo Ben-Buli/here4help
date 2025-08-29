@@ -23,6 +23,17 @@ class _ChatTitleWidgetState extends State<ChatTitleWidget> {
   void initState() {
     super.initState();
     debugPrint('🔍 ChatTitleWidget.initState()');
+    debugPrint('🔍 widget.data: ${widget.data}');
+
+    // 如果有 widget.data，立即設置初始狀態
+    if (widget.data != null && widget.data!.isNotEmpty) {
+      setState(() {
+        _chatData = widget.data;
+        _loading = false;
+      });
+      debugPrint('✅ 立即設置初始 _chatData: ${widget.data}');
+    }
+
     _checkUserInfo();
     _init();
   }
@@ -90,8 +101,6 @@ class _ChatTitleWidgetState extends State<ChatTitleWidget> {
       debugPrint('⚠️ 沒有可用數據，使用空 Map');
     }
 
-    debugPrint('🔍 最終使用的數據: $data');
-
     if (!mounted) return;
     setState(() {
       _chatData = data;
@@ -109,13 +118,34 @@ class _ChatTitleWidgetState extends State<ChatTitleWidget> {
     debugPrint('🔍 _chatData == null: ${_chatData == null}');
     debugPrint('🔍 _chatData?.isEmpty: ${_chatData?.isEmpty}');
 
+    // 如果正在載入，顯示載入狀態
     if (_loading) {
       debugPrint('⏳ 顯示 Loading 標題');
       return const Text('Loading...');
     }
 
+    // 如果 _chatData 為空但有 widget.data，嘗試使用 widget.data
+    if ((_chatData == null || _chatData!.isEmpty) && widget.data != null) {
+      debugPrint('🔄 使用 widget.data 作為臨時數據');
+      final tempData = widget.data!;
+
+      // 嘗試從 widget.data 構建臨時標題
+      final task = tempData['task'] as Map<String, dynamic>?;
+      final room = tempData['room'] as Map<String, dynamic>?;
+
+      if (task != null && task['title'] != null) {
+        debugPrint('✅ 使用 widget.data 中的任務標題');
+        return Text(task['title'].toString());
+      } else if (room != null) {
+        debugPrint('✅ 使用 widget.data 中的房間信息');
+        return const Text('Chat Room');
+      }
+    }
+
+    // 如果 _chatData 為空且沒有可用的 widget.data
     if (_chatData == null || _chatData!.isEmpty) {
       debugPrint('❌ 顯示預設 Chat Detail 標題，因為 _chatData 為空');
+      debugPrint('🔍 widget.data: ${widget.data}');
       return const Text('Chat Detail');
     }
 

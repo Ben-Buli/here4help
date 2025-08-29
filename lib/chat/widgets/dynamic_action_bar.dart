@@ -26,11 +26,25 @@ class DynamicActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🔍 [DynamicActionBar] build() 開始');
+    debugPrint('  - taskStatus: $taskStatus');
+    debugPrint('  - userRole: $userRole');
+    debugPrint('  - showStatusBar: $showStatusBar');
+    debugPrint('  - statusDisplayName: $statusDisplayName');
+    debugPrint('  - progressRatio: $progressRatio');
+    debugPrint('  - actionCallbacks keys: ${actionCallbacks.keys.toList()}');
+
     final actions = ActionBarConfigManager.getActionsForStatus(
       status: taskStatus,
       userRole: userRole,
       actionCallbacks: actionCallbacks,
     );
+
+    debugPrint('  - 獲取到的 actions 數量: ${actions.length}');
+    for (int i = 0; i < actions.length; i++) {
+      final action = actions[i];
+      debugPrint('    - Action $i: ${action.label} (${action.icon})');
+    }
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -46,8 +60,15 @@ class DynamicActionBar extends StatelessWidget {
 
   /// 構建狀態顯示條
   Widget _buildStatusBar(BuildContext context) {
+    debugPrint('🔍 [DynamicActionBar] _buildStatusBar() 開始');
+
     final statusColor = ActionBarConfigManager.getStatusColor(taskStatus);
     final statusIcon = ActionBarConfigManager.getStatusIcon(taskStatus);
+
+    debugPrint('  - statusColor: $statusColor');
+    debugPrint('  - statusIcon: $statusIcon');
+    debugPrint('  - statusDisplayName: $statusDisplayName');
+    debugPrint('  - progressRatio: $progressRatio');
 
     return Container(
       width: double.infinity,
@@ -107,6 +128,9 @@ class DynamicActionBar extends StatelessWidget {
 
   /// 構建 Action Bar
   Widget _buildActionBar(BuildContext context, List<ActionBarAction> actions) {
+    debugPrint('🔍 [DynamicActionBar] _buildActionBar() 開始');
+    debugPrint('  - actions 數量: ${actions.length}');
+
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
@@ -238,6 +262,7 @@ class DynamicActionBar extends StatelessWidget {
 
   /// 獲取默認狀態名稱
   String _getDefaultStatusName(TaskStatus status) {
+    debugPrint('🔍 [DynamicActionBar][_getDefaultStatusName] status: $status');
     switch (status) {
       case TaskStatus.open:
         return 'Open';
@@ -253,6 +278,8 @@ class DynamicActionBar extends StatelessWidget {
         return 'Cancelled';
       case TaskStatus.rejected:
         return 'Rejected';
+      default:
+        return 'Unknown';
     }
   }
 }

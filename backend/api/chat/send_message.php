@@ -55,7 +55,7 @@ try {
     Response::error('Chat room not found', 404);
   }
 
-  // Block messaging for completed/closed/canceled/rejected tasks（相容多種欄位）
+  // Block messaging for completed/closed/cancelled/rejected tasks（相容多種欄位）
   if (!empty($existingRoom['task_id'])) {
     try {
       $task = $db->fetch("SELECT * FROM tasks WHERE id = ?", [$existingRoom['task_id']]);

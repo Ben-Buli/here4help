@@ -80,6 +80,10 @@ class AppConfig {
     return '$apiBaseUrl/backend/api/tasks/applications/reject.php';
   }
 
+  static String get applicationApproveUrlV2 {
+    return '$apiBaseUrl/backend/api/tasks/applications/approve.php';
+  }
+
   // 任務完成相關 API
   static String get taskConfirmCompletionUrl {
     return '$apiBaseUrl/backend/api/tasks/confirm_completion.php';

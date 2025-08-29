@@ -127,9 +127,11 @@ try {
     'description' => $row['description'],
     'location' => $row['location'],
     'reward_point' => $row['reward_point'],
-    'status_id' => $row['status_id'],
-    'status_code' => $row['status_code'],
-    'status_display' => $row['status_display'],
+    'status' => [
+      'id' => $row['status_id'],
+      'code' => $row['status_code'],
+      'display_name' => $row['status_display'],
+    ],
     'created_at' => $row['task_created_at'] ?? null,
     'updated_at' => $row['task_updated_at'] ?? null,
   ];

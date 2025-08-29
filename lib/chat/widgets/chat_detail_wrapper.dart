@@ -94,8 +94,6 @@ class _ChatDetailWrapperState extends State<ChatDetailWrapper> {
         debugPrint('✅ 已將傳入數據設置為當前會話');
       }
 
-      debugPrint('🔍 最終使用的數據: $chatData');
-
       if (mounted) {
         setState(() {
           _chatData = chatData;

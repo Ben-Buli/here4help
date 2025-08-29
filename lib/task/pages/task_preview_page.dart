@@ -438,7 +438,7 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: Text(
-                                    '$rewardPoint / hour',
+                                    rewardPoint,
                                     overflow: TextOverflow.ellipsis,
                                     maxLines: 1,
                                   ),

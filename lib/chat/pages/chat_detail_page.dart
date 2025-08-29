@@ -25,6 +25,7 @@ import 'package:here4help/services/theme_config_manager.dart';
 import 'dart:ui';
 import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/chat/services/chat_storage_service.dart';
+import 'package:here4help/chat/providers/chat_list_provider.dart';
 import 'package:here4help/widgets/dispute_dialog.dart';
 import 'package:here4help/chat/widgets/disagree_completion_dialog.dart';
 import 'package:here4help/chat/widgets/confirm_completion_dialog.dart';
@@ -226,24 +227,61 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   // _taskStatusCode() 暫不使用（資料以顯示文字流程處理）
 
   int? _getOpponentUserId() {
+    debugPrint('🔍 [ChatDetailPage] _getOpponentUserId() 開始');
+    debugPrint('  - _currentUserId: $_currentUserId');
+    debugPrint('  - _chatData: ${_chatData != null ? 'not null' : 'null'}');
+    debugPrint('  - _room: ${_room != null ? 'not null' : 'null'}');
+
     try {
       final room = _room;
-      if (room == null) return null;
+      if (room == null) {
+        debugPrint('❌ [ChatDetailPage] _room 為 null');
+        return null;
+      }
+
+      debugPrint('  - room 內容: ${room.keys.toList()}');
+      debugPrint('  - room 原始數據: $room');
+
       final creatorId = room['creator_id'] ?? room['creatorId'];
       final participantId = room['participant_id'] ?? room['participantId'];
-      if (_currentUserId == null) return null;
+
+      debugPrint(
+          '  - creatorId (原始): $creatorId (類型: ${creatorId.runtimeType})');
+      debugPrint(
+          '  - participantId (原始): $participantId (類型: ${participantId.runtimeType})');
+
+      if (_currentUserId == null) {
+        debugPrint('❌ [ChatDetailPage] _currentUserId 為 null');
+        return null;
+      }
+
       final int? creator =
           (creatorId is int) ? creatorId : int.tryParse('$creatorId');
       final int? participant = (participantId is int)
           ? participantId
           : int.tryParse('$participantId');
-      debugPrint(
-          '👥 resolve opponent: currentUserId=$_currentUserId, creator=$creator, participant=$participant');
-      if (creator == _currentUserId) return participant;
-      if (participant == _currentUserId) return creator;
-      return participant ?? creator;
+
+      debugPrint('  - creator (解析後): $creator');
+      debugPrint('  - participant (解析後): $participant');
+      debugPrint('  - currentUserId: $_currentUserId');
+
+      if (creator == _currentUserId) {
+        debugPrint(
+            '✅ [ChatDetailPage] 當前用戶是 creator，返回 participant: $participant');
+        return participant;
+      }
+      if (participant == _currentUserId) {
+        debugPrint('✅ [ChatDetailPage] 當前用戶是 participant，返回 creator: $creator');
+        return creator;
+      }
+
+      // 如果都不匹配，返回 participant 或 creator
+      final result = participant ?? creator;
+      debugPrint('⚠️ [ChatDetailPage] 用戶角色不匹配，返回預設值: $result');
+      return result;
     } catch (e) {
-      debugPrint('❌ _getOpponentUserId error: $e');
+      debugPrint('❌ [ChatDetailPage] _getOpponentUserId error: $e');
+      debugPrint('  - 錯誤堆疊: ${e.toString()}');
       return null;
     }
   }
@@ -512,6 +550,18 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   @override
   void initState() {
     super.initState();
+    debugPrint('🔍 ChatDetailPage.initState() 開始');
+    debugPrint('🔍 widget.data: ${widget.data}');
+
+    // 如果有 widget.data，先設置初始狀態
+    if (widget.data != null) {
+      setState(() {
+        // 設置初始的 _chatData，讓 AppBar 能立即顯示
+        _chatData = widget.data;
+      });
+      debugPrint('✅ 設置初始 _chatData: ${widget.data}');
+    }
+
     _initializeChat(); // 先初始化聊天室，再載入用戶ID
 
     // 移除狀態 Bar 動畫初始化
@@ -548,42 +598,61 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   /// 載入當前登入用戶 ID
   Future<void> _loadCurrentUserId() async {
+    debugPrint('🔍 [ChatDetailPage] _loadCurrentUserId() 開始');
+    debugPrint('  - 當前 _currentUserId: $_currentUserId');
+
     try {
       // 優先從 UserService 獲取當前用戶
+      debugPrint('🔍 [ChatDetailPage] 嘗試從 UserService 獲取用戶');
       final userService = Provider.of<UserService>(context, listen: false);
       await userService.ensureUserLoaded();
+      debugPrint('  - UserService 載入完成');
 
       if (userService.currentUser != null) {
+        debugPrint('✅ [ChatDetailPage] UserService 有當前用戶');
+        debugPrint('  - 用戶ID: ${userService.currentUser!.id}');
+        debugPrint('  - 用戶名稱: ${userService.currentUser!.name}');
+        debugPrint('  - 用戶頭像: ${userService.currentUser!.avatar_url}');
+
         if (mounted) {
           setState(() {
             _currentUserId = userService.currentUser!.id;
           });
-          debugPrint('✅ 從 UserService 載入當前用戶 ID: $_currentUserId');
-          debugPrint('✅ 當前用戶頭像: ${userService.currentUser!.avatar_url}');
+          debugPrint(
+              '✅ [ChatDetailPage] 從 UserService 載入當前用戶 ID: $_currentUserId');
 
           // 重新解析對方身份
           _resolveOpponentIdentity();
         }
         return;
+      } else {
+        debugPrint(
+            '⚠️ [ChatDetailPage] UserService 沒有當前用戶，嘗試 SharedPreferences');
       }
 
       // 備用方案：從 SharedPreferences 讀取
+      debugPrint('🔍 [ChatDetailPage] 嘗試從 SharedPreferences 讀取');
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('user_id');
       final currentAvatar = prefs.getString('user_avatarUrl') ?? '';
+
+      debugPrint('  - SharedPreferences user_id: $userId');
+      debugPrint(
+          '  - SharedPreferences user_avatarUrl: ${currentAvatar.isNotEmpty ? currentAvatar : 'empty'}');
+
       if (mounted) {
         setState(() {
           _currentUserId = userId;
         });
-        debugPrint('⚠️ 從 SharedPreferences 載入用戶 ID: $userId');
-        debugPrint(
-            '⚠️ 從 SharedPreferences 載入頭像: ${currentAvatar.isNotEmpty ? currentAvatar : 'empty'}');
+        debugPrint('⚠️ [ChatDetailPage] 從 SharedPreferences 載入用戶 ID: $userId');
 
         // 重新解析對方身份
         _resolveOpponentIdentity();
       }
     } catch (e) {
-      debugPrint('❌ 載入當前用戶 ID 失敗: $e');
+      debugPrint('❌ [ChatDetailPage] 載入當前用戶 ID 失敗: $e');
+      debugPrint('  - 錯誤類型: ${e.runtimeType}');
+      debugPrint('  - 錯誤堆疊: ${e.toString()}');
     }
   }
 
@@ -851,6 +920,18 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
       // 使用聚合 API 獲取聊天室數據
       final chatData = await ChatService().getChatDetailData(roomId: roomId);
+
+      // 驗證返回的數據
+      if (chatData.isEmpty) {
+        debugPrint('❌ ChatService.getChatDetailData 返回空數據');
+        setState(() {
+          _hasError = true;
+          _errorMessage = '無法載入聊天室數據，請稍後重試';
+        });
+        return;
+      }
+
+      debugPrint('✅ 成功獲取聊天室數據: ${chatData.keys}');
 
       if (mounted) {
         setState(() {
@@ -2426,36 +2507,73 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   /// 處理接受應徵
   Future<void> _handleAcceptApplication() async {
-    if (_task == null) return;
+    debugPrint('🔍 [ChatDetailPage] _handleAcceptApplication() 開始');
+    debugPrint('  - _task: ${_task != null ? 'not null' : 'null'}');
+    debugPrint('  - _chatData: ${_chatData != null ? 'not null' : 'null'}');
+    debugPrint('  - _room: ${_room != null ? 'not null' : 'null'}');
+
+    if (_task == null) {
+      debugPrint('❌ [ChatDetailPage] _task 為 null，無法處理接受應徵');
+      return;
+    }
 
     try {
+      debugPrint('🔍 [ChatDetailPage] 開始載入當前用戶ID');
+
       // 確保當前用戶ID已載入
       if (_currentUserId == null) {
+        debugPrint('  - _currentUserId 為 null，開始載入');
         await _loadCurrentUserId();
+        debugPrint('  - 載入後 _currentUserId: $_currentUserId');
+      } else {
+        debugPrint('  - _currentUserId 已存在: $_currentUserId');
       }
 
       if (_currentUserId == null) {
+        debugPrint('❌ [ChatDetailPage] 載入後仍無法獲取當前用戶ID');
         throw Exception('Unable to get current user ID');
       }
 
-      // 獲取對手用戶ID（應徵者）
-      final opponentId = _getOpponentUserId();
-      if (opponentId == null) {
-        throw Exception('Unable to get opponent user ID');
+      // 檢查聊天室數據是否已載入
+      debugPrint('🔍 [ChatDetailPage] 檢查聊天室數據');
+      debugPrint('  - _chatData: ${_chatData != null ? 'not null' : 'null'}');
+      if (_chatData != null) {
+        debugPrint('  - _chatData 內容: ${_chatData!.keys.toList()}');
       }
+
+      if (_chatData == null || _chatData!.isEmpty) {
+        debugPrint('❌ [ChatDetailPage] _chatData 為空，無法獲取對手用戶ID');
+        throw Exception('Chat data not loaded. Please refresh the page.');
+      }
+
+      // 獲取對手用戶ID（應徵者）
+      debugPrint('🔍 [ChatDetailPage] 開始獲取對手用戶ID');
+      final opponentId = _getOpponentUserId();
+      debugPrint('  - 獲取到的 opponentId: $opponentId');
+
+      if (opponentId == null) {
+        debugPrint('❌ [ChatDetailPage] 無法獲取對手用戶ID');
+        debugPrint('  - _room: $_room');
+        debugPrint('  - _chatData: $_chatData');
+        throw Exception(
+            'Unable to get opponent user ID. Please check chat room data.');
+      }
+
+      debugPrint(
+          '✅ 準備接受應徵 - Task: ${_task!['id']}, User: $opponentId, Poster: $_currentUserId');
 
       // 呼叫新的 Application Accept API
       final result = await TaskService().acceptApplication(
         taskId: _task!['id'].toString(),
-        userId: opponentId?.toString(),
+        userId: opponentId.toString(),
         posterId: _currentUserId.toString(),
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text(
-                'Task assigned to ${result['assigned_user']?['username'] ?? 'user'}. Task is now in progress.'),
+                'Congratulations! You’ve been selected as the tasker for this task. Let’s get started!'),
           ),
         );
       }
@@ -2468,7 +2586,66 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
       // 刷新頁面資料
       await _initializeChat();
+
+      // 調試：檢查任務狀態是否已更新
+      debugPrint('🔍 [Accept] 刷新後任務狀態檢查:');
+      debugPrint('  - _chatData: ${_chatData != null ? 'not null' : 'null'}');
+      if (_chatData != null && _chatData!['task'] != null) {
+        final task = _chatData!['task'];
+        debugPrint('  - task status code: ${task['status']?['code']}');
+        debugPrint(
+            '  - task status display: ${task['status']?['display_name']}');
+        debugPrint('  - task participant_id: ${task['participant_id']}');
+      }
+
+      // 強制更新 UI 狀態（多次調用確保更新）
+      if (mounted) {
+        setState(() {});
+        debugPrint('✅ [Accept] setState() 已調用');
+
+        // 延遲再次更新，確保 UI 完全刷新
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted) {
+            setState(() {});
+            debugPrint('✅ [Accept] 延遲 setState() 已調用');
+          }
+        });
+      }
+
+      // 通知 Provider 刷新聊天列表數據
+      if (mounted && context.mounted) {
+        try {
+          final provider = context.read<ChatListProvider>();
+          if (provider != null) {
+            // 根據用戶角色刷新對應的標籤頁
+            if (_userRole == 'creator') {
+              provider
+                  .checkAndTriggerTabLoad(ChatListProvider.TAB_POSTED_TASKS);
+              debugPrint('✅ [Accept] 已通知 Provider 刷新 POSTED_TASKS');
+            } else {
+              provider.checkAndTriggerTabLoad(ChatListProvider.TAB_MY_WORKS);
+              debugPrint('✅ [Accept] 已通知 Provider 刷新 MY_WORKS');
+            }
+            // 強制刷新快取
+            provider.forceRefreshCache();
+            debugPrint('✅ [Accept] 已強制刷新快取');
+
+            // 新增：通知兩個分頁的分頁控制器刷新（若上層有監聽）
+            try {
+              // 透過 Provider 的事件機制定義：這裡只呼叫既有方法，
+              // 具體分頁元件會在 build 中使用 RefreshIndicator 與 PagingController.refresh()
+              // 因此這裡不直接持有 controller，避免相依。
+              provider
+                  .checkAndTriggerTabLoad(ChatListProvider.TAB_POSTED_TASKS);
+              provider.checkAndTriggerTabLoad(ChatListProvider.TAB_MY_WORKS);
+            } catch (_) {}
+          }
+        } catch (e) {
+          debugPrint('❌ 通知 Provider 刷新失敗: $e');
+        }
+      }
     } catch (e) {
+      debugPrint('❌ Accept application failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to accept application: $e')),
@@ -2508,12 +2685,14 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             .TaskStatus.statusString['pending_confirmation_tasker']!,
         statusCode: 'pending_confirmation',
       );
-      if (mounted) setState(() {});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Waiting for poster confirmation.')),
         );
       }
+
+      // 刷新頁面資料以更新任務狀態
+      await _initializeChat();
     }
   }
 
@@ -2535,7 +2714,6 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             taskId: _task!['id'].toString(),
             preview: false,
           );
-          if (mounted) setState(() {});
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Task confirmed and paid.')),
@@ -2565,7 +2743,6 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             taskId: _task!['id'].toString(),
             reason: reason,
           );
-          if (mounted) setState(() {});
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Disagree submitted.')),
@@ -2860,7 +3037,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         }
         break;
       default:
-        // 其他（Rejected/Closed/Canceled）
+        // 其他（Rejected/Closed/Cancelled）
         actions.add(actionDefs('Report', Icons.article, () {
           _openReportSheet();
         }));
@@ -3345,7 +3522,18 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   // 輔助方法：安全地獲取數據
   Map<String, dynamic>? get _task => _chatData?['task'];
-  Map<String, dynamic>? get _room => _chatData?['chat_room'];
+  Map<String, dynamic>? get _room {
+    final room = _chatData?['room'] ?? _chatData?['chat_room'];
+    // debugPrint(
+    //     '🔍 [ChatDetailPage] _room getter - _chatData keys: ${_chatData?.keys.toList()}');
+    // debugPrint(
+    //     '🔍 [ChatDetailPage] _room getter - room from "room": ${_chatData?['room']}');
+    // debugPrint(
+    //     '🔍 [ChatDetailPage] _room getter - room from "chat_room": ${_chatData?['chat_room']}');
+    // debugPrint('🔍 [ChatDetailPage] _room getter - final result: $room');
+    return room;
+  }
+
   Map<String, dynamic>? get _application => _chatData?['application'];
   Map<String, dynamic>? get _chatPartnerInfo => _chatData?['chat_partner_info'];
   List<Map<String, dynamic>> get _applicationQuestions =>
@@ -3380,7 +3568,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     return name[0].toUpperCase();
   }
 
-  // 已移除狀態欄輔助方法 - 使用 DynamicActionBar 替代
+  /// 已移除狀態欄輔助方法 - 使用 DynamicActionBar 替代
   @deprecated
   Color _getStatusBarColor() {
     final statusCode = _task?['status']?['code'];
@@ -3432,6 +3620,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         return _buildResumeBubble(message);
       case 'image':
         return _buildImageBubble(message);
+      case 'system':
+        return _buildSystemMessage(message);
       case 'text':
       default:
         // 向後兼容：檢查是否為舊的 View Resume 訊息
@@ -3869,46 +4059,47 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               ),
             ),
             const SizedBox(width: 8),
-            CircleAvatar(
-              radius: 16,
-              backgroundImage: Provider.of<UserService>(context, listen: false)
-                              .currentUser
-                              ?.avatar_url !=
-                          null &&
-                      Provider.of<UserService>(context, listen: false)
-                          .currentUser!
-                          .avatar_url
-                          .isNotEmpty
-                  ? ImageHelper.getAvatarImage(
-                      Provider.of<UserService>(context, listen: false)
-                          .currentUser!
-                          .avatar_url)
-                  : null,
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              child: Provider.of<UserService>(context, listen: false)
-                              .currentUser
-                              ?.avatar_url ==
-                          null ||
-                      Provider.of<UserService>(context, listen: false)
-                          .currentUser!
-                          .avatar_url
-                          .isEmpty
-                  ? Text(
-                      () {
-                        final user =
-                            Provider.of<UserService>(context, listen: false)
-                                .currentUser;
-                        final name = user?.name ?? '';
-                        return name.isNotEmpty ? name[0].toUpperCase() : 'U';
-                      }(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                  : null,
-            ),
+            // 我方頭像 不顯示
+            // CircleAvatar(
+            //   radius: 16,
+            //   backgroundImage: Provider.of<UserService>(context, listen: false)
+            //                   .currentUser
+            //                   ?.avatar_url !=
+            //               null &&
+            //           Provider.of<UserService>(context, listen: false)
+            //               .currentUser!
+            //               .avatar_url
+            //               .isNotEmpty
+            //       ? ImageHelper.getAvatarImage(
+            //           Provider.of<UserService>(context, listen: false)
+            //               .currentUser!
+            //               .avatar_url)
+            //       : null,
+            //   backgroundColor: Theme.of(context).colorScheme.primary,
+            //   child: Provider.of<UserService>(context, listen: false)
+            //                   .currentUser
+            //                   ?.avatar_url ==
+            //               null ||
+            //           Provider.of<UserService>(context, listen: false)
+            //               .currentUser!
+            //               .avatar_url
+            //               .isEmpty
+            //       ? Text(
+            //           () {
+            //             final user =
+            //                 Provider.of<UserService>(context, listen: false)
+            //                     .currentUser;
+            //             final name = user?.name ?? '';
+            //             return name.isNotEmpty ? name[0].toUpperCase() : 'U';
+            //           }(),
+            //           style: const TextStyle(
+            //             color: Colors.white,
+            //             fontSize: 12,
+            //             fontWeight: FontWeight.bold,
+            //           ),
+            //         )
+            //       : null,
+            // ),
           ],
         ),
       );
@@ -3979,4 +4170,148 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       );
     }
   }
+
+// #region 渲染系統訊息
+  Widget _buildSystemMessage(Map<String, dynamic> message) {
+    final isFromMe =
+        _currentUserId != null && message['from_user_id'] == _currentUserId;
+    final content = message['content'] ?? message['message'] ?? '';
+    final messageTime = message['created_at']?.toString() ?? '';
+
+    if (isFromMe) {
+      // 我方訊息：使用原有的樣式和狀態顯示
+      final int msgId = (message['id'] is int)
+          ? message['id']
+          : int.tryParse('${message['id']}') ?? 0;
+      final int opponentReadId = (resultOpponentLastReadId ?? 0);
+      // 已讀狀態暫時不使用
+      // final String status = opponentReadId >= msgId ? 'read' : 'sent';
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // 訊息氣泡 + 已讀標記
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    constraints: const BoxConstraints(maxWidth: 300),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.tertiaryContainer,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(4),
+                      ),
+                    ),
+                    child: Text(
+                      content,
+                      style: TextStyle(
+                        color:
+                            Theme.of(context).colorScheme.onTertiaryContainer,
+                        fontSize: 14,
+                      ),
+                      softWrap: true,
+                      overflow: TextOverflow.visible,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _formatMessageTime(messageTime),
+                        style:
+                            const TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
+                      const SizedBox(width: 4),
+                      // 已讀標記：先不做
+                      // Icon(
+                      //   status == 'read' ? Icons.done_all : Icons.done,
+                      //   size: 12,
+                      //   color: status == 'read' ? Colors.blue : Colors.grey,
+                      // ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+      );
+    } else {
+      // 對方訊息：使用對方的樣式
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundImage: _opponentAvatarUrlCached != null
+                  ? ImageHelper.getAvatarImage(_opponentAvatarUrlCached!)
+                  : null,
+              backgroundColor:
+                  Theme.of(context).colorScheme.secondary.withOpacity(0.35),
+              child: _opponentAvatarUrlCached == null
+                  ? Text(
+                      _opponentNameCached.isNotEmpty
+                          ? _opponentNameCached[0].toUpperCase()
+                          : 'U',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSecondary,
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    constraints: const BoxConstraints(maxWidth: 300),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.secondaryContainer,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(4),
+                        topRight: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      content,
+                      style: TextStyle(
+                        color:
+                            Theme.of(context).colorScheme.onSecondaryContainer,
+                        fontSize: 14,
+                      ),
+                      softWrap: true,
+                      overflow: TextOverflow.visible,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatMessageTime(messageTime),
+                    style: const TextStyle(fontSize: 10, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+// #endregion
 }
