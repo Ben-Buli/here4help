@@ -115,29 +115,14 @@ class _ChatListTaskWidgetState extends State<ChatListTaskWidget>
       builder: (context, themeManager, child) {
         // 使用主題配色
         final subtitleColor = themeManager.effectiveTheme.onSecondary;
-        final chatProvider = Provider.of<ChatListProvider?>(context);
-        final bool postedHasUnread = chatProvider?.hasUnreadForTab(0) ?? false;
-        final bool worksHasUnread = chatProvider?.hasUnreadForTab(1) ?? false;
-        Widget buildTabLabel(String text, bool showDot) {
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Text(text),
-              if (showDot)
-                Positioned(
-                  right: -8,
-                  top: -6,
-                  child: Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.error,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-            ],
-          );
+        // 移除未讀狀態檢查
+        // final chatProvider = Provider.of<ChatListProvider?>(context);
+        // final bool postedHasUnread = chatProvider?.hasUnreadForTab(0) ?? false;
+        // final bool worksHasUnread = chatProvider?.hasUnreadForTab(1) ?? false;
+
+        // 簡化的 tab 標籤構建函數，移除未讀紅點
+        Widget buildTabLabel(String text) {
+          return Text(text);
         }
 
         return SizedBox(
@@ -162,8 +147,8 @@ class _ChatListTaskWidgetState extends State<ChatListTaskWidget>
               fontWeight: FontWeight.w300,
             ),
             tabs: [
-              Tab(child: buildTabLabel('Post', postedHasUnread)),
-              Tab(child: buildTabLabel('Expolore', worksHasUnread)),
+              Tab(child: buildTabLabel('Post')),
+              Tab(child: buildTabLabel('Expolore')),
             ],
           ),
         );

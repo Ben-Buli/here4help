@@ -25,17 +25,24 @@ const String kRewardPointField = 'Reward Point';
 const String kTimeField = 'Time';
 const String kPostingPeriodField = 'Posting period';
 
-class TaskCreatePage extends StatefulWidget {
-  const TaskCreatePage({super.key, this.editData});
+class TaskEditPage extends StatefulWidget {
+  const TaskEditPage({super.key, this.editData});
 
   /// 若不為空，表示編輯模式，並填入預設值
   final Map<String, dynamic>? editData;
 
   @override
-  State<TaskCreatePage> createState() => _PostFormPageState();
+  State<TaskEditPage> createState() => _PostFormPageState();
 }
 
-class _PostFormPageState extends State<TaskCreatePage> {
+class _PostFormPageState extends State<TaskEditPage> {
+  int _initialRewardPoint = 0; // 原始任務點數（編輯模式用）
+  bool get _isEditing => widget.editData != null && widget.editData!.isNotEmpty;
+  int get _effectiveUsablePoints {
+    final avail = _walletSummary?.pointsSummary.availablePoints ?? 0;
+    return avail + (_isEditing ? _initialRewardPoint : 0);
+  }
+
   final MapController _mapController = MapController();
   final TextEditingController _rewardPointController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
@@ -46,7 +53,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
   DateTime? _periodEnd;
 
   LatLng? _selectedLocation = const LatLng(25.0208, 121.5418);
-  String _locationLabel = 'NCCU';
+  String _locationLabel = '';
 
   final TextEditingController _locationSearchController =
       TextEditingController();
@@ -82,6 +89,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
       final formatter = NumberFormat('#,##0', 'en_US');
       final rp = t['reward_point']?.toString() ?? '0';
       _rewardPointController.text = formatter.format(int.tryParse(rp) ?? 0);
+      _initialRewardPoint =
+          int.tryParse(rp.replaceAll(',', '')) ?? int.tryParse(rp) ?? 0;
       _locationLabel = (t['location'] ?? 'NCCU').toString();
       _locationSearchController.text = _locationLabel;
       // task_date 可能為 yyyy-MM-dd 或完整時間
@@ -109,19 +118,20 @@ class _PostFormPageState extends State<TaskCreatePage> {
             .toList());
       _languageRequirement = (t['language_requirement'] ?? '').toString();
     } else {
-      _titleController.text = 'Opening Bank Account (Demo)';
+      _titleController.text = '';
       _taskDescriptionController.text =
           'Need help with opening a bank account. Looking for someone who can guide me through the process and accompany me to the bank.';
       final formatter = NumberFormat('#,##0', 'en_US');
       _rewardPointController.text = formatter.format(500);
-      _locationLabel = 'NCCU';
-      _locationSearchController.text = 'NCCU';
+      _initialRewardPoint = 0;
+      _locationLabel = '';
+      _locationSearchController.text = '';
       final now = DateTime.now();
       _taskDate = DateTime(now.year, now.month, now.day, now.hour, now.minute);
       _periodStart = DateTime(2025, 9, 10, 12, 0);
       _periodEnd = DateTime(2025, 9, 10, 13, 0);
       _applicationQuestions.clear();
-      _languageRequirement = 'English,Japanese';
+      _languageRequirement = 'English';
     }
 
     _loadUniversities();
@@ -602,7 +612,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                 // 顯示可用餘額
                 if (_walletSummary != null)
                   Text(
-                    'Usable Points: ${WalletService.formatPoints(_walletSummary!.pointsSummary.availablePoints)}',
+                    'Usable Points: ${WalletService.formatPoints(_effectiveUsablePoints)}',
                     style: TextStyle(
                       color: Colors.grey[600],
                       fontSize: 12,
@@ -655,10 +665,10 @@ class _PostFormPageState extends State<TaskCreatePage> {
                       onChanged: (value) {
                         // 檢查餘額是否足夠
                         if (value.isNotEmpty) {
-                          final inputAmount = int.tryParse(value) ?? 0;
-                          final availablePoints =
-                              _walletSummary?.pointsSummary.availablePoints ??
-                                  0;
+                          final inputAmount = int.tryParse(
+                                  value.replaceAll(RegExp(r'[^\d]'), '')) ??
+                              0;
+                          final availablePoints = _effectiveUsablePoints;
 
                           setState(() {
                             _showInsufficientBalance =
@@ -675,7 +685,8 @@ class _PostFormPageState extends State<TaskCreatePage> {
                           return 'Please enter a reward point';
                         }
                         // 檢查是否為有效數字
-                        final number = int.tryParse(value);
+                        final number = int.tryParse(
+                            value.replaceAll(RegExp(r'[^\d]'), ''));
                         if (number == null) {
                           return 'Please enter a valid integer';
                         }
@@ -684,8 +695,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
                           return 'Reward point must be greater than 0';
                         }
                         // 檢查餘額是否足夠
-                        final availablePoints =
-                            _walletSummary?.pointsSummary.availablePoints ?? 0;
+                        final availablePoints = _effectiveUsablePoints;
                         if (number > availablePoints) {
                           return 'Insufficient balance. Available: ${WalletService.formatPoints(availablePoints)}';
                         }
@@ -917,57 +927,6 @@ class _PostFormPageState extends State<TaskCreatePage> {
           ],
         ),
       ],
-    );
-  }
-
-  Widget _buildTaskTitleCard() {
-    final themeManager =
-        Provider.of<ThemeConfigManager>(context, listen: false);
-    final theme = themeManager.effectiveTheme;
-
-    return _buildFormCard(
-      title: 'Task Title',
-      icon: Icons.title,
-      isRequired: true,
-      isError: _errorFields.contains(kTaskTitleField),
-      child: TextFormField(
-        controller: _titleController,
-        decoration: InputDecoration(
-          hintText: 'Enter a clear and descriptive task title',
-          hintStyle: TextStyle(color: Colors.grey[400]),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: theme.primary, width: 2),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: theme.error, width: 2),
-          ),
-          filled: true,
-          fillColor: _errorFields.contains(kTaskTitleField)
-              ? theme.error.withOpacity(0.1)
-              : Colors.white,
-          prefixIcon: Icon(
-            Icons.edit,
-            color: _errorFields.contains(kTaskTitleField)
-                ? theme.error
-                : theme.primary,
-          ),
-        ),
-        onChanged: (_) {
-          if (_errorFields.contains(kTaskTitleField)) {
-            setState(() => _errorFields.remove(kTaskTitleField));
-          }
-        },
-      ),
     );
   }
 
@@ -3021,22 +2980,6 @@ extension _MoveToSearchLocationExtension on _PostFormPageState {
       if (mounted) {
         _showError('Failed to search location. Please try again.');
       }
-    }
-  }
-
-  // 格式化 reward_point，移除格式化字符並返回純數字
-  String _formatRewardPoint(String value) {
-    if (value.isEmpty) return '0';
-    try {
-      // 移除所有非數字字符（除了小數點）
-      final cleanValue = value.replaceAll(RegExp(r'[^\d.]'), '');
-      if (cleanValue.isEmpty) return '0';
-
-      final num = double.tryParse(cleanValue);
-      if (num == null) return '0';
-      return num.toStringAsFixed(0); // 返回整數格式
-    } catch (e) {
-      return '0';
     }
   }
 }

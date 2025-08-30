@@ -2,15 +2,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:here4help/services/notification_service.dart';
-import 'dart:async';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/services/data_preload_service.dart';
 import 'package:here4help/chat/services/chat_session_manager.dart';
+import 'package:here4help/auth/services/user_service.dart';
 import 'dart:ui';
 import 'dart:math';
 import 'package:here4help/services/scroll_event_bus.dart';
 import 'package:here4help/constants/shell_pages.dart';
+import 'package:here4help/chat/providers/chat_list_provider.dart';
 
 // 新增：導覽列項目資料結構
 class NavigationItem {
@@ -803,45 +803,125 @@ class _ChatBadgeDotIcon extends StatefulWidget {
 }
 
 class _ChatBadgeDotIconState extends State<_ChatBadgeDotIcon> {
-  int _total = 0;
-  StreamSubscription<int>? _sub;
-
   @override
   void initState() {
     super.initState();
-    final center = NotificationCenter();
-    _sub = center.totalUnreadStream.listen((v) {
-      if (!mounted) return;
-      setState(() => _total = v);
-    });
+    // 不再需要 StreamSubscription，直接使用 Consumer
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        const Icon(Icons.message),
-        if (_total > 0)
-          Positioned(
-            right: -1,
-            top: -1,
-            child: Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.error,
-                shape: BoxShape.circle,
+    return Consumer<ChatListProvider>(
+      builder: (context, chatProvider, child) {
+        // 計算當前用戶有權限的聊天室未讀數總和
+        int totalUnread = 0;
+
+        // 獲取當前用戶信息
+        final userService = Provider.of<UserService>(context, listen: false);
+        final currentUserId = userService.currentUser?.id.toString();
+
+        // 調試：打印未讀數據
+        debugPrint('🔍 [底部導航] 調試未讀數據:');
+        debugPrint('  - 當前用戶 ID: $currentUserId');
+        debugPrint('  - 總聊天室數: ${chatProvider.unreadByRoom.length}');
+        debugPrint('  - 未讀數據: ${chatProvider.unreadByRoom}');
+
+        if (currentUserId != null) {
+          // 只統計當前用戶有權限的聊天室
+          for (final entry in chatProvider.unreadByRoom.entries) {
+            final roomId = entry.key;
+            final count = entry.value;
+
+            // 檢查聊天室是否屬於當前用戶
+            if (_isUserAuthorizedForRoom(roomId, currentUserId)) {
+              totalUnread += count;
+              debugPrint('  - 有權限的聊天室: $roomId = $count');
+            } else {
+              debugPrint('  - 無權限的聊天室: $roomId = $count (已排除)');
+            }
+          }
+        }
+
+        debugPrint('  - 最終未讀總數: $totalUnread');
+        debugPrint(
+            '  - 顯示類型: ${totalUnread > 99 ? "99+" : totalUnread > 9 ? "數字" : "小圓點"}');
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(Icons.message),
+            if (totalUnread > 0)
+              Positioned(
+                right: totalUnread > 99 ? -2 : 0,
+                top: totalUnread > 99 ? -2 : 0,
+                child: Container(
+                  width: totalUnread > 99 ? 16 : (totalUnread > 9 ? 12 : 8),
+                  height: totalUnread > 99 ? 16 : (totalUnread > 9 ? 12 : 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.error,
+                    shape: BoxShape.circle,
+                  ),
+                  child: totalUnread > 99
+                      ? const Center(
+                          child: Text(
+                            '99+',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 7,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        )
+                      : totalUnread > 9
+                          ? Center(
+                              child: Text(
+                                totalUnread.toString(),
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            )
+                          : null,
+                ),
               ),
-            ),
-          ),
-      ],
+          ],
+        );
+      },
     );
+  }
+
+  /// 檢查用戶是否有權限訪問特定聊天室
+  bool _isUserAuthorizedForRoom(String roomId, String currentUserId) {
+    // 這裡需要根據聊天室 ID 的格式來判斷用戶權限
+    // 假設聊天室 ID 格式為: "room_${taskId}_${creatorId}_${participantId}"
+    // 或者 "room_${taskId}_${userId1}_${userId2}"
+
+    try {
+      // 解析聊天室 ID
+      if (roomId.startsWith('room_')) {
+        final parts = roomId.split('_');
+        if (parts.length >= 4) {
+          // 格式: room_taskId_creatorId_participantId
+          final creatorId = parts[2];
+          final participantId = parts[3];
+
+          // 檢查當前用戶是否為創建者或參與者
+          return creatorId == currentUserId || participantId == currentUserId;
+        }
+      }
+
+      // 如果無法解析，預設為無權限
+      return false;
+    } catch (e) {
+      // 解析失敗，預設為無權限
+      return false;
+    }
   }
 }

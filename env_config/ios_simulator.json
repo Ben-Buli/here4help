@@ -1,0 +1,14 @@
+{
+  "environment": "development",
+  "api_base_url": "http://localhost:8888/here4help",
+  "socket_url": "http://localhost:3001",
+  "image_base_url": "http://localhost:8888/here4help",
+  "debug_mode": true,
+  "log_level": "debug",
+  "features": {
+    "third_party_auth": true,
+    "chat": true,
+    "tasks": true,
+    "payments": false
+  }
+}

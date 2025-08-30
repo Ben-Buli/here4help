@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/chat/services/chat_cache_manager.dart';
-import 'package:here4help/chat/providers/chat_list_provider.dart';
 
 /// 聊天頁面的 Provider 配置
+/// 注意：ChatListProvider 現在在 main.dart 的根部提供
 class ChatProviders extends StatelessWidget {
   final Widget child;
 
@@ -19,9 +19,7 @@ class ChatProviders extends StatelessWidget {
         ChangeNotifierProvider<ChatCacheManager>(
           create: (context) => ChatCacheManager(),
         ),
-        ChangeNotifierProvider<ChatListProvider>(
-          create: (context) => ChatListProvider(),
-        ),
+        // ChatListProvider 已移至 main.dart 根部提供
       ],
       child: child,
     );

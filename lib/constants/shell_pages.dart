@@ -50,6 +50,7 @@ import 'package:here4help/task/pages/task_create_page.dart';
 import 'package:here4help/task/pages/task_list_page.dart';
 import 'package:here4help/task/pages/task_preview_page.dart';
 import 'package:here4help/task/pages/task_apply_page.dart';
+import 'package:here4help/task/pages/task_edit_page.dart';
 
 // 集中管理 ShellRoute 內的頁面
 final List<Map<String, dynamic>> shellPages = [
@@ -142,6 +143,18 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': true,
     'showBackArrow': true,
     'permission': 1, // 需要已認證用戶才能創建任務
+  },
+  {
+    'path': '/task/edit',
+    'builder': (context, data) {
+      return TaskEditPage(
+        editData: data as Map<String, dynamic>?,
+      );
+    },
+    'title': 'Editing Task',
+    'showBottomNav': true,
+    'showBackArrow': true,
+    'permission': 1, // 需要已認證用戶才能編輯任務
   },
   {
     'path': '/task/create/preview',

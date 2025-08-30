@@ -38,6 +38,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
   List<Map<String, dynamic>> _filteredTasks = []; // 新增：篩選後的任務
   List<Map<String, dynamic>> _sortedTasks = []; // 新增：排序後的任務
 
+  // Pin 功能相關狀態
+  final Set<String> _pinnedTaskIds = {}; // 已釘選的任務 ID
+
   /// 臨時偵錯方法 - 用於追蹤 widget 生命週期
   void _guard(String tag) {
     assert(() {
@@ -61,21 +64,25 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     // 初始化未讀數據監聽器
     _setupUnreadListener();
 
-    // 延遲載入數據，避免在 initState 中直接調用
+    // 統一設置 Provider 監聽器（避免重複設置）
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
-      // 檢查 Provider 是否已初始化
+      // 安全地獲取 Provider
       ChatListProvider? chatProvider;
       try {
         chatProvider = context.read<ChatListProvider>();
       } catch (e) {
         debugPrint(
-            '⚠️ [Posted Tasks][_initState()] 無法獲取 ChatListProvider，跳過初始化檢查');
+            '⚠️ [Posted Tasks][initState] 無法獲取 ChatListProvider，跳過監聽器設置');
         return;
       }
 
-      if (chatProvider.isInitialized) {
+      // 設置 Provider 變化監聽器
+      chatProvider.addListener(_handleProviderChanges);
+
+      // 檢查 Provider 是否已初始化
+      if (chatProvider!.isInitialized) {
         debugPrint('✅ [Posted Tasks] Provider 已初始化，檢查分頁狀態');
         _checkAndLoadIfNeeded();
       } else {
@@ -83,63 +90,23 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         // 等待 Provider 初始化完成
         chatProvider.addListener(() {
           if (!mounted) return;
-          if (chatProvider?.isInitialized == true) {
+          if (chatProvider!.isInitialized) {
             debugPrint('✅ [Posted Tasks] Provider 初始化完成，檢查分頁狀態');
             _checkAndLoadIfNeeded();
-            // 移除一次性監聽器
-            chatProvider?.removeListener(() {});
           }
         });
       }
-    });
-
-    // 監聽快取載入完成事件
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-
-      ChatListProvider? chatProvider;
-      try {
-        chatProvider = context.read<ChatListProvider>();
-      } catch (e) {
-        debugPrint(
-            '⚠️ [Posted Tasks][_setupCacheListener()] 無法獲取 ChatListProvider，跳過快取監聽');
-        return;
-      }
-
-      chatProvider.addListener(() {
-        if (!mounted) return;
-        if (chatProvider?.lastEvent == 'cache_loaded') {
-          debugPrint('📡 [Posted Tasks] 收到快取載入完成事件，重新載入數據');
-          _fetchAllTasks();
-        }
-        // 新增：監聽分頁載入完成事件（tab_loaded_0），載入任務清單
-        if (chatProvider?.lastEvent == 'tab_loaded_0') {
-          debugPrint('📡 [Posted Tasks] 分頁載入完成 (tab_loaded_0)，載入任務清單');
-          _fetchAllTasks();
-        }
-      });
-    });
-
-    // 監聽 ChatListProvider 的篩選條件變化和其他事件
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-
-      ChatListProvider? chatProvider;
-      try {
-        chatProvider = context.read<ChatListProvider>();
-      } catch (e) {
-        debugPrint(
-            '⚠️ [Posted Tasks][_setupUnreadListener()] 無法獲取 ChatListProvider，跳過事件監聽');
-        return;
-      }
-
-      chatProvider.addListener(_handleProviderChanges);
 
       // 監聽快取載入完成事件
       chatProvider.addListener(() {
         if (!mounted) return;
-        if (chatProvider?.lastEvent == 'cache_loaded') {
+        if (chatProvider!.lastEvent == 'cache_loaded') {
           debugPrint('📡 [Posted Tasks] 收到快取載入完成事件，重新載入數據');
+          _fetchAllTasks();
+        }
+        // 新增：監聽分頁載入完成事件（tab_loaded_0），載入任務清單
+        if (chatProvider!.lastEvent == 'tab_loaded_0') {
+          debugPrint('📡 [Posted Tasks] 分頁載入完成 (tab_loaded_0)，載入任務清單');
           _fetchAllTasks();
         }
       });
@@ -529,19 +496,25 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           _lastSelectedLocations = currentLocations;
           _lastSelectedStatuses = currentStatuses;
 
-          // 如果有搜尋查詢變化，立即觸發篩選和排序
-          if (hasSearchChanged) {
+          // 搜尋和篩選互斥邏輯：執行其中一個時重設另一個
+          if (hasSearchChanged && currentSearchQuery.isNotEmpty) {
+            // 有搜尋查詢時，清空篩選條件
             if (kDebugMode && verboseSearchLog) {
-              debugPrint('🔍 [Posted Tasks] 搜尋查詢變化，立即重新篩選和排序');
+              debugPrint('🔍 [Posted Tasks] 搜尋查詢變化，清空篩選條件');
             }
-            _applyFiltersAndSort();
-          } else {
-            // 其他篩選條件變化：僅前端重算（不觸發 API）
+            // 只清空篩選條件，不清空搜尋查詢
+            chatProvider.updateLocationFilter({});
+            chatProvider.updateStatusFilter({});
+          } else if (hasLocationChanged || hasStatusChanged) {
+            // 有篩選條件變化時，清空搜尋查詢
             if (kDebugMode && verboseSearchLog) {
-              debugPrint('✅ [Posted Tasks] 僅前端重算篩選/排序（不觸發 API）');
+              debugPrint('🔍 [Posted Tasks] 篩選條件變化，清空搜尋查詢');
             }
-            _applyFiltersAndSort();
+            chatProvider.setSearchQuery('');
           }
+
+          // 重新應用篩選和排序
+          _applyFiltersAndSort();
         } else {
           if (kDebugMode && verboseSearchLog) {
             debugPrint('🔄 [Posted Tasks] 無篩選條件變化，跳過刷新');
@@ -605,12 +578,15 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       _pagingController.dispose();
     } catch (_) {}
 
-    // 移除 provider listener
+    // 安全地移除 provider listener（避免在 dispose 中訪問 context）
     try {
-      final chatProvider = context.read<ChatListProvider>();
-      chatProvider.removeListener(_handleProviderChanges);
+      // 使用靜態實例而不是 context
+      final chatProvider = ChatListProvider.instance;
+      if (chatProvider != null) {
+        chatProvider.removeListener(_handleProviderChanges);
+      }
     } catch (e) {
-      // Provider may not be available during dispose
+      debugPrint('⚠️ [Posted Tasks] 移除 Provider 監聽器失敗: $e');
     }
 
     // 取消未讀數據訂閱
@@ -830,11 +806,25 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     debugPrint('  - 排序方式: ${chatProvider.currentSortBy}');
     debugPrint('  - 排序方向: ${chatProvider.sortAscending ? "升序" : "降序"}');
 
+    // 首先按釘選狀態排序（釘選的任務優先）
+    final sortedTasks = List<Map<String, dynamic>>.from(tasks);
+    sortedTasks.sort((a, b) {
+      final aPinned = _isTaskPinned(a['id'].toString());
+      final bPinned = _isTaskPinned(b['id'].toString());
+
+      // 釘選的任務排在前面
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+
+      // 如果釘選狀態相同，則按原有邏輯排序
+      return 0;
+    });
+
     // 簡化邏輯：只有搜尋相關性需要前端排序，其他使用後端排序
     if (chatProvider.searchQuery.isNotEmpty &&
         chatProvider.currentSortBy == 'relevance') {
       debugPrint('🔍 [Posted Tasks] 使用前端相關性排序');
-      return _sortByRelevance(tasks, chatProvider);
+      return _sortByRelevance(sortedTasks, chatProvider);
     }
 
     // 其他情況直接使用後端排序（後端已按 status_id ASC, updated_at DESC, id ASC 排序）
@@ -844,10 +834,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     if (chatProvider.currentSortBy != 'status_id') {
       debugPrint(
           '⚠️ [Posted Tasks] 用戶選擇非預設排序，執行前端排序: ${chatProvider.currentSortBy}');
-      return _sortByUserChoice(tasks, chatProvider);
+      return _sortByUserChoice(sortedTasks, chatProvider);
     }
 
-    return tasks; // 直接使用後端排序結果
+    return sortedTasks; // 直接使用後端排序結果
   }
 
   /// 搜尋相關性排序
@@ -1501,6 +1491,28 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           ? Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
+                // Pin 按鈕
+                SizedBox(
+                  width: 40,
+                  child: OutlinedButton(
+                    onPressed: () => _togglePinTask(task),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: colorScheme.primary),
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      minimumSize: const Size(40, 32),
+                    ),
+                    child: Icon(
+                      _isTaskPinned(task['id'].toString())
+                          ? Icons.push_pin
+                          : Icons.push_pin_outlined,
+                      size: 16,
+                      color: _isTaskPinned(task['id'].toString())
+                          ? colorScheme.primary
+                          : colorScheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 // Info 按鈕
                 Expanded(
                   child: OutlinedButton.icon(
@@ -1553,23 +1565,49 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                 ),
               ],
             )
-          : Center(
-              child: SizedBox(
-                width: 120,
-                child: OutlinedButton.icon(
-                  onPressed: () => _showTaskInfoDialog(task),
-                  icon: Icon(Icons.info_outline,
-                      size: 16, color: colorScheme.primary),
-                  label: Text('Info',
-                      style:
-                          TextStyle(fontSize: 12, color: colorScheme.primary)),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: colorScheme.primary),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Pin 按鈕（非 Open 狀態也顯示）
+                SizedBox(
+                  width: 40,
+                  child: OutlinedButton(
+                    onPressed: () => _togglePinTask(task),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: colorScheme.primary),
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      minimumSize: const Size(40, 32),
+                    ),
+                    child: Icon(
+                      _isTaskPinned(task['id'].toString())
+                          ? Icons.push_pin
+                          : Icons.push_pin_outlined,
+                      size: 16,
+                      color: _isTaskPinned(task['id'].toString())
+                          ? colorScheme.primary
+                          : colorScheme.primary,
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(width: 16),
+                // Info 按鈕
+                SizedBox(
+                  width: 120,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showTaskInfoDialog(task),
+                    icon: Icon(Icons.info_outline,
+                        size: 16, color: colorScheme.primary),
+                    label: Text('Info',
+                        style: TextStyle(
+                            fontSize: 12, color: colorScheme.primary)),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: colorScheme.primary),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                    ),
+                  ),
+                ),
+              ],
             ),
     );
   }
@@ -1651,14 +1689,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                 ),
               ],
             ),
-            subtitle: Text(
-              applier['latest_message_snippet'] ??
-                  applier['first_message_snippet'] ??
-                  'No messages',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            subtitle: _buildRealTimeMessageSubtitle(applier),
             trailing: // 未讀數字徽章（警示色）
                 Selector<ChatListProvider, int>(
               selector: (context, provider) {
@@ -2085,14 +2116,14 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
   void _navigateToEditTask(Map<String, dynamic> task) {
     final taskId = task['id']?.toString();
     if (taskId == null || taskId.isEmpty) {
-      context.go('/task/create', extra: task);
+      context.go('/task/edit', extra: task);
       return;
     }
     // 優先載入聚合資料再前往編輯
     TaskService()
         .fetchTaskEditData(taskId)
-        .then((fullTask) => context.go('/task/create', extra: fullTask ?? task))
-        .catchError((_) => context.go('/task/create', extra: task));
+        .then((fullTask) => context.go('/task/edit', extra: fullTask ?? task))
+        .catchError((_) => context.go('/task/edit', extra: task));
   }
 
   /// 確認刪除任務
@@ -2125,19 +2156,23 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
   /// 刪除任務（設置狀態為 cancelled）
   void _deleteTask(Map<String, dynamic> task) async {
+    final taskId = task['id'].toString();
+
     try {
       final taskService = TaskService();
       await taskService.updateTaskStatus(
-        task['id'].toString(),
+        taskId,
         'cancelled',
         statusId: 8,
       );
 
       if (mounted) {
+        // 從本地列表中移除該任務
+        _removeTaskById(taskId);
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Task deleted successfully')),
         );
-        // _pagingController.refresh(); // 移除分頁控制器
       }
     } catch (e) {
       if (mounted) {
@@ -2145,6 +2180,95 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           SnackBar(content: Text('Failed to delete task: $e')),
         );
       }
+    }
+  }
+
+  /// 通過 ID 移除任務（本地狀態更新）
+  void _removeTaskById(String taskId) {
+    if (!mounted) return;
+
+    setState(() {
+      // 從 _allTasks 中移除
+      _allTasks.removeWhere((task) => task['id'].toString() == taskId);
+
+      // 從 _filteredTasks 中移除
+      _filteredTasks.removeWhere((task) => task['id'].toString() == taskId);
+
+      // 從 _sortedTasks 中移除
+      _sortedTasks.removeWhere((task) => task['id'].toString() == taskId);
+
+      // 從應徵者數據中移除
+      _applicationsByTask.remove(taskId);
+
+      // 從展開狀態中移除
+      _expandedTaskIds.remove(taskId);
+    });
+
+    // 更新分頁控制器的狀態
+    try {
+      // 從分頁控制器的項目列表中移除該任務
+      final currentItems = _pagingController.itemList ?? [];
+      final updatedItems = currentItems
+          .where((task) => task['id'].toString() != taskId)
+          .toList();
+
+      // 重新設置分頁控制器的項目列表
+      _pagingController.itemList = updatedItems;
+
+      debugPrint('🗑️ [Posted Tasks] 已從分頁控制器中移除任務: $taskId');
+      debugPrint('  - 分頁控制器項目數量: ${updatedItems.length}');
+    } catch (e) {
+      debugPrint('⚠️ [Posted Tasks] 更新分頁控制器失敗: $e');
+    }
+
+    debugPrint('🗑️ [Posted Tasks] 已從本地狀態中移除任務: $taskId');
+    debugPrint('  - _allTasks 剩餘數量: ${_allTasks.length}');
+    debugPrint('  - _filteredTasks 剩餘數量: ${_filteredTasks.length}');
+    debugPrint('  - _sortedTasks 剩餘數量: ${_sortedTasks.length}');
+  }
+
+  /// 通過 ID 更新任務狀態（本地狀態更新）
+  void _updateTaskById(String taskId, Map<String, dynamic> updatedTask) {
+    if (!mounted) return;
+
+    setState(() {
+      // 更新 _allTasks 中的任務
+      final allTaskIndex =
+          _allTasks.indexWhere((task) => task['id'].toString() == taskId);
+      if (allTaskIndex != -1) {
+        _allTasks[allTaskIndex] = updatedTask;
+      }
+
+      // 更新 _filteredTasks 中的任務
+      final filteredTaskIndex =
+          _filteredTasks.indexWhere((task) => task['id'].toString() == taskId);
+      if (filteredTaskIndex != -1) {
+        _filteredTasks[filteredTaskIndex] = updatedTask;
+      }
+
+      // 更新 _sortedTasks 中的任務
+      final sortedTaskIndex =
+          _sortedTasks.indexWhere((task) => task['id'].toString() == taskId);
+      if (sortedTaskIndex != -1) {
+        _sortedTasks[sortedTaskIndex] = updatedTask;
+      }
+    });
+
+    // 更新分頁控制器的狀態
+    try {
+      final currentItems = _pagingController.itemList ?? [];
+      final updatedItems = currentItems.map((task) {
+        if (task['id'].toString() == taskId) {
+          return updatedTask;
+        }
+        return task;
+      }).toList();
+
+      _pagingController.itemList = updatedItems;
+
+      debugPrint('🔄 [Posted Tasks] 已更新任務: $taskId');
+    } catch (e) {
+      debugPrint('⚠️ [Posted Tasks] 更新分頁控制器失敗: $e');
     }
   }
 
@@ -2293,6 +2417,76 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       ),
     );
   }
+
+  /// Pin 功能相關方法
+
+  /// 檢查任務是否已釘選
+  bool _isTaskPinned(String taskId) {
+    return _pinnedTaskIds.contains(taskId);
+  }
+
+  /// 切換任務釘選狀態
+  void _togglePinTask(Map<String, dynamic> task) {
+    final taskId = task['id'].toString();
+
+    setState(() {
+      if (_pinnedTaskIds.contains(taskId)) {
+        _pinnedTaskIds.remove(taskId);
+        debugPrint('📌 [Posted Tasks] 取消釘選任務: $taskId');
+      } else {
+        _pinnedTaskIds.add(taskId);
+        debugPrint('📌 [Posted Tasks] 釘選任務: $taskId');
+      }
+    });
+
+    // 重新應用篩選和排序
+    _applyFiltersAndSort();
+  }
+
+  /// 建構實時消息副標題
+  Widget _buildRealTimeMessageSubtitle(Map<String, dynamic> applier) {
+    final roomId = applier['chat_room_id']?.toString();
+
+    if (roomId == null || roomId.isEmpty) {
+      return Text(
+        'No messages',
+        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: _getLatestMessageStream(roomId),
+      builder: (context, snapshot) {
+        String messageText = applier['latest_message_snippet'] ??
+            applier['first_message_snippet'] ??
+            'No messages';
+
+        if (snapshot.hasData && snapshot.data != null) {
+          final messageData = snapshot.data!;
+          final text = messageData['text']?.toString() ?? '';
+          if (text.isNotEmpty) {
+            messageText = text;
+          }
+        }
+
+        return Text(
+          messageText,
+          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        );
+      },
+    );
+  }
+
+  /// 獲取最新消息的 Stream
+  Stream<Map<String, dynamic>> _getLatestMessageStream(String roomId) {
+    // 這裡可以連接到 Socket 服務或其他實時消息源
+    // 暫時返回一個空的 Stream，實際實現需要連接到 Socket
+    return Stream.empty();
+  }
 }
 
 /// 帶有錯誤回退的頭像 Widget
@@ -2337,8 +2531,13 @@ class _AvatarWithFallbackState extends State<_AvatarWithFallback> {
         onBackgroundImageError: (exception, stackTrace) {
           AvatarErrorCache.addFailedUrl(avatarPath);
           if (mounted) {
-            setState(() {
-              _hasError = true;
+            // 使用 addPostFrameCallback 避免在繪製過程中調用 setState
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _hasError = true;
+                });
+              }
             });
           }
         },
@@ -2356,8 +2555,13 @@ class _AvatarWithFallbackState extends State<_AvatarWithFallback> {
           AvatarErrorCache.addFailedUrl(avatarPath);
           debugPrint('🔴 Avatar load error (cached): $avatarPath');
           if (mounted) {
-            setState(() {
-              _hasError = true;
+            // 使用 addPostFrameCallback 避免在繪製過程中調用 setState
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _hasError = true;
+                });
+              }
             });
           }
         },

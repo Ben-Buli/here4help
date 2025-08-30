@@ -1,0 +1,6 @@
+--dart-define=ENVIRONMENT=development
+--dart-define=API_BASE_URL=http://localhost:8888/here4help
+--dart-define=SOCKET_URL=http://localhost:3001
+--dart-define=IMAGE_BASE_URL=http://localhost:8888/here4help
+--dart-define=DEBUG_MODE=true
+--dart-define=LOG_LEVEL=debug

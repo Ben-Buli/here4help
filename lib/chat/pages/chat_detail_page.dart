@@ -8,8 +8,6 @@ import 'package:here4help/chat/widgets/dynamic_action_bar.dart';
 import 'package:here4help/chat/utils/action_bar_config.dart';
 import 'dart:convert';
 import 'dart:async';
-import 'package:http/http.dart' as http;
-import 'package:here4help/config/app_config.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/utils/image_helper.dart';
 import 'package:here4help/task/models/resume_data.dart';
@@ -17,10 +15,11 @@ import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/chat/services/chat_service.dart';
 import 'package:here4help/services/rating_service.dart';
 import 'package:here4help/chat/services/socket_service.dart';
+import 'package:here4help/services/wallet_service.dart';
+import 'package:provider/provider.dart';
 
 import 'package:photo_view/photo_view.dart';
 import 'package:here4help/utils/path_mapper.dart';
-import 'package:provider/provider.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'dart:ui';
 import 'package:here4help/services/notification_service.dart';
@@ -3203,97 +3202,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   void _openPayAndReview() {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) {
-        int service = 0, attitude = 0, experience = 0;
-        final commentCtrl = TextEditingController();
-        final code1 = TextEditingController();
-        final code2 = TextEditingController();
-        return StatefulBuilder(builder: (context, setState) {
-          Widget buildStars(int value, ValueChanged<int> onChanged) {
-            return Row(
-              children: List.generate(
-                  5,
-                  (i) => IconButton(
-                        icon: Icon(i < value ? Icons.star : Icons.star_border,
-                            color: Colors.amber),
-                        onPressed: () => onChanged(i + 1),
-                      )),
-            );
-          }
-
-          return AlertDialog(
-            title: const Text('Review & Pay'),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Service'),
-                  buildStars(service, (v) => setState(() => service = v)),
-                  const Text('Attitude'),
-                  buildStars(attitude, (v) => setState(() => attitude = v)),
-                  const Text('Experience'),
-                  buildStars(experience, (v) => setState(() => experience = v)),
-                  const SizedBox(height: 8),
-                  const Text('Comment (<= 100 chars)'),
-                  TextField(
-                      controller: commentCtrl, maxLength: 100, maxLines: 3),
-                  const Divider(height: 24),
-                  const Text('Payment Code (6 digits) — Enter twice'),
-                  TextField(
-                      controller: code1,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6),
-                  TextField(
-                      controller: code2,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel')),
-              ElevatedButton(
-                onPressed: () async {
-                  if (!(code1.text.length == 6 && code1.text == code2.text)) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content:
-                            Text('Please enter two identical 6-digit codes.')));
-                    return;
-                  }
-                  try {
-                    if (_task != null) {
-                      await TaskService().payAndReview(
-                        taskId: _task!['id'].toString(),
-                        ratingService: service,
-                        ratingAttitude: attitude,
-                        ratingExperience: experience,
-                        comment: commentCtrl.text.trim().isEmpty
-                            ? null
-                            : commentCtrl.text.trim(),
-                        paymentCode1: code1.text,
-                        paymentCode2: code2.text,
-                      );
-                      if (mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Task completed and paid.')));
-                      }
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Pay failed: $e')));
-                    }
-                  }
-                },
-                child: const Text('Pay'),
-              ),
-            ],
-          );
-        });
+        return _ConfirmPayDialog(task: _task);
       },
     );
   }
@@ -4330,4 +4241,490 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 // #endregion
+}
+
+/// 確認付款對話框
+class _ConfirmPayDialog extends StatefulWidget {
+  final Map<String, dynamic>? task;
+
+  const _ConfirmPayDialog({required this.task});
+
+  @override
+  State<_ConfirmPayDialog> createState() => _ConfirmPayDialogState();
+}
+
+class _ConfirmPayDialogState extends State<_ConfirmPayDialog> {
+  // 手續費設定
+  FeeSettings? _feeSettings;
+  bool _isLoadingFee = true;
+
+  // UI 狀態
+  bool _isAgreed = false;
+  bool _isSubmitting = false;
+
+  // 付款密碼
+  final _paymentCode1Controller = TextEditingController();
+  final _paymentCode2Controller = TextEditingController();
+  bool _isPaymentCode1Visible = false;
+  bool _isPaymentCode2Visible = false;
+  String _passwordMismatchError = '';
+
+  // 評分
+  double _rating = 1.0; // 預設最低 1 星
+  final _commentController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFeeSettings();
+    _paymentCode2Controller.addListener(_validatePasswordMatch);
+  }
+
+  @override
+  void dispose() {
+    _paymentCode1Controller.dispose();
+    _paymentCode2Controller.dispose();
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  /// 安全地將任務數據中的數值轉換為整數
+  int _safeParseInt(dynamic value, {int defaultValue = 0}) {
+    if (value == null) return defaultValue;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? defaultValue;
+    if (value is double) return value.toInt();
+    return defaultValue;
+  }
+
+  /// 載入手續費設定
+  Future<void> _loadFeeSettings() async {
+    try {
+      final userService = Provider.of<UserService>(context, listen: false);
+      final settings = await WalletService.getFeeSettings(userService);
+      if (mounted) {
+        setState(() {
+          _feeSettings = settings;
+          _isLoadingFee = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingFee = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load fee settings: $e')),
+        );
+      }
+    }
+  }
+
+  /// 驗證兩次密碼輸入是否一致
+  void _validatePasswordMatch() {
+    final code1 = _paymentCode1Controller.text;
+    final code2 = _paymentCode2Controller.text;
+
+    if (code2.isNotEmpty && code1 != code2) {
+      setState(() {
+        _passwordMismatchError = 'Payment passwords do not match.';
+      });
+    } else {
+      setState(() {
+        _passwordMismatchError = '';
+      });
+    }
+  }
+
+  /// 計算手續費
+  int _calculateFee() {
+    if (_feeSettings == null || widget.task == null) return 0;
+
+    final rewardPoints = _safeParseInt(widget.task!['reward_point']);
+    final feeRate = _feeSettings!.rate;
+
+    return WalletService.calculateFee(rewardPoints, feeRate);
+  }
+
+  /// 檢查是否可以提交
+  bool _canSubmit() {
+    return _isAgreed &&
+        _paymentCode1Controller.text.length == 6 &&
+        _paymentCode2Controller.text.length == 6 &&
+        _paymentCode1Controller.text == _paymentCode2Controller.text &&
+        !_isSubmitting;
+  }
+
+  /// 提交付款
+  Future<void> _submitPayment() async {
+    if (!_canSubmit()) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      // 1. 驗證付款密碼
+      await TaskService().verifyPaymentPassword(
+        paymentPassword: _paymentCode1Controller.text,
+      );
+
+      // 2. 執行完整的付款流程
+      if (widget.task != null) {
+        final taskId = widget.task!['id'].toString();
+        final rewardPoints = _safeParseInt(widget.task!['reward_point']);
+        final creatorId = _safeParseInt(widget.task!['creator_id']);
+        final participantId = _safeParseInt(widget.task!['participant_id']);
+
+        // 點數轉移
+        await TaskService().transferPoints(
+          fromUserId: creatorId,
+          toUserId: participantId,
+          amount: rewardPoints,
+          taskId: taskId,
+        );
+
+        // 扣除手續費（如果有）
+        final feeAmount = _calculateFee();
+        if (feeAmount > 0) {
+          final feeRate = _feeSettings!.rate;
+          await TaskService().deductCompletionFee(
+            userId: creatorId,
+            amount: feeAmount,
+            taskId: taskId,
+            feeRate: feeRate,
+          );
+        }
+
+        // 提交評分（使用現有的 payAndReview API 或新的 submitReview）
+        await TaskService().submitReview(
+          taskId: taskId,
+          ratingService: _rating.round(),
+          ratingAttitude: _rating.round(),
+          ratingExperience: _rating.round(),
+          comment: _commentController.text.trim().isEmpty
+              ? null
+              : _commentController.text.trim(),
+        );
+
+        if (mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Payment completed, task finished')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMessage = 'Payment failed. Please try again.';
+
+        // 判斷是否是密碼錯誤
+        if (e.toString().contains('Invalid payment password') ||
+            e.toString().contains('E_PAYMENT_PASSWORD')) {
+          errorMessage = 'Payment password is incorrect. Please try again.';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        width: screenWidth * 0.9, // 90% 畫面寬度
+        constraints: const BoxConstraints(maxHeight: 600),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 標題
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+              ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Confirm & Pay',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+
+            // 內容區域
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 上半部 - 說明文字 + 手續費說明
+                    _buildUpperSection(),
+
+                    // 分隔線
+                    const Divider(height: 32, thickness: 1),
+
+                    // 下半部 - 評分 + 同意勾選 + 付款碼輸入
+                    _buildLowerSection(),
+                  ],
+                ),
+              ),
+            ),
+
+            // 底部按鈕
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                borderRadius:
+                    BorderRadius.vertical(bottom: Radius.circular(12)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _canSubmit() ? _submitPayment : null,
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Confirm Payment'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 上半部 - 說明文字 + 手續費說明
+  Widget _buildUpperSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 說明文字
+        const Text(
+          'Please confirm the task is completed and agree to release payment to the assignee.',
+          style: TextStyle(fontSize: 14),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'The completion fee will be deducted from the reward points, rounded to the nearest integer, and collected by the system.',
+          style: TextStyle(fontSize: 14),
+        ),
+        const SizedBox(height: 16),
+
+        // 手續費詳情
+        if (_isLoadingFee)
+          const Center(child: CircularProgressIndicator())
+        else
+          _buildFeeDetails(),
+      ],
+    );
+  }
+
+  /// 手續費詳情
+  Widget _buildFeeDetails() {
+    if (widget.task == null) return const SizedBox.shrink();
+
+    final rewardPoints = _safeParseInt(widget.task!['reward_point']);
+    final feeRate = _feeSettings?.rate ?? 0.0;
+    final feeAmount = _calculateFee();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Reward Points Outcome：',
+                  style: TextStyle(fontSize: 12)),
+              Text('$rewardPoints Points',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.red)),
+            ],
+          ),
+          const Divider(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Completion Fee Rate：',
+                  style: TextStyle(fontSize: 12)),
+              Text('${(feeRate * 100).toStringAsFixed(2)}%',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.cyan)),
+            ],
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Fee Amount Outcome：', style: TextStyle(fontSize: 12)),
+              Text('$feeAmount Points',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.red)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 下半部 - 評分 + 同意勾選 + 付款碼輸入
+  Widget _buildLowerSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 評分區域
+        const Text('Rating and Comment',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            const Text('Rating：'),
+            const SizedBox(width: 8),
+            // 使用簡單的星星評分（可以後續改為 flutter_rating_bar）
+            ...List.generate(5, (index) {
+              return IconButton(
+                onPressed: () {
+                  setState(() {
+                    _rating = (index + 1).toDouble();
+                  });
+                },
+                icon: Icon(
+                  index < _rating ? Icons.star : Icons.star_border,
+                  color: Colors.amber,
+                ),
+              );
+            }),
+          ],
+        ),
+
+        // 評論輸入
+        const SizedBox(height: 8),
+        TextField(
+          controller: _commentController,
+          decoration: const InputDecoration(
+            labelText: 'Comment (Optional)',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+        ),
+
+        const SizedBox(height: 16),
+        const Divider(),
+
+        const SizedBox(height: 16),
+        // 付款碼輸入
+        const Text('Payment Password',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        // 同意勾選
+        CheckboxListTile(
+          value: _isAgreed,
+          onChanged: (value) {
+            setState(() {
+              _isAgreed = value ?? false;
+            });
+          },
+          title: const Text(
+              'I agree to release payment to the assignee and pay the completion fee.'),
+          controlAffinity: ListTileControlAffinity.leading,
+        ),
+
+        const SizedBox(height: 16),
+
+        // 第一次輸入
+        TextField(
+          controller: _paymentCode1Controller,
+          enabled: _isAgreed,
+          obscureText: !_isPaymentCode1Visible,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          decoration: InputDecoration(
+            labelText: 'Payment Password',
+            border: const OutlineInputBorder(),
+            suffixIcon: IconButton(
+              onPressed: () {
+                setState(() {
+                  _isPaymentCode1Visible = !_isPaymentCode1Visible;
+                });
+              },
+              icon: Icon(_isPaymentCode1Visible
+                  ? Icons.visibility
+                  : Icons.visibility_off),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 8),
+
+        // 第二次輸入
+        TextField(
+          controller: _paymentCode2Controller,
+          enabled: _isAgreed,
+          obscureText: !_isPaymentCode2Visible,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          decoration: InputDecoration(
+            labelText: 'Confirm Payment Password',
+            border: const OutlineInputBorder(),
+            errorText:
+                _passwordMismatchError.isEmpty ? null : _passwordMismatchError,
+            suffixIcon: IconButton(
+              onPressed: () {
+                setState(() {
+                  _isPaymentCode2Visible = !_isPaymentCode2Visible;
+                });
+              },
+              icon: Icon(_isPaymentCode2Visible
+                  ? Icons.visibility
+                  : Icons.visibility_off),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+      ],
+    );
+  }
 }

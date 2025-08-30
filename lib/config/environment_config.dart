@@ -10,15 +10,49 @@ class EnvironmentConfig {
     // 檢查環境變數
     const androidEmulator =
         bool.fromEnvironment('ANDROID_EMULATOR', defaultValue: false);
-    if (androidEmulator) return true;
+    if (androidEmulator) {
+      debugPrint('🔧 檢測到 ANDROID_EMULATOR 環境變數');
+      return true;
+    }
 
     // 檢查是否在 Android 平台上運行且不是 Web
     if (!kIsWeb) {
       // 在 Android 平台上，默認使用模擬器配置
+      debugPrint('🔧 檢測到 Android 平台，使用模擬器配置');
       return true;
     }
 
     return false;
+  }
+
+  /// 檢測是否為 iOS 模擬器
+  static bool _isIOSSimulator() {
+    // 檢查環境變數
+    const iosSimulator =
+        bool.fromEnvironment('IOS_SIMULATOR', defaultValue: false);
+    if (iosSimulator) return true;
+
+    // 檢查是否在 iOS 平台上運行且不是 Web
+    if (!kIsWeb) {
+      // 需要更精確的檢測，不能默認所有非 Web 平台都是 iOS
+      return false;
+    }
+
+    return false;
+  }
+
+  /// 獲取正確的網路地址
+  static String _getNetworkAddress(String baseUrl) {
+    try {
+      final uri = Uri.parse(baseUrl);
+      if (defaultTargetPlatform == TargetPlatform.android &&
+          (uri.host == 'localhost' || uri.host == '127.0.0.1')) {
+        return uri.replace(host: '10.0.2.2').toString();
+      }
+      return baseUrl;
+    } catch (_) {
+      return baseUrl;
+    }
   }
 
   /// 初始化配置
@@ -39,6 +73,14 @@ class EnvironmentConfig {
         }
       }
 
+      // 檢測 iOS 模擬器並使用相應配置
+      if (_isIOSSimulator()) {
+        environment = 'ios_simulator';
+        if (kDebugMode) {
+          print('🍎 檢測到 iOS 模擬器，使用 ios_simulator 配置');
+        }
+      }
+
       final configFile = 'assets/app_env/$environment.json';
       final configString = await rootBundle.loadString(configFile);
       _config = json.decode(configString) as Map<String, dynamic>;
@@ -56,15 +98,10 @@ class EnvironmentConfig {
       _config = {
         'environment': 'development',
         'public': {
-          'api_base_url': _isAndroidEmulator()
-              ? 'http://10.0.2.2:8888/here4help'
-              : 'http://localhost:8888/here4help',
-          'socket_url': _isAndroidEmulator()
-              ? 'http://10.0.2.2:3001'
-              : 'http://localhost:3001',
-          'image_base_url': _isAndroidEmulator()
-              ? 'http://10.0.2.2:8888/here4help'
-              : 'http://localhost:8888/here4help',
+          'api_base_url': _getNetworkAddress('http://127.0.0.1:8888/here4help'),
+          'socket_url': _getNetworkAddress('http://127.0.0.1:3001'),
+          'image_base_url':
+              _getNetworkAddress('http://127.0.0.1:8888/here4help'),
           'google_client_id': '',
           'facebook_app_id': '',
           'apple_service_id': '',
@@ -93,33 +130,24 @@ class EnvironmentConfig {
   /// API 基礎 URL
   static String get apiBaseUrl {
     final baseUrl = _config?['public']?['api_base_url'] ??
-        'http://localhost:8888/here4help';
-    // 在 Android 平台上自動替換 localhost 為 10.0.2.2
-    if (!kIsWeb && baseUrl.contains('localhost')) {
-      return baseUrl.replaceAll('localhost', '10.0.2.2');
-    }
-    return baseUrl;
+        'http://127.0.0.1:8888/here4help';
+    // 使用正確的網路地址分流邏輯
+    return _getNetworkAddress(baseUrl);
   }
 
   /// Socket 伺服器 URL
   static String get socketUrl {
     final socketUrl =
-        _config?['public']?['socket_url'] ?? 'http://localhost:3001';
-    // 在 Android 平台上自動替換 localhost 為 10.0.2.2
-    if (!kIsWeb && socketUrl.contains('localhost')) {
-      return socketUrl.replaceAll('localhost', '10.0.2.2');
-    }
-    return socketUrl;
+        _config?['public']?['socket_url'] ?? 'http://127.0.0.1:3001';
+    // 使用正確的網路地址分流邏輯
+    return _getNetworkAddress(socketUrl);
   }
 
   /// 圖片基礎 URL
   static String get imageBaseUrl {
     final imageUrl = _config?['public']?['image_base_url'] ?? apiBaseUrl;
-    // 在 Android 平台上自動替換 localhost 為 10.0.2.2
-    if (!kIsWeb && imageUrl.contains('localhost')) {
-      return imageUrl.replaceAll('localhost', '10.0.2.2');
-    }
-    return imageUrl;
+    // 使用正確的網路地址分流邏輯
+    return _getNetworkAddress(imageUrl);
   }
 
   /// 是否啟用調試模式

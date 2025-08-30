@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_config.dart';
 import '../../auth/services/auth_service.dart';
+import '../../services/http_client_service.dart';
 
 class TaskService extends ChangeNotifier {
   static final TaskService _instance = TaskService._internal();
@@ -297,6 +298,13 @@ class TaskService extends ChangeNotifier {
     required String paymentCode1,
     required String paymentCode2,
   }) async {
+    // 獲取用戶 token
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    if (token == null) {
+      throw Exception('User not authenticated');
+    }
+
     final body = {
       'task_id': taskId,
       'ratings': {
@@ -311,7 +319,10 @@ class TaskService extends ChangeNotifier {
     final resp = await http
         .post(
           Uri.parse(AppConfig.taskPayAndReviewUrl),
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 30));
@@ -367,7 +378,137 @@ class TaskService extends ChangeNotifier {
       }
       throw Exception(data['message'] ?? 'Accept application failed');
     } else {
+      // 檢查是否返回 HTML 錯誤頁面
+      final responseBody = resp.body;
+      if (responseBody.contains('<html>') || responseBody.contains('<br />')) {
+        debugPrint('❌ TaskService acceptApplication: 後端返回 HTML 錯誤頁面');
+        debugPrint('❌ 回應內容: ${responseBody.substring(0, 200)}...');
+        throw Exception('Backend server error: Invalid response format');
+      }
       throw Exception('HTTP ${resp.statusCode}: Accept application failed');
+    }
+  }
+
+  /// 轉移點數（發布者 → 任務接案者）
+  Future<Map<String, dynamic>> transferPoints({
+    required int fromUserId,
+    required int toUserId,
+    required int amount,
+    required String taskId,
+  }) async {
+    final body = {
+      'from_user_id': fromUserId,
+      'to_user_id': toUserId,
+      'amount': amount,
+      'task_id': taskId,
+      'transaction_type': 'task_payment',
+    };
+
+    final resp = await HttpClientService.post(
+      '${AppConfig.apiBaseUrl}/backend/api/points/transfer.php',
+      body: body,
+    );
+
+    if (HttpClientService.isSuccessResponse(resp)) {
+      final data = HttpClientService.parseJsonResponse(resp);
+      if (data['success'] == true) {
+        return Map<String, dynamic>.from(data['data'] ?? {});
+      }
+      throw Exception(data['message'] ?? 'Points transfer failed');
+    } else {
+      throw Exception('HTTP ${resp.statusCode}: Points transfer failed');
+    }
+  }
+
+  /// 扣除官方手續費（由發布者支付）
+  Future<Map<String, dynamic>> deductCompletionFee({
+    required int userId,
+    required int amount,
+    required String taskId,
+    required double feeRate,
+  }) async {
+    final body = {
+      'user_id': userId,
+      'amount': amount,
+      'task_id': taskId,
+      'fee_rate': feeRate,
+      'transaction_type': 'completion_fee',
+    };
+
+    final resp = await HttpClientService.post(
+      '${AppConfig.apiBaseUrl}/backend/api/points/deduct-fee.php',
+      body: body,
+    );
+
+    if (HttpClientService.isSuccessResponse(resp)) {
+      final data = HttpClientService.parseJsonResponse(resp);
+      if (data['success'] == true) {
+        return Map<String, dynamic>.from(data['data'] ?? {});
+      }
+      throw Exception(data['message'] ?? 'Fee deduction failed');
+    } else {
+      throw Exception('HTTP ${resp.statusCode}: Fee deduction failed');
+    }
+  }
+
+  /// 記錄官方費用收入（fee_revenue_ledger）
+  Future<Map<String, dynamic>> recordFeeRevenue({
+    required String taskId,
+    required int srcTransactionId,
+    required int payerUserId,
+    required int amountPoints,
+    required double rate,
+    String? note,
+  }) async {
+    final body = {
+      'task_id': taskId,
+      'src_transaction_id': srcTransactionId,
+      'payer_user_id': payerUserId,
+      'amount_points': amountPoints,
+      'rate': rate,
+      if (note != null) 'note': note,
+    };
+
+    final resp = await HttpClientService.post(
+      '${AppConfig.apiBaseUrl}/backend/api/fees/record.php',
+      body: body,
+    );
+
+    if (HttpClientService.isSuccessResponse(resp)) {
+      final data = HttpClientService.parseJsonResponse(resp);
+      if (data['success'] == true) {
+        return Map<String, dynamic>.from(data['data'] ?? {});
+      }
+      throw Exception(data['message'] ?? 'Record fee failed');
+    } else {
+      throw Exception('HTTP ${resp.statusCode}: Record fee failed');
+    }
+  }
+
+  /// 驗證付款密碼
+  Future<Map<String, dynamic>> verifyPaymentPassword({
+    required String paymentPassword,
+  }) async {
+    final body = {
+      'payment_password': paymentPassword,
+    };
+
+    final resp = await HttpClientService.post(
+      '${AppConfig.apiBaseUrl}/backend/api/account/verify-payment-password.php',
+      body: body,
+    );
+
+    if (HttpClientService.isSuccessResponse(resp)) {
+      final data = HttpClientService.parseJsonResponse(resp);
+      if (data['success'] == true) {
+        return Map<String, dynamic>.from(data['data'] ?? {});
+      }
+      throw Exception(
+          data['message'] ?? 'Payment password verification failed');
+    } else {
+      final data = HttpClientService.parseJsonResponse(resp);
+      throw Exception(data['message'] ??
+          'HTTP ${resp.statusCode}: Payment password verification failed');
     }
   }
 

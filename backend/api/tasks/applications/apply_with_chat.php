@@ -168,13 +168,7 @@ function _processApplicationWithChat($db, $conn, $taskId, $userId, $coverLetter,
         [$roomId, $userId, $messageContent]
     );
 
-    // 5. 更新應徵記錄的 room_id
-    $db->query(
-        'UPDATE task_applications SET room_id = ? WHERE id = ?',
-        [$roomId, $applicationId]
-    );
-
-    // 6. 獲取完整的應徵和聊天室信息
+    // 5. 獲取完整的應徵和聊天室信息
     $result = $db->fetch(
         "SELECT 
             ta.*,
@@ -187,11 +181,11 @@ function _processApplicationWithChat($db, $conn, $taskId, $userId, $coverLetter,
             creator.name AS creator_name
          FROM task_applications ta 
          JOIN users u ON u.id = ta.user_id 
-         JOIN chat_rooms cr ON cr.id = ta.room_id
+         JOIN chat_rooms cr ON cr.id = ?
          JOIN tasks t ON t.id = ta.task_id
          JOIN users creator ON creator.id = t.creator_id
          WHERE ta.id = ?",
-        [$applicationId]
+        [$roomId, $applicationId]
     );
 
     return [

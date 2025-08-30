@@ -445,10 +445,16 @@ class ChatService {
     required String roomId,
   }) async {
     try {
+      debugPrint('🔍 [ChatService] 開始獲取聊天室詳細數據');
+      debugPrint('  - roomId: $roomId');
+
       final token = await AuthService.getToken();
       if (token == null) {
+        debugPrint('❌ [ChatService] 沒有找到 token，用戶未登入');
         throw Exception('未登入');
       }
+
+      debugPrint('✅ [ChatService] 找到 token: ${token.substring(0, 10)}...');
 
       final queryParams = <String, String>{
         'room_id': roomId,
@@ -458,29 +464,47 @@ class ChatService {
           Uri.parse('$_baseUrl/backend/api/chat/get_chat_detail_data.php')
               .replace(queryParameters: queryParams);
 
+      debugPrint('🌐 [ChatService] 請求 URL: $uri');
+
+      final headers = {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      };
+
+      debugPrint('📤 [ChatService] 請求標頭: $headers');
+
       final response = await http.get(
         uri,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
       );
+
+      debugPrint('📥 [ChatService] 回應狀態碼: ${response.statusCode}');
+      debugPrint('📥 [ChatService] 回應內容: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
+          debugPrint('✅ [ChatService] 成功獲取聊天室數據');
           return data['data'];
         } else {
+          debugPrint('❌ [ChatService] API 返回錯誤: ${data['message']}');
           throw Exception(data['message'] ?? '獲取聊天室詳細數據失敗');
         }
+      } else if (response.statusCode == 401) {
+        debugPrint('❌ [ChatService] 授權失敗，可能需要重新登入');
+        throw Exception('授權失敗，請重新登入');
       } else if (response.statusCode == 403) {
+        debugPrint('❌ [ChatService] 沒有權限訪問此聊天室');
         throw Exception('您沒有權限訪問此聊天室');
       } else if (response.statusCode == 404) {
+        debugPrint('❌ [ChatService] 聊天室不存在');
         throw Exception('聊天室不存在');
       } else {
+        debugPrint('❌ [ChatService] 網路錯誤: ${response.statusCode}');
         throw Exception('網路錯誤: ${response.statusCode}');
       }
     } catch (e) {
+      debugPrint('💥 [ChatService] 獲取聊天室詳細數據失敗: $e');
       throw Exception('獲取聊天室詳細數據失敗: $e');
     }
   }

@@ -1,9 +1,9 @@
 {
   "environment": "development",
   "public": {
-    "api_base_url": "http://127.0.0.1:8888/here4help",
-    "socket_url": "http://127.0.0.1:3001",
-    "image_base_url": "http://127.0.0.1:8888/here4help",
+    "api_base_url": "http://localhost:8888/here4help",
+    "socket_url": "http://localhost:3001",
+    "image_base_url": "http://localhost:8888/here4help",
     "google_client_id": "",
     "facebook_app_id": "",
     "apple_service_id": ""

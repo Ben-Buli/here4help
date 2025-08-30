@@ -85,7 +85,7 @@ try {
             t.title as task_title,
             t.description as task_description,
             t.status_id,
-            ts.name as task_status,
+            ts.code as task_status,
             ts.display_name as task_status_display,
             t.updated_at as task_updated_at,
             

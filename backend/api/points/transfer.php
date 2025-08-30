@@ -123,6 +123,7 @@ try {
             $taskId,
             "Payment for task ID: $taskId"
         ]);
+        $outTransactionId = $db->lastInsertId();
         
         // 記錄轉入交易
         $db->execute($transactionSql, [
@@ -132,6 +133,7 @@ try {
             $taskId,
             "Payment received for task ID: $taskId"
         ]);
+        $inTransactionId = $db->lastInsertId();
         
         // 提交事務
         $db->commit();
@@ -141,7 +143,9 @@ try {
             'to_user_id' => $toUserId,
             'amount' => $amount,
             'task_id' => $taskId,
-            'transaction_type' => $transactionType
+            'transaction_type' => $transactionType,
+            'out_transaction_id' => (int)$outTransactionId,
+            'in_transaction_id' => (int)$inTransactionId
         ], 'Points transferred successfully');
         
     } catch (Exception $e) {
