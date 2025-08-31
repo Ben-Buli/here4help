@@ -6,10 +6,10 @@
       :class="{ '-translate-x-full': !sidebarOpen }"
     >
       <!-- 側邊欄標題 -->
-      <div class="flex items-center justify-between h-16 px-6 bg-primary-600">
+      <div class="flex items-center justify-between h-16 px-6 bg-cyan-600">
         <div class="flex items-center">
           <div class="flex-shrink-0 w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-            <span class="text-primary-600 font-bold text-lg">H4H</span>
+            <span class="text-cyan-600 font-bold text-lg">H4H</span>
           </div>
           <span class="ml-3 text-white font-semibold">Admin Panel</span>
         </div>
@@ -27,38 +27,105 @@
 
       <!-- 導航選單 -->
       <nav class="mt-8 px-4 space-y-2">
-        <router-link
-          v-for="item in navigation"
-          :key="item.name"
-          :to="item.href"
-          class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200"
-          :class="[
-            $route.path === item.href || $route.path.startsWith(item.href + '/')
-              ? 'bg-primary-100 text-primary-700 border-r-2 border-primary-500'
-              : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900',
-          ]"
-          @click="sidebarOpen = false"
-        >
-          <component
-            :is="item.icon"
-            class="mr-3 h-5 w-5 flex-shrink-0"
+        <template v-for="item in navigation" :key="item.name">
+          <!-- 一般選單項目 -->
+          <router-link
+            v-if="!item.children"
+            :to="item.href"
+            class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200"
             :class="[
               $route.path === item.href || $route.path.startsWith(item.href + '/')
-                ? 'text-primary-500'
-                : 'text-gray-400 group-hover:text-gray-500',
+                ? 'bg-cyan-100 text-cyan-700 border-r-2 border-cyan-500'
+                : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900',
             ]"
-          />
-          {{ item.name }}
-        </router-link>
+            @click="sidebarOpen = false"
+          >
+            <component
+              :is="item.icon"
+              class="mr-3 h-5 w-5 flex-shrink-0"
+              :class="[
+                $route.path === item.href || $route.path.startsWith(item.href + '/')
+                  ? 'text-cyan-500'
+                  : 'text-gray-400 group-hover:text-gray-500',
+              ]"
+            />
+            {{ item.name }}
+          </router-link>
+
+          <!-- 有子選單的項目 -->
+          <div v-else class="space-y-1">
+            <button
+              @click="toggleSubmenu(item.name)"
+              class="group w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200"
+              :class="[
+                $route.path.startsWith(item.href)
+                  ? 'bg-cyan-100 text-cyan-700 border-r-2 border-cyan-500'
+                  : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900',
+              ]"
+            >
+              <div class="flex items-center">
+                <component
+                  :is="item.icon"
+                  class="mr-3 h-5 w-5 flex-shrink-0"
+                  :class="[
+                    $route.path.startsWith(item.href)
+                      ? 'text-cyan-500'
+                      : 'text-gray-400 group-hover:text-gray-500',
+                  ]"
+                />
+                {{ item.name }}
+              </div>
+              <svg
+                class="w-4 h-4 transition-transform duration-200"
+                :class="{ 'rotate-180': openSubmenus.includes(item.name) }"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            <!-- 子選單 -->
+            <div
+              v-show="openSubmenus.includes(item.name)"
+              class="ml-4 space-y-1"
+            >
+              <router-link
+                v-for="child in item.children"
+                :key="child.name"
+                :to="child.href"
+                class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200"
+                :class="[
+                  $route.path === child.href
+                    ? 'bg-cyan-50 text-cyan-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                ]"
+                @click="sidebarOpen = false"
+              >
+                <component
+                  :is="child.icon"
+                  class="mr-3 h-4 w-4 flex-shrink-0"
+                  :class="[
+                    $route.path === child.href
+                      ? 'text-cyan-500'
+                      : 'text-gray-400 group-hover:text-gray-500',
+                  ]"
+                />
+                {{ child.name }}
+              </router-link>
+            </div>
+          </div>
+        </template>
       </nav>
 
       <!-- 用戶資訊 -->
       <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
         <div class="flex items-center">
           <div
-            class="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center"
+            class="flex-shrink-0 w-8 h-8 bg-cyan-100 rounded-full flex items-center justify-center"
           >
-            <span class="text-primary-600 font-medium text-sm">
+            <span class="text-cyan-600 font-medium text-sm">
               {{ authStore.userDisplayName.charAt(0).toUpperCase() }}
             </span>
           </div>
@@ -80,7 +147,7 @@
       <div class="sticky top-0 z-40 flex h-16 bg-white shadow-sm border-b border-gray-200">
         <button
           @click="sidebarOpen = true"
-          class="px-4 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 lg:hidden"
+          class="px-4 text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cyan-500 lg:hidden"
         >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -133,7 +200,7 @@
           <div class="flex items-center space-x-4">
             <!-- 通知按鈕 -->
             <button
-              class="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              class="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
             >
               <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -149,10 +216,10 @@
             <div class="relative">
               <button
                 @click="userMenuOpen = !userMenuOpen"
-                class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
               >
-                <div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                  <span class="text-primary-600 font-medium text-sm">
+                <div class="w-8 h-8 bg-cyan-100 rounded-full flex items-center justify-center">
+                  <span class="text-cyan-600 font-medium text-sm">
                     {{ authStore.userDisplayName.charAt(0).toUpperCase() }}
                   </span>
                 </div>
@@ -208,20 +275,62 @@ const UsersIcon = 'svg'
 const ClipboardListIcon = 'svg'
 const DocumentTextIcon = 'svg'
 const CogIcon = 'svg'
+const ChatBubbleLeftRightIcon = 'svg'
+const CreditCardIcon = 'svg'
+const CurrencyDollarIcon = 'svg'
+const BanknotesIcon = 'svg'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const sidebarOpen = ref(false)
 const userMenuOpen = ref(false)
+const openSubmenus = ref<string[]>([])
 
-const navigation = [
+// 定義導航項目類型
+interface NavigationItem {
+  name: string
+  href: string
+  icon: string
+  children?: NavigationItem[]
+}
+
+const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Users', href: '/users', icon: UsersIcon },
+  { name: 'Issues', href: '/issues', icon: ChatBubbleLeftRightIcon },
+  { 
+    name: 'Payments', 
+    href: '/payments/requests', 
+    icon: CreditCardIcon,
+    children: [
+      { name: 'Deposit Requests', href: '/payments/requests', icon: CurrencyDollarIcon },
+      { name: 'Fee Settings', href: '/payments/fee-settings', icon: CogIcon },
+      { name: 'Official Account', href: '/payments/official-account', icon: BanknotesIcon },
+    ]
+  },
   { name: 'Tasks', href: '/tasks', icon: ClipboardListIcon },
-  { name: 'Logs', href: '/logs', icon: DocumentTextIcon },
+  { 
+    name: 'Logs', 
+    href: '/logs', 
+    icon: DocumentTextIcon,
+    children: [
+      { name: 'System Logs', href: '/logs', icon: DocumentTextIcon },
+      { name: 'User Activities', href: '/user-activities', icon: ClipboardListIcon },
+      { name: 'User Transactions', href: '/user-transactions', icon: CurrencyDollarIcon },
+    ]
+  },
   { name: 'Settings', href: '/settings', icon: CogIcon },
 ]
+
+const toggleSubmenu = (menuName: string) => {
+  const index = openSubmenus.value.indexOf(menuName)
+  if (index > -1) {
+    openSubmenus.value.splice(index, 1)
+  } else {
+    openSubmenus.value.push(menuName)
+  }
+}
 
 const handleLogout = async () => {
   await authStore.logout()

@@ -68,7 +68,7 @@
 
     <!-- 篩選與搜尋 -->
     <div class="admin-card">
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <!-- 搜尋 -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
@@ -120,6 +120,18 @@
             <option value="last_7_days">Last 7 Days</option>
             <option value="last_30_days">Last 30 Days</option>
             <option value="custom">Custom Range</option>
+          </select>
+        </div>
+
+        <!-- 每頁顯示筆數 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Per Page</label>
+          <select v-model="pagination.per_page" @change="handlePerPageChange" class="admin-input">
+            <option value="10">10</option>
+            <option value="15">15</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
           </select>
         </div>
       </div>
@@ -334,31 +346,57 @@
 
       <!-- Pagination -->
       <div
-        v-if="pagination.total > pagination.per_page"
+        v-if="pagination.total > 0"
         class="mt-6 flex items-center justify-between"
       >
         <div class="text-sm text-gray-700">
-          Page {{ pagination.current_page }} of {{ pagination.last_page }}
+          Showing {{ (pagination.current_page - 1) * pagination.per_page + 1 }} to
+          {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} of
+          {{ pagination.total }} results
+          <span class="text-gray-500">({{ pagination.per_page }} per page)</span>
         </div>
-        <div class="flex space-x-2">
-          <button
-            @click="changePage(pagination.current_page - 1)"
-            :disabled="pagination.current_page <= 1"
-            class="admin-button-secondary text-sm"
-            :class="{ 'opacity-50 cursor-not-allowed': pagination.current_page <= 1 }"
-          >
-            Previous
-          </button>
-          <button
-            @click="changePage(pagination.current_page + 1)"
-            :disabled="pagination.current_page >= pagination.last_page"
-            class="admin-button-secondary text-sm"
-            :class="{
-              'opacity-50 cursor-not-allowed': pagination.current_page >= pagination.last_page,
-            }"
-          >
-            Next
-          </button>
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center space-x-2">
+            <button
+              @click="changePage(1)"
+              :disabled="pagination.current_page <= 1"
+              class="admin-button-secondary text-sm px-2 py-1"
+              :class="{ 'opacity-50 cursor-not-allowed': pagination.current_page <= 1 }"
+            >
+              First
+            </button>
+            <button
+              @click="changePage(pagination.current_page - 1)"
+              :disabled="pagination.current_page <= 1"
+              class="admin-button-secondary text-sm px-2 py-1"
+              :class="{ 'opacity-50 cursor-not-allowed': pagination.current_page <= 1 }"
+            >
+              Previous
+            </button>
+            <span class="text-sm text-gray-700 px-2">
+              Page {{ pagination.current_page }} of {{ pagination.last_page }}
+            </span>
+            <button
+              @click="changePage(pagination.current_page + 1)"
+              :disabled="pagination.current_page >= pagination.last_page"
+              class="admin-button-secondary text-sm px-2 py-1"
+              :class="{
+                'opacity-50 cursor-not-allowed': pagination.current_page >= pagination.last_page,
+              }"
+            >
+              Next
+            </button>
+            <button
+              @click="changePage(pagination.last_page)"
+              :disabled="pagination.current_page >= pagination.last_page"
+              class="admin-button-secondary text-sm px-2 py-1"
+              :class="{
+                'opacity-50 cursor-not-allowed': pagination.current_page >= pagination.last_page,
+              }"
+            >
+              Last
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -383,7 +421,7 @@ const stats = ref({
 
 const pagination = ref({
   current_page: 1,
-  per_page: 25,
+  per_page: 15,
   total: 0,
   last_page: 1,
 })
@@ -522,6 +560,12 @@ const handleDateRangeChange = () => {
   if (filters.date_range !== 'custom') {
     loadLogs(1)
   }
+}
+
+const handlePerPageChange = () => {
+  // 當每頁顯示筆數改變時，重置到第一頁並重新載入
+  pagination.value.current_page = 1
+  loadLogs(1)
 }
 
 // Debounced search

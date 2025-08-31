@@ -9,45 +9,31 @@
         <p class="mt-1 text-sm text-gray-500">Manage user accounts, permissions, and status</p>
       </div>
       <div class="mt-4 flex md:mt-0 md:ml-4 space-x-3">
-        <button @click="refreshData" class="admin-button-secondary" :disabled="isLoading">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-          Refresh
-        </button>
-        <button
-          @click="showBatchActions = !showBatchActions"
-          class="admin-button-secondary"
-          :class="{ 'bg-primary-100 text-primary-700': selectedUsers.length > 0 }"
-        >
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-            />
-          </svg>
-          Batch Actions ({{ selectedUsers.length }})
-        </button>
+    
       </div>
     </div>
 
     <!-- 篩選與搜尋 -->
     <div class="admin-card">
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <!-- 搜尋 -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
           <input
             v-model="filters.search"
             type="text"
-            placeholder="Name, email, or ID..."
+            placeholder="Name or email..."
+            class="admin-input"
+            @input="debouncedSearch"
+          />
+        </div>
+        <!-- User ID 搜尋 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">User ID</label>
+          <input
+            v-model="filters.user_id"
+            type="number"
+            placeholder="User ID"
             class="admin-input"
             @input="debouncedSearch"
           />
@@ -61,7 +47,7 @@
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="banned">Banned</option>
-            <option value="pending">Pending</option>
+            <option value="pending_review">Pending Review</option>
           </select>
         </div>
 
@@ -70,31 +56,42 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">Permission Level</label>
           <select v-model="filters.permission" @change="() => loadUsers()" class="admin-input">
             <option value="">All Permissions</option>
-            <option value="99">Super Admin (99)</option>
-            <option value="1">Admin (1)</option>
-            <option value="0">Regular User (0)</option>
-            <option value="-1">Restricted (-1)</option>
-            <option value="-2">Suspended (-2)</option>
-            <option value="-3">Banned (-3)</option>
-            <option value="-4">Deleted (-4)</option>
+            <option value="99">Super User (99)</option> //  管理員使用
+            <option value="1">Verified User (1)</option> //  已認證用戶
+            <option value="0">Unverified User (0)</option> //  新用戶未認證
+            <option value="-1">Restricted (-1)</option> //  被管理員停權
+            <option value="-2">Suspended (-2)</option> //  被管理員軟刪除
+            <option value="-3">Banned (-3)</option> //  用戶自行停權
+            <option value="-4">Deleted (-4)</option> //  用戶自行軟刪除
           </select>
         </div>
 
         <!-- 排序 -->
-        <div>
+        <!-- <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
           <select v-model="filters.sort_by" @change="() => loadUsers()" class="admin-input">
+            <option value="id">ID</option>
             <option value="created_at">Registration Date</option>
             <option value="name">Name</option>
             <option value="email">Email</option>
-            <option value="last_login">Last Login</option>
             <option value="points">Points</option>
+          </select>
+        </div> -->
+        <!-- 每頁數量 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Per Page</label>
+          <select v-model="filters.per_page" @change="handlePerPageChange" class="admin-input w-full">
+            <option value="10">10</option>
+            <option value="15">15</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
           </select>
         </div>
       </div>
 
       <!-- 排序方向與每頁數量 -->
-      <div class="mt-4 flex items-center justify-between">
+      <!-- <div class="mt-4 flex items-center justify-start">
         <div class="flex items-center space-x-4">
           <label class="flex items-center">
             <input
@@ -117,16 +114,7 @@
             Oldest First
           </label>
         </div>
-        <div class="flex items-center space-x-2">
-          <span class="text-sm text-gray-700">Per Page:</span>
-          <select v-model="filters.per_page" @change="() => loadUsers()" class="admin-input w-20">
-            <option value="10">10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
-        </div>
-      </div>
+      </div> -->
     </div>
 
     <!-- 批量操作面板 -->
@@ -158,7 +146,7 @@
     </div>
 
     <!-- 統計卡片 -->
-    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    <!-- <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
       <div class="admin-card">
         <div class="flex items-center">
           <div class="flex-shrink-0">
@@ -258,7 +246,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </div> -->
 
     <!-- 用戶列表 -->
     <div class="admin-card">
@@ -299,39 +287,97 @@
       <div v-else class="overflow-x-auto">
         <table class="admin-table">
           <thead>
-            <tr>
-              <th class="w-4">
-                <input
-                  type="checkbox"
-                  :checked="allSelected"
-                  @change="toggleAllSelection"
-                  class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-              </th>
-              <th>User</th>
-              <th>Status</th>
-              <th>Permission</th>
-              <th>Points</th>
-              <th>Last Login</th>
-              <th>Registered</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
+  <tr>
+    <!-- 全選保留 -->
+    <!-- <th class="w-4">
+      <input
+        type="checkbox"
+        :checked="allSelected"
+        @change="toggleAllSelection"
+        class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+      />
+    </th> -->
+
+    <th>
+      <button type="button" class="flex items-center gap-1 select-none" @click="setSort('name')">
+        User
+        <svg v-if="isSorted('name')" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+          <path v-if="filters.sort_order==='asc'" d="M3 12l7-8 7 8H3z"/>
+          <path v-else d="M3 8l7 8 7-8H3z"/>
+        </svg>
+      </button>
+    </th>
+
+    <th>
+      <button type="button" class="flex items-center gap-1 select-none" @click="setSort('status')">
+        Status
+        <svg v-if="isSorted('status')" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+          <path v-if="filters.sort_order==='asc'" d="M3 12l7-8 7 8H3z"/>
+          <path v-else d="M3 8l7 8 7-8H3z"/>
+        </svg>
+      </button>
+    </th>
+
+    <th>
+      <button type="button" class="flex items-center gap-1 select-none" @click="setSort('permission')">
+        Permission
+        <svg v-if="isSorted('permission')" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+          <path v-if="filters.sort_order==='asc'" d="M3 12l7-8 7 8H3z"/>
+          <path v-else d="M3 8l7 8 7-8H3z"/>
+        </svg>
+      </button>
+    </th>
+
+    <th>
+      <button type="button" class="flex items-center gap-1 select-none" @click="setSort('points')">
+        Points
+        <svg v-if="isSorted('points')" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+          <path v-if="filters.sort_order==='asc'" d="M3 12l7-8 7 8H3z"/>
+          <path v-else d="M3 8l7 8 7-8H3z"/>
+        </svg>
+      </button>
+    </th>
+
+    <th>
+      <button type="button" class="flex items-center gap-1 select-none" @click="setSort('updated_at')">
+        Last Login
+        <svg v-if="isSorted('updated_at')" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+          <path v-if="filters.sort_order==='asc'" d="M3 12l7-8 7 8H3z"/>
+          <path v-else d="M3 8l7 8 7-8H3z"/>
+        </svg>
+      </button>
+    </th>
+
+    <th>
+      <button type="button" class="flex items-center gap-1 select-none" @click="setSort('created_at')">
+        Registered
+        <svg v-if="isSorted('created_at')" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+          <path v-if="filters.sort_order==='asc'" d="M3 12l7-8 7 8H3z"/>
+          <path v-else d="M3 8l7 8 7-8H3z"/>
+        </svg>
+      </button>
+    </th>
+
+    <th>Actions</th>
+  </tr>
+</thead>
           <tbody class="divide-y divide-gray-200">
             <tr
               v-for="user in users"
               :key="user.id"
-              class="hover:bg-gray-50"
+              class="hover:bg-gray-50 cursor-pointer"
               :class="{ 'bg-blue-50': selectedUsers.includes(user.id) }"
+              @click="viewUser(user.id)"
             >
-              <td>
+              <!-- <td>
                 <input
                   type="checkbox"
                   :value="user.id"
                   v-model="selectedUsers"
                   class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  @click.stop
                 />
-              </td>
+              </td> -->
               <td>
                 <div class="flex items-center">
                   <div class="flex-shrink-0 h-10 w-10">
@@ -380,17 +426,12 @@
                 {{ formatDate(user.created_at) }}
               </td>
               <td>
-                <div class="flex items-center space-x-2">
-                  <button
-                    @click="viewUser(user.id)"
-                    class="text-primary-600 hover:text-primary-900 text-sm"
-                  >
-                    View
-                  </button>
-                  <button @click="editUser(user)" class="text-gray-600 hover:text-gray-900 text-sm">
-                    Edit
-                  </button>
-                </div>
+                <button
+                  @click.stop="viewUser(user.id)"
+                  class="admin-button-secondary text-sm"
+                >
+                  Detail
+                </button>
               </td>
             </tr>
           </tbody>
@@ -399,31 +440,57 @@
 
       <!-- Pagination -->
       <div
-        v-if="pagination.total > pagination.per_page"
+        v-if="pagination.total > 0"
         class="mt-6 flex items-center justify-between"
       >
         <div class="text-sm text-gray-700">
-          Page {{ pagination.current_page }} of {{ pagination.last_page }}
+          Showing {{ (pagination.current_page - 1) * pagination.per_page + 1 }} to
+          {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} of
+          {{ pagination.total }} results
+          <span class="text-gray-500">({{ pagination.per_page }} per page)</span>
         </div>
-        <div class="flex space-x-2">
-          <button
-            @click="changePage(pagination.current_page - 1)"
-            :disabled="pagination.current_page <= 1"
-            class="admin-button-secondary text-sm"
-            :class="{ 'opacity-50 cursor-not-allowed': pagination.current_page <= 1 }"
-          >
-            Previous
-          </button>
-          <button
-            @click="changePage(pagination.current_page + 1)"
-            :disabled="pagination.current_page >= pagination.last_page"
-            class="admin-button-secondary text-sm"
-            :class="{
-              'opacity-50 cursor-not-allowed': pagination.current_page >= pagination.last_page,
-            }"
-          >
-            Next
-          </button>
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center space-x-2">
+            <button
+              @click="changePage(1)"
+              :disabled="pagination.current_page <= 1"
+              class="admin-button-secondary text-sm px-2 py-1"
+              :class="{ 'opacity-50 cursor-not-allowed': pagination.current_page <= 1 }"
+            >
+              First
+            </button>
+            <button
+              @click="changePage(pagination.current_page - 1)"
+              :disabled="pagination.current_page <= 1"
+              class="admin-button-secondary text-sm px-2 py-1"
+              :class="{ 'opacity-50 cursor-not-allowed': pagination.current_page <= 1 }"
+            >
+              Previous
+            </button>
+            <span class="text-sm text-gray-700 px-2">
+              Page {{ pagination.current_page }} of {{ pagination.last_page }}
+            </span>
+            <button
+              @click="changePage(pagination.current_page + 1)"
+              :disabled="pagination.current_page >= pagination.last_page"
+              class="admin-button-secondary text-sm px-2 py-1"
+              :class="{
+                'opacity-50 cursor-not-allowed': pagination.current_page >= pagination.last_page,
+              }"
+            >
+              Next
+            </button>
+            <button
+              @click="changePage(pagination.last_page)"
+              :disabled="pagination.current_page >= pagination.last_page"
+              class="admin-button-secondary text-sm px-2 py-1"
+              :class="{
+                'opacity-50 cursor-not-allowed': pagination.current_page >= pagination.last_page,
+              }"
+            >
+              Last
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -465,18 +532,19 @@ const stats = ref({
 
 const pagination = ref({
   current_page: 1,
-  per_page: 25,
+  per_page: 15,
   total: 0,
   last_page: 1,
 })
 
 const filters = reactive({
   search: '',
+  user_id: '',
   status: '',
   permission: '',
   sort_by: 'created_at',
   sort_order: 'desc' as 'asc' | 'desc',
-  per_page: 25,
+  per_page: 15,
 })
 
 // Computed
@@ -493,6 +561,7 @@ const loadUsers = async (page = 1) => {
       page,
       per_page: filters.per_page,
       search: filters.search || undefined,
+      user_id: filters.user_id || undefined,
       status: filters.status || undefined,
       permission: filters.permission ? parseInt(filters.permission) : undefined,
       sort_by: filters.sort_by,
@@ -518,9 +587,16 @@ const refreshData = () => {
 }
 
 const changePage = (page: number) => {
-  if (page >= 1 && page <= pagination.value.last_page) {
-    loadUsers(page)
-  }
+  const last = Number(pagination.value.last_page || 1)
+  if (page < 1 || page > last) return
+  // 先更新目前頁，讓 UI 立刻反映
+  pagination.value.current_page = page
+  loadUsers(page)
+}
+
+const handlePerPageChange = () => {
+  pagination.value.current_page = 1
+  loadUsers(1)
 }
 
 const toggleAllSelection = () => {
@@ -574,8 +650,22 @@ const debouncedSearch = () => {
   }, 500)
 }
 
+// Sorting helpers for clickable headers
+const isSorted = (field: string) => filters.sort_by === field
+const setSort = (field: string) => {
+  if (filters.sort_by === field) {
+    filters.sort_order = filters.sort_order === 'asc' ? 'desc' : 'asc'
+  } else {
+    filters.sort_by = field
+    // 切換欄位時預設改為 desc（你也可以用 asc）
+    filters.sort_order = 'desc'
+  }
+  loadUsers(1)
+}
+
 // Utility functions
-const getUserInitials = (name: string) => {
+const getUserInitials = (name: string | null | undefined) => {
+  if (!name) return 'U'
   return name
     .split(' ')
     .map((n) => n[0])
@@ -614,13 +704,13 @@ const getPermissionBadgeClass = (permission: number) => {
 }
 
 const getPermissionText = (permission: number) => {
-  if (permission >= 99) return 'Super Admin'
-  if (permission >= 1) return 'Admin'
-  if (permission === 0) return 'User'
-  if (permission === -1) return 'Restricted'
-  if (permission === -2) return 'Suspended'
-  if (permission === -3) return 'Banned'
-  if (permission === -4) return 'Deleted'
+  if (permission >= 99) return 'SuperUser(99)'
+  if (permission >= 1) return 'Verified(1)'
+  if (permission === 0) return 'Unverified(0)'
+  if (permission === -1) return 'Restricted(-1)'
+  if (permission === -2) return 'Suspended(-2)'
+  if (permission === -3) return 'Banned(-3)'
+  if (permission === -4) return 'Deleted(-4)'
   return `Level ${permission}`
 }
 

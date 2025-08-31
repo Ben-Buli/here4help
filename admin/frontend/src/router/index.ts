@@ -80,6 +80,32 @@ const router = createRouter({
       ],
     },
     {
+      path: '/user-activities',
+      component: () => import('../components/AppLayout.vue'),
+      meta: { requiresAuth: true, permission: 'logs.view' },
+      children: [
+        {
+          path: '',
+          name: 'user-activities',
+          component: () => import('../views/UserActivitiesView.vue'),
+          meta: { title: 'User Activities' },
+        },
+      ],
+    },
+    {
+      path: '/user-transactions',
+      component: () => import('../components/AppLayout.vue'),
+      meta: { requiresAuth: true, permission: 'logs.view' },
+      children: [
+        {
+          path: '',
+          name: 'user-transactions',
+          component: () => import('../views/UserTransactionsView.vue'),
+          meta: { title: 'User Transactions' },
+        },
+      ],
+    },
+    {
       path: '/settings',
       component: () => import('../components/AppLayout.vue'),
       meta: { requiresAuth: true },
@@ -89,6 +115,48 @@ const router = createRouter({
           name: 'settings',
           component: () => import('../views/SettingsView.vue'),
           meta: { title: 'Settings' },
+        },
+      ],
+    },
+    {
+      path: '/issues',
+      component: () => import('../components/AppLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'issues',
+          component: () => import('../views/IssuesView.vue'),
+          meta: { title: 'Issues' },
+        },
+      ],
+    },
+    {
+      path: '/payments',
+      component: () => import('../components/AppLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          redirect: '/payments/requests',
+        },
+        {
+          path: 'requests',
+          name: 'payment-requests',
+          component: () => import('../components/wallet/DepositApprovalPage.vue'),
+          meta: { title: 'Deposit Requests' },
+        },
+        {
+          path: 'fee-settings',
+          name: 'payment-fee-settings',
+          component: () => import('../components/wallet/FeeManagementPage.vue'),
+          meta: { title: 'Fee Settings' },
+        },
+        {
+          path: 'official-account',
+          name: 'payment-official-account',
+          component: () => import('../components/wallet/OfficialBankAccountPage.vue'),
+          meta: { title: 'Official Bank Account' },
         },
       ],
     },

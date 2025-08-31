@@ -98,7 +98,17 @@ class TaskController extends Controller
         $tasks = $query->orderBy("tasks.{$sortBy}", $sortOrder)
                       ->offset(($page - 1) * $perPage)
                       ->limit($perPage)
-                      ->get();
+                      ->get()
+                      ->map(function ($t) {
+                          // 加入 pending 倒數資訊（若狀態碼為 pending_confirmation 且有 deadline 欄位）
+                          if (isset($t->status_code) && $t->status_code === 'pending_confirmation' && isset($t->deadline)) {
+                              $remaining = strtotime($t->deadline) - time();
+                              $t->countdown_seconds = $remaining > 0 ? $remaining : 0;
+                          } else {
+                              $t->countdown_seconds = null;
+                          }
+                          return $t;
+                      });
 
         // 統計資訊
         $stats = [
@@ -161,7 +171,16 @@ class TaskController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'task' => $task
+                'task' => (function($task){
+                    // 單筆詳情也加入倒數資訊
+                    if (isset($task->status_code) && $task->status_code === 'pending_confirmation' && isset($task->deadline)) {
+                        $remaining = strtotime($task->deadline) - time();
+                        $task->countdown_seconds = $remaining > 0 ? $remaining : 0;
+                    } else {
+                        $task->countdown_seconds = null;
+                    }
+                    return $task;
+                })($task)
             ]
         ]);
     }
@@ -237,15 +256,13 @@ class TaskController extends Controller
         DB::table('admin_activity_logs')->insert([
             'admin_id' => $admin->id,
             'action' => 'update_task_status',
-            'resource_type' => 'tasks',
-            'resource_id' => $taskId,
-            'old_values' => json_encode(['status' => $oldStatus]),
-            'new_values' => json_encode(['status' => $newStatus]),
-            'description' => "Changed task status from {$oldStatus} to {$newStatus}. Reason: {$reason}",
+            'table_name' => 'tasks',
+            'record_id' => $taskId,
+            'old_data' => json_encode(['status' => $oldStatus]),
+            'new_data' => json_encode(['status' => $newStatus]),
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
-            'created_at' => now(),
-            'updated_at' => now()
+            'created_at' => now()
         ]);
     }
 }

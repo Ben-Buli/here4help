@@ -204,6 +204,50 @@
           </dl>
         </div>
 
+        <!-- Student Verification -->
+        <div class="admin-card">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">Student Verification</h3>
+          <div v-if="!user.student_verification" class="text-sm text-gray-500">No verification data</div>
+          <dl v-else class="space-y-3 text-sm">
+            <div>
+              <dt class="text-gray-500">School</dt>
+              <dd class="text-gray-900">{{ user.student_verification.school_name }}</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Student Name</dt>
+              <dd class="text-gray-900">{{ user.student_verification.student_name }}</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Student ID</dt>
+              <dd class="text-gray-900">{{ user.student_verification.student_id }}</dd>
+            </div>
+            <div>
+              <dt class="text-gray-500">Status</dt>
+              <dd>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+                  :class="studentStatusBadge(user.student_verification.verification_status)">
+                  {{ (user.student_verification.verification_status || '').replace('_', ' ') }}
+                </span>
+              </dd>
+            </div>
+            <div v-if="user.student_verification.verification_notes">
+              <dt class="text-gray-500">Notes</dt>
+              <dd class="text-gray-900">{{ user.student_verification.verification_notes }}</dd>
+            </div>
+          </dl>
+          <div v-if="user.student_verification && user.student_verification.student_id_image_path">
+            <dt class="text-gray-500">Student ID Image</dt>
+            <dd>
+              <img
+                :src="getImageUrl(user.student_verification.student_id_image_path)"
+                alt="Student ID"
+                class="h-32 rounded border cursor-pointer"
+                @click="openImage(user.student_verification.student_id_image_path)"
+              />
+            </dd>
+          </div>
+        </div>
+
         <!-- Statistics -->
         <div class="admin-card">
           <h3 class="text-lg font-medium text-gray-900 mb-4">Statistics</h3>
@@ -258,7 +302,7 @@
       <UserEditModal
         v-if="showEditModal"
         :user="user"
-        @close="showEditModal = false"
+        @close="onCloseEdit"
         @saved="handleUserSaved"
       />
     </div>
@@ -270,6 +314,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { userApi } from '@/services/api'
 import UserEditModal from '@/components/UserEditModal.vue'
+import { getImageUrl } from '@/config/env'
 
 const route = useRoute()
 const router = useRouter()
@@ -277,10 +322,23 @@ const router = useRouter()
 // State
 const isLoading = ref(false)
 const error = ref('')
-const user = ref<any>(null)
+type StudentVerification = {
+  school_name?: string
+  student_name?: string
+  student_id?: string
+  student_id_image_path?: string
+  verification_status?: string
+  verification_notes?: string
+}
+
+type UserWithStudent = any & { student_verification?: StudentVerification | null }
+
+const user = ref<UserWithStudent | null>(null)
 const stats = ref<any>({})
 const recentActivities = ref<any[]>([])
 const showEditModal = ref(false)
+const showImageModal = ref(false)
+const selectedImagePath = ref('')
 
 // Methods
 const loadUser = async () => {
@@ -296,7 +354,10 @@ const loadUser = async () => {
     const response = await userApi.show(userId)
 
     if (response.data.success && response.data.data) {
-      user.value = response.data.data.user
+      user.value = {
+        ...response.data.data.user,
+        student_verification: response.data.data.student_verification || null,
+      }
       stats.value = response.data.data.stats || {}
       recentActivities.value = response.data.data.recent_activities || []
     } else {
@@ -325,8 +386,18 @@ const handleUserSaved = () => {
   refreshData()
 }
 
+const onCloseEdit = () => {
+  showEditModal.value = false
+}
+
+const openImage = (path: string) => {
+  selectedImagePath.value = getImageUrl(path)
+  showImageModal.value = true
+}
+
 // Utility functions
-const getUserInitials = (name: string) => {
+const getUserInitials = (name: string | null) => {
+  if (!name) return 'U'
   return name
     .split(' ')
     .map((n) => n[0])
@@ -335,7 +406,8 @@ const getUserInitials = (name: string) => {
     .substring(0, 2)
 }
 
-const getStatusBadgeClass = (status: string) => {
+const getStatusBadgeClass = (status: string | null) => {
+  if (!status) return 'bg-gray-100 text-gray-800'
   const classes = {
     active: 'bg-green-100 text-green-800',
     inactive: 'bg-gray-100 text-gray-800',
@@ -345,7 +417,8 @@ const getStatusBadgeClass = (status: string) => {
   return classes[status as keyof typeof classes] || 'bg-gray-100 text-gray-800'
 }
 
-const getStatusText = (status: string) => {
+const getStatusText = (status: string | null) => {
+  if (!status) return 'Unknown'
   const texts = {
     active: 'Active',
     inactive: 'Inactive',
@@ -355,7 +428,8 @@ const getStatusText = (status: string) => {
   return texts[status as keyof typeof texts] || status
 }
 
-const getPermissionBadgeClass = (permission: number) => {
+const getPermissionBadgeClass = (permission: number | null) => {
+  if (permission === null || permission === undefined) return 'bg-gray-100 text-gray-800'
   if (permission >= 99) return 'bg-purple-100 text-purple-800'
   if (permission >= 1) return 'bg-blue-100 text-blue-800'
   if (permission === 0) return 'bg-green-100 text-green-800'
@@ -364,7 +438,8 @@ const getPermissionBadgeClass = (permission: number) => {
   return 'bg-gray-100 text-gray-800'
 }
 
-const getPermissionText = (permission: number) => {
+const getPermissionText = (permission: number | null) => {
+  if (permission === null || permission === undefined) return 'Unknown'
   if (permission >= 99) return 'Super Admin'
   if (permission >= 1) return 'Admin'
   if (permission === 0) return 'User'
@@ -378,6 +453,15 @@ const getPermissionText = (permission: number) => {
 const formatDate = (dateString: string | null) => {
   if (!dateString) return 'Never'
   return new Date(dateString).toLocaleDateString()
+}
+
+const studentStatusBadge = (s?: string) => {
+  const map: Record<string, string> = {
+    pending: 'bg-yellow-100 text-yellow-800',
+    approved: 'bg-green-100 text-green-800',
+    rejected: 'bg-red-100 text-red-800',
+  }
+  return s ? (map[s] || 'bg-gray-100 text-gray-800') : 'bg-gray-100 text-gray-800'
 }
 
 // Lifecycle

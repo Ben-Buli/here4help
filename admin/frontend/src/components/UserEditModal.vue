@@ -57,7 +57,7 @@
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                   <option value="banned">Banned</option>
-                  <option value="pending">Pending</option>
+                  <option value="pending_review">Pending Review</option>
                 </select>
               </div>
 

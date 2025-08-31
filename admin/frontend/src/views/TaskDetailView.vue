@@ -139,6 +139,13 @@
               <dt class="text-sm font-medium text-gray-500">Deadline</dt>
               <dd class="text-sm text-gray-900">{{ formatDate(task.deadline) }}</dd>
             </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Countdown</dt>
+              <dd class="text-sm text-gray-900">
+                <span v-if="task.countdown_seconds && task.countdown_seconds > 0">{{ formatCountdown(task.countdown_seconds) }}</span>
+                <span v-else class="text-gray-400">-</span>
+              </dd>
+            </div>
           </dl>
         </div>
 
@@ -350,6 +357,18 @@ const formatDate = (dateString: string | null) => {
 const formatDateTime = (dateString: string | null) => {
   if (!dateString) return 'Not set'
   return new Date(dateString).toLocaleString()
+}
+
+const formatCountdown = (seconds: number) => {
+  const s = Math.max(0, Math.floor(seconds))
+  const d = Math.floor(s / 86400)
+  const h = Math.floor((s % 86400) / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const ss = s % 60
+  if (d > 0) return `${d}d ${h}h ${m}m`
+  if (h > 0) return `${h}h ${m}m ${ss}s`
+  if (m > 0) return `${m}m ${ss}s`
+  return `${ss}s`
 }
 
 // Lifecycle

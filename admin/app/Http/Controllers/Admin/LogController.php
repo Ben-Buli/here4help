@@ -10,6 +10,168 @@ use Illuminate\Support\Facades\Validator;
 class LogController extends Controller
 {
     /**
+     * 獲取綜合日誌列表（主要端點）
+     */
+    public function index(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'page' => 'integer|min:1',
+            'per_page' => 'integer|min:1|max:100',
+            'search' => 'string',
+            'user_id' => 'integer',
+            'action_type' => 'string',
+            'date_from' => 'string',
+            'date_to' => 'string',
+            'log_type' => 'string|in:all,login,activity,admin'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $page = $request->get('page', 1);
+        $perPage = $request->get('per_page', 15);
+        $search = $request->get('search');
+        $userId = $request->get('user_id');
+        $actionType = $request->get('action_type');
+        $dateFrom = $request->get('date_from');
+        $dateTo = $request->get('date_to');
+        $logType = $request->get('log_type', 'all');
+
+        // 根據日誌類型選擇不同的查詢
+        if ($logType === 'login') {
+            $query = DB::table('admin_login_logs')
+                ->leftJoin('admins', 'admin_login_logs.admin_id', '=', 'admins.id')
+                ->select([
+                    'admin_login_logs.id',
+                    'admin_login_logs.admin_id as user_id',
+                    'admins.full_name as user_name',
+                    'admin_login_logs.status as action_type',
+                    'admin_login_logs.ip_address',
+                    'admin_login_logs.user_agent',
+                    'admin_login_logs.login_time as created_at',
+                    DB::raw("CONCAT('Login ', admin_login_logs.status) as details")
+                ]);
+        } elseif ($logType === 'activity') {
+            $query = DB::table('admin_activity_logs')
+                ->leftJoin('admins', 'admin_activity_logs.admin_id', '=', 'admins.id')
+                ->select([
+                    'admin_activity_logs.id',
+                    'admin_activity_logs.admin_id as user_id',
+                    'admins.full_name as user_name',
+                    'admin_activity_logs.action as action_type',
+                    'admin_activity_logs.ip_address',
+                    'admin_activity_logs.user_agent',
+                    'admin_activity_logs.created_at',
+                    DB::raw("CONCAT(admin_activity_logs.action, ' on ', admin_activity_logs.table_name) as details")
+                ]);
+        } else {
+            // 綜合查詢 - 合併登入和活動日誌
+            $loginQuery = DB::table('admin_login_logs')
+                ->leftJoin('admins', 'admin_login_logs.admin_id', '=', 'admins.id')
+                ->select([
+                    'admin_login_logs.id',
+                    'admin_login_logs.admin_id as user_id',
+                    'admins.full_name as user_name',
+                    'admin_login_logs.status as action_type',
+                    'admin_login_logs.ip_address',
+                    'admin_login_logs.user_agent',
+                    'admin_login_logs.login_time as created_at',
+                    DB::raw("CONCAT('Login ', admin_login_logs.status) as details")
+                ]);
+
+            $activityQuery = DB::table('admin_activity_logs')
+                ->leftJoin('admins', 'admin_activity_logs.admin_id', '=', 'admins.id')
+                ->select([
+                    'admin_activity_logs.id',
+                    'admin_activity_logs.admin_id as user_id',
+                    'admins.full_name as user_name',
+                    'admin_activity_logs.action as action_type',
+                    'admin_activity_logs.ip_address',
+                    'admin_activity_logs.user_agent',
+                    'admin_activity_logs.created_at',
+                    DB::raw("CONCAT(admin_activity_logs.action, ' on ', admin_activity_logs.table_name) as details")
+                ]);
+
+            $query = $loginQuery->union($activityQuery);
+        }
+
+        // 篩選條件
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('user_name', 'LIKE', "%{$search}%")
+                  ->orWhere('action_type', 'LIKE', "%{$search}%")
+                  ->orWhere('ip_address', 'LIKE', "%{$search}%")
+                  ->orWhere('details', 'LIKE', "%{$search}%");
+            });
+        }
+
+        if ($userId) {
+            $query->where('user_id', $userId);
+        }
+
+        if ($actionType) {
+            $query->where('action_type', $actionType);
+        }
+
+        if ($dateFrom) {
+            $query->where('created_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo) {
+            $query->where('created_at', '<=', $dateTo . ' 23:59:59');
+        }
+
+        // 總數
+        $total = $query->count();
+
+        // 分頁和排序
+        $logs = $query->orderBy('created_at', 'desc')
+                     ->offset(($page - 1) * $perPage)
+                     ->limit($perPage)
+                     ->get();
+
+        // 統計資訊
+        $stats = [
+            'total_logs' => DB::table('admin_login_logs')->count() + DB::table('admin_activity_logs')->count(),
+            'today_logins' => DB::table('admin_login_logs')
+                ->where('login_time', '>=', now()->startOfDay())
+                ->count(),
+            'failed_logins' => DB::table('admin_login_logs')
+                ->where('status', 'failed')
+                ->count(),
+            'admin_actions' => DB::table('admin_activity_logs')->count()
+        ];
+
+        // Tab 計數
+        $tabCounts = [
+            'all' => $stats['total_logs'],
+            'login' => DB::table('admin_login_logs')->count(),
+            'activity' => DB::table('admin_activity_logs')->count(),
+            'admin' => DB::table('admin_activity_logs')->count()
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'items' => $logs,
+                'pagination' => [
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                    'last_page' => ceil($total / $perPage)
+                ],
+                'stats' => $stats,
+                'tab_counts' => $tabCounts
+            ]
+        ]);
+    }
+
+    /**
      * 獲取管理員活動日誌
      */
     public function activityLogs(Request $request)
@@ -34,7 +196,7 @@ class LogController extends Controller
         }
 
         $page = $request->get('page', 1);
-        $perPage = $request->get('per_page', 20);
+        $perPage = $request->get('per_page', 15);
         $adminId = $request->get('admin_id');
         $action = $request->get('action');
         $resourceType = $request->get('resource_type');
@@ -61,7 +223,7 @@ class LogController extends Controller
         }
 
         if ($resourceType) {
-            $query->where('admin_activity_logs.resource_type', $resourceType);
+            $query->where('admin_activity_logs.table_name', $resourceType);
         }
 
         if ($dateFrom) {
@@ -98,9 +260,9 @@ class LogController extends Controller
                 ->limit(10)
                 ->get(),
             'by_resource' => DB::table('admin_activity_logs')
-                ->select('resource_type', DB::raw('COUNT(*) as count'))
-                ->whereNotNull('resource_type')
-                ->groupBy('resource_type')
+                ->select('table_name', DB::raw('COUNT(*) as count'))
+                ->whereNotNull('table_name')
+                ->groupBy('table_name')
                 ->orderBy('count', 'desc')
                 ->get()
         ];
@@ -145,7 +307,7 @@ class LogController extends Controller
         }
 
         $page = $request->get('page', 1);
-        $perPage = $request->get('per_page', 20);
+        $perPage = $request->get('per_page', 15);
         $adminId = $request->get('admin_id');
         $status = $request->get('status');
         $ipAddress = $request->get('ip_address');

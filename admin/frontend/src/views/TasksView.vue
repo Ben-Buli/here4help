@@ -11,7 +11,7 @@
         </p>
       </div>
       <div class="mt-4 flex md:mt-0 md:ml-4 space-x-3">
-        <button @click="refreshData" class="admin-button-secondary" :disabled="isLoading">
+        <!-- <button @click="refreshData" class="admin-button-secondary" :disabled="isLoading">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
@@ -21,8 +21,8 @@
             />
           </svg>
           Refresh
-        </button>
-        <button @click="exportTasks" class="admin-button-primary">
+        </button> -->
+        <!-- <button @click="exportTasks" class="admin-button-primary">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
@@ -32,7 +32,7 @@
             />
           </svg>
           Export
-        </button>
+        </button> -->
       </div>
     </div>
 
@@ -295,6 +295,7 @@
               <th>Status</th>
               <th>Reward</th>
               <th>Deadline</th>
+              <th>Countdown</th>
               <th>Created</th>
               <th>Actions</th>
             </tr>
@@ -336,8 +337,12 @@
                 </span>
               </td>
               <td class="text-sm text-gray-900">{{ task.reward || 0 }} points</td>
-              <td class="text-sm text-gray-500">
-                {{ formatDate(task.deadline) }}
+              <td class="text-sm text-gray-500">{{ formatDate(task.deadline || task.task_date) }}</td>
+              <td class="text-sm">
+                <span v-if="task.countdown_seconds && task.countdown_seconds > 0">
+                  {{ formatCountdown(task.countdown_seconds) }}
+                </span>
+                <span v-else class="text-gray-400">-</span>
               </td>
               <td class="text-sm text-gray-500">
                 {{ formatDate(task.created_at) }}
@@ -468,9 +473,10 @@ const loadTasks = async (page = 1) => {
     const response = await taskApi.list(params)
 
     if (response.data.success && response.data.data) {
-      tasks.value = response.data.data.items || []
-      pagination.value = response.data.data.pagination || pagination.value
-      stats.value = response.data.data.stats || stats.value
+      const data = response.data.data as any
+      tasks.value = data.tasks || data.items || []
+      pagination.value = data.pagination || pagination.value
+      stats.value = data.stats || stats.value
     }
   } catch (error) {
     console.error('Failed to load tasks:', error)
@@ -533,6 +539,18 @@ const getStatusBadgeClass = (status: string) => {
 const formatDate = (dateString: string | null) => {
   if (!dateString) return 'Not set'
   return new Date(dateString).toLocaleDateString()
+}
+
+const formatCountdown = (seconds: number) => {
+  const s = Math.max(0, Math.floor(seconds))
+  const d = Math.floor(s / 86400)
+  const h = Math.floor((s % 86400) / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const ss = s % 60
+  if (d > 0) return `${d}d ${h}h ${m}m`
+  if (h > 0) return `${h}h ${m}m ${ss}s`
+  if (m > 0) return `${m}m ${ss}s`
+  return `${ss}s`
 }
 
 // Load task statuses

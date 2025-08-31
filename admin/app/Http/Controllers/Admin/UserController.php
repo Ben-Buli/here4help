@@ -20,7 +20,7 @@ class UserController extends Controller
             'status' => 'string|in:active,pending_review,rejected,banned,inactive',
             'permission' => 'integer',
             'search' => 'string|max:255',
-            'sort_by' => 'string|in:id,name,email,created_at,points,permission',
+            'sort_by' => 'string|in:id,name,email,created_at,updated_at,points,permission,status',
             'sort_order' => 'string|in:asc,desc'
         ]);
 
@@ -36,6 +36,7 @@ class UserController extends Controller
         $perPage = $request->get('per_page', 20);
         $status = $request->get('status');
         $permission = $request->get('permission');
+        $userId = $request->get('user_id');
         $search = $request->get('search');
         $sortBy = $request->get('sort_by', 'id');
         $sortOrder = $request->get('sort_order', 'desc');
@@ -50,6 +51,10 @@ class UserController extends Controller
 
         if ($permission !== null) {
             $query->where('permission', $permission);
+        }
+
+        if ($userId) {
+            $query->where('id', $userId);
         }
 
         if ($search) {
@@ -85,7 +90,8 @@ class UserController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'users' => $users,
+                // 與前端約定：清單鍵名為 items
+                'items' => $users,
                 'pagination' => [
                     'current_page' => $page,
                     'per_page' => $perPage,
@@ -111,6 +117,12 @@ class UserController extends Controller
             ], 404);
         }
 
+        // 取得學生證認證資料（若有）
+        $studentVerification = DB::table('student_verifications')
+            ->where('user_id', $id)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
         // 獲取用戶相關統計
         $userStats = [
             'total_tasks_created' => DB::table('tasks')->where('creator_id', $id)->count(),
@@ -132,7 +144,8 @@ class UserController extends Controller
             'data' => [
                 'user' => $user,
                 'stats' => $userStats,
-                'recent_activities' => $recentActivities
+                'recent_activities' => $recentActivities,
+                'student_verification' => $studentVerification,
             ]
         ]);
     }
@@ -178,6 +191,26 @@ class UserController extends Controller
 
         // 記錄狀態變更日誌
         $this->logStatusChange($request->user(), $id, $oldStatus, $newStatus, $reason);
+
+        // 寫入 user_active_log（最小集合）
+        try {
+            $tableExists = DB::selectOne("SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_active_log'");
+            if ((int)($tableExists->c ?? 0) > 0) {
+                DB::table('user_active_log')->insert([
+                    'user_id' => $id,
+                    'actor_type' => 'admin',
+                    'actor_id' => $request->user()->id,
+                    'action' => 'status_change',
+                    'field' => 'status',
+                    'old_value' => $oldStatus,
+                    'new_value' => $newStatus,
+                    'reason' => $reason,
+                    'created_at' => now(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // 靜默失敗，避免阻斷主流程
+        }
 
         return response()->json([
             'success' => true,
@@ -289,6 +322,26 @@ class UserController extends Controller
         // 記錄權限變更日誌
         $this->logPermissionChange($request->user(), $id, $oldPermission, $newPermission, $reason);
 
+        // 寫入 user_active_log（最小集合）
+        try {
+            $tableExists = DB::selectOne("SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_active_log'");
+            if ((int)($tableExists->c ?? 0) > 0) {
+                DB::table('user_active_log')->insert([
+                    'user_id' => $id,
+                    'actor_type' => 'admin',
+                    'actor_id' => $request->user()->id,
+                    'action' => 'permission_change',
+                    'field' => 'permission',
+                    'old_value' => (string)$oldPermission,
+                    'new_value' => (string)$newPermission,
+                    'reason' => $reason,
+                    'created_at' => now(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // 靜默失敗
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'User permission updated successfully',
@@ -363,15 +416,13 @@ class UserController extends Controller
         DB::table('admin_activity_logs')->insert([
             'admin_id' => $admin->id,
             'action' => 'update_user_status',
-            'resource_type' => 'users',
-            'resource_id' => $userId,
-            'old_values' => json_encode(['status' => $oldStatus]),
-            'new_values' => json_encode(['status' => $newStatus]),
-            'description' => "Changed user status from {$oldStatus} to {$newStatus}. Reason: {$reason}",
+            'table_name' => 'users',
+            'record_id' => $userId,
+            'old_data' => json_encode(['status' => $oldStatus]),
+            'new_data' => json_encode(['status' => $newStatus]),
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
-            'created_at' => now(),
-            'updated_at' => now()
+            'created_at' => now()
         ]);
     }
 
@@ -383,15 +434,13 @@ class UserController extends Controller
         DB::table('admin_activity_logs')->insert([
             'admin_id' => $admin->id,
             'action' => 'update_user_permission',
-            'resource_type' => 'users',
-            'resource_id' => $userId,
-            'old_values' => json_encode(['permission' => $oldPermission]),
-            'new_values' => json_encode(['permission' => $newPermission]),
-            'description' => "Changed user permission from {$oldPermission} to {$newPermission}. Reason: {$reason}",
+            'table_name' => 'users',
+            'record_id' => $userId,
+            'old_data' => json_encode(['permission' => $oldPermission]),
+            'new_data' => json_encode(['permission' => $newPermission]),
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
-            'created_at' => now(),
-            'updated_at' => now()
+            'created_at' => now()
         ]);
     }
 
@@ -403,12 +452,13 @@ class UserController extends Controller
         DB::table('admin_activity_logs')->insert([
             'admin_id' => $admin->id,
             'action' => 'batch_user_action',
-            'resource_type' => 'users',
-            'description' => "Batch {$action} on " . count($userIds) . " users. IDs: " . implode(',', $userIds) . ". Reason: {$reason}",
+            'table_name' => 'users',
+            'record_id' => null,
+            'old_data' => null,
+            'new_data' => json_encode(['action' => $action, 'user_ids' => $userIds, 'reason' => $reason]),
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
-            'created_at' => now(),
-            'updated_at' => now()
+            'created_at' => now()
         ]);
     }
 }

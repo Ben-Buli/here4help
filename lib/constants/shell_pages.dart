@@ -17,6 +17,7 @@ import 'package:here4help/account/pages/support_page.dart';
 import 'package:here4help/account/pages/theme_settings_page.dart';
 import 'package:here4help/account/pages/wallet_page.dart';
 import 'package:here4help/account/pages/point_history_page.dart';
+import 'package:here4help/account/pages/support_issues_page.dart';
 
 // ==================== auth 模組 ====================
 import 'package:here4help/auth/pages/login_page.dart';
@@ -360,6 +361,29 @@ final List<Map<String, dynamic>> shellPages = [
     'showBackArrow': true,
     'icon': Icons.report_problem,
     'permission': 0, // 新用戶可查看問題狀態
+  },
+  {
+    'path': '/account/support/issues',
+    'child': const SupportIssuesPage(),
+    'title': 'My Support Issues',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'icon': Icons.support_agent,
+    'permission': 0, // 新用戶可查看客服事件
+  },
+  {
+    'path': '/account/support/chat',
+    'builder': (context, data) {
+      // 後續可透過 extra 傳入 roomId 與資料
+      return ChatDetailWrapper(data: data as Map<String, dynamic>?);
+    },
+    'title': 'Support Chat',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'icon': Icons.chat,
+    'permission': 1, // 需已認證用戶
   },
   {
     'path': '/pay/setting',

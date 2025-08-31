@@ -7,6 +7,11 @@
 
 並據此給出：系統範疇、資料模型、API 設計、前後端落地計畫（分期）、缺漏與決策點的最小集合。
 
+開發原則
+接下來只做規格文件中的事，不要額外執行其他工作，並且確保完成後都有檢查是否有 Problem錯誤會導致專案壞掉或無法執行，沒有影響性錯誤才算完成
+flutter 前端元件請確保符合RWD 或是有避免溢出導致錯誤的風險
+
+
 ---
 
 ## 0. 決策彙總（已確認）
@@ -73,12 +78,16 @@
 - GET /referral/list ...（可 Phase 2）
 - GET /referral/get-referral-code（已修正參數順序並放寬為有效用戶）
 
-### 3.3 Support（/api/admin/support 或 /api/support）
-- POST /support/tickets（使用者端）
-- GET /support/issues?type=all|support|dispute&status=...
-- POST /support/issues/{id}/accept（claim）
-- POST /support/issues/{id}/transfer
-- POST /support/issues/{id}/status（in_progress / waiting_customer / resolved / closed）
+### 3.3 Support（Admin 與 App 端）
+- Admin 端：
+  - GET /support/issues?type=all|support|dispute&status=...
+  - POST /support/issues/{id}/accept（claim）
+  - POST /support/issues/{id}/transfer
+  - POST /support/issues/{id}/status（in_progress / waiting_customer / resolved / closed）
+- App 端（目前需新增）：
+  - GET /support/issues（回傳「我的」客服事件清單；含 room_id、type、status、未讀數、最後訊息時間）
+  - GET /support/issues/{roomId}（單房事件詳情，供 IssueStatusPage 使用）
+  - 可選：GET /chat/rooms?type=support|dispute（若沿用現有 chat API）
 
 ### 3.4 Dispute（/api/disputes）
 - POST /disputes（body: task_id, description）→ 建 dispute_cases + chat_room(type='dispute') + 改任務狀態（若需要）
@@ -107,10 +116,21 @@
 ---
 
 ## 5. Flutter App 配合（落差待補）
-- /contact-us：建立 Support ticket（表單）＋ 進聊天室（type='support'）
-- 任務房 Action Bar：發起 Dispute（建立 dispute case + 房）
-- 註冊成功後若填他人推薦碼且驗證通過：呼叫 use-referral-code 綁定（已有 ReferralService，可串）
-- Confirm & Pay：遵循「驗支付碼 → 轉帳/扣費/記帳 → 改任務狀態」，UI 引導需對齊
+
+### 5.1 新增路由
+- /account/support/issues：我的客服事件列表（support/dispute；可 Tab 或篩選）
+- /account/support/chat/:roomId：客服聊天室（沿用 ChatDetail，對 type 做分支）
+
+### 5.2 IssueStatusPage 擴充
+- 行為調整：
+  - 若有 chatRoomId → 以 API 取得該房事件流（現有雛形 `SupportEventApi.getEvents`）
+  - 若無 chatRoomId → 改為載入「我的客服事件清單」模式（非僅顯示舊版單筆靜態 UI）；保留舊版 UI 作為 fallback（可在頁內切換）
+- 篩選器：all/open/in_progress/resolved/closed_by_customer（已存在，可沿用）
+
+### 5.3 對接 API
+- GET /support/issues（清單）
+- GET /support/issues/{roomId}（單房事件）
+- 可選：GET /chat/rooms?type=support|dispute（沿用現有 chat API）
 
 ---
 
@@ -128,6 +148,7 @@
   - Users 模組（列表/詳細/批准）
   - Referral 流程全串（verify/use/批准發點）
   - 最小 logs 寫入（permission/status 變更）
+  - Flutter：新增 /account/support/issues 與 /account/support/chat/:roomId，擴充 IssueStatusPage
 - Phase 2（2~3 週）
   - Support/Dispute 列表與基本流（Claim/Transfer/Resolve/聊天室權限）
   - Payment：requests 審核、fee settings、官方帳戶

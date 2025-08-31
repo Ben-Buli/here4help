@@ -5,6 +5,10 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\TaskController;
 use App\Http\Controllers\Admin\LogController;
 use App\Http\Controllers\Admin\DisputeController;
+use App\Http\Controllers\Admin\SupportController;
+use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\UserActivityController;
+use App\Http\Controllers\Admin\UserTransactionController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -65,6 +69,7 @@ Route::prefix('admin')->group(function () {
         // 日誌管理路由
         Route::prefix('logs')->group(function () {
             Route::middleware('admin:logs.view')->group(function () {
+                Route::get('/', [LogController::class, 'index']);
                 Route::get('/activity', [LogController::class, 'activityLogs']);
                 Route::get('/login', [LogController::class, 'loginLogs']);
                 Route::get('/stats', [LogController::class, 'systemStats']);
@@ -84,6 +89,39 @@ Route::prefix('admin')->group(function () {
             Route::middleware('admin:disputes.edit')->group(function () {
                 Route::patch('/{id}/status', [DisputeController::class, 'updateStatus']);
                 Route::post('/batch-action', [DisputeController::class, 'batchAction']);
+            });
+        });
+
+        // 客服/支援路由
+        Route::prefix('support')->group(function () {
+            Route::get('/issues', [SupportController::class, 'issues']);
+            Route::post('/issues/{roomId}/accept', [SupportController::class, 'accept']);
+            Route::post('/issues/{roomId}/transfer', [SupportController::class, 'transfer']);
+            Route::post('/issues/{roomId}/status', [SupportController::class, 'updateStatus']);
+        });
+
+        // 支付/儲值路由
+        Route::prefix('payment')->group(function () {
+            Route::get('/requests', [PaymentController::class, 'requests']);
+            Route::post('/requests/{id}/approve', [PaymentController::class, 'approve']);
+            Route::post('/requests/{id}/reject', [PaymentController::class, 'reject']);
+            Route::match(['get', 'post'], '/fee-settings', [PaymentController::class, 'feeSettings']);
+            Route::match(['get', 'post'], '/official-accounts', [PaymentController::class, 'officialAccounts']);
+        });
+
+        // 使用者活動紀錄路由
+        Route::prefix('user-activities')->group(function () {
+            Route::middleware('admin:logs.view')->group(function () {
+                Route::get('/', [UserActivityController::class, 'index']);
+                Route::get('/{userId}', [UserActivityController::class, 'show']);
+            });
+        });
+
+        // 使用者交易紀錄路由
+        Route::prefix('user-transactions')->group(function () {
+            Route::middleware('admin:logs.view')->group(function () {
+                Route::get('/', [UserTransactionController::class, 'index']);
+                Route::get('/{userId}', [UserTransactionController::class, 'show']);
             });
         });
         

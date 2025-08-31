@@ -2,7 +2,7 @@ import axios from 'axios'
 import type { AxiosInstance, AxiosResponse } from 'axios'
 
 // API 基礎配置
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
 
 // 建立 axios 實例
 const api: AxiosInstance = axios.create({
@@ -75,9 +75,9 @@ export const authApi = {
         token: string
         permissions: string[]
       }>
-    >('/admin/login', { email, password }),
+    >('/api/admin/login', { email, password }),
 
-  logout: () => api.post<ApiResponse>('/admin/logout'),
+  logout: () => api.post<ApiResponse>('/api/admin/logout'),
 
   me: () =>
     api.get<
@@ -85,9 +85,9 @@ export const authApi = {
         admin: any
         permissions: string[]
       }>
-    >('/admin/me'),
+    >('/api/admin/me'),
 
-  refresh: () => api.post<ApiResponse<{ token: string }>>('/admin/refresh'),
+  refresh: () => api.post<ApiResponse<{ token: string }>>('/api/admin/refresh'),
 }
 
 // 用戶管理 API
@@ -100,7 +100,7 @@ export const userApi = {
     search?: string
     sort_by?: string
     sort_order?: 'asc' | 'desc'
-  }) => api.get<PaginatedResponse<any>>('/admin/users', { params }),
+  }) => api.get<PaginatedResponse<any>>('/api/admin/users', { params }),
 
   show: (id: number) =>
     api.get<
@@ -108,17 +108,18 @@ export const userApi = {
         user: any
         stats: any
         recent_activities: any[]
+        student_verification?: any
       }>
-    >(`/admin/users/${id}`),
+    >(`/api/admin/users/${id}`),
 
   updateStatus: (id: number, status: string, reason?: string) =>
-    api.patch<ApiResponse>(`/admin/users/${id}/status`, { status, reason }),
+    api.patch<ApiResponse>(`/api/admin/users/${id}/status`, { status, reason }),
 
   updatePermission: (id: number, permission: number, reason?: string) =>
-    api.patch<ApiResponse>(`/admin/users/${id}/permission`, { permission, reason }),
+    api.patch<ApiResponse>(`/api/admin/users/${id}/permission`, { permission, reason }),
 
   batchAction: (action: string, user_ids: number[], reason?: string) =>
-    api.post<ApiResponse>('/admin/users/batch-action', { action, user_ids, reason }),
+    api.post<ApiResponse>('/api/admin/users/batch-action', { action, user_ids, reason }),
 }
 
 // 任務管理 API
@@ -134,17 +135,34 @@ export const taskApi = {
     date_to?: string
     sort_by?: string
     sort_order?: 'asc' | 'desc'
-  }) => api.get<PaginatedResponse<any>>('/admin/tasks', { params }),
+  }) => api.get<PaginatedResponse<any>>('/api/admin/tasks', { params }),
 
   show: (id: string) =>
     api.get<
       ApiResponse<{
         task: any
       }>
-    >(`/admin/tasks/${id}`),
+    >(`/api/admin/tasks/${id}`),
 
   updateStatus: (id: string, status_id: number, reason?: string) =>
-    api.patch<ApiResponse>(`/admin/tasks/${id}/status`, { status_id, reason }),
+    api.patch<ApiResponse>(`/api/admin/tasks/${id}/status`, { status_id, reason }),
+}
+
+// 支援/客服 API
+export const supportApi = {
+  listIssues: (params?: {
+    page?: number
+    per_page?: number
+    type?: 'all' | 'support' | 'dispute'
+    status?: 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed'
+    search?: string
+  }) => api.get<PaginatedResponse<any>>('/api/admin/support/issues', { params }),
+
+  accept: (roomId: string) => api.post<ApiResponse>(`/api/admin/support/issues/${roomId}/accept`),
+  transfer: (roomId: string, target_admin_id: number) =>
+    api.post<ApiResponse>(`/api/admin/support/issues/${roomId}/transfer`, { target_admin_id }),
+  updateStatus: (roomId: string, status: 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed') =>
+    api.post<ApiResponse>(`/api/admin/support/issues/${roomId}/status`, { status }),
 }
 
 // 日誌管理 API
@@ -158,7 +176,7 @@ export const logApi = {
     date_from?: string
     date_to?: string
     log_type?: string
-  }) => api.get<PaginatedResponse<any>>('/admin/logs', { params }),
+  }) => api.get<PaginatedResponse<any>>('/api/admin/logs', { params }),
 
   activityLogs: (params?: {
     page?: number
@@ -169,7 +187,7 @@ export const logApi = {
     date_from?: string
     date_to?: string
     sort_order?: 'asc' | 'desc'
-  }) => api.get<PaginatedResponse<any>>('/admin/logs/activity', { params }),
+  }) => api.get<PaginatedResponse<any>>('/api/admin/logs/activity', { params }),
 
   loginLogs: (params?: {
     page?: number
@@ -180,7 +198,7 @@ export const logApi = {
     date_from?: string
     date_to?: string
     sort_order?: 'asc' | 'desc'
-  }) => api.get<PaginatedResponse<any>>('/admin/logs/login', { params }),
+  }) => api.get<PaginatedResponse<any>>('/api/admin/logs/login', { params }),
 
   systemStats: (params?: { period?: 'today' | 'week' | 'month' | 'year' }) =>
     api.get<
@@ -192,13 +210,81 @@ export const logApi = {
         task_stats: any
         login_stats: any
       }>
-    >('/admin/logs/stats', { params }),
+    >('/api/admin/logs/stats', { params }),
 }
 
 // 系統資訊 API
 export const systemApi = {
-  dashboard: () => api.get<ApiResponse>('/admin/dashboard'),
-  test: () => api.get<ApiResponse>('/test'),
+  dashboard: () => api.get<ApiResponse>('/api/admin/dashboard'),
+  test: () => api.get<ApiResponse>('/api/test'),
+}
+
+// 付款/儲值 API（Admin）
+export const paymentApi = {
+  requests: (params?: {
+    page?: number
+    per_page?: number
+    status?: 'pending' | 'approved' | 'rejected'
+    from_date?: string
+    to_date?: string
+  }) => api.get<PaginatedResponse<any>>('/api/admin/payment/requests', { params }),
+
+  approve: (id: number, note?: string) => api.post<ApiResponse>(`/api/admin/payment/requests/${id}/approve`, { note }),
+  reject: (id: number, note?: string) => api.post<ApiResponse>(`/api/admin/payment/requests/${id}/reject`, { note }),
+
+  getFeeSettings: () => api.get<ApiResponse<{ items: any[] }>>('/api/admin/payment/fee-settings'),
+  setFeeSettings: (percentage: number) => api.post<ApiResponse>('/api/admin/payment/fee-settings', { percentage }),
+
+  getOfficialAccounts: () => api.get<ApiResponse<{ items: any[] }>>('/api/admin/payment/official-accounts'),
+  setOfficialAccount: (payload: { bank_name: string; account_number: string; account_name: string }) =>
+    api.post<ApiResponse>('/api/admin/payment/official-accounts', payload),
+}
+
+// 使用者活動紀錄 API
+export const userActivityApi = {
+  list: (params?: {
+    page?: number
+    per_page?: number
+    user_id?: number
+    action?: string
+    actor_type?: 'user' | 'admin' | 'system'
+    date_from?: string
+    date_to?: string
+    search?: string
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
+  }) => api.get<PaginatedResponse<any>>('/api/admin/user-activities', { params }),
+
+  show: (userId: number, params?: {
+    page?: number
+    per_page?: number
+    action?: string
+    date_from?: string
+    date_to?: string
+  }) => api.get<PaginatedResponse<any>>(`/api/admin/user-activities/${userId}`, { params }),
+}
+
+// 使用者交易紀錄 API
+export const userTransactionApi = {
+  list: (params?: {
+    page?: number
+    per_page?: number
+    user_id?: number
+    transaction_type?: 'earn' | 'spend' | 'deposit' | 'fee' | 'refund' | 'adjustment'
+    date_from?: string
+    date_to?: string
+    search?: string
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
+  }) => api.get<PaginatedResponse<any>>('/api/admin/user-transactions', { params }),
+
+  show: (userId: number, params?: {
+    page?: number
+    per_page?: number
+    transaction_type?: 'earn' | 'spend' | 'deposit' | 'fee' | 'refund' | 'adjustment'
+    date_from?: string
+    date_to?: string
+  }) => api.get<PaginatedResponse<any>>(`/api/admin/user-transactions/${userId}`, { params }),
 }
 
 export default api
