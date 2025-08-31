@@ -24,7 +24,8 @@ class TaskStatus {
     'Completed': 1.0,
     'Dispute': 0.75,
     'Applying': 0.0,
-    'Rejected': 0.0,
+    'Rejected': 1.0,
+    'Cancelled': 1.0,
   };
 
   // 狀態排序權重
@@ -34,6 +35,8 @@ class TaskStatus {
     'pending_confirmation': 2,
     'dispute': 3,
     'completed': 4,
+    'rejected': 5,
+    'cancelled': 6,
   };
 
   // 角色視角狀態映射表
@@ -157,11 +160,11 @@ class TaskStatus {
       'Completed': (intensity: 1.0, fg: scheme.onSurface, bg: muted(neutral)),
       'Dispute': (intensity: 0.75, fg: scheme.error, bg: muted(scheme.error)),
       'Applying': (intensity: 0.0, fg: primary, bg: muted(primary)),
-      'Rejected': (intensity: 0.0, fg: scheme.onSurface, bg: muted(neutral)),
+      'Rejected': (intensity: 1.0, fg: scheme.onSurface, bg: muted(neutral)),
       // 新增角色視角狀態
       'Pending Review': (intensity: 0.0, fg: warning, bg: muted(warning)),
       'Accepted': (intensity: 0.25, fg: secondary, bg: muted(secondary)),
-      'Cancelled': (intensity: 0.0, fg: scheme.onSurface, bg: muted(neutral)),
+      'Cancelled': (intensity: 1.0, fg: scheme.onSurface, bg: muted(neutral)),
     };
   }
 

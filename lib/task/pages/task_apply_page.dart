@@ -174,7 +174,15 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                                   style:
                                       TextStyle(fontWeight: FontWeight.bold)),
                               Text('UserName: ${task['creator_name'] ?? ''}'),
-                              const Text('Rating: ⭐ 5.0 (16 reviews)'),
+                              Row(
+                                children: [
+                                  const Icon(Icons.star,
+                                      color: Colors.amber, size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                      '${task['creator_rating'] ?? 0.0} (${task['creator_reviews_count'] ?? 0} reviews)'),
+                                ],
+                              ),
                             ],
                           ),
                           actions: [

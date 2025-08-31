@@ -221,13 +221,70 @@ class UserController extends Controller
         $newPermission = $request->permission;
         $reason = $request->get('reason', '');
 
-        // 更新用戶權限
-        DB::table('users')
-            ->where('id', $id)
-            ->update([
-                'permission' => $newPermission,
-                'updated_at' => now()
-            ]);
+        DB::beginTransaction();
+        try {
+            // 1) 更新用戶權限
+            DB::table('users')
+                ->where('id', $id)
+                ->update([
+                    'permission' => $newPermission,
+                    'updated_at' => now()
+                ]);
+
+            // 2) 若 0 -> 1：
+            if ((int)$oldPermission === 0 && (int)$newPermission === 1) {
+                // 2.1 生成 referral_code（若沒有）
+                if (!$user->referral_code) {
+                    do {
+                        $refCode = strtoupper(substr(md5($id . rand()), 0, 6));
+                        $exists = DB::table('referral_codes')->where('referral_code', $refCode)->exists();
+                    } while ($exists);
+
+                    DB::table('referral_codes')->insert([
+                        'user_id' => $id,
+                        'referral_code' => $refCode,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    DB::table('users')->where('id', $id)->update([
+                        'referral_code' => $refCode,
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                // 2.2 在 referral_codes 以 used_by_user_id 記錄引用，批准時發點數
+                // 確保 awarded_at 欄位存在（若無則新增）
+                $col = DB::selectOne("SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'referral_codes' AND COLUMN_NAME = 'awarded_at'");
+                if ((int)($col->c ?? 0) === 0) {
+                    DB::statement("ALTER TABLE referral_codes ADD COLUMN awarded_at TIMESTAMP NULL DEFAULT NULL, ADD INDEX idx_awarded_at (awarded_at)");
+                }
+
+                // 將以此用戶為被推薦人的紀錄標記為已發獎（僅一次），並加點數
+                $affected = DB::table('referral_codes')
+                    ->where('used_by_user_id', $id)
+                    ->whereNull('awarded_at')
+                    ->update([
+                        'awarded_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                if ($affected > 0) {
+                    DB::table('users')->where('id', $id)->update([
+                        'points' => DB::raw('(points + 500)'),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update permission: ' . $e->getMessage(),
+            ], 500);
+        }
 
         // 記錄權限變更日誌
         $this->logPermissionChange($request->user(), $id, $oldPermission, $newPermission, $reason);

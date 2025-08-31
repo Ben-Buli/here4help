@@ -360,6 +360,45 @@ class ChatService {
     return null;
   }
 
+  /// 檢查用戶是否已經檢舉過聊天室
+  Future<Map<String, dynamic>> checkReportStatus({
+    required String roomId,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('未登入');
+      }
+
+      final queryParams = <String, String>{
+        'room_id': roomId,
+      };
+
+      final uri = Uri.parse('$_baseUrl/backend/api/chat/check_report.php')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return Map<String, dynamic>.from(data['data'] ?? {});
+        }
+        throw Exception(data['message'] ?? '檢查檢舉狀態失敗');
+      } else {
+        throw Exception('HTTP ${response.statusCode}: 檢查檢舉狀態失敗');
+      }
+    } catch (e) {
+      throw Exception('檢查檢舉狀態失敗: $e');
+    }
+  }
+
   /// 檢舉聊天（含證據上傳占位，實際檔案上傳改為後續 API）
   Future<Map<String, dynamic>> reportChat({
     required String roomId,

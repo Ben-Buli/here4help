@@ -50,9 +50,27 @@ try {
             throw new Exception('Application is not in applied status');
         }
 
+
         // 3. 標記該應徵為 rejected
         $stmt = $conn->prepare("UPDATE task_applications SET status = 'rejected', updated_at = NOW() WHERE task_id = ? AND user_id = ?");
         $stmt->execute([$taskId, $userId]);
+
+        // 3.1 紀錄 user_active_log
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? ($_SERVER['REMOTE_ADDR'] ?? null);
+        $metadata = json_encode([
+            'task_id' => $taskId,
+            'application_user_id' => $userId,
+            'application_status_from' => 'applied',
+            'application_status_to' => 'rejected',
+        ]);
+        $logStmt = $conn->prepare("INSERT INTO user_active_log (
+            user_id, actor_type, actor_id, action, field, old_value, new_value,
+            reason, metadata, ip, created_at
+          ) VALUES (
+            ?, 'user', ?, CONCAT('application_rejected:poster_', ?, '_rejected_user_', ?, '_task_', ?), 'status', 'applied', 'rejected',
+            NULL, ?, ?, NOW()
+          )");
+        $logStmt->execute([$userId, $posterId, $posterId, $userId, $taskId, $metadata, $ip]);
 
         $conn->commit();
 

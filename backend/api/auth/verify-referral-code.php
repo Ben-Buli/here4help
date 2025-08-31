@@ -38,9 +38,12 @@ try {
     // 建立資料庫連線
     $db = Database::getInstance();
     
-    // 檢查推薦碼是否存在且對應用戶狀態為 active
+    // 檢查推薦碼是否存在且擁有者為有效用戶（status 有效且 permission > 0）
     $stmt = $db->query(
-        "SELECT id, name, status FROM users WHERE referral_code = ? AND status = 'active'",
+        "SELECT id, name, status, permission FROM users 
+         WHERE referral_code = ? 
+           AND (status = 'active' OR status = 'verified')
+           AND permission > 0",
         [$referralCode]
     );
     

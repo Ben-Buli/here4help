@@ -1,5 +1,7 @@
 import 'package:here4help/config/environment_config.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
@@ -241,20 +243,31 @@ class ThirdPartyAuthService {
   // 移動版 Facebook 登入
   Future<Map<String, dynamic>?> _signInWithFacebookMobile() async {
     try {
-      // 暫時使用模擬資料進行測試
-      // TODO: 整合 flutter_facebook_auth 套件
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final userData = {
-        'provider': 'facebook',
-        'platform': isIOS ? 'ios' : 'android',
-        'facebook_id': 'mobile_facebook_user_$timestamp',
-        'name': 'Mobile Facebook User $timestamp',
-        'email': 'mobileuser_facebook_$timestamp@example.com',
-        'avatar_url': 'https://example.com/avatar.jpg',
-        'access_token': 'mock_access_token_$timestamp',
-      };
+      // 整合 flutter_facebook_auth 套件
+      final FacebookAuth facebookAuth = FacebookAuth.instance;
 
-      return await _sendUserDataToBackend(userData);
+      // 執行 Facebook 登入
+      final LoginResult result = await facebookAuth.login();
+
+      if (result.status == LoginStatus.success) {
+        // 獲取用戶資料
+        final userData = await facebookAuth.getUserData();
+
+        final facebookData = {
+          'provider': 'facebook',
+          'platform': isIOS ? 'ios' : 'android',
+          'facebook_id': userData['id'],
+          'name': userData['name'] ?? '',
+          'email': userData['email'] ?? '',
+          'avatar_url': userData['picture']?['data']?['url'] ?? '',
+          'access_token': result.accessToken?.token ?? '',
+        };
+
+        return await _sendUserDataToBackend(facebookData);
+      } else {
+        print('Facebook 登入失敗: ${result.status}');
+        return null;
+      }
     } catch (e) {
       print('移動版 Facebook 登入錯誤: $e');
       return null;
@@ -344,19 +357,33 @@ class ThirdPartyAuthService {
   // iOS 版 Apple 登入
   Future<Map<String, dynamic>?> _signInWithAppleIOS() async {
     try {
-      // 暫時使用模擬資料進行測試
-      // TODO: 整合 sign_in_with_apple 套件
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final userData = {
+      // 整合 sign_in_with_apple 套件
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      // 組合用戶姓名
+      String fullName = '';
+      if (credential.givenName != null || credential.familyName != null) {
+        fullName =
+            '${credential.givenName ?? ''} ${credential.familyName ?? ''}'
+                .trim();
+      }
+
+      final appleData = {
         'provider': 'apple',
         'platform': 'ios',
-        'apple_id': 'ios_apple_user_$timestamp',
-        'name': 'iOS Apple User $timestamp',
-        'email': 'iosuser_apple_$timestamp@example.com',
-        'identity_token': 'mock_identity_token_$timestamp',
+        'apple_id': credential.userIdentifier,
+        'name': fullName.isNotEmpty ? fullName : 'Apple User',
+        'email': credential.email ?? '',
+        'identity_token': credential.identityToken,
+        'authorization_code': credential.authorizationCode,
       };
 
-      return await _sendUserDataToBackend(userData);
+      return await _sendUserDataToBackend(appleData);
     } catch (e) {
       print('iOS Apple 登入錯誤: $e');
       return null;

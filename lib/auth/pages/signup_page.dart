@@ -178,34 +178,34 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   }
 
   // 處理國家選擇變更
-  void _onCountryChanged(Country? country) {
-    if (country != null) {
-      setState(() {
-        selectedCountry = country;
-      });
+  // void _onCountryChanged(Country? country) {
+  //   if (country != null) {
+  //     setState(() {
+  //       selectedCountry = country;
+  //     });
 
-      // 自動填充主要語言
-      _autoFillPrimaryLanguage(country);
+  //     // 自動填充主要語言
+  //     _autoFillPrimaryLanguage(country);
 
-      print('🌍 選擇國家: ${country.name}');
-      print('🗣️ 主要語言: ${country.languages.join(', ')}');
-    }
-  }
+  //     print('🌍 選擇國家: ${country.name}');
+  //     print('🗣️ 主要語言: ${country.languages.join(', ')}');
+  //   }
+  // }
 
   // 自動填充主要語言
-  void _autoFillPrimaryLanguage(Country country) {
-    if (country.languages.isNotEmpty) {
-      final primaryLanguage = country.languages.first;
+  // void _autoFillPrimaryLanguage(Country country) {
+  //   if (country.languages.isNotEmpty) {
+  //     final primaryLanguage = country.languages.first;
 
-      // 更新 selectedLanguages
-      setState(() {
-        selectedLanguages = [primaryLanguage];
-        languagesError = false;
-      });
+  //     // 更新 selectedLanguages
+  //     setState(() {
+  //       selectedLanguages = [primaryLanguage];
+  //       languagesError = false;
+  //     });
 
-      print('✅ 自動填充主要語言: $primaryLanguage');
-    }
-  }
+  //     print('✅ 自動填充主要語言: $primaryLanguage');
+  //   }
+  // }
 
   // 處理 OAuth 註冊
   Future<void> _handleOAuthRegistration() async {
@@ -1825,27 +1825,13 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
 
   Future<bool> _createUserAccount() async {
     try {
-      // 準備學校資訊
-      String? schoolName;
-      if (selectedUniversityId == 'other') {
-        schoolName = schoolController.text;
-      } else if (selectedUniversityId != null) {
-        final university = universityOptions.firstWhere(
-          (u) => u['id'].toString() == selectedUniversityId,
-          orElse: () => {},
-        );
-        if (university.isNotEmpty) {
-          '${university['abbr']} - ${university['en_name']} - ${university['zh_name']}';
-        }
-      }
-
       final response = await http.post(
         Uri.parse(AppConfig.registerUrl),
         headers: {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'full_name': fullNameController.text,
+          'name': fullNameController.text,
           'nickname': nicknameController.text,
           'gender': selectedGender,
           'email': emailController.text,
@@ -1857,14 +1843,54 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
           'payment_password': paymentPasswordController.text,
           'is_permanent_address': isPermanentAddress,
           'primary_language': selectedLanguages.join(','),
-          'school': schoolName,
+          'school': _getSchoolValue(),
           'referral_code': referralCodeController.text.trim(),
         }),
       );
 
-      final responseData = jsonDecode(response.body);
+      // 🔧 修復：檢查回應是否為 HTML 錯誤頁面
+      if (response.body.trim().startsWith('<') ||
+          response.body.contains('<br />') ||
+          response.body.contains('<html>')) {
+        debugPrint('❌ 伺服器回傳 HTML 錯誤頁面: ${response.body.substring(0, 100)}...');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Server error (HTTP ${response.statusCode}): Please try again later'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        return false;
+      }
 
-      if (response.statusCode == 200 && responseData['success']) {
+      // 🔧 修復：安全的 JSON 解析
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body);
+      } catch (jsonError) {
+        debugPrint('❌ JSON 解析失敗: $jsonError');
+        debugPrint('❌ 回應內容: ${response.body}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                const Text('Invalid server response format. Please try again.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        return false;
+      }
+
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        // 🔧 修復：保存 user_id 到 SharedPreferences
+        final userData = responseData['data'] as Map<String, dynamic>?;
+        final userId = userData?['user_id'];
+
+        if (userId != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('signup_user_id', userId.toString());
+          debugPrint('✅ 用戶註冊成功，user_id: $userId');
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Account created successfully!'),
@@ -1873,12 +1899,24 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         );
         return true;
       } else {
-        throw Exception(responseData['message'] ?? 'Failed to create account');
+        // 🔑 這裡從 responseData 取出後端的錯誤資訊
+        final errorCode = responseData['code'] ?? 'Unknown Code';
+        final errorMessage = responseData['message'] ?? 'Unknown Error';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed: ${errorCode ?? errorMessage}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        return false;
       }
     } catch (e) {
+      // 真的連 request 都失敗才會跑到這裡
+      debugPrint('❌ 註冊請求失敗: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Failed to create account: $e'),
+          content:
+              Text('Network error: Please check your connection and try again'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/constants/task_status.dart';
 import 'package:here4help/constants/theme_schemes.dart';
+import 'package:here4help/chat/utils/application_status_utils.dart';
 import 'package:provider/provider.dart';
 
 /// 任務標題（AppBar 專用）
@@ -112,6 +113,14 @@ class TaskAppBarTitle extends StatelessWidget {
 
   /// 獲取任務狀態顯示文字
   String _getStatusDisplay() {
+    // 如果是 participant 角色，優先使用 application_status
+    if (userRole == 'participant') {
+      final applicationStatus = task['application_status']?.toString();
+      if (applicationStatus != null && applicationStatus.isNotEmpty) {
+        return ApplicationStatusUtils.getDisplayName(applicationStatus);
+      }
+    }
+
     // 優先使用 mapped_status（後端計算的角色視角狀態）
     if (task['mapped_status'] != null &&
         task['mapped_status'].toString().isNotEmpty) {
@@ -134,6 +143,14 @@ class TaskAppBarTitle extends StatelessWidget {
 
   /// 獲取狀態標籤的顏色
   Color _getStatusColor(ThemeScheme themeScheme) {
+    // 如果是 participant 角色，使用 ApplicationStatusUtils 的顏色
+    if (userRole == 'participant') {
+      final applicationStatus = task['application_status']?.toString();
+      if (applicationStatus != null && applicationStatus.isNotEmpty) {
+        return ApplicationStatusUtils.getStatusColor(applicationStatus);
+      }
+    }
+
     final status = _getStatusDisplay();
 
     switch (status.toLowerCase()) {

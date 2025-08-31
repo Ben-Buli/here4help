@@ -15,8 +15,8 @@ try {
     
     // 驗證必要欄位
     $requiredFields = [
-        'first_name', 'last_name', 'gender', 'email', 'phone', 
-        'country', 'address', 'password', 'date_of_birth', 
+        'name', 'gender', 'email', 'phone', 
+         'address', 'password', 'date_of_birth', 
         'payment_password', 'school_name', 'student_name', 'student_id'
     ];
     
@@ -79,9 +79,8 @@ try {
             created_at, updated_at
         ) VALUES (?, ?, ?, ?, 0, 'pending_verification', ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
         
-        $userName = $_POST['first_name'] . ' ' . $_POST['last_name'];
         $db->query($userSql, [
-            $userName,
+            $_POST['name'] ,
             $email,
             $hashedPassword,
             $_POST['phone'],

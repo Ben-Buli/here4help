@@ -36,6 +36,7 @@ import 'package:here4help/chat/services/image_processing_service.dart';
 import 'package:here4help/chat/widgets/image_tray.dart';
 import 'package:here4help/chat/widgets/pending_image_message.dart';
 import 'package:here4help/utils/error_message_mapper.dart';
+import 'package:here4help/chat/utils/application_status_utils.dart';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, this.data});
@@ -3104,99 +3105,145 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   }
 
   // ====== 以下為動作視窗（報告、支付+評論、已付款資訊）骨架 ======
-  void _openReportSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        final descriptionCtrl = TextEditingController();
-        String? selectedReason;
-        return Padding(
-          padding:
-              EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Report',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  const Text('Reason'),
-                  const SizedBox(height: 6),
-                  StatefulBuilder(builder: (context, setState) {
-                    Widget reasonTile(String value, String label) {
-                      return RadioListTile<String>(
-                        title: Text(label),
-                        value: value,
-                        groupValue: selectedReason,
-                        onChanged: (v) => setState(() => selectedReason = v),
-                      );
-                    }
+  void _openReportSheet() async {
+    if (_currentRoomId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('無法獲取聊天室ID')),
+      );
+      return;
+    }
 
-                    return Column(
-                      children: [
-                        reasonTile('abuse', 'Abusive behavior'),
-                        reasonTile('spam', 'Spam or scam'),
-                        reasonTile('harassment', 'Harassment'),
-                        reasonTile('dispute', 'Request Dispute'),
-                      ],
-                    );
-                  }),
-                  const SizedBox(height: 8),
-                  const Text('Description (min 10 chars)'),
-                  TextField(maxLines: 4, controller: descriptionCtrl),
-                  const SizedBox(height: 8),
-                  ElevatedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.photo),
-                      label: const Text('Upload evidence (coming soon)')),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final roomId = _currentRoomId;
-                        if (roomId == null ||
-                            selectedReason == null ||
-                            (descriptionCtrl.text.trim().length < 10)) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                              content: Text(
-                                  'Please select a reason and enter at least 10 characters description.')));
-                          return;
-                        }
-                        try {
-                          await ChatService().reportChat(
-                            roomId: roomId,
-                            reason: selectedReason!,
-                            description: descriptionCtrl.text.trim(),
-                          );
-                          if (mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Report submitted.')));
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Report failed: $e')));
-                          }
-                        }
-                      },
-                      child: const Text('Submit'),
-                    ),
-                  )
-                ],
-              ),
+    try {
+      // 先檢查用戶是否已經檢舉過
+      final reportStatus = await ChatService().checkReportStatus(
+        roomId: _currentRoomId!,
+      );
+
+      final hasReported = reportStatus['has_reported'] ?? false;
+
+      if (hasReported) {
+        // 如果已經檢舉過，顯示已檢舉的提示
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green),
+                SizedBox(width: 8),
+                Text('Already Reported'),
+              ],
             ),
+            content: const Text(
+              'You have already reported this chat room. Our team will review your report and take appropriate action.',
+              style: TextStyle(fontSize: 16),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
           ),
         );
-      },
-    );
+        return;
+      }
+
+      // 如果沒有檢舉過，顯示檢舉表單
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) {
+          final descriptionCtrl = TextEditingController();
+          String? selectedReason;
+          return Padding(
+            padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Report',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    const Text('Reason'),
+                    const SizedBox(height: 6),
+                    StatefulBuilder(builder: (context, setState) {
+                      Widget reasonTile(String value, String label) {
+                        return RadioListTile<String>(
+                          title: Text(label),
+                          value: value,
+                          groupValue: selectedReason,
+                          onChanged: (v) => setState(() => selectedReason = v),
+                        );
+                      }
+
+                      return Column(
+                        children: [
+                          reasonTile('abuse', 'Abusive behavior'),
+                          reasonTile('spam', 'Spam or scam'),
+                          reasonTile('harassment', 'Harassment'),
+                          reasonTile('dispute', 'Request Dispute'),
+                        ],
+                      );
+                    }),
+                    const SizedBox(height: 8),
+                    const Text('Description (min 10 chars)'),
+                    TextField(maxLines: 4, controller: descriptionCtrl),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final roomId = _currentRoomId;
+                          if (roomId == null ||
+                              selectedReason == null ||
+                              (descriptionCtrl.text.trim().length < 10)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'Please select a reason and enter at least 10 characters description.')));
+                            return;
+                          }
+                          try {
+                            await ChatService().reportChat(
+                              roomId: roomId,
+                              reason: selectedReason!,
+                              description: descriptionCtrl.text.trim(),
+                            );
+                            if (mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('Report submitted.')));
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Report failed: $e')));
+                            }
+                          }
+                        },
+                        child: const Text('Submit'),
+                      ),
+                    )
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('檢查檢舉狀態失敗: $e')),
+        );
+      }
+    }
   }
 
   void _openPayAndReview() {

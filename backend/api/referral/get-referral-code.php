@@ -34,8 +34,14 @@ try {
         exit;
     }
     
-    // 檢查用戶是否已驗證
-    if ($user['status'] !== 'verified') {
+    // 檢查用戶是否為有效用戶：狀態有效且（若有 permission 欄位）permission > 0
+    // 若無 permission 欄位，向後相容僅檢查狀態
+    $isStatusOk = ($user['status'] === 'active' || $user['status'] === 'verified');
+    $permissionOk = true;
+    if (array_key_exists('permission', $user)) {
+        $permissionOk = ((int)$user['permission']) > 0;
+    }
+    if (!($isStatusOk && $permissionOk)) {
         Response::error('User must be verified to get referral code');
         exit;
     }
@@ -51,8 +57,8 @@ try {
         // 插入推薦碼記錄
         $db->query("INSERT INTO referral_codes (user_id, referral_code) VALUES (?, ?)", [$userId, $referralCode]);
         
-        // 更新用戶表
-        $db->query("UPDATE users SET referral_code = ? WHERE id = ?", [$userId, $referralCode]);
+        // 更新用戶表（參數順序修正）
+        $db->query("UPDATE users SET referral_code = ? WHERE id = ?", [$referralCode, $userId]);
         
         $user['referral_code'] = $referralCode;
         $user['generated_code'] = $referralCode;

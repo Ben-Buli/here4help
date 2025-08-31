@@ -3,18 +3,15 @@ import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:intl/intl.dart';
-import 'package:go_router/go_router.dart';
 import 'package:here4help/chat/providers/chat_list_provider.dart';
 import 'package:here4help/chat/widgets/task_card_components.dart';
-import 'package:here4help/chat/services/chat_service.dart';
-import 'package:here4help/chat/services/chat_storage_service.dart';
-import 'package:here4help/chat/services/chat_session_manager.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/chat/utils/avatar_error_cache.dart';
 import 'package:here4help/chat/services/smart_refresh_strategy.dart';
 import 'package:here4help/chat/services/chat_navigation_service.dart';
+import 'package:here4help/chat/utils/application_status_utils.dart';
 
 /// My Works 分頁組件
 /// 從原 ChatListPage 中抽取的 My Works 相關功能
@@ -313,11 +310,9 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       debugPrint('🔍 [My Works] _fetchMyWorksPage 開始，offset: $offset');
 
       // 安全地獲取 Provider
-      ChatListProvider? chatProvider;
       UserService? userService;
 
       try {
-        chatProvider = context.read<ChatListProvider>();
         userService = context.read<UserService>();
       } catch (e) {
         debugPrint('⚠️ [My Works] 無法獲取 Provider: $e');
@@ -358,44 +353,6 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
         _pagingController.appendLastPage([]);
         return;
       }
-
-      final allTasks = _composeMyWorks(taskService, currentUserId);
-      debugPrint('🔍 [My Works] 組合後的任務數量: ${allTasks.length}');
-
-      // 應用篩選和排序
-      final filtered = _filterTasks(allTasks, chatProvider);
-      debugPrint('🔍 [My Works] 篩選後的任務數量: ${filtered.length}');
-
-      final sorted = _sortTasks(filtered, chatProvider);
-      debugPrint('🔍 [My Works] 排序後的任務數量: ${sorted.length}');
-
-      final start = offset;
-      final end = (offset + _pageSize) > sorted.length
-          ? sorted.length
-          : (offset + _pageSize);
-      final slice = sorted.sublist(start, end);
-      final hasMore = end < sorted.length;
-
-      debugPrint(
-          '🔍 [My Works] 分頁處理: start=$start, end=$end, slice=${slice.length}, hasMore=$hasMore');
-
-      if (!mounted) return;
-
-      if (hasMore) {
-        _pagingController.appendPage(slice, end);
-        debugPrint('✅ [My Works] 添加分頁數據，下一頁 key: $end');
-      } else {
-        _pagingController.appendLastPage(slice);
-        debugPrint('✅ [My Works] 添加最後一頁數據');
-      }
-
-      // 資料載入完成後更新未讀標記
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _updateMyWorksTabUnreadFlag();
-      });
-
-      debugPrint('✅ [My Works] _fetchMyWorksPage 完成');
     } catch (error) {
       debugPrint('❌ [My Works] _fetchMyWorksPage 錯誤: $error');
       if (mounted) {
@@ -480,291 +437,6 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     }).toList();
   }
 
-  /// 整理 My Works 清單：優先使用 ChatListProvider 快取，回退到 TaskService
-  List<Map<String, dynamic>> _composeMyWorks(
-      TaskService service, int? currentUserId) {
-    // 安全地獲取 ChatListProvider
-    ChatListProvider? chatProvider;
-    try {
-      chatProvider = context.read<ChatListProvider>();
-    } catch (e) {
-      debugPrint('⚠️ [My Works] _composeMyWorks 無法獲取 ChatListProvider: $e');
-      // 如果無法獲取 Provider，直接使用 TaskService 數據
-      final apps = service.myApplications;
-      debugPrint('📡 [My Works] 使用 TaskService 數據作為備用: ${apps.length} 個應徵記錄');
-      return _processApplicationsFromService(apps);
-    }
-
-    List<Map<String, dynamic>> apps = [];
-
-    // 檢查 Provider 中的數據
-    if (chatProvider.myWorksApplications.isNotEmpty) {
-      apps = List<Map<String, dynamic>>.from(chatProvider.myWorksApplications);
-      debugPrint('✅ [My Works] 使用 ChatListProvider 快取: ${apps.length} 個應徵記錄');
-    } else if (chatProvider.isCacheReadyForTab(ChatListProvider.TAB_MY_WORKS)) {
-      apps = List<Map<String, dynamic>>.from(
-          chatProvider.cacheManager.myWorksCache);
-      debugPrint('✅ [My Works] 使用 ChatCacheManager 快取: ${apps.length} 個應徵記錄');
-    } else {
-      // 如果 Provider 中沒有數據，強制從 TaskService 載入
-      debugPrint('📡 [My Works] Provider 中沒有數據，強制從 TaskService 載入');
-      apps = service.myApplications;
-      debugPrint('📡 [My Works] TaskService 數據: ${apps.length} 個應徵記錄');
-
-      // 如果 TaskService 中也沒有數據，嘗試強制重新載入
-      if (apps.isEmpty && currentUserId != null) {
-        debugPrint('🔄 [My Works] TaskService 中沒有數據，嘗試強制重新載入');
-        try {
-          // 這裡不能直接 await，因為這個方法不是 async
-          // 但我們可以記錄需要重新載入的狀態
-          debugPrint('⚠️ [My Works] 需要重新載入數據，請檢查 API 調用');
-        } catch (e) {
-          debugPrint('❌ [My Works] 強制重新載入失敗: $e');
-        }
-      }
-    }
-
-    // 添加詳細的除錯資訊
-    // debugPrint('🔍 [My Works] _composeMyWorks 開始');
-    debugPrint('🔍 [My Works] currentUserId: $currentUserId');
-    debugPrint(
-        '🔍 [My Works][_composeMyWorks] 數據來源: ${chatProvider.isCacheReadyForTab(ChatListProvider.TAB_MY_WORKS) ? "快取" : "API"}');
-    // debugPrint('🔍 [My Works] 應徵記錄長度: ${apps.length}');
-    debugPrint('🔍 [My Works][_composeMyWorks] 應徵記錄內容: ${apps.length} 個應徵記錄');
-
-    // 如果沒有應徵數據，返回空列表
-    if (apps.isEmpty) {
-      debugPrint('⚠️ [My Works] 沒有應徵數據，返回空列表');
-      return [];
-    }
-
-    final result = apps.map((raw) {
-      // 確保是可變 Map 並統一鍵值型別
-      final Map<String, dynamic> app = Map<String, dynamic>.from(raw);
-
-      final statusCodeRaw =
-          app['status_code'] ?? app['client_status_code'] ?? app['status'];
-      final statusDispRaw = app['status_display'] ??
-          app['client_status_display'] ??
-          app['display_status'];
-
-      return {
-        'id': app['id'] != null ? _as<String>(app['id'], '') : '',
-        'task_id':
-            app['task_id'] != null ? _as<String>(app['task_id'], '') : '',
-        'title': app['title'] != null
-            ? _as<String>(app['title'], 'Untitled Task')
-            : 'Untitled Task',
-        'description': app['description'] != null
-            ? _as<String>(app['description'], '')
-            : '',
-        'reward_point': app['reward_point'] != null
-            ? _as<double>(app['reward_point'], 0.0)
-            : 0.0,
-        'location':
-            app['location'] != null ? _as<String>(app['location'], '') : '',
-        'task_date':
-            app['task_date'] != null ? _asDateStr(app['task_date']) : '',
-        'language_requirement': app['language_requirement'] != null
-            ? _as<String>(app['language_requirement'], '')
-            : '',
-        'status_code':
-            statusCodeRaw != null ? _as<String>(statusCodeRaw, '') : '',
-        'status_display': _normStatus(statusCodeRaw, statusDispRaw),
-        'creator_id': app['creator_id'] != null
-            ? _as<int>(app['creator_id'], 0)
-            : 0, // 若為 UUID 改成 _as<String>
-        'creator_name': app['creator_name'] != null
-            ? _as<String>(app['creator_name'], 'Unknown')
-            : 'Unknown',
-        'creator_avatar': app['creator_avatar'] != null
-            ? _as<String>(app['creator_avatar'], '')
-            : '',
-        'latest_message_snippet': app['latest_message_snippet'] != null
-            ? _as<String>(app['latest_message_snippet'], 'No conversation yet')
-            : 'No conversation yet',
-        'chat_room_id': app['chat_room_id'] != null
-            ? _as<String>(app['chat_room_id'], '')
-            : '',
-        'applied_by_me': true,
-        'application_id': app['application_id'] != null
-            ? _as<String>(app['application_id'], '')
-            : '',
-        'application_status': app['application_status'] != null
-            ? _as<String>(app['application_status'], '')
-            : '',
-        'application_created_at': app['application_created_at'] != null
-            ? _asDateStr(app['application_created_at'])
-            : '',
-        'application_updated_at': app['application_updated_at'] != null
-            ? _asDateStr(app['application_updated_at'])
-            : '',
-        // 供排序用的輔助欄位（避免 parse 失敗）
-        'updated_at':
-            (app['application_updated_at'] != null || app['updated_at'] != null)
-                ? _asDateStr(app['application_updated_at'] ?? app['updated_at'])
-                : '',
-      };
-    }).toList();
-
-    debugPrint('✅ [My Works] _composeMyWorks 完成，返回 ${result.length} 個任務');
-    // debugPrint('🔍 [My Works] 轉換後的任務列表: $result');
-
-    return result;
-  }
-
-  /// 正規化搜尋文本 - 與 PostedTasks 一致，移除特殊字符並轉為小寫
-  String _normalizeSearchText(String text) {
-    if (text.isEmpty) return '';
-    final normalized = text
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^\w\s\-\(\)\.\,\:\;\!\?]'), '')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-    return normalized;
-  }
-
-  /// 篩選任務列表（My Works）— 統一搜尋/篩選邏輯
-  List<Map<String, dynamic>> _filterTasks(
-      List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
-    final rawQuery = chatProvider.searchQuery.trim();
-    final hasSearchQuery = rawQuery.isNotEmpty;
-    final normalizedQuery = _normalizeSearchText(rawQuery);
-
-    return tasks.where((task) {
-      final title = (task['title'] ?? '').toString();
-      final description = (task['description'] ?? '').toString();
-      final latestMessage = (task['latest_message_snippet'] ?? '').toString();
-      final creatorName = (task['creator_name'] ?? '').toString();
-      final location = (task['location'] ?? '').toString();
-      final language = (task['language_requirement'] ?? '').toString();
-      final statusDisplay = _displayStatus(task);
-
-      // 統一正規化
-      final nTitle = _normalizeSearchText(title);
-      final nDesc = _normalizeSearchText(description);
-      final nMsg = _normalizeSearchText(latestMessage);
-      final nCreator = _normalizeSearchText(creatorName);
-      final nLoc = _normalizeSearchText(location);
-      final nLang = _normalizeSearchText(language);
-      final nStatus = _normalizeSearchText(statusDisplay);
-
-      // 搜尋：任一可見欄位命中即可
-      bool matchQuery = true;
-      if (hasSearchQuery) {
-        matchQuery = nTitle.contains(normalizedQuery) ||
-            nDesc.contains(normalizedQuery) ||
-            nMsg.contains(normalizedQuery) ||
-            nCreator.contains(normalizedQuery) ||
-            nLoc.contains(normalizedQuery) ||
-            nLang.contains(normalizedQuery) ||
-            nStatus.contains(normalizedQuery);
-      }
-
-      if (!matchQuery) return false;
-
-      // 位置篩選：始終尊重使用者的位置篩選
-      final matchLocation = chatProvider.selectedLocations.isEmpty ||
-          chatProvider.selectedLocations.contains(location);
-      if (!matchLocation) return false;
-
-      // 狀態篩選
-      final matchStatus = chatProvider.selectedStatuses.isEmpty ||
-          chatProvider.selectedStatuses.contains(statusDisplay);
-
-      return matchStatus;
-    }).toList();
-  }
-
-  /// 排序任務列表（簡化版：統一使用 status_id 優先級排序）
-  List<Map<String, dynamic>> _sortTasks(
-      List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
-    debugPrint('🔄 [My Works] 開始排序任務: ${tasks.length} 個任務');
-    debugPrint('  - 排序方式: ${chatProvider.currentSortBy}');
-    debugPrint('  - 排序方向: ${chatProvider.sortAscending ? "升序" : "降序"}');
-
-    // 簡化邏輯：統一使用 status_id 優先級排序
-    if (chatProvider.currentSortBy == 'status_id') {
-      debugPrint('✅ [My Works] 使用預設 status_id 排序');
-      return _sortByStatusId(tasks, chatProvider);
-    }
-
-    // 用戶選擇其他排序時
-    debugPrint('⚠️ [My Works] 用戶選擇排序: ${chatProvider.currentSortBy}');
-    return _sortByUserChoice(tasks, chatProvider);
-  }
-
-  /// status_id 優先級排序（預設）
-  List<Map<String, dynamic>> _sortByStatusId(
-      List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
-    final sortedTasks = List<Map<String, dynamic>>.from(tasks);
-
-    sortedTasks.sort((a, b) {
-      // 主鍵：status_id 升序（1,2,3...）
-      final statusIdA = int.tryParse(a['status_id']?.toString() ?? '0') ?? 0;
-      final statusIdB = int.tryParse(b['status_id']?.toString() ?? '0') ?? 0;
-      int comparison = statusIdA.compareTo(statusIdB);
-
-      // 次鍵：updated_at 降序（最新的在前）
-      if (comparison == 0) {
-        final timeA =
-            DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
-        final timeB =
-            DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
-        comparison = timeB.compareTo(timeA);
-      }
-
-      // 三次鍵：id 降序（穩定排序）
-      if (comparison == 0) {
-        final idA = a['id']?.toString() ?? '';
-        final idB = b['id']?.toString() ?? '';
-        comparison = idB.compareTo(idA);
-      }
-
-      return comparison;
-    });
-
-    return sortedTasks;
-  }
-
-  /// 用戶自選排序
-  List<Map<String, dynamic>> _sortByUserChoice(
-      List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
-    final sortedTasks = List<Map<String, dynamic>>.from(tasks);
-
-    sortedTasks.sort((a, b) {
-      int comparison = 0;
-
-      switch (chatProvider.currentSortBy) {
-        case 'updated_time':
-          final timeA =
-              DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
-          final timeB =
-              DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
-          comparison = timeA.compareTo(timeB);
-          break;
-
-        default:
-          // 其他排序選項暫時不支援，使用預設比較
-          debugPrint('⚠️ [My Works] 不支援的排序選項: ${chatProvider.currentSortBy}');
-          comparison = 0;
-      }
-
-      return chatProvider.sortAscending ? comparison : -comparison;
-    });
-
-    return sortedTasks;
-  }
-
-  String _displayStatus(Map<String, dynamic> task) {
-    final dynamic display = task['status_display'];
-    if (display != null && display is String && display.isNotEmpty) {
-      return display;
-    }
-    final dynamic codeOrLegacy = task['status_code'] ?? task['status'];
-    return (codeOrLegacy ?? '').toString();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -808,18 +480,22 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
   /// My Works 分頁的聊天室列表項目
   Widget _buildMyWorksChatRoomItem(Map<String, dynamic> task) {
     final colorScheme = Theme.of(context).colorScheme;
-    final displayStatus = TaskCardUtils.displayStatus(task);
-    final progressData = TaskCardUtils.getProgressData(displayStatus);
+
+    // 使用 ApplicationStatusUtils 來獲取狀態資訊
+    final applicationStatus = task['application_status']?.toString();
+    final displayStatus =
+        ApplicationStatusUtils.getDisplayName(applicationStatus);
+    final progressData =
+        ApplicationStatusUtils.getProgressData(applicationStatus);
     final progress = (progressData['progress'] is num)
         ? (progressData['progress'] as num).toDouble()
         : 0.0;
     final baseColor = (progressData['color'] is Color)
         ? progressData['color'] as Color
-        : (Colors.grey[600]!);
+        : ApplicationStatusUtils.getStatusColor(applicationStatus);
 
     // 未讀（by_room）
     final roomId = (task['chat_room_id'] ?? '').toString();
-    final provider = context.read<ChatListProvider>();
 
     return Card(
       key: ValueKey('myworks-task-$roomId'), // My Works 任務卡片綁定 room id
@@ -1009,7 +685,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
           ),
 
           // 倒數計時懸浮在右上角
-          if (TaskCardUtils.isCountdownStatus(displayStatus))
+          if (ApplicationStatusUtils.isCountdownStatus(applicationStatus))
             Positioned(
               top: -8,
               right: -8,

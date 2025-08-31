@@ -19,9 +19,8 @@ try {
     
     // 驗證必要欄位
     $requiredFields = [
-        'full_name', 'nickname', 'gender', 'email', 'phone', 
-        'country', 'address', 'password', 'date_of_birth', 
-        'payment_password', 'is_permanent_address', 'primary_language'
+        'address', 'password', 'date_of_birth', 
+        'payment_password', 'primary_language'
     ];
     
     foreach ($requiredFields as $field) {
@@ -56,7 +55,7 @@ try {
         ) VALUES (?, ?, ?, ?, ?, 0, 'active', ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
         
         $db->query($userSql, [
-            $input['full_name'],
+            $input['name'],
             $input['nickname'],
             $email,
             $hashedPassword,
@@ -75,11 +74,11 @@ try {
         // 提交交易
         $connection->commit();
         
-        Response::success('User registered successfully', [
+        Response::success([
             'user_id' => $userId,
             'email' => $email,
             'status' => 'active'
-        ]);
+        ], 'User registered successfully');
         
     } catch (Exception $e) {
         // 回滾交易

@@ -28,9 +28,9 @@ try {
         exit;
     }
     
-    // 檢查推薦碼是否存在且未使用
+    // 檢查推薦碼是否存在（含擁有者狀態/權限）
     $referralData = $db->fetch("
-        SELECT rc.id, rc.user_id, rc.referral_code, rc.is_used, u.name, u.nickname
+        SELECT rc.id, rc.user_id, rc.referral_code, rc.is_used, rc.used_by_user_id, u.name, u.nickname, u.status, u.permission
         FROM referral_codes rc
         JOIN users u ON rc.user_id = u.id
         WHERE rc.referral_code = ?
@@ -41,14 +41,21 @@ try {
         exit;
     }
     
-    if ($referralData['is_used']) {
-        Response::error('Referral code has already been used');
+    // 檢查推薦碼擁有者是否為有效用戶（status 有效且 permission > 0）
+    if (!(($referralData['status'] === 'active' || $referralData['status'] === 'verified') && ((int)$referralData['permission'] > 0))) {
+        Response::error('Referral code is not active');
         exit;
     }
     
     // 檢查是否自己使用自己的推薦碼
-    if ($referralData['user_id'] == $newUserId) {
+    if ((int)$referralData['user_id'] === (int)$newUserId) {
         Response::error('Cannot use your own referral code');
+        exit;
+    }
+    
+    // 檢查是否已被其他用戶綁定（單次使用制）
+    if (!empty($referralData['used_by_user_id'])) {
+        Response::error('Referral code has already been referenced');
         exit;
     }
     
@@ -57,23 +64,21 @@ try {
     $connection->beginTransaction();
     
     try {
-        // 標記推薦碼為已使用
+        // 將這個推薦碼標記為被此新用戶引用（待管理員批准後才會發點數與最終生效）
         $db->query("
-            UPDATE referral_codes 
-            SET is_used = 1, used_by_user_id = ?, updated_at = NOW()
-            WHERE referral_code = ?
-        ", [$newUserId, $referralCode]);
-        
-        // 這裡可以添加獎勵邏輯，例如給推薦人積分
-        // $db->query("UPDATE users SET points = points + 100 WHERE id = ?", [$referralData['user_id']]);
+            UPDATE referral_codes
+            SET used_by_user_id = ?, updated_at = NOW()
+            WHERE id = ?
+        ", [$newUserId, $referralData['id']]);
         
         // 提交事務
         $connection->commit();
         
-        Response::success('Referral code used successfully', [
+        Response::success('Referral code referenced successfully (pending approval)', [
             'referral_code' => $referralCode,
             'referrer_name' => $referralData['nickname'] ?: $referralData['name'],
-            'used_by_user_id' => $newUserId
+            'referred_user_id' => (int)$newUserId,
+            'pending' => true
         ]);
         
     } catch (Exception $e) {

@@ -39,18 +39,31 @@ class _StudentIdPageState extends State<StudentIdPage> {
 
     final hasPaymentCode = prefs.getString('signup_payment_code') != null;
 
+    // 🔧 新增：檢查是否有 user_id（註冊成功後才會有）
+    final hasUserId = prefs.getString('signup_user_id') != null;
+
     setState(() {
-      hasAllData = hasBasicInfo && hasPaymentCode;
+      hasAllData = hasBasicInfo && hasPaymentCode && hasUserId;
     });
 
     if (!hasAllData) {
+      String errorMessage = 'Please complete the registration form first';
+      if (hasBasicInfo && hasPaymentCode && !hasUserId) {
+        errorMessage = 'Registration incomplete. Please register again.';
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please complete the registration form first'),
+        SnackBar(
+          content: Text(errorMessage),
           backgroundColor: Colors.orange,
         ),
       );
       context.go('/signup');
+    } else {
+      // 🔧 新增：顯示用戶資訊確認
+      final email = prefs.getString('signup_email');
+      final userId = prefs.getString('signup_user_id');
+      debugPrint('✅ 學生證頁面載入成功 - Email: $email, User ID: $userId');
     }
   }
 
@@ -347,13 +360,24 @@ class _StudentIdPageState extends State<StudentIdPage> {
     });
 
     try {
+      // 🔧 修復：使用 user_id 而不是 email 來關聯用戶
+      final userId = prefs.getString('signup_user_id');
+      final email = prefs.getString('signup_email');
+
+      if (userId == null || userId.isEmpty) {
+        throw Exception('User ID not found. Please register again.');
+      }
+
       // Get student ID data
       final studentIdData = {
-        'email': prefs.getString('signup_email') ?? '',
+        'user_id': userId,
+        'email': email ?? '', // 保留 email 作為備用驗證
         'school_name': schoolNameController.text,
         'student_name': studentNameController.text,
         'student_id': studentIdController.text,
       };
+
+      debugPrint('📤 準備上傳學生證資料 - User ID: $userId, Email: $email');
 
       // Upload student ID image
       final success = await _uploadStudentIdImage(studentIdData);
@@ -411,6 +435,8 @@ class _StudentIdPageState extends State<StudentIdPage> {
 
   Future<void> _clearSignupData() async {
     final prefs = await SharedPreferences.getInstance();
+
+    // 🔧 修復：清理所有註冊相關的暫存資料
     await prefs.remove('signup_full_name');
     await prefs.remove('signup_nickname');
     await prefs.remove('signup_gender');
@@ -423,5 +449,8 @@ class _StudentIdPageState extends State<StudentIdPage> {
     await prefs.remove('signup_payment_code');
     await prefs.remove('signup_is_permanent_address');
     await prefs.remove('signup_languages');
+    await prefs.remove('signup_user_id'); // 🔧 新增：清理 user_id
+
+    debugPrint('🧹 已清理所有註冊暫存資料');
   }
 }

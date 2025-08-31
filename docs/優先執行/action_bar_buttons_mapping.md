@@ -24,7 +24,32 @@
     - 當前聊天室送出 `kind='system'` 系統訊息
     - `user_active_log`：`action='application_accept'`，`field='participant_id'`
 
+
+### Reject （婉拒當前應徵者）
+- 使用時機：creator × open
+- 用途：婉拒此應徵者，此應徵者的應徵狀態轉為被拒絕
+- 前端
+  - 觸發：`處理婉拒應徵者(待新增功能)`（`chat_detail_page.dart`）
+  - 服務：`TaskService.acceptApplication()`（已改呼叫 v2 URL）
+- 後端
+  - API：`backend/api/tasks/applications/reject.php`
+  - 副作用：
+    - `tasks.participant_id = user_id`
+    - 若任務為 open → 切 `in_progress`
+    - `task_applications`：當前 `accepted`，其餘 `rejected`
+    - 當前聊天室送出 `kind='system'` 系統訊息
+    - `user_active_log`：`action='application_accept'`，`field='participant_id'`
+
+
 ---
+
+### Pay (由任務發布者直接結案)
+- 使用時機：creator × in_progress
+- 用途：由任務發布者直接結案並轉移點數
+- 後端
+  - API：`backend/api/tasks/pay_and_review.php`
+
+
 
 ### Completed（提交完成/送審）
 - 使用時機：participant × in_progress
@@ -71,7 +96,7 @@
 
 ---
 
-### Raise Dispute（發起爭議）
+### (Raise) Dispute（發起爭議）
 - 使用時機：執行過程狀態（如 in_progress/pending_confirmation）
 - 用途：將任務進入爭議，交由管理員處理
 - 前端

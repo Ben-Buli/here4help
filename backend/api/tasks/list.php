@@ -87,10 +87,20 @@ try {
               s.sort_order,
               u.id AS creator_id,
               u.name AS creator_name,
-              u.avatar_url AS creator_avatar
+              u.avatar_url AS creator_avatar,
+              creator_stats.avg_rating AS creator_rating,
+              creator_stats.total_reviews AS creator_reviews_count
             FROM tasks t
             LEFT JOIN task_statuses s ON t.status_id = s.id
             LEFT JOIN users u ON t.creator_id = u.id
+            LEFT JOIN (
+              SELECT 
+                tasker_id,
+                ROUND(AVG(rating), 1) AS avg_rating,
+                COUNT(*) AS total_reviews
+              FROM task_ratings
+              GROUP BY tasker_id
+            ) creator_stats ON creator_stats.tasker_id = u.id
             $whereClause
             " . ($currentUserId ? " AND NOT EXISTS (
               SELECT 1 FROM user_blocks b 

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:here4help/chat/widgets/payment_dialog.dart';
 
 /// Action Bar 動作定義
 class ActionBarAction {
@@ -53,8 +52,10 @@ class ActionBarAction {
       label: label,
       icon: icon,
       onTap: onTap,
-      backgroundColor: backgroundColor ?? Colors.red,
-      foregroundColor: foregroundColor ?? Colors.white,
+      backgroundColor:
+          backgroundColor ?? const Color.fromARGB(255, 140, 91, 88),
+      foregroundColor:
+          foregroundColor ?? const Color.fromARGB(255, 255, 255, 255),
       isDestructive: true,
       requiresConfirmation: requiresConfirmation,
       confirmationTitle: confirmationTitle,
@@ -92,6 +93,7 @@ class ActionBarConfigManager {
     final actions = <ActionBarAction>[];
 
     switch (status) {
+      // #region 任務 open 開放中
       case TaskStatus.open:
         if (userRole == UserRole.creator) {
           // 檢查應徵狀態，只有非 withdrawn 狀態才顯示 Accept 按鈕
@@ -102,6 +104,8 @@ class ActionBarConfigManager {
                 id: 'accept',
                 label: 'Accept',
                 icon: Icons.check,
+                backgroundColor: const Color.fromARGB(255, 88, 140, 127),
+                foregroundColor: const Color.fromARGB(255, 255, 255, 255),
                 onTap: actionCallbacks['accept'] ?? () {},
               ).withConfirmation(
                 title: 'Accept Application',
@@ -110,13 +114,28 @@ class ActionBarConfigManager {
               ),
             );
           }
-
+          actions.add(
+            ActionBarAction(
+              id: 'reject',
+              label: 'Reject',
+              icon: Icons.close,
+              backgroundColor: const Color.fromARGB(255, 145, 93, 90),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
+              onTap: actionCallbacks['reject'] ?? () {},
+            ).asDestructive().withConfirmation(
+                  title: 'Reject Application',
+                  content:
+                      'Are you sure you want to reject this applicant for this task?',
+                ),
+          );
           actions.add(
             ActionBarAction(
               id: 'block',
               label: 'Block',
               icon: Icons.block,
               onTap: actionCallbacks['block'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 109, 105, 105),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
             ).asDestructive().withConfirmation(
                   title: 'Block User',
                   content:
@@ -124,12 +143,25 @@ class ActionBarConfigManager {
                 ),
           );
         } else {
+          // participant 角色
           actions.add(
             ActionBarAction(
               id: 'report',
               label: 'Report',
               icon: Icons.article,
               onTap: actionCallbacks['report'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 97, 97, 97),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
+            ),
+          );
+          actions.add(
+            ActionBarAction(
+              id: 'withdraw',
+              label: 'Withdraw',
+              icon: Icons.close,
+              onTap: actionCallbacks['withdraw'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 109, 105, 105),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
             ),
           );
         }
@@ -143,39 +175,39 @@ class ActionBarConfigManager {
               label: 'Pay',
               icon: Icons.payment,
               onTap: actionCallbacks['pay'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 187, 150, 49),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
             ),
             ActionBarAction(
-              id: 'report',
-              label: 'Report',
-              icon: Icons.article,
-              onTap: actionCallbacks['report'] ?? () {},
-            ),
-            ActionBarAction(
-              id: 'block',
-              label: 'Block',
-              icon: Icons.block,
-              onTap: actionCallbacks['block'] ?? () {},
-            ).asDestructive().withConfirmation(
-                  title: 'Block User',
-                  content: 'Block this user?',
-                ),
+              id: 'dispute',
+              label: 'Dispute',
+              icon: Icons.report_problem,
+              onTap: actionCallbacks['dispute'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 119, 96, 72),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
+            )
           ]);
         } else {
+          // participant 角色
           actions.addAll([
             ActionBarAction(
               id: 'complete',
               label: 'Completed',
               icon: Icons.check_circle,
               onTap: actionCallbacks['complete'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 93, 72, 105),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
             ).withConfirmation(
               title: 'Mark as Completed',
               content: 'Are you sure you have completed this task?',
             ),
             ActionBarAction(
-              id: 'report',
-              label: 'Report',
-              icon: Icons.article,
-              onTap: actionCallbacks['report'] ?? () {},
+              id: 'dispute',
+              label: 'Dispute',
+              icon: Icons.report_problem,
+              onTap: actionCallbacks['dispute'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 119, 96, 72),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
             ),
           ]);
         }
@@ -189,6 +221,8 @@ class ActionBarConfigManager {
               label: 'Confirm',
               icon: Icons.check,
               onTap: actionCallbacks['confirm'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 88, 140, 127),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
             ).withConfirmation(
               title: 'Confirm Completion',
               content:
@@ -199,6 +233,8 @@ class ActionBarConfigManager {
               label: 'Disagree',
               icon: Icons.close,
               onTap: actionCallbacks['disagree'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 120, 72, 70),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
             ).asDestructive().withConfirmation(
                   title: 'Disagree Completion',
                   content: 'Disagree this task is completed?',
@@ -208,28 +244,21 @@ class ActionBarConfigManager {
               label: 'Dispute',
               icon: Icons.report_problem,
               onTap: actionCallbacks['dispute'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 119, 96, 72),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
             ).asDestructive(),
-            ActionBarAction(
-              id: 'report',
-              label: 'Report',
-              icon: Icons.article,
-              onTap: actionCallbacks['report'] ?? () {},
-            ),
           ]);
         } else {
+          // participant 角色
           actions.addAll([
             ActionBarAction(
               id: 'dispute',
               label: 'Dispute',
               icon: Icons.report_problem,
               onTap: actionCallbacks['dispute'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 119, 96, 72),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
             ).asDestructive(),
-            ActionBarAction(
-              id: 'report',
-              label: 'Report',
-              icon: Icons.article,
-              onTap: actionCallbacks['report'] ?? () {},
-            ),
           ]);
         }
         break;
@@ -237,59 +266,42 @@ class ActionBarConfigManager {
       case TaskStatus.completed:
         if (userRole == UserRole.creator) {
           actions.addAll([
-            ActionBarAction(
-              id: 'paid_info',
-              label: 'Paid',
-              icon: Icons.attach_money,
-              onTap: actionCallbacks['paid_info'] ?? () {},
-            ),
+            // ActionBarAction(
+            //   id: 'paid_info',
+            //   label: 'Paid',
+            //   icon: Icons.attach_money,
+            //   onTap: actionCallbacks['paid_info'] ?? () {},
+            // ),
             ActionBarAction(
               id: 'review',
               label: 'Reviews',
               icon: Icons.reviews,
               onTap: actionCallbacks['review'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 72, 107, 119),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
             ),
-            ActionBarAction(
-              id: 'dispute',
-              label: 'Dispute',
-              icon: Icons.report_problem,
-              onTap: actionCallbacks['dispute'] ?? () {},
-            ).asDestructive(),
             ActionBarAction(
               id: 'block',
               label: 'Block',
               icon: Icons.block,
               onTap: actionCallbacks['block'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 109, 105, 105),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
             ).asDestructive().withConfirmation(
                   title: 'Block User',
                   content: 'Block this user?',
                 ),
           ]);
         } else {
+          // participant 角色
           actions.addAll([
-            ActionBarAction(
-              id: 'dispute',
-              label: 'Dispute',
-              icon: Icons.report_problem,
-              onTap: actionCallbacks['dispute'] ?? () {},
-            ).asDestructive(),
-            ActionBarAction(
-              id: 'report',
-              label: 'Report',
-              icon: Icons.article,
-              onTap: actionCallbacks['report'] ?? () {},
-            ),
-            ActionBarAction(
-              id: 'review',
-              label: 'Reviews',
-              icon: Icons.reviews,
-              onTap: actionCallbacks['review'] ?? () {},
-            ),
             ActionBarAction(
               id: 'block',
               label: 'Block',
               icon: Icons.block,
               onTap: actionCallbacks['block'] ?? () {},
+              backgroundColor: const Color.fromARGB(255, 109, 105, 105),
+              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
             ).asDestructive().withConfirmation(
                   title: 'Block User',
                   content: 'Block this user?',
@@ -301,10 +313,12 @@ class ActionBarConfigManager {
       case TaskStatus.dispute:
         actions.add(
           ActionBarAction(
-            id: 'report',
-            label: 'Report',
-            icon: Icons.article,
-            onTap: actionCallbacks['report'] ?? () {},
+            id: 'dispute',
+            label: 'Dispute',
+            icon: Icons.report_problem,
+            onTap: actionCallbacks['dispute'] ?? () {},
+            backgroundColor: const Color.fromARGB(255, 119, 96, 72),
+            foregroundColor: const Color.fromARGB(255, 255, 255, 255),
           ),
         );
         break;
@@ -318,12 +332,16 @@ class ActionBarConfigManager {
             label: 'Report',
             icon: Icons.article,
             onTap: actionCallbacks['report'] ?? () {},
+            backgroundColor: const Color.fromARGB(255, 97, 97, 97),
+            foregroundColor: const Color.fromARGB(255, 255, 255, 255),
           ),
           ActionBarAction(
             id: 'block',
             label: 'Block',
             icon: Icons.block,
             onTap: actionCallbacks['block'] ?? () {},
+            backgroundColor: const Color.fromARGB(255, 109, 105, 105),
+            foregroundColor: const Color.fromARGB(255, 255, 255, 255),
           ).asDestructive().withConfirmation(
                 title: 'Block User',
                 content: 'Block this user?',
