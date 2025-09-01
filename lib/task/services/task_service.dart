@@ -126,7 +126,7 @@ class TaskService extends ChangeNotifier {
       }
 
       final uri = Uri.parse(
-              '${AppConfig.apiBaseUrl}/backend/api/tasks/applications/posted_task_applications.php')
+              AppConfig.api('/tasks/applications/posted_task_applications.php'))
           .replace(queryParameters: query);
 
       debugPrint('🔍 [Posted Tasks Aggregated] API URL: $uri');
@@ -200,8 +200,8 @@ class TaskService extends ChangeNotifier {
   /// 取得任務的編輯資料（完整任務 + application_questions）
   Future<Map<String, dynamic>?> fetchTaskEditData(String taskId) async {
     try {
-      final uri = Uri.parse(
-          '${AppConfig.apiBaseUrl}/backend/api/tasks/task_edit_data.php?id=$taskId');
+      final uri =
+          Uri.parse(AppConfig.api('/tasks/task_edit_data.php?id=$taskId'));
       final resp = await http.get(uri, headers: {
         'Content-Type': 'application/json'
       }).timeout(const Duration(seconds: 30));
@@ -360,8 +360,7 @@ class TaskService extends ChangeNotifier {
 
     final resp = await http
         .post(
-          Uri.parse(
-              '${AppConfig.apiBaseUrl}/backend/api/tasks/applications/accept.php'),
+          Uri.parse(AppConfig.api('/tasks/applications/accept.php')),
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer $token',
@@ -405,7 +404,7 @@ class TaskService extends ChangeNotifier {
     };
 
     final resp = await HttpClientService.post(
-      '${AppConfig.apiBaseUrl}/backend/api/points/transfer.php',
+      AppConfig.api('/points/transfer.php'),
       body: body,
     );
 
@@ -436,7 +435,7 @@ class TaskService extends ChangeNotifier {
     };
 
     final resp = await HttpClientService.post(
-      '${AppConfig.apiBaseUrl}/backend/api/points/deduct-fee.php',
+      AppConfig.api('/points/deduct-fee.php'),
       body: body,
     );
 
@@ -470,7 +469,7 @@ class TaskService extends ChangeNotifier {
     };
 
     final resp = await HttpClientService.post(
-      '${AppConfig.apiBaseUrl}/backend/api/fees/record.php',
+      AppConfig.api('/fees/record.php'),
       body: body,
     );
 
@@ -494,7 +493,7 @@ class TaskService extends ChangeNotifier {
     };
 
     final resp = await HttpClientService.post(
-      '${AppConfig.apiBaseUrl}/backend/api/account/verify-payment-password.php',
+      AppConfig.api('/account/verify-payment-password.php'),
       body: body,
     );
 
@@ -906,7 +905,7 @@ class TaskService extends ChangeNotifier {
 
       final response = await http.get(
         Uri.parse(
-            '${AppConfig.apiBaseUrl}/backend/api/tasks/generate-sample-data.php?action=check'),
+            AppConfig.api('/tasks/generate-sample-data.php?action=check')),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -942,8 +941,7 @@ class TaskService extends ChangeNotifier {
       notifyListeners();
 
       final response = await http.get(
-        Uri.parse(
-            '${AppConfig.apiBaseUrl}/backend/api/tasks/generate-sample-data.php?action=fill'),
+        Uri.parse(AppConfig.api('/tasks/generate-sample-data.php?action=fill')),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -982,8 +980,7 @@ class TaskService extends ChangeNotifier {
 
       final response = await http
           .post(
-            Uri.parse(
-                '${AppConfig.apiBaseUrl}/backend/api/tasks/generate-sample-data.php'),
+            Uri.parse(AppConfig.api('/tasks/generate-sample-data.php')),
             headers: {
               'Content-Type': 'application/json',
             },
@@ -1095,8 +1092,7 @@ class TaskService extends ChangeNotifier {
 
       final response = await http
           .put(
-            Uri.parse(
-                '${AppConfig.apiBaseUrl}/backend/api/tasks/applications/update-status.php'),
+            Uri.parse(AppConfig.api('/tasks/applications/update-status.php')),
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $token',
@@ -1136,8 +1132,8 @@ class TaskService extends ChangeNotifier {
       }
 
       final response = await http.delete(
-        Uri.parse(
-            '${AppConfig.apiBaseUrl}/backend/api/tasks/applications/delete.php?application_id=$applicationId'),
+        Uri.parse(AppConfig.api(
+            '/tasks/applications/delete.php?application_id=$applicationId')),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',

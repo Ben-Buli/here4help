@@ -67,7 +67,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
   Future<void> _loadFeeSettings() async {
     try {
       final response = await HttpClientService.get(
-        '${AppConfig.apiBaseUrl}/backend/api/wallet/fee-settings.php',
+        AppConfig.api('/wallet/fee-settings.php'),
         useQueryParamToken: true,
       );
 
@@ -188,7 +188,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
   /// 點數轉移
   Future<void> _transferPoints() async {
     final response = await HttpClientService.post(
-      '${AppConfig.apiBaseUrl}/backend/api/points/transfer.php',
+      AppConfig.api('/points/transfer.php'),
       useQueryParamToken: true,
       body: {
         'from_user_id': widget.userData['id'],
@@ -208,7 +208,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
   /// 扣除手續費
   Future<void> _deductFee() async {
     final response = await HttpClientService.post(
-      '${AppConfig.apiBaseUrl}/backend/api/points/deduct-fee.php',
+      AppConfig.api('/points/deduct-fee.php'),
       useQueryParamToken: true,
       body: {
         'user_id': widget.userData['id'],
@@ -228,7 +228,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
   /// 記錄交易
   Future<void> _recordTransactions() async {
     final response = await HttpClientService.post(
-      '${AppConfig.apiBaseUrl}/backend/api/points/transactions.php',
+      AppConfig.api('/points/transactions.php'),
       useQueryParamToken: true,
       body: {
         'transactions': [
@@ -268,7 +268,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
   /// 記錄手續費收入
   Future<void> _recordFeeRevenue() async {
     final response = await HttpClientService.post(
-      '${AppConfig.apiBaseUrl}/backend/api/admin/fee-revenue.php',
+      AppConfig.api('/admin/fee-revenue.php'),
       useQueryParamToken: true,
       body: {
         'task_id': widget.taskData['id'],
@@ -287,7 +287,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
   /// 提交評分評論
   Future<void> _submitReview() async {
     final response = await HttpClientService.post(
-      '${AppConfig.apiBaseUrl}/backend/api/reviews/create.php',
+      AppConfig.api('/reviews/create.php'),
       useQueryParamToken: true,
       body: {
         'task_id': widget.taskData['id'],

@@ -1,4 +1,5 @@
 import 'package:here4help/config/environment_config.dart';
+import 'package:here4help/config/app_config.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -68,19 +69,24 @@ class ThirdPartyAuthService {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
       // 創建 Google OAuth 2.0 授權 URL - 直接重定向到後端回調
-      final googleAuthUrl =
-          Uri.https('accounts.google.com', '/o/oauth2/v2/auth', {
+      final params = {
         'client_id': EnvironmentConfig.googleClientId,
-        'redirect_uri':
-            '${EnvironmentConfig.apiBaseUrl}/backend/api/auth/google-callback.php',
+        // 與後端一致：使用 AppConfig.api 組裝回調 URL
+        'redirect_uri': AppConfig.api('/auth/google-callback.php'),
         'response_type': 'code',
         'scope': 'email profile',
         'state': 'web_google_$timestamp', // 防止 CSRF 攻擊
         'access_type': 'offline',
-        'prompt': 'consent',
-      });
+        'prompt': 'select_account',
+      };
+
+      final googleAuthUrl =
+          Uri.https('accounts.google.com', '/o/oauth2/v2/auth', params);
 
       debugPrint('🔐 準備跳轉到 Google 登入頁面: $googleAuthUrl');
+      debugPrint('🔑 Client ID: ${EnvironmentConfig.googleClientId}');
+      debugPrint(
+          '🔄 Redirect URI: ${AppConfig.api('/auth/google-callback.php')}');
 
       // 在 Web 環境中直接重定向到 Google OAuth
       if (isWeb) {
@@ -91,7 +97,7 @@ class ThirdPartyAuthService {
             debugPrint('🌐 正在重定向到 Google 登入頁面...');
             final launched = await launchUrl(
               googleAuthUrl,
-              mode: LaunchMode.externalApplication,
+              mode: LaunchMode.platformDefault,
             );
 
             if (launched) {

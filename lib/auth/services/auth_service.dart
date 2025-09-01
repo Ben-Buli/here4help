@@ -133,7 +133,11 @@ class AuthService {
       }
 
       debugPrint('🔍 調用 getProfile API...');
-      debugPrint('🔍 Token: ${token.substring(0, 10)}...');
+      if (token.length > 10) {
+        debugPrint('🔍 Token: ${token.substring(0, 10)}...');
+      } else {
+        debugPrint('🔍 Token: $token');
+      }
       debugPrint('🔍 API URL: ${AppConfig.profileUrl}');
 
       final headers = {
@@ -149,13 +153,23 @@ class AuthService {
       );
 
       debugPrint('🔍 API 回應狀態碼: ${response.statusCode}');
-      // debugPrint('🔍 API 回應內容: ${response.body}');
 
-      final data = jsonDecode(response.body);
+      Map<String, dynamic> data;
+      try {
+        data = jsonDecode(response.body);
+      } catch (e) {
+        debugPrint('❌ JSON 解析錯誤: $e');
+        throw Exception('Invalid JSON response');
+      }
 
       if (response.statusCode == 200 && data['success']) {
-        debugPrint('✅ getProfile 成功: ${data['data']['id']}');
-        return data['data'];
+        if (data.containsKey('data') && data['data'] != null) {
+          debugPrint('✅ getProfile 成功: ${data['data']['id']}');
+          return data['data'];
+        } else {
+          debugPrint('❌ getProfile 失敗: 回傳資料缺少 data 欄位');
+          throw Exception('Response missing data field');
+        }
       } else {
         debugPrint('❌ getProfile 失敗: ${data['message']}');
         throw Exception(data['message'] ?? 'Failed to get profile');
@@ -226,5 +240,15 @@ class AuthService {
   static Future<void> _saveUserData(Map<String, dynamic> user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userKey, jsonEncode(user));
+  }
+
+  // 公開方法：儲存 token
+  static Future<void> saveToken(String token) async {
+    await _saveToken(token);
+  }
+
+  // 公開方法：儲存用戶資料
+  static Future<void> saveUserData(Map<String, dynamic> user) async {
+    await _saveUserData(user);
   }
 }

@@ -2918,7 +2918,7 @@ class _PostFormPageState extends State<TaskCreatePage> {
     }
 
     final response = await HttpClientService.post(
-      '${AppConfig.apiBaseUrl}/backend/api/points/request_topup.php',
+      AppConfig.api('/points/request_topup.php'),
       useQueryParamToken: true, // MAMP 兼容性
       body: {
         'user_id': currentUser.id,

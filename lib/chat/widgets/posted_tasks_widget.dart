@@ -71,7 +71,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       // 安全地獲取 Provider
       ChatListProvider? chatProvider;
       try {
-        chatProvider = context.read<ChatListProvider>();
+        chatProvider = _getChatProvider();
       } catch (e) {
         debugPrint(
             '⚠️ [Posted Tasks][initState] 無法獲取 ChatListProvider，跳過監聽器設置');
@@ -79,18 +79,18 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       }
 
       // 設置 Provider 變化監聽器
-      chatProvider.addListener(_handleProviderChanges);
+      chatProvider?.addListener(_handleProviderChanges);
 
       // 檢查 Provider 是否已初始化
-      if (chatProvider!.isInitialized) {
+      if (chatProvider?.isInitialized == true) {
         debugPrint('✅ [Posted Tasks] Provider 已初始化，檢查分頁狀態');
         _checkAndLoadIfNeeded();
       } else {
         debugPrint('⏳ [Posted Tasks] Provider 未初始化，等待初始化完成');
         // 等待 Provider 初始化完成
-        chatProvider.addListener(() {
+        chatProvider?.addListener(() {
           if (!mounted) return;
-          if (chatProvider!.isInitialized) {
+          if (chatProvider?.isInitialized == true) {
             debugPrint('✅ [Posted Tasks] Provider 初始化完成，檢查分頁狀態');
             _checkAndLoadIfNeeded();
           }
@@ -98,14 +98,14 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       }
 
       // 監聽快取載入完成事件
-      chatProvider.addListener(() {
+      chatProvider?.addListener(() {
         if (!mounted) return;
-        if (chatProvider!.lastEvent == 'cache_loaded') {
+        if ((chatProvider?.lastEvent) == 'cache_loaded') {
           debugPrint('📡 [Posted Tasks] 收到快取載入完成事件，重新載入數據');
           _fetchAllTasks();
         }
         // 新增：監聽分頁載入完成事件（tab_loaded_0），載入任務清單
-        if (chatProvider!.lastEvent == 'tab_loaded_0') {
+        if ((chatProvider?.lastEvent) == 'tab_loaded_0') {
           debugPrint('📡 [Posted Tasks] 分頁載入完成 (tab_loaded_0)，載入任務清單');
           _fetchAllTasks();
         }
@@ -191,6 +191,13 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
   ChatListProvider? _getChatProvider() {
     if (!mounted) return null;
 
+    // 先嘗試使用靜態實例，避免在 deactivated 階段透過 context 查找祖先
+    final staticInstance = ChatListProvider.instance;
+    if (staticInstance != null) {
+      return staticInstance;
+    }
+
+    // 回退：僅在需要時才透過 context 取得，降低在 deactivated 階段觸發錯誤的機率
     try {
       return Provider.of<ChatListProvider>(context, listen: false);
     } catch (e) {
@@ -243,13 +250,13 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
             // 安全地獲取 Provider
             ChatListProvider? safeProvider;
             try {
-              safeProvider = context.read<ChatListProvider>();
+              safeProvider = _getChatProvider();
             } catch (e) {
               debugPrint('⚠️ [Posted Tasks] PostFrame 中無法獲取 ChatListProvider');
               return;
             }
 
-            safeProvider.setTabHasUnread(
+            safeProvider?.setTabHasUnread(
                 ChatListProvider.TAB_POSTED_TASKS, hasUnread);
           } catch (e) {
             debugPrint('❌ [Posted Tasks] 設置未讀狀態失敗: $e');
@@ -283,14 +290,14 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
             // 安全地獲取 Provider
             ChatListProvider? provider;
             try {
-              provider = context.read<ChatListProvider>();
+              provider = _getChatProvider();
             } catch (e) {
               debugPrint(
                   '⚠️ [Posted Tasks][_setupUnreadListener()] 無法獲取 ChatListProvider，跳過未讀數據更新');
               return;
             }
 
-            provider.updateUnreadByRoom(unreadData);
+            provider?.updateUnreadByRoom(unreadData);
           } catch (e) {
             debugPrint('❌ [Posted Tasks] 更新未讀數據失敗: $e');
           }
@@ -427,14 +434,14 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         // 安全地獲取 Provider
         ChatListProvider? provider;
         try {
-          provider = context.read<ChatListProvider>();
+          provider = _getChatProvider();
         } catch (e) {
           debugPrint(
               '⚠️ [Posted Tasks][_ensureUnreadDataLoaded()] 無法獲取 ChatListProvider，跳過未讀數據更新');
           return;
         }
 
-        provider.updateUnreadByRoom(unreadData);
+        provider?.updateUnreadByRoom(unreadData);
 
         if (kDebugMode && verboseSearchLog) {
           // debugPrint('✅ [Posted Tasks] 未讀數據載入完成: ${unreadData.length} 個房間');
@@ -451,7 +458,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     try {
       ChatListProvider? chatProvider;
       try {
-        chatProvider = context.read<ChatListProvider>();
+        chatProvider = _getChatProvider();
       } catch (e) {
         debugPrint(
             '⚠️ [Posted Tasks][_handleProviderChanges()] 無法獲取 ChatListProvider，跳過變化處理');
@@ -459,8 +466,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       }
 
       // 只有當前是 Posted Tasks 分頁時才刷新
-      if (chatProvider.isPostedTasksTab) {
-        final currentSearchQuery = chatProvider.searchQuery;
+      if (chatProvider?.isPostedTasksTab == true) {
+        final currentSearchQuery = chatProvider!.searchQuery;
         final currentLocations =
             Set<String>.from(chatProvider.selectedLocations);
         final currentStatuses = Set<String>.from(chatProvider.selectedStatuses);
@@ -536,7 +543,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
       ChatListProvider? chatProvider;
       try {
-        chatProvider = context.read<ChatListProvider>();
+        chatProvider = _getChatProvider();
       } catch (e) {
         debugPrint(
             '⚠️ [Posted Tasks][_applyFiltersAndSort()] 無法獲取 ChatListProvider，跳過篩選和排序');
@@ -544,7 +551,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       }
 
       // 應用篩選
-      final filteredTasks = _filterTasks(_allTasks, chatProvider);
+      final filteredTasks = _filterTasks(_allTasks, chatProvider!);
       debugPrint('🔍 [Posted Tasks] [_applyFiltersAndSort()] 篩選完成:');
       // debugPrint('  - 篩選後任務數: ${filteredTasks.length}');
 
@@ -971,8 +978,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
             return RefreshIndicator(
               onRefresh: () async {
                 try {
-                  final provider = context.read<ChatListProvider>();
-                  await provider.cacheManager.forceRefresh();
+                  final provider = _getChatProvider();
+                  await provider?.cacheManager.forceRefresh();
                 } catch (_) {}
                 _applicationsByTask.clear();
                 _allTasks.clear();
@@ -1010,7 +1017,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       ChatListProvider? chatProvider;
       UserService? userService;
       try {
-        chatProvider = context.read<ChatListProvider>();
+        chatProvider = _getChatProvider();
         userService = context.read<UserService>();
       } catch (_) {}
 
@@ -1852,8 +1859,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     try {
       // 這裡可以調用相應的 API 來標記聊天室為已讀
       // 暫時使用 Provider 來清除未讀數
-      final provider = context.read<ChatListProvider>();
-      provider.markRoomAsRead(roomId);
+      final provider = _getChatProvider();
+      provider?.markRoomAsRead(roomId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2037,8 +2044,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
   /// 刷新應徵數據
   void _refreshApplications() {
     // 觸發 Provider 重新載入數據
-    final provider = context.read<ChatListProvider>();
-    provider.refreshPostedTasksApplications();
+    final provider = _getChatProvider();
+    provider?.refreshPostedTasksApplications();
   }
 
   /// 顯示任務資訊對話框（使用 awesome_dialog）

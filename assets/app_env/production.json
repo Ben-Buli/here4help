@@ -1,6 +1,8 @@
 {
   "environment": "production",
   "public": {
+    "api_origin": "https://hero4help.demofhs.com",
+    "api_prefix": "/here4help/backend/api",
     "api_base_url": "https://hero4help.demofhs.com",
     "socket_url": "https://hero4help.demofhs.com:3001",
     "image_base_url": "https://hero4help.demofhs.com",

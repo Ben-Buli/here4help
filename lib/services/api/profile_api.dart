@@ -9,7 +9,7 @@ class ProfileApi {
   static Future<Map<String, dynamic>> getProfile() async {
     try {
       final response = await HttpClientService.get(
-        '${AppConfig.apiBaseUrl}/backend/api/account/profile.php',
+        AppConfig.api('/account/profile.php'),
         useQueryParamToken: true, // MAMP 兼容
       );
 
@@ -61,7 +61,7 @@ class ProfileApi {
       if (aboutMe != null) body['about_me'] = aboutMe;
 
       final response = await HttpClientService.put(
-        '${AppConfig.apiBaseUrl}/backend/api/account/profile.php',
+        AppConfig.api('/account/profile.php'),
         body: jsonEncode(body),
         useQueryParamToken: true, // MAMP 兼容
       );
@@ -90,7 +90,7 @@ class ProfileApi {
       final imageService = CrossPlatformImageService();
       return await imageService.uploadImage(
         image: image,
-        uploadUrl: '${AppConfig.apiBaseUrl}/backend/api/account/avatar.php',
+        uploadUrl: AppConfig.api('/account/avatar.php'),
         token: token,
         fieldName: 'avatar',
         additionalFields: {
@@ -106,7 +106,7 @@ class ProfileApi {
   static Future<Map<String, dynamic>> deleteAvatar() async {
     try {
       final response = await HttpClientService.delete(
-        '${AppConfig.apiBaseUrl}/backend/api/account/avatar.php',
+        AppConfig.api('/account/avatar.php'),
         useQueryParamToken: true, // MAMP 兼容
       );
 

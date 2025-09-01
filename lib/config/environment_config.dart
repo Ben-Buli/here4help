@@ -7,6 +7,8 @@ class EnvironmentConfig {
 
   /// 檢測是否為 Android 模擬器
   static bool _isAndroidEmulator() {
+    // 在 Web 平台不使用模擬器配置（最小改動修正）
+    if (kIsWeb) return false;
     // 檢查環境變數
     const androidEmulator =
         bool.fromEnvironment('ANDROID_EMULATOR', defaultValue: false);
@@ -27,6 +29,8 @@ class EnvironmentConfig {
 
   /// 檢測是否為 iOS 模擬器
   static bool _isIOSSimulator() {
+    // 在 Web 平台不使用模擬器配置（最小改動修正）
+    if (kIsWeb) return false;
     // 檢查環境變數
     const iosSimulator =
         bool.fromEnvironment('IOS_SIMULATOR', defaultValue: false);
@@ -60,7 +64,7 @@ class EnvironmentConfig {
     if (_config != null) return;
 
     try {
-      String environment = String.fromEnvironment(
+      String environment = const String.fromEnvironment(
         'ENVIRONMENT',
         defaultValue: 'development',
       );
@@ -88,6 +92,8 @@ class EnvironmentConfig {
       if (kDebugMode) {
         print('🌍 環境配置已載入: $environment');
         print('📁 配置檔案: $configFile');
+        print(
+            '🔑 Google Client ID: ${_config?['public']?['google_client_id'] ?? 'NULL'}');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -102,9 +108,10 @@ class EnvironmentConfig {
           'socket_url': _getNetworkAddress('http://127.0.0.1:3001'),
           'image_base_url':
               _getNetworkAddress('http://127.0.0.1:8888/here4help'),
-          'google_client_id': '',
-          'facebook_app_id': '',
-          'apple_service_id': '',
+          'google_client_id':
+              '102744926949-bhrnm2970bgt3dfm2nmdbqt03mrvdh3i.apps.googleusercontent.com',
+          'facebook_app_id': '1037019294991326',
+          'apple_service_id': 'com.example.here4help.login',
         },
         'app': {
           'debug_mode': true,
@@ -131,8 +138,20 @@ class EnvironmentConfig {
   static String get apiBaseUrl {
     final baseUrl = _config?['public']?['api_base_url'] ??
         'http://127.0.0.1:8888/here4help';
-    // 使用正確的網路地址分流邏輯
     return _getNetworkAddress(baseUrl);
+  }
+
+  /// API Origin（scheme + host[:port]）
+  static String get apiOrigin {
+    final origin = _config?['public']?['api_origin'] ?? apiBaseUrl;
+    return _getNetworkAddress(origin);
+  }
+
+  /// API Prefix（例：/api 或 /here4help/backend/api）
+  static String get apiPrefix {
+    final prefix = _config?['public']?['api_prefix'] ?? '/api';
+    if (prefix.isEmpty) return '';
+    return prefix.startsWith('/') ? prefix : '/$prefix';
   }
 
   /// Socket 伺服器 URL
@@ -251,24 +270,24 @@ class EnvironmentConfig {
 
   /// 預設 API 基礎 URL
   static String _getDefaultApiBaseUrl() {
-    // Web 平台使用 localhost
+    // Web 平台使用 127.0.0.1
     if (kIsWeb) {
-      return 'http://localhost:8888/here4help';
+      return 'http://127.0.0.1:8888/here4help';
     }
 
-    // 其他平台使用 localhost
-    return 'http://localhost:8888/here4help';
+    // 其他平台使用 127.0.0.1
+    return 'http://127.0.0.1:8888/here4help';
   }
 
   /// 預設 Socket 伺服器 URL
   static String _getDefaultSocketUrl() {
-    // Web 平台使用 localhost
+    // Web 平台使用 127.0.0.1
     if (kIsWeb) {
-      return 'http://localhost:3001';
+      return 'http://127.0.0.1:3001';
     }
 
-    // 其他平台使用 localhost
-    return 'http://localhost:3001';
+    // 其他平台使用 127.0.0.1
+    return 'http://127.0.0.1:3001';
   }
 
   /// 檢查是否為 Android 模擬器

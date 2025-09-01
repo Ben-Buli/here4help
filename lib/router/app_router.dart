@@ -45,7 +45,12 @@ final GoRouter appRouter = GoRouter(
     debugPrint('👤 用戶狀態: ${email != null ? "已登入 ($email)" : "未登入"}');
 
     // 定義公開頁面（不需要登入驗證）
-    final publicPages = ['/login', '/signup', '/signup/student-id'];
+    final publicPages = [
+      '/login',
+      '/signup',
+      '/signup/student-id',
+      '/auth/callback'
+    ];
 
     // 如果是公開頁面，允許訪問
     if (publicPages.contains(state.uri.path)) {

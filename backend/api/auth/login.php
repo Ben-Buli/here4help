@@ -2,16 +2,18 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 
 // 處理 OPTIONS 請求
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit(0);
+    http_response_code(200);
+    echo json_encode(['success' => true, 'message' => 'OK']);
+    exit;
 }
 
-// 只允許 POST 請求
+// 只允許 POST 請求（錯誤也回 200 + success=false）
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
+    http_response_code(200);
     echo json_encode(['success' => false, 'message' => 'Method not allowed']);
     exit;
 }
@@ -86,6 +88,11 @@ try {
         throw new Exception('Token generation failed: ' . $e->getMessage());
     }
     
+    // 防呆：避免產出空字串或不合法 token
+    if (!is_string($token) || strlen(trim($token)) < 20) {
+        throw new Exception('Token generation failed: invalid token');
+    }
+    
     // 更新最後更新時間（因為沒有 last_login 欄位）
     $db->query(
         "UPDATE users SET updated_at = NOW() WHERE id = ?",
@@ -94,18 +101,18 @@ try {
     
     // 準備回應資料
     $userData = [
-        'id' => $user['id'],
+        'id' => (int)($user['id'] ?? 0),
         'name' => $user['name'] ?? '',
-        'email' => $user['email'],
+        'email' => $user['email'] ?? '',
         'phone' => $user['phone'] ?? '',
         'nickname' => $user['nickname'] ?? '',
         'avatar_url' => $user['avatar_url'] ?? '',
         'points' => (int)($user['points'] ?? 0),
-        'status' => $user['status'],
+        'status' => $user['status'] ?? 'active',
         'provider' => null, // 傳統登入，provider 為 null
         'google_id' => null, // 已棄用，設為 null
-        'created_at' => $user['created_at'],
-        'updated_at' => $user['updated_at'],
+        'created_at' => $user['created_at'] ?? '',
+        'updated_at' => $user['updated_at'] ?? '',
         'referral_code' => $user['referral_code'] ?? '',
         'primary_language' => $user['primary_language'] ?? 'English',
         'permission' => (int)($user['permission'] ?? 0)
@@ -121,9 +128,10 @@ try {
     ]);
     
 } catch (Exception $e) {
-    http_response_code(400);
+    // 錯誤統一回 200 + success=false，避免瀏覽器以 CORS/非 2xx 視為網路錯誤
+    http_response_code(200);
     echo json_encode([
         'success' => false,
         'message' => $e->getMessage()
     ]);
-} 
+}

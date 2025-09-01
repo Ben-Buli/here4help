@@ -76,9 +76,49 @@ try {
         );
         
         $user = $existingIdentity;
-        $isNewUser = false;
+        
+        // 生成 JWT Token
+        $payload = [
+            'user_id' => $user['user_id'],
+            'email' => $user['email'] ?? '',
+            'name' => $user['name'],
+            'iat' => time(),
+            'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
+        ];
+        
+        $token = JWTManager::generateToken($payload);
+        
+        // 準備回應資料
+        $userData = [
+            'id' => $user['user_id'],
+            'name' => $user['name'] ?? '',
+            'email' => $user['email'] ?? '',
+            'phone' => $user['phone'] ?? '',
+            'nickname' => $user['nickname'] ?? '',
+            'avatar_url' => $user['avatar_url'] ?? '',
+            'points' => (int)($user['points'] ?? 0),
+            'status' => $user['status'],
+            'provider' => 'google',
+            'created_at' => $user['created_at'],
+            'updated_at' => $user['updated_at'],
+            'referral_code' => $user['referral_code'] ?? '',
+            'primary_language' => $user['primary_language'] ?? 'English',
+            'permission' => (int)($user['permission'] ?? 0),
+            'is_new_user' => false,
+            'provider_user_id' => $googleId
+        ];
         
         error_log("Google Login - 現有用戶登入成功");
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Google login successful',
+            'data' => [
+                'token' => $token,
+                'user' => $userData
+            ]
+        ]);
+        
     } else {
         error_log("Google Login - 新用戶，檢查 email 是否已存在...");
         
@@ -92,154 +132,81 @@ try {
             $existingUser = $stmt->fetch();
             
             if ($existingUser) {
-                error_log("Google Login - Email 已存在，需要綁定到現有帳號，用戶 ID: {$existingUser['id']}");
-                
-                // Email 已存在，需要綁定到現有帳號
-                // 建立 user_identity 記錄，綁定到現有帳號
-                $db->query(
-                    "INSERT INTO user_identities (
-                        user_id, provider, provider_user_id, email, name, avatar_url, 
-                        access_token, raw_profile, created_at, updated_at
-                    ) VALUES (?, 'google', ?, ?, ?, ?, ?, ?, NOW(), NOW())",
-                    [
-                        $existingUser['id'], 
-                        $googleId, 
-                        $email, 
-                        $name, 
-                        $avatarUrl, 
-                        $accessToken,
-                        json_encode($input) // 儲存原始資料
-                    ]
-                );
-                
-                $user = $existingUser;
-                $isNewUser = false;
-                
-                error_log("Google Login - 成功綁定 Google 帳號到現有用戶");
+                // 與規劃一致：不在此自動綁定，回覆需綁定提示
+                error_log("Google Login - Email 已存在，請綁定現有帳號，用戶 ID: {$existingUser['id']}");
+                echo json_encode([
+                    'success' => false,
+                    'code' => 'ACCOUNT_EXISTS_NEED_BIND',
+                    'message' => 'Account exists, please bind',
+                    'provider' => 'google',
+                    'provider_user_id' => $googleId,
+                    'email' => $email
+                ]);
             } else {
-                error_log("Google Login - 完全新用戶，建立新帳號...");
-                
-                // 完全新用戶，建立 users 記錄
+                // 完全新用戶 → 寫入 oauth_temp_users 並回傳 oauth_token
+                error_log("Google Login - 完全新用戶，建立 oauth_temp_users 暫存並回傳 token");
+                $tempToken = bin2hex(openssl_random_pseudo_bytes(24));
+                $expiresAt = date('Y-m-d H:i:s', time() + 3600);
                 $db->query(
-                    "INSERT INTO users (
-                        name, email, avatar_url, status, created_at, updated_at
-                    ) VALUES (?, ?, ?, 'active', NOW(), NOW())",
-                    [$name, $email, $avatarUrl]
-                );
-                
-                $userId = $db->lastInsertId();
-                error_log("Google Login - 新用戶建立成功，用戶 ID: $userId");
-                
-                // 建立 user_identity 記錄
-                $db->query(
-                    "INSERT INTO user_identities (
-                        user_id, provider, provider_user_id, email, name, avatar_url, 
-                        access_token, raw_profile, created_at, updated_at
-                    ) VALUES (?, 'google', ?, ?, ?, ?, ?, ?, NOW(), NOW())",
+                    "INSERT INTO oauth_temp_users (provider, provider_user_id, email, name, avatar_url, raw_data, token, expired_at, created_at) 
+                     VALUES ('google', ?, ?, ?, ?, ?, ?, ?, NOW())",
                     [
-                        $userId, 
-                        $googleId, 
-                        $email, 
-                        $name, 
-                        $avatarUrl, 
-                        $accessToken,
-                        json_encode($input) // 儲存原始資料
+                        $googleId,
+                        $email ?: null,
+                        $name ?: null,
+                        $avatarUrl ?: null,
+                        json_encode($input),
+                        $tempToken,
+                        $expiresAt
                     ]
                 );
-                
-                // 重新查詢用戶資料
-                $stmt = $db->query("SELECT * FROM users WHERE id = ?", [$userId]);
-                $user = $stmt->fetch();
-                $isNewUser = true;
-                
-                error_log("Google Login - 新用戶和 user_identity 建立完成");
+                echo json_encode([
+                    'success' => true,
+                    'is_new_user' => true,
+                    'message' => 'New user, please complete registration',
+                    'oauth_token' => $tempToken,
+                    'temp_identity' => [
+                        'provider' => 'google',
+                        'provider_user_id' => $googleId,
+                        'email' => $email,
+                        'name' => $name,
+                        'avatar_url' => $avatarUrl
+                    ]
+                ]);
             }
         } else {
-            error_log("Google Login - 無 email 的新用戶，建立新帳號...");
-            
-            // 無 email 的新用戶，建立 users 記錄
+            // 無 email 也視為新用戶 → 寫入 oauth_temp_users 並回傳 oauth_token
+            error_log("Google Login - 無 email 新用戶，建立 oauth_temp_users 暫存並回傳 token");
+            $tempToken = bin2hex(openssl_random_pseudo_bytes(24));
+            $expiresAt = date('Y-m-d H:i:s', time() + 3600);
             $db->query(
-                "INSERT INTO users (
-                    name, avatar_url, status, created_at, updated_at
-                ) VALUES (?, ?, 'active', NOW(), NOW())",
-                [$name, $avatarUrl]
-            );
-            
-            $userId = $db->lastInsertId();
-            error_log("Google Login - 無 email 新用戶建立成功，用戶 ID: $userId");
-            
-            // 建立 user_identity 記錄
-            $db->query(
-                "INSERT INTO user_identities (
-                    user_id, provider, provider_user_id, name, avatar_url, 
-                    access_token, raw_profile, created_at, updated_at
-                ) VALUES (?, 'google', ?, ?, ?, ?, ?, NOW(), NOW())",
+                "INSERT INTO oauth_temp_users (provider, provider_user_id, email, name, avatar_url, raw_data, token, expired_at, created_at) 
+                 VALUES ('google', ?, ?, ?, ?, ?, ?, ?, NOW())",
                 [
-                    $userId, 
-                    $googleId, 
-                    $name, 
-                    $avatarUrl, 
-                    $accessToken,
-                    json_encode($input) // 儲存原始資料
+                    $googleId,
+                    null,
+                    $name ?: null,
+                    $avatarUrl ?: null,
+                    json_encode($input),
+                    $tempToken,
+                    $expiresAt
                 ]
             );
-            
-            // 重新查詢用戶資料
-            $stmt = $db->query("SELECT * FROM users WHERE id = ?", [$userId]);
-            $user = $stmt->fetch();
-            $isNewUser = true;
-            
-            error_log("Google Login - 無 email 新用戶和 user_identity 建立完成");
+            echo json_encode([
+                'success' => true,
+                'is_new_user' => true,
+                'message' => 'New user, please complete registration',
+                'oauth_token' => $tempToken,
+                'temp_identity' => [
+                    'provider' => 'google',
+                    'provider_user_id' => $googleId,
+                    'email' => '',
+                    'name' => $name,
+                    'avatar_url' => $avatarUrl
+                ]
+            ]);
         }
     }
-    
-    // 生成 JWT Token
-    $payload = [
-        'user_id' => $user['id'],
-        'email' => $user['email'] ?? '',
-        'name' => $user['name'],
-        'iat' => time(),
-        'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
-    ];
-    
-    try {
-        $token = JWTManager::generateToken($payload);
-        error_log("JWT token generated successfully for user: " . $user['id']);
-    } catch (Exception $e) {
-        error_log("JWT token generation failed: " . $e->getMessage());
-        throw new Exception('Token generation failed: ' . $e->getMessage());
-    }
-    
-    // 準備回應資料
-    $userData = [
-        'id' => $user['id'],
-        'name' => $user['name'] ?? '',
-        'email' => $user['email'] ?? '',
-        'phone' => $user['phone'] ?? '',
-        'nickname' => $user['nickname'] ?? '',
-        'avatar_url' => $user['avatar_url'] ?? '',
-        'points' => (int)($user['points'] ?? 0),
-        'status' => $user['status'],
-        'provider' => 'google',
-        'created_at' => $user['created_at'],
-        'updated_at' => $user['updated_at'],
-        'referral_code' => $user['referral_code'] ?? '',
-        'primary_language' => $user['primary_language'] ?? 'English',
-        'permission' => (int)($user['permission'] ?? 0),
-        'is_new_user' => $isNewUser,
-        'provider_user_id' => $googleId
-    ];
-    
-    error_log("Google Login - 登入成功，用戶 ID: {$user['id']}, 新用戶: " . ($isNewUser ? '是' : '否'));
-    
-    echo json_encode([
-        'success' => true,
-        'message' => 'Google login successful',
-        'data' => [
-            'token' => $token,
-            'user' => $userData
-        ]
-    ]);
     
 } catch (Exception $e) {
     error_log("Google Login Error: " . $e->getMessage());

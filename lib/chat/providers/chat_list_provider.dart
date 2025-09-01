@@ -692,12 +692,22 @@ class ChatListProvider extends ChangeNotifier {
   /// 房間級別未讀數管理方法
   /// 設置特定聊天室的未讀數
   void setUnreadForRoom(String roomId, int count) {
+    // 確保 count 不為負數
+    final safeCount = count < 0 ? 0 : count;
     final prev = _unreadByRoom[roomId] ?? 0;
-    if (prev != count) {
-      _unreadByRoom[roomId] = count;
-      debugPrint('✅ [ChatListProvider] 更新房間未讀數: $roomId = $count');
-      _emit('room_unread_update');
+
+    if (prev == safeCount) return;
+
+    if (safeCount == 0) {
+      // 移除 0 值項目以節省記憶體
+      _unreadByRoom.remove(roomId);
+      debugPrint('✅ [ChatListProvider] 移除房間未讀數: $roomId (設為0)');
+    } else {
+      _unreadByRoom[roomId] = safeCount;
+      debugPrint(
+          '✅ [ChatListProvider] 更新房間未讀數: $roomId = $safeCount (原: $prev)');
     }
+    _emit('room_unread_update');
   }
 
   /// 增量更新房間未讀數
@@ -719,20 +729,45 @@ class ChatListProvider extends ChangeNotifier {
 
   /// 批量更新未讀數（用於初始化或同步）
   void updateUnreadByRoom(Map<String, int> unreadData) {
+    debugPrint('🔍 [ChatListProvider] 批量更新未讀數請求: ${unreadData.length} 個房間');
+    debugPrint(
+        '🔍 [ChatListProvider] 調用堆疊: ${StackTrace.current.toString().split('\n').take(5).join('\n')}');
+
     bool hasChanges = false;
+    int addedCount = 0;
+    int updatedCount = 0;
+    int totalUnread = 0;
+
     for (final entry in unreadData.entries) {
       final roomId = entry.key;
-      final count = entry.value;
+      final count = entry.value < 0 ? 0 : entry.value; // 確保不為負數
       final prev = _unreadByRoom[roomId] ?? 0;
+
       if (prev != count) {
-        _unreadByRoom[roomId] = count;
+        if (count == 0) {
+          _unreadByRoom.remove(roomId);
+        } else {
+          _unreadByRoom[roomId] = count;
+        }
         hasChanges = true;
+
+        if (prev == 0) {
+          addedCount++;
+        } else {
+          updatedCount++;
+        }
       }
+
+      totalUnread += count;
     }
 
     if (hasChanges) {
-      debugPrint('✅ [ChatListProvider] 批量更新未讀數: ${unreadData.length} 個房間');
+      debugPrint(
+          '✅ [ChatListProvider] 批量更新完成: 新增=$addedCount, 更新=$updatedCount, 總未讀=$totalUnread');
+      debugPrint('✅ [ChatListProvider] 當前房間總數: ${_unreadByRoom.length}');
       _emit('room_unread_update');
+    } else {
+      debugPrint('🔄 [ChatListProvider] 批量更新無變化: ${unreadData.length} 個房間');
     }
   }
 

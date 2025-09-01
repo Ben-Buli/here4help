@@ -5,7 +5,7 @@ import 'package:here4help/services/http_client_service.dart';
 
 /// 任務收藏 API 服務
 class TaskFavoritesApi {
-  static String get _baseUrl => '${AppConfig.apiBaseUrl}/backend/api/tasks';
+  static String get _baseUrl => AppConfig.api('/tasks');
 
   /// 獲取用戶收藏列表
   static Future<Map<String, dynamic>> getFavorites({

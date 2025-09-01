@@ -4,6 +4,7 @@ import 'package:here4help/config/app_config.dart';
 import 'package:here4help/auth/services/auth_service.dart';
 import 'package:here4help/services/media/cross_platform_image_service.dart';
 import 'package:flutter/foundation.dart'; // Added for debugPrint
+import 'package:here4help/services/http_client_service.dart';
 
 class ChatService {
   static final ChatService _instance = ChatService._internal();
@@ -33,16 +34,10 @@ class ChatService {
         queryParams['task_id'] = taskId;
       }
 
-      final uri = Uri.parse('$_baseUrl/backend/api/chat/get_rooms.php')
+      final uri = Uri.parse(AppConfig.api('/chat/get_rooms.php'))
           .replace(queryParameters: queryParams);
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
+      final response = await HttpClientService.get(uri.toString());
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -80,16 +75,10 @@ class ChatService {
         queryParams['before_id'] = beforeId.toString();
       }
 
-      final uri = Uri.parse('$_baseUrl/backend/api/chat/get_messages.php')
+      final uri = Uri.parse(AppConfig.api('/chat/get_messages.php'))
           .replace(queryParameters: queryParams);
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
+      final response = await HttpClientService.get(uri.toString());
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -119,18 +108,14 @@ class ChatService {
         throw Exception('未登入');
       }
 
-      final response = await http.post(
-        Uri.parse('$_baseUrl/backend/api/chat/send_message.php'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
+      final response = await HttpClientService.post(
+        AppConfig.api('/chat/send_message.php'),
+        body: {
           'room_id': roomId,
           'message': message,
-          'kind': kind, // 傳送 kind 參數
+          'kind': kind,
           if (taskId != null) 'task_id': taskId,
-        }),
+        },
       );
 
       if (response.statusCode == 200) {
@@ -216,18 +201,14 @@ class ChatService {
         throw Exception('未登入');
       }
 
-      final response = await http.post(
-        Uri.parse('$_baseUrl/backend/api/chat/ensure_room.php'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
+      final response = await HttpClientService.post(
+        AppConfig.api('/chat/ensure_room.php'),
+        body: {
           'task_id': taskId,
           'creator_id': creatorId,
           'participant_id': participantId,
           'type': type,
-        }),
+        },
       );
 
       if (response.statusCode == 200) {
@@ -255,15 +236,11 @@ class ChatService {
         throw Exception('未登入');
       }
 
-      final response = await http.post(
-        Uri.parse('$_baseUrl/backend/api/chat/read_room_v2.php'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
+      final response = await HttpClientService.post(
+        AppConfig.api('/chat/read_room_v2.php'),
+        body: {
           'room_id': roomId,
-        }),
+        },
       );
 
       if (response.statusCode == 200) {
@@ -289,12 +266,8 @@ class ChatService {
         throw Exception('未登入');
       }
 
-      final response = await http.get(
-        Uri.parse('$_baseUrl/backend/api/chat/unread_by_tasks.php?scope=all'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
+      final response = await HttpClientService.get(
+        AppConfig.api('/chat/unread_by_tasks.php?scope=all'),
       );
 
       if (response.statusCode == 200) {
@@ -499,9 +472,8 @@ class ChatService {
         'room_id': roomId,
       };
 
-      final uri =
-          Uri.parse('$_baseUrl/backend/api/chat/get_chat_detail_data.php')
-              .replace(queryParameters: queryParams);
+      final uri = Uri.parse(AppConfig.api('/chat/get_chat_detail_data.php'))
+          .replace(queryParameters: queryParams);
 
       debugPrint('🌐 [ChatService] 請求 URL: $uri');
 
@@ -512,13 +484,10 @@ class ChatService {
 
       debugPrint('📤 [ChatService] 請求標頭: $headers');
 
-      final response = await http.get(
-        uri,
-        headers: headers,
-      );
+      final response = await HttpClientService.get(uri.toString());
 
       debugPrint('📥 [ChatService] 回應狀態碼: ${response.statusCode}');
-      debugPrint('📥 [ChatService] 回應內容: ${response.body}');
+      // debugPrint('📥 [ChatService] 回應內容: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -567,16 +536,10 @@ class ChatService {
       };
 
       final uri = Uri.parse(
-              '$_baseUrl/backend/api/tasks/applications/get_application_status.php')
+              AppConfig.api('/tasks/applications/get_application_status.php'))
           .replace(queryParameters: queryParams);
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
+      final response = await HttpClientService.get(uri.toString());
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);

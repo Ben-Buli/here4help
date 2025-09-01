@@ -3,9 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/auth/services/auth_service.dart';
+import 'package:here4help/services/http_client_service.dart';
 
 /// 統一聊天 API 服務 - 遵循聊天系統規格文件標準
-/// 
+///
 /// 實現統一的 API 端點：
 /// - GET /api/chat/unreads?scope=posted|myworks|all
 /// - POST /api/chat/rooms/{roomId}/read
@@ -15,7 +16,7 @@ class UnifiedChatApiService {
   static const String _tag = '[UnifiedChatApiService]';
 
   /// 獲取未讀計數 - 規格文件標準
-  /// 
+  ///
   /// [scope] posted|myworks|all
   /// 返回: {total: int, by_room: Map<String, int>, scope: String}
   static Future<Map<String, dynamic>> getUnreadCounts({
@@ -29,7 +30,7 @@ class UnifiedChatApiService {
         throw Exception('No authentication token available');
       }
 
-      final url = '${AppConfig.apiBaseUrl}/backend/api/chat/unreads.php?scope=$scope';
+      final url = AppConfig.api('/chat/unreads.php?scope=$scope');
       debugPrint('$_tag 請求 URL: $url');
 
       final response = await http.get(
@@ -60,7 +61,7 @@ class UnifiedChatApiService {
   }
 
   /// 標記聊天室為已讀 - 規格文件標準
-  /// 
+  ///
   /// [roomId] 聊天室 ID
   /// [upToMessageId] 可選，標記到指定訊息 ID，預設為最新
   /// 返回: {room_id: String, last_read_message_id: int, unread_count: int}
@@ -76,7 +77,7 @@ class UnifiedChatApiService {
         throw Exception('No authentication token available');
       }
 
-      final url = '${AppConfig.apiBaseUrl}/backend/api/chat/mark_read.php';
+      final url = AppConfig.api('/chat/mark_read.php');
       final body = {
         'room_id': roomId,
         if (upToMessageId != null) 'up_to_message_id': upToMessageId,
@@ -114,7 +115,7 @@ class UnifiedChatApiService {
   }
 
   /// 獲取聊天室列表 - 規格文件標準
-  /// 
+  ///
   /// [scope] posted|myworks|all
   /// [withUnread] 是否包含未讀計數
   /// [limit] 分頁限制
@@ -145,7 +146,7 @@ class UnifiedChatApiService {
           .map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}')
           .join('&');
 
-      final url = '${AppConfig.apiBaseUrl}/backend/api/chat/rooms.php?$query';
+      final url = AppConfig.api('/chat/rooms.php?$query');
       debugPrint('$_tag 請求 URL: $url');
 
       final response = await http.get(
@@ -175,40 +176,17 @@ class UnifiedChatApiService {
   }
 
   /// 獲取全域未讀總計 - 規格文件標準
-  /// 
+  ///
   /// 返回: {total_unread: int}
   static Future<int> getTotalUnreadCount() async {
     try {
       debugPrint('$_tag 獲取全域未讀總計');
 
-      final token = await AuthService.getToken();
-      if (token == null) {
-        throw Exception('No authentication token available');
+      final data = await ApiClient.getJson('/chat/total_unread.php');
+      if (data['success'] == true) {
+        return data['data']['total_unread'] ?? 0;
       }
-
-      final url = '${AppConfig.apiBaseUrl}/backend/api/chat/total_unread.php';
-      debugPrint('$_tag 請求 URL: $url');
-
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      debugPrint('$_tag 響應狀態: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          return data['data']['total_unread'] ?? 0;
-        } else {
-          throw Exception(data['message'] ?? 'Failed to get total unread count');
-        }
-      } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
-      }
+      throw Exception(data['message'] ?? 'Failed to get total unread count');
     } catch (e) {
       debugPrint('❌ $_tag 獲取全域未讀總計失敗: $e');
       rethrow;

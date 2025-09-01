@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:here4help/config/app_config.dart';
+import 'package:here4help/config/environment_config.dart';
 
 /// 頭像路徑類型
 enum AvatarPathType {
@@ -19,8 +19,8 @@ enum AvatarPathType {
 /// 頭像 URL 管理器
 /// 統一處理不同來源的頭像路徑格式
 class AvatarUrlManager {
-  /// 獲取當前環境的基礎 URL
-  static String get _baseUrl => AppConfig.apiBaseUrl;
+  /// 圖片基礎 URL（避免與 API base 重複 /backend）
+  static String get _baseUrl => EnvironmentConfig.imageBaseUrl;
 
   /// 判斷頭像路徑類型
   static AvatarPathType getPathType(String? avatarUrl) {

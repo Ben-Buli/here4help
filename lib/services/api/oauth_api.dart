@@ -5,8 +5,7 @@ import 'package:here4help/config/app_config.dart';
 
 class OAuthApi {
   static Future<Map<String, dynamic>?> fetchTempUser(String token) async {
-    final url =
-        '${AppConfig.apiBaseUrl}/auth/oauth-temp.php?token=$token&peek=true';
+    final url = AppConfig.api('/auth/oauth-temp.php?token=$token&peek=true');
     if (kDebugMode) debugPrint('🔍 [OAuthApi] GET $url');
     final resp = await http.get(Uri.parse(url), headers: {
       'Accept': 'application/json',

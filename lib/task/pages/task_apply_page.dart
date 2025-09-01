@@ -464,8 +464,7 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
       // 備用方案：使用專門的 API
       debugPrint('⚠️ TaskService 中找不到任務，嘗試使用 task_edit_data API');
       final response = await http.get(
-        Uri.parse(
-            '${AppConfig.apiBaseUrl}/backend/api/tasks/task_edit_data.php?id=$taskId'),
+        Uri.parse(AppConfig.api('/tasks/task_edit_data.php?id=$taskId')),
         headers: {
           'Content-Type': 'application/json',
         },

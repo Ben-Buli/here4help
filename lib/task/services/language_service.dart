@@ -1,10 +1,8 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:here4help/config/app_config.dart';
+import 'package:here4help/services/http_client_service.dart';
 
 class LanguageService {
-  static String get _baseUrl => AppConfig.apiBaseUrl;
   static const String _cacheKey = 'languages_cache';
   static const String _cacheTimestampKey = 'languages_cache_timestamp';
   static const Duration _cacheDuration = Duration(hours: 24);
@@ -19,11 +17,8 @@ class LanguageService {
       }
 
       // 如果緩存不存在或已過期，從API獲取
-      final response = await http.get(
-        Uri.parse('$_baseUrl/backend/api/languages/list.php'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      final response = await ApiClient.get(
+        'languages/list.php',
       );
 
       if (response.statusCode == 200) {

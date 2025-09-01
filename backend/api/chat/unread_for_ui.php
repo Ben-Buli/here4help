@@ -1,4 +1,15 @@
 <?php
+/**
+ * NOTICE: 此 API 過於複雜，建議拆分為多個專用端點
+ * 
+ * 建議替代方案:
+ * - /api/chat/unreads - 獲取未讀計數
+ * - /api/tasks/list - 獲取任務列表
+ * - /api/users/profile - 獲取用戶資料
+ * 
+ * 當前仍可使用，但建議逐步遷移
+ */
+
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');

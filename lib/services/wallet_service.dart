@@ -14,8 +14,8 @@ class WalletService {
         debugPrint('[getWalletSummary] $_baseUrl');
       }
 
-      final response = await HttpClientService.get(
-        '$_baseUrl/backend/api/wallet/summary.php',
+      final response = await ApiClient.get(
+        '/wallet/summary.php',
         useQueryParamToken: true, // MAMP 兼容性
       );
 
@@ -38,8 +38,8 @@ class WalletService {
   /// 手續費設定數據
   static Future<FeeSettings> getFeeSettings(UserService userService) async {
     try {
-      final response = await HttpClientService.get(
-        '$_baseUrl/backend/api/wallet/fee-settings.php',
+      final response = await ApiClient.get(
+        '/wallet/fee-settings.php',
         useQueryParamToken: true, // MAMP 兼容性
       );
 
@@ -71,8 +71,8 @@ class WalletService {
   static Future<BankAccountInfo> getBankAccountInfo(
       UserService userService) async {
     try {
-      final response = await HttpClientService.get(
-        '$_baseUrl/backend/api/wallet/bank-accounts.php',
+      final response = await ApiClient.get(
+        '/wallet/bank-accounts.php',
         useQueryParamToken: true, // MAMP 兼容性
       );
 
@@ -117,7 +117,7 @@ class WalletService {
         queryParams['to_date'] = toDate;
       }
 
-      final uri = Uri.parse('$_baseUrl/backend/api/wallet/deposit-requests.php')
+      final uri = Uri.parse(AppConfig.api('/wallet/deposit-requests.php'))
           .replace(queryParameters: queryParams);
 
       final response = await HttpClientService.get(
@@ -168,7 +168,7 @@ class WalletService {
 
       // according to DB: point_transactions
       // according to DB: point_deposit_requests
-      final uri = Uri.parse('$_baseUrl/backend/api/wallet/transactions.php')
+      final uri = Uri.parse(AppConfig.api('/wallet/transactions.php'))
           .replace(queryParameters: queryParams);
 
       final response = await HttpClientService.get(

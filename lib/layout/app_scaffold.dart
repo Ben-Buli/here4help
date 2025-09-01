@@ -838,12 +838,12 @@ class _ChatBadgeDotIconState extends State<_ChatBadgeDotIcon> {
             final count = entry.value;
 
             // 檢查聊天室是否屬於當前用戶
-            if (_isUserAuthorizedForRoom(roomId, currentUserId)) {
-              totalUnread += count;
-              debugPrint('  - 有權限的聊天室: $roomId = $count');
-            } else {
-              debugPrint('  - 無權限的聊天室: $roomId = $count (已排除)');
-            }
+            // if (_isUserAuthorizedForRoom(roomId, currentUserId)) {
+            totalUnread += count;
+            //   debugPrint('  - 有權限的聊天室: $roomId = $count');
+            // } else {
+            //   debugPrint('  - 無權限的聊天室: $roomId = $count (已排除)');
+            // }
           }
         }
 
@@ -898,30 +898,30 @@ class _ChatBadgeDotIconState extends State<_ChatBadgeDotIcon> {
   }
 
   /// 檢查用戶是否有權限訪問特定聊天室
-  bool _isUserAuthorizedForRoom(String roomId, String currentUserId) {
-    // 這裡需要根據聊天室 ID 的格式來判斷用戶權限
-    // 假設聊天室 ID 格式為: "room_${taskId}_${creatorId}_${participantId}"
-    // 或者 "room_${taskId}_${userId1}_${userId2}"
+//   bool _isUserAuthorizedForRoom(String roomId, String currentUserId) {
+//     // 這裡需要根據聊天室 ID 的格式來判斷用戶權限
+//     // 假設聊天室 ID 格式為: "room_${taskId}_${creatorId}_${participantId}"
+//     // 或者 "room_${taskId}_${userId1}_${userId2}"
 
-    try {
-      // 解析聊天室 ID
-      if (roomId.startsWith('room_')) {
-        final parts = roomId.split('_');
-        if (parts.length >= 4) {
-          // 格式: room_taskId_creatorId_participantId
-          final creatorId = parts[2];
-          final participantId = parts[3];
+//     try {
+//       // 解析聊天室 ID
+//       if (roomId.startsWith('room_')) {
+//         final parts = roomId.split('_');
+//         if (parts.length >= 4) {
+//           // 格式: room_taskId_creatorId_participantId
+//           final creatorId = parts[2];
+//           final participantId = parts[3];
 
-          // 檢查當前用戶是否為創建者或參與者
-          return creatorId == currentUserId || participantId == currentUserId;
-        }
-      }
+//           // 檢查當前用戶是否為創建者或參與者
+//           return creatorId == currentUserId || participantId == currentUserId;
+//         }
+//       }
 
-      // 如果無法解析，預設為無權限
-      return false;
-    } catch (e) {
-      // 解析失敗，預設為無權限
-      return false;
-    }
-  }
+//       // 如果無法解析，預設為無權限
+//       return false;
+//     } catch (e) {
+//       // 解析失敗，預設為無權限
+//       return false;
+//     }
+//   }
 }

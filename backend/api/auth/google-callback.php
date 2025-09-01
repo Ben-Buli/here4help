@@ -2,11 +2,13 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 
 // 處理 OPTIONS 請求
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit(0);
+    http_response_code(200);
+    echo json_encode(['success' => true, 'message' => 'OK']);
+    exit;
 }
 
 // 引入必要的檔案
@@ -17,8 +19,13 @@ require_once __DIR__ . '/../../utils/Response.php';
 // 載入環境配置
 require_once __DIR__ . '/../../config/env_loader.php';
 
-// 啟動 session 管理
-session_start();
+// 啟動 session 管理（僅在需要時）
+if (function_exists('session_status') && session_status() === PHP_SESSION_NONE) {
+    session_start();
+} elseif (!function_exists('session_status')) {
+    // 舊版 PHP 的兼容性處理
+    @session_start();
+}
 
 try {
     // 檢查是否為 GET 請求（OAuth 回調通常是 GET）
@@ -58,7 +65,14 @@ try {
     // 從環境配置獲取 Google OAuth 設定
     $clientId = EnvLoader::get('GOOGLE_CLIENT_ID', '');
     $clientSecret = EnvLoader::get('GOOGLE_CLIENT_SECRET', '');
-    $redirectUri = EnvLoader::get('GOOGLE_REDIRECT_URI', 'http://localhost:8888/here4help/backend/api/auth/google-callback.php');
+    // 優先使用明確設定的 GOOGLE_REDIRECT_URI，否則以 APP_URL 拼出預設回調路徑
+    $explicitRedirect = trim(EnvLoader::get('GOOGLE_REDIRECT_URI', ''));
+    if (!empty($explicitRedirect)) {
+        $redirectUri = $explicitRedirect;
+    } else {
+        $base = rtrim(EnvLoader::get('APP_URL', 'http://127.0.0.1:8888'), '/');
+        $redirectUri = $base . '/backend/api/auth/google-callback.php';
+    }
     
     if (empty($clientId) || empty($clientSecret)) {
         throw new Exception('Google OAuth configuration is missing');
@@ -227,19 +241,24 @@ try {
             throw new Exception('Token generation failed: ' . $e->getMessage());
         }
         
+        // 防呆：避免產出空字串或不合法 token
+        if (!is_string($token) || strlen(trim($token)) < 20) {
+            throw new Exception('Token generation failed: invalid token');
+        }
+        
         // 準備用戶資料
         $userData = [
-            'id' => $user['id'],
+            'id' => (int)($user['id'] ?? 0),
             'name' => $user['name'] ?? '',
             'email' => $user['email'] ?? '',
             'phone' => $user['phone'] ?? '',
             'nickname' => $user['nickname'] ?? '',
             'avatar_url' => $user['avatar_url'] ?? '',
             'points' => (int)($user['points'] ?? 0),
-            'status' => $user['status'],
+            'status' => $user['status'] ?? 'active',
             'provider' => 'google',
-            'created_at' => $user['created_at'],
-            'updated_at' => $user['updated_at'],
+            'created_at' => $user['created_at'] ?? '',
+            'updated_at' => $user['updated_at'] ?? '',
             'referral_code' => $user['referral_code'] ?? '',
             'primary_language' => $user['primary_language'] ?? 'English',
             'permission' => (int)($user['permission'] ?? 0),
@@ -285,7 +304,7 @@ try {
         $origin = '';
     }
     
-    $frontendUrl = $origin ?: EnvLoader::get('FRONTEND_URL', 'http://localhost:3000');
+    $frontendUrl = $origin ?: EnvLoader::get('FRONTEND_URL', 'http://127.0.0.1:3000');
     
     // 根據用戶狀態建立不同的重定向 URL
     if ($redirectToSignup) {
@@ -295,7 +314,14 @@ try {
 
         $db->query(
             "INSERT INTO oauth_temp_users (provider, provider_user_id, email, name, avatar_url, raw_data, token, expired_at, created_at)
-             VALUES ('google', ?, ?, ?, ?, ?, ?, ?, NOW())",
+             VALUES ('google', ?, ?, ?, ?, ?, ?, ?, NOW())
+             ON DUPLICATE KEY UPDATE
+               email = VALUES(email),
+               name = VALUES(name),
+               avatar_url = VALUES(avatar_url),
+               raw_data = VALUES(raw_data),
+               token = VALUES(token),
+               expired_at = VALUES(expired_at)",
             [
                 $googleId,
                 $email ?: null,
@@ -307,18 +333,12 @@ try {
             ]
         );
 
-        // 重定向到註冊頁面（帶 token 和可選的 existing_user_id）
-        $signupParams = [
+        // 新用戶：直接重定向到註冊頁面
+        $redirectUrl = rtrim($frontendUrl, '/') . '/signup?' . http_build_query([
             'token' => $tempToken,
             'provider' => 'google',
             'is_new_user' => 'true'
-        ];
-        
-        if ($existingUserId !== null) {
-            $signupParams['existing_user_id'] = $existingUserId;
-        }
-
-        $redirectUrl = rtrim($frontendUrl, '/') . '/signup?' . http_build_query($signupParams);
+        ]);
 
         error_log("Google OAuth Callback - 前往註冊頁面: $redirectUrl");
         if ($existingUserId !== null) {
@@ -326,9 +346,13 @@ try {
         }
     } else {
         // 情況1：現有用戶，重定向到主頁
-        $redirectUrl = rtrim($frontendUrl, '/') . '/home?' . http_build_query([
+        $userDataJson = json_encode($userData, JSON_UNESCAPED_UNICODE);
+        $userDataB64 = rtrim(strtr(base64_encode($userDataJson), '+/', '-_'), '=');
+
+        $redirectUrl = rtrim($frontendUrl, '/') . '/auth/callback?' . http_build_query([
+            'success' => 'true',
             'token' => $token,
-            'user_data' => json_encode($userData),
+            'user_data' => $userDataB64,
             'provider' => 'google'
         ]);
         
@@ -345,7 +369,7 @@ try {
     error_log("Google OAuth Callback Error: " . $e->getMessage());
     
     // 重定向到前端應用，並傳遞錯誤資訊
-    $frontendUrl = EnvLoader::get('FRONTEND_URL', 'http://localhost:8080');
+    $frontendUrl = EnvLoader::get('FRONTEND_URL', 'http://127.0.0.1:3000');
     $errorRedirectUrl = $frontendUrl . '/auth/callback?' . http_build_query([
         'success' => 'false',
         'provider' => 'google',

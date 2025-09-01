@@ -1,10 +1,12 @@
 {
   "environment": "development",
   "public": {
+    "api_origin": "http://10.0.2.2:8888",
+    "api_prefix": "/api",
     "api_base_url": "http://127.0.0.1:8888/here4help",
     "socket_url": "http://127.0.0.1:3001",
     "image_base_url": "http://127.0.0.1:8888/here4help",
-    "google_client_id": "",
+    "google_client_id": "102744926949-bhrnm2970bgt3dfm2nmdbqt03mrvdh3i.apps.googleusercontent.com",
     "facebook_app_id": "",
     "apple_service_id": ""
   },

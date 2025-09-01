@@ -18,7 +18,7 @@ class AccountApi {
   /// 檢查帳號風險操作
   static Future<Map<String, dynamic>> checkRiskyActions(String token) async {
     final response = await HttpClientService.get(
-      '${AppConfig.apiBaseUrl}/backend/api/account/risky-actions-check.php',
+      AppConfig.api('/account/risky-actions-check.php'),
       useQueryParamToken: true,
       additionalHeaders: {'Authorization': 'Bearer $token'},
     );
@@ -30,7 +30,7 @@ class AccountApi {
   /// 停用帳號
   static Future<Map<String, dynamic>> deactivateAccount(String token) async {
     final response = await HttpClientService.post(
-      '${AppConfig.apiBaseUrl}/backend/api/account/deactivate.php',
+      AppConfig.api('/account/deactivate.php'),
       useQueryParamToken: true,
       additionalHeaders: {'Authorization': 'Bearer $token'},
     );
@@ -42,7 +42,7 @@ class AccountApi {
   /// 重新啟用帳號
   static Future<Map<String, dynamic>> reactivateAccount(String token) async {
     final response = await HttpClientService.post(
-      '${AppConfig.apiBaseUrl}/backend/api/account/reactivate.php',
+      AppConfig.api('/account/reactivate.php'),
       useQueryParamToken: true,
       additionalHeaders: {'Authorization': 'Bearer $token'},
     );

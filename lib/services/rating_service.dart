@@ -119,8 +119,7 @@ class RecentRating {
 
 class RatingService {
   /// 獲取使用者評分統計 API URL
-  static String get userStatsUrl =>
-      '${AppConfig.apiBaseUrl}/backend/api/ratings/user-stats.php';
+  static String get userStatsUrl => AppConfig.api('/ratings/user-stats.php');
 
   /// 獲取使用者評分統計
   static Future<RatingStats?> getUserRatingStats({int? userId}) async {

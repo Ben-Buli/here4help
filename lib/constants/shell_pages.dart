@@ -62,7 +62,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': false,
     'showBottomNav': false,
     'showBackArrow': false,
-    'permission': -4, // 任何狀態都可訪問登入頁
+    'permission': -10, // 公開頁面：任何狀態都可訪問登入頁
   },
   {
     'path': '/signup',
@@ -72,7 +72,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
-    'permission': -4, // 任何狀態都可訪問註冊頁
+    'permission': -10, // 公開頁面：任何狀態都可訪問（包括未登入）
   },
 
   {
@@ -401,7 +401,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
-    'permission': -4, // 任何狀態都可訪問權限不足頁面
+    'permission': -10, // 公開頁面：任何狀態都可訪問權限不足頁面
   },
   {
     'path': '/permission-unverified',
@@ -422,7 +422,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
-    'permission': -4, // 任何狀態都可訪問 404 頁面
+    'permission': -10, // 公開頁面：任何狀態都可訪問 404 頁面
   },
   // #endregion
 ];

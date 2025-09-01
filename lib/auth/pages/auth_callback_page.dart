@@ -1,14 +1,16 @@
 import 'dart:convert';
 // import 'dart:html' as html;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../services/third_party_auth_service.dart';
+import '../services/auth_service.dart';
 // 如需判斷 kIsWeb
 
 class AuthCallbackPage extends StatefulWidget {
   const AuthCallbackPage({Key? key}) : super(key: key);
 
   @override
-  _AuthCallbackPageState createState() => _AuthCallbackPageState();
+  State<AuthCallbackPage> createState() => _AuthCallbackPageState();
 }
 
 class _AuthCallbackPageState extends State<AuthCallbackPage> {
@@ -16,7 +18,6 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
   String _status = 'Processing...';
   String? _errorMessage;
   Map<String, dynamic>? _userData;
-  String? _token;
   bool? _isNewUser;
 
   @override
@@ -31,16 +32,14 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
       final Uri uri =
           Uri.base; // Web 等同 window.location.href；行動裝置是 app 的 base URI
       final qp = uri.queryParameters;
-      final code = qp['code'];
-      final state = qp['state'];
       final error = qp['error'];
       final success = uri.queryParameters['success'] == 'true';
       final provider = uri.queryParameters['provider'] ?? '';
 
-      print('🔐 OAuth 回調處理開始');
-      print('   Provider: $provider');
-      print('   Success: $success');
-      print('   Error: $error');
+      debugPrint('🔐 OAuth 回調處理開始');
+      debugPrint('   Provider: $provider');
+      debugPrint('   Success: $success');
+      debugPrint('   Error: $error');
 
       if (success) {
         // 處理登入成功
@@ -50,7 +49,7 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
         await _handleLoginError(error ?? '');
       }
     } catch (e) {
-      print('❌ 回調處理錯誤: $e');
+      debugPrint('❌ 回調處理錯誤: $e');
       setState(() {
         _isProcessing = false;
         _status = '處理失敗';
@@ -66,10 +65,11 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
       });
 
       // 檢查是否為新用戶（需要註冊）
-      final oauthToken = uri.queryParameters['oauth_token'];
+      final oauthToken = uri.queryParameters['token'];
       final provider = uri.queryParameters['provider'] ?? '';
+      final isNewUser = uri.queryParameters['is_new_user'] == 'true';
 
-      if (oauthToken != null && oauthToken.isNotEmpty) {
+      if (oauthToken != null && oauthToken.isNotEmpty && isNewUser) {
         // 新用戶：重定向到註冊頁面
         debugPrint('✅ 新用戶 OAuth 流程，重定向到註冊頁面');
         debugPrint('   Provider: $provider');
@@ -109,7 +109,6 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
           _isProcessing = false;
           _status = '登入成功！';
           _userData = userData;
-          _token = token;
           _isNewUser = false;
         });
 
@@ -129,7 +128,7 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
   }
 
   Future<void> _handleLoginError(String error) async {
-    print('❌ 登入失敗: $error');
+    debugPrint('❌ 登入失敗: $error');
     setState(() {
       _isProcessing = false;
       _status = '登入失敗';
@@ -145,16 +144,15 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
   Future<void> _saveLoginInfo(
       String token, Map<String, dynamic> userData) async {
     try {
-      // 這裡應該調用 AuthService 來儲存登入資訊
-      // 暫時使用簡單的本地儲存
-      print('💾 儲存登入資訊...');
+      debugPrint('💾 儲存登入資訊...');
 
-      // TODO: 整合 AuthService
-      // await AuthService.saveLoginInfo(token, userData);
+      // 使用 AuthService 儲存登入資訊
+      await AuthService.saveToken(token);
+      await AuthService.saveUserData(userData);
 
-      print('✅ 登入資訊儲存成功');
+      debugPrint('✅ 登入資訊儲存成功');
     } catch (e) {
-      print('❌ 儲存登入資訊失敗: $e');
+      debugPrint('❌ 儲存登入資訊失敗: $e');
       rethrow;
     }
   }
@@ -163,7 +161,7 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
     debugPrint('🔄 重定向到主頁...');
     // 重定向到主頁或儀表板
     if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      context.pushReplacement('/home');
     }
   }
 
@@ -171,7 +169,7 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
     debugPrint('🔄 重定向到登入頁面...');
     // 重定向到登入頁面
     if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/login');
+      context.pushReplacement('/login');
     }
   }
 
@@ -181,13 +179,22 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
     debugPrint('   Provider: $provider');
     // 重定向到註冊頁面並帶上 OAuth token
     if (mounted) {
-      Navigator.of(context).pushReplacementNamed(
-          '/signup?oauth_token=$oauthToken&provider=$provider');
+      final signupUrl = Uri(
+        path: '/signup',
+        queryParameters: {
+          'token': oauthToken,
+          'provider': provider,
+          'is_new_user': 'true',
+        },
+      ).toString();
+
+      debugPrint('🔗 重定向 URL: $signupUrl');
+      context.pushReplacement(signupUrl);
     }
   }
 
   void _retryLogin() {
-    print('🔄 重試登入...');
+    debugPrint('🔄 重試登入...');
     // 重新導向到 Google 登入
     final thirdPartyAuth = ThirdPartyAuthService();
     thirdPartyAuth.signInWithProvider('google');

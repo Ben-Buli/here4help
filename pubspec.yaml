@@ -68,3 +68,6 @@ flutter:
   assets:
     - assets/icon/
     - assets/app_env/
+    - assets/app_env/development.json
+    - assets/app_env/android_emulator.json
+    - assets/app_env/ios_simulator.json

@@ -77,7 +77,7 @@ class TaskReport {
 
 /// 任務檢舉 API 服務
 class TaskReportsApi {
-  static String get _baseUrl => '${AppConfig.apiBaseUrl}/backend/api/tasks';
+  static String get _baseUrl => AppConfig.api('/tasks');
 
   /// 檢查用戶是否已檢舉過指定任務
   static Future<Map<String, dynamic>> checkReportStatus({

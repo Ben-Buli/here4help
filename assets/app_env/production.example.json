@@ -1,6 +1,8 @@
 {
   "environment": "production",
   "public": {
+    "api_origin": "https://yourdomain.com",
+    "api_prefix": "/here4help/backend/api",
     "api_base_url": "https://yourdomain.com",
     "socket_url": "https://yourdomain.com:3001",
     "image_base_url": "https://yourdomain.com",

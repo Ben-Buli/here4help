@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'package:here4help/auth/services/auth_service.dart';
+import 'package:here4help/config/app_config.dart';
+import 'package:here4help/config/environment_config.dart';
 
 /// 全域 HTTP Client 服務
 /// 統一管理所有 HTTP 請求，自動添加 Authorization 頭
@@ -46,36 +48,88 @@ class HttpClientService {
     }
   }
 
-  /// GET 請求
-  static Future<http.Response> get(
+  static Object? _encodeBody(Object? body) {
+    if (body == null) return null;
+    if (body is String) return body;
+    return jsonEncode(body);
+  }
+
+  static Never _throwByStatus(int status, {String? message}) {
+    switch (status) {
+      case 401:
+        throw Exception(message ?? 'Unauthorized');
+      case 403:
+        throw Exception(message ?? 'Forbidden');
+      case 404:
+        throw Exception(message ?? 'Not Found');
+      default:
+        throw Exception(message ?? 'HTTP $status');
+    }
+  }
+
+  static Future<http.Response> _send(
+    String method,
     String url, {
     Map<String, String>? additionalHeaders,
-    bool useQueryParamToken = true, // MAMP 兼容性選項
+    Object? body,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
   }) async {
     try {
       final token = await AuthService.getToken();
       String finalUrl = url;
 
-      // 如果啟用查詢參數 token（MAMP 兼容性）
-      if (useQueryParamToken && token != null && token.isNotEmpty) {
+      // Prod 預設關閉 query token
+      final effectiveQueryToken =
+          EnvironmentConfig.isProduction ? false : useQueryParamToken;
+
+      if (effectiveQueryToken && token != null && token.isNotEmpty) {
         finalUrl = addTokenToUrl(url, token);
         debugPrint('🔍 [HTTP] MAMP 兼容模式：使用查詢參數傳遞 token');
       }
 
       final headers = await getAuthHeaders();
-      if (additionalHeaders != null) {
-        headers.addAll(additionalHeaders);
-      }
+      if (additionalHeaders != null) headers.addAll(additionalHeaders);
 
       if (kDebugMode) {
-        debugPrint('🔍 [HTTP] GET: $finalUrl');
+        debugPrint('🔍 [HTTP] $method: $finalUrl');
         debugPrint('🔍 [HTTP] Headers: ${headers.keys.toList()}');
+        if (body != null) {
+          final s = body.toString();
+          final preview = s.substring(0, s.length > 200 ? 200 : s.length);
+          debugPrint('🔍 [HTTP] Body: $preview${s.length > 200 ? '...' : ''}');
+        }
       }
 
-      final response = await http.get(
-        Uri.parse(finalUrl),
-        headers: headers,
-      );
+      final uri = Uri.parse(finalUrl);
+      late http.Response response;
+      switch (method) {
+        case 'GET':
+          response = await http.get(uri, headers: headers).timeout(timeout);
+          break;
+        case 'POST':
+          response = await http
+              .post(uri, headers: headers, body: _encodeBody(body))
+              .timeout(timeout);
+          break;
+        case 'PUT':
+          response = await http
+              .put(uri, headers: headers, body: _encodeBody(body))
+              .timeout(timeout);
+          break;
+        case 'PATCH':
+          response = await http
+              .patch(uri, headers: headers, body: _encodeBody(body))
+              .timeout(timeout);
+          break;
+        case 'DELETE':
+          response = await http
+              .delete(uri, headers: headers, body: _encodeBody(body))
+              .timeout(timeout);
+          break;
+        default:
+          throw ArgumentError('Unsupported method $method');
+      }
 
       if (kDebugMode) {
         debugPrint('🔍 [HTTP] Response: ${response.statusCode}');
@@ -83,9 +137,25 @@ class HttpClientService {
 
       return response;
     } catch (e) {
-      debugPrint('❌ [HTTP] GET 請求失敗: $e');
+      debugPrint('❌ [HTTP] $method 請求失敗: $e');
       rethrow;
     }
+  }
+
+  /// GET 請求
+  static Future<http.Response> get(
+    String url, {
+    Map<String, String>? additionalHeaders,
+    bool useQueryParamToken = true, // MAMP 兼容性選項（在 prod 會自動關閉）
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return _send(
+      'GET',
+      url,
+      additionalHeaders: additionalHeaders,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
   }
 
   /// POST 請求
@@ -93,47 +163,17 @@ class HttpClientService {
     String url, {
     Map<String, String>? additionalHeaders,
     Object? body,
-    bool useQueryParamToken = true, // MAMP 兼容性選項
-  }) async {
-    try {
-      final token = await AuthService.getToken();
-      String finalUrl = url;
-
-      // 如果啟用查詢參數 token（MAMP 兼容性）
-      if (useQueryParamToken && token != null && token.isNotEmpty) {
-        finalUrl = addTokenToUrl(url, token);
-        debugPrint('🔍 [HTTP] MAMP 兼容模式：使用查詢參數傳遞 token');
-      }
-
-      final headers = await getAuthHeaders();
-      if (additionalHeaders != null) {
-        headers.addAll(additionalHeaders);
-      }
-
-      if (kDebugMode) {
-        debugPrint('🔍 [HTTP] POST: $finalUrl');
-        debugPrint('🔍 [HTTP] Headers: ${headers.keys.toList()}');
-        if (body != null) {
-          debugPrint(
-              '🔍 [HTTP] Body: ${body.toString().substring(0, body.toString().length > 100 ? 100 : body.toString().length)}...');
-        }
-      }
-
-      final response = await http.post(
-        Uri.parse(finalUrl),
-        headers: headers,
-        body: body is String ? body : jsonEncode(body),
-      );
-
-      if (kDebugMode) {
-        debugPrint('🔍 [HTTP] Response: ${response.statusCode}');
-      }
-
-      return response;
-    } catch (e) {
-      debugPrint('❌ [HTTP] POST 請求失敗: $e');
-      rethrow;
-    }
+    bool useQueryParamToken = true, // MAMP 兼容性選項（在 prod 會自動關閉）
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return _send(
+      'POST',
+      url,
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
   }
 
   /// PUT 請求
@@ -141,43 +181,17 @@ class HttpClientService {
     String url, {
     Map<String, String>? additionalHeaders,
     Object? body,
-    bool useQueryParamToken = true, // MAMP 兼容性選項
-  }) async {
-    try {
-      final token = await AuthService.getToken();
-      String finalUrl = url;
-
-      // 如果啟用查詢參數 token（MAMP 兼容性）
-      if (useQueryParamToken && token != null && token.isNotEmpty) {
-        finalUrl = addTokenToUrl(url, token);
-        debugPrint('🔍 [HTTP] MAMP 兼容模式：使用查詢參數傳遞 token');
-      }
-
-      final headers = await getAuthHeaders();
-      if (additionalHeaders != null) {
-        headers.addAll(additionalHeaders);
-      }
-
-      if (kDebugMode) {
-        debugPrint('🔍 [HTTP] PUT: $finalUrl');
-        debugPrint('🔍 [HTTP] Headers: ${headers.keys.toList()}');
-      }
-
-      final response = await http.put(
-        Uri.parse(finalUrl),
-        headers: headers,
-        body: body is String ? body : jsonEncode(body),
-      );
-
-      if (kDebugMode) {
-        debugPrint('🔍 [HTTP] Response: ${response.statusCode}');
-      }
-
-      return response;
-    } catch (e) {
-      debugPrint('❌ [HTTP] PUT 請求失敗: $e');
-      rethrow;
-    }
+    bool useQueryParamToken = true, // MAMP 兼容性選項（在 prod 會自動關閉）
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return _send(
+      'PUT',
+      url,
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
   }
 
   /// PATCH 請求
@@ -185,43 +199,17 @@ class HttpClientService {
     String url, {
     Map<String, String>? additionalHeaders,
     Object? body,
-    bool useQueryParamToken = true, // MAMP 兼容性選項
-  }) async {
-    try {
-      final token = await AuthService.getToken();
-      String finalUrl = url;
-
-      // 如果啟用查詢參數 token（MAMP 兼容性）
-      if (useQueryParamToken && token != null && token.isNotEmpty) {
-        finalUrl = addTokenToUrl(url, token);
-        debugPrint('🔍 [HTTP] MAMP 兼容模式：使用查詢參數傳遞 token');
-      }
-
-      final headers = await getAuthHeaders();
-      if (additionalHeaders != null) {
-        headers.addAll(additionalHeaders);
-      }
-
-      if (kDebugMode) {
-        debugPrint('🔍 [HTTP] PATCH: $finalUrl');
-        debugPrint('🔍 [HTTP] Headers: ${headers.keys.toList()}');
-      }
-
-      final response = await http.patch(
-        Uri.parse(finalUrl),
-        headers: headers,
-        body: body is String ? body : jsonEncode(body),
-      );
-
-      if (kDebugMode) {
-        debugPrint('🔍 [HTTP] Response: ${response.statusCode}');
-      }
-
-      return response;
-    } catch (e) {
-      debugPrint('❌ [HTTP] PATCH 請求失敗: $e');
-      rethrow;
-    }
+    bool useQueryParamToken = true, // MAMP 兼容性選項（在 prod 會自動關閉）
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return _send(
+      'PATCH',
+      url,
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
   }
 
   /// DELETE 請求
@@ -229,43 +217,17 @@ class HttpClientService {
     String url, {
     Map<String, String>? additionalHeaders,
     Object? body,
-    bool useQueryParamToken = true, // MAMP 兼容性選項
-  }) async {
-    try {
-      final token = await AuthService.getToken();
-      String finalUrl = url;
-
-      // 如果啟用查詢參數 token（MAMP 兼容性）
-      if (useQueryParamToken && token != null && token.isNotEmpty) {
-        finalUrl = addTokenToUrl(url, token);
-        debugPrint('🔍 [HTTP] MAMP 兼容模式：使用查詢參數傳遞 token');
-      }
-
-      final headers = await getAuthHeaders();
-      if (additionalHeaders != null) {
-        headers.addAll(additionalHeaders);
-      }
-
-      if (kDebugMode) {
-        debugPrint('🔍 [HTTP] DELETE: $finalUrl');
-        debugPrint('🔍 [HTTP] Headers: ${headers.keys.toList()}');
-      }
-
-      final response = await http.delete(
-        Uri.parse(finalUrl),
-        headers: headers,
-        body: body is String ? body : jsonEncode(body),
-      );
-
-      if (kDebugMode) {
-        debugPrint('🔍 [HTTP] Response: ${response.statusCode}');
-      }
-
-      return response;
-    } catch (e) {
-      debugPrint('❌ [HTTP] DELETE 請求失敗: $e');
-      rethrow;
-    }
+    bool useQueryParamToken = true, // MAMP 兼容性選項（在 prod 會自動關閉）
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return _send(
+      'DELETE',
+      url,
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
   }
 
   /// 檢查響應狀態
@@ -282,5 +244,262 @@ class HttpClientService {
       debugPrint('❌ [HTTP] Response body: ${response.body}');
       rethrow;
     }
+  }
+
+  static Map<String, dynamic> _ensureSuccessOrThrow(http.Response response) {
+    if (isSuccessResponse(response)) {
+      return parseJsonResponse(response);
+    }
+    // 嘗試解析 message
+    String? message;
+    try {
+      final m = jsonDecode(response.body);
+      if (m is Map && m['message'] != null) {
+        message = m['message'].toString();
+      }
+    } catch (_) {}
+    _throwByStatus(response.statusCode, message: message);
+  }
+
+  static Future<Map<String, dynamic>> getJson(
+    String url, {
+    Map<String, String>? additionalHeaders,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final res = await get(
+      url,
+      additionalHeaders: additionalHeaders,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+    return _ensureSuccessOrThrow(res);
+  }
+
+  static Future<Map<String, dynamic>> postJson(
+    String url, {
+    Map<String, String>? additionalHeaders,
+    Object? body,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final res = await post(
+      url,
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+    return _ensureSuccessOrThrow(res);
+  }
+
+  static Future<Map<String, dynamic>> putJson(
+    String url, {
+    Map<String, String>? additionalHeaders,
+    Object? body,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final res = await put(
+      url,
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+    return _ensureSuccessOrThrow(res);
+  }
+
+  static Future<Map<String, dynamic>> patchJson(
+    String url, {
+    Map<String, String>? additionalHeaders,
+    Object? body,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final res = await patch(
+      url,
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+    return _ensureSuccessOrThrow(res);
+  }
+
+  static Future<Map<String, dynamic>> deleteJson(
+    String url, {
+    Map<String, String>? additionalHeaders,
+    Object? body,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final res = await delete(
+      url,
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+    return _ensureSuccessOrThrow(res);
+  }
+}
+
+/// 便捷 API 包裝：以 AppConfig.api('/path') 組裝 URL
+class ApiClient {
+  static Future<http.Response> get(
+    String path, {
+    Map<String, String>? additionalHeaders,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return HttpClientService.get(
+      AppConfig.api(path),
+      additionalHeaders: additionalHeaders,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+  }
+
+  static Future<http.Response> post(
+    String path, {
+    Map<String, String>? additionalHeaders,
+    Object? body,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return HttpClientService.post(
+      AppConfig.api(path),
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+  }
+
+  static Future<http.Response> put(
+    String path, {
+    Map<String, String>? additionalHeaders,
+    Object? body,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return HttpClientService.put(
+      AppConfig.api(path),
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+  }
+
+  static Future<http.Response> patch(
+    String path, {
+    Map<String, String>? additionalHeaders,
+    Object? body,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return HttpClientService.patch(
+      AppConfig.api(path),
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+  }
+
+  static Future<http.Response> delete(
+    String path, {
+    Map<String, String>? additionalHeaders,
+    Object? body,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return HttpClientService.delete(
+      AppConfig.api(path),
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+  }
+
+  static Future<Map<String, dynamic>> getJson(
+    String path, {
+    Map<String, String>? additionalHeaders,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return HttpClientService.getJson(
+      AppConfig.api(path),
+      additionalHeaders: additionalHeaders,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+  }
+
+  static Future<Map<String, dynamic>> postJson(
+    String path, {
+    Map<String, String>? additionalHeaders,
+    Object? body,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return HttpClientService.postJson(
+      AppConfig.api(path),
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+  }
+
+  static Future<Map<String, dynamic>> putJson(
+    String path, {
+    Map<String, String>? additionalHeaders,
+    Object? body,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return HttpClientService.putJson(
+      AppConfig.api(path),
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+  }
+
+  static Future<Map<String, dynamic>> patchJson(
+    String path, {
+    Map<String, String>? additionalHeaders,
+    Object? body,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return HttpClientService.patchJson(
+      AppConfig.api(path),
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
+  }
+
+  static Future<Map<String, dynamic>> deleteJson(
+    String path, {
+    Map<String, String>? additionalHeaders,
+    Object? body,
+    bool useQueryParamToken = true,
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    return HttpClientService.deleteJson(
+      AppConfig.api(path),
+      additionalHeaders: additionalHeaders,
+      body: body,
+      useQueryParamToken: useQueryParamToken,
+      timeout: timeout,
+    );
   }
 }

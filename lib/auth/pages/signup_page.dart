@@ -108,7 +108,12 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   Future<void> _loadThirdPartyData() async {
     // 支援 token 預填：/signup?token=...
     final uri = Uri.base;
+    debugPrint('🔍 [SignupPage] 當前 URL: ${uri.toString()}');
+    debugPrint('🔍 [SignupPage] URL 參數: ${uri.queryParameters}');
+
     final tokenParam = uri.queryParameters['token'];
+    debugPrint('🔍 [SignupPage] Token 參數: $tokenParam');
+
     if (tokenParam != null && tokenParam.isNotEmpty) {
       try {
         final temp = await OAuthApi.fetchTempUser(tokenParam);
@@ -220,8 +225,10 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     try {
       // 獲取 OAuth token（從 URL 參數或 widget 資料）
       final uri = Uri.base;
-      final oauthToken = uri.queryParameters['oauth_token'] ??
-          widget.oauthData?['oauth_token'];
+      final oauthToken = uri.queryParameters['token'] ??
+          uri.queryParameters['oauth_token'] ??
+          widget.oauthData?['oauth_token'] ??
+          widget.oauthData?['token'];
 
       if (oauthToken == null || oauthToken.isEmpty) {
         throw Exception(
@@ -255,7 +262,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
 
       // 調用新的 OAuth 註冊 API
       final response = await http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/auth/register-oauth.php'),
+        Uri.parse(AppConfig.api('/auth/register-oauth.php')),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(registrationData),
       );
@@ -1779,8 +1786,10 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     try {
       // 檢查是否有 OAuth token，決定使用哪種註冊方式
       final uri = Uri.base;
-      final oauthToken = uri.queryParameters['oauth_token'] ??
-          widget.oauthData?['oauth_token'];
+      final oauthToken = uri.queryParameters['token'] ??
+          uri.queryParameters['oauth_token'] ??
+          widget.oauthData?['oauth_token'] ??
+          widget.oauthData?['token'];
 
       if (oauthToken != null && oauthToken.isNotEmpty) {
         // 使用 OAuth 註冊

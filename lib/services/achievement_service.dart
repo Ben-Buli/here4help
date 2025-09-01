@@ -115,7 +115,7 @@ double _safeToDouble(dynamic value) {
 class AchievementService {
   /// 獲取用戶成就統計 API URL
   static String get achievementsUrl =>
-      '${AppConfig.apiBaseUrl}/backend/api/account/achievements.php';
+      AppConfig.api('/account/achievements.php');
 
   /// 獲取用戶成就統計
   static Future<UserAchievements?> getUserAchievements({int? userId}) async {

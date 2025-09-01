@@ -125,22 +125,41 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
   }
 
   void _updateMyWorksTabUnreadFlag() {
-    if (!mounted) return;
-    bool hasUnread = false;
+    if (!mounted) {
+      debugPrint('⚠️ [My Works] Widget 未掛載，跳過未讀狀態更新');
+      return;
+    }
 
     try {
-      // 使用 try-catch 包裝 context.read 調用
-      final provider = context.read<ChatListProvider>();
+      debugPrint('🔄 [My Works] 開始更新 Tab 未讀狀態...');
+
+      // 安全地獲取 Provider
+      final ChatListProvider provider;
+      try {
+        provider = context.read<ChatListProvider>();
+      } catch (e) {
+        debugPrint('❌ [My Works] 無法獲取 ChatListProvider: $e');
+        return;
+      }
 
       // 檢查所有未讀訊息映射中是否有大於 0 的計數
+      bool hasUnread = false;
+      int totalUnreadCount = 0;
+      int roomsWithUnread = 0;
+
       for (final count in provider.unreadByRoom.values) {
+        totalUnreadCount += count;
         if (count > 0) {
           hasUnread = true;
-          break;
+          roomsWithUnread++;
         }
       }
 
+      debugPrint(
+          '🔍 [My Works] 未讀統計: 總房間=${provider.unreadByRoom.length}, 有未讀房間=$roomsWithUnread, 總未讀數=$totalUnreadCount');
+
       final oldState = provider.hasUnreadForTab(ChatListProvider.TAB_MY_WORKS);
+      debugPrint('🔍 [My Works] 狀態變化: $oldState -> $hasUnread');
 
       // 使用智能刷新策略的狀態更新器
       SmartRefreshStrategy.updateUnreadState(
@@ -148,18 +167,24 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
         oldState: oldState,
         newState: hasUnread,
         updateCallback: () {
-          if (!mounted) return;
+          if (!mounted) {
+            debugPrint('⚠️ [My Works] 回調中 Widget 未掛載，跳過狀態更新');
+            return;
+          }
           try {
-            debugPrint('✅ [My Works] 更新 Tab 未讀狀態: $hasUnread');
+            debugPrint('✅ [My Works] 執行 Tab 未讀狀態更新: $hasUnread');
             provider.setTabHasUnread(ChatListProvider.TAB_MY_WORKS, hasUnread);
+            debugPrint('✅ [My Works] Tab 未讀狀態更新完成');
           } catch (e) {
-            debugPrint('❌ [My Works] 更新 Tab 未讀狀態失敗: $e');
+            debugPrint('❌ [My Works] setTabHasUnread 失敗: $e');
+            debugPrint('❌ [My Works] 錯誤堆疊: ${e.toString()}');
           }
         },
         description: 'My Works Tab 未讀狀態',
       );
-    } catch (e) {
-      debugPrint('❌ [My Works] 更新 Tab 未讀狀態失敗: $e');
+    } catch (e, stackTrace) {
+      debugPrint('❌ [My Works] _updateMyWorksTabUnreadFlag 失敗: $e');
+      debugPrint('❌ [My Works] 錯誤堆疊: $stackTrace');
     }
   }
 

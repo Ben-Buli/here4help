@@ -58,24 +58,26 @@ class EnvLoader {
                 continue;
             }
 
-            // 解析 KEY=VALUE 格式
-            if (strpos($line, '=') !== false) {
-                list($key, $value) = explode('=', $line, 2);
-                $key = trim($key);
-                $value = trim($value);
+         // 解析 KEY=VALUE 格式
+if (strpos($line, '=') !== false) {
+    list($key, $value) = explode('=', $line, 2);
+    $key = trim($key);
+    $value = trim($value);
 
-                // 移除引號
-                if (preg_match('/^(["\'])(.*)\\1$/', $value, $matches)) {
-                    $value = $matches[2];
-                }
+    // 移除引號
+    if (preg_match('/^(["\'])(.*)\1$/', $value, $matches)) {
+        $value = $matches[2];
+    }
 
-                // 設置環境變數
-                if (isset($_ENV[$key])) {
-                    return $_ENV[$key];
-                }
-                putenv("$key=$value");
-                self::$vars[$key] = $value;
-            }
+    // 如果已存在於 $_ENV，跳過繼續
+    if (isset($_ENV[$key])) {
+        continue;
+    }
+
+    putenv("$key=$value");
+    $_ENV[$key] = $value;   // 建議同步放入 $_ENV
+    self::$vars[$key] = $value;
+}
         }
 
         self::$loaded = true;

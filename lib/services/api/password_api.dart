@@ -16,7 +16,7 @@ class PasswordApi {
       };
 
       final response = await HttpClientService.post(
-        '${AppConfig.apiBaseUrl}/backend/api/account/change-password.php',
+        AppConfig.api('/account/change-password.php'),
         body: jsonEncode(body),
         useQueryParamToken: true, // 使用查詢參數傳遞 token（MAMP 兼容）
       );
@@ -42,7 +42,7 @@ class PasswordApi {
       };
 
       final response = await HttpClientService.post(
-        '${AppConfig.apiBaseUrl}/backend/api/account/request-password-reset.php',
+        AppConfig.api('/account/request-password-reset.php'),
         body: jsonEncode(body),
       );
 
@@ -73,7 +73,7 @@ class PasswordApi {
       };
 
       final response = await HttpClientService.post(
-        '${AppConfig.apiBaseUrl}/backend/api/account/reset-password.php',
+        AppConfig.api('/account/reset-password.php'),
         body: jsonEncode(body),
       );
 
@@ -104,7 +104,7 @@ class PasswordApi {
       }
 
       final response = await HttpClientService.post(
-        '${AppConfig.apiBaseUrl}/backend/api/account/delete.php',
+        AppConfig.api('/account/delete.php'),
         body: jsonEncode(body),
         useQueryParamToken: true, // 使用查詢參數傳遞 token（MAMP 兼容）
       );
