@@ -61,6 +61,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   bool _hasError = false;
   String _errorMessage = '';
 
+  // 封鎖狀態
+  bool _isBlocked = false;
+
   // 聊天訊息列表（從資料庫載入）
   List<Map<String, dynamic>> _chatMessages = [];
   bool _isLoadingMessages = false;
@@ -525,6 +528,16 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             _showScrollToBottomButton = false;
           });
 
+          // 立即同步 Provider 未讀為 0，避免等待後端推播造成數字不同步
+          try {
+            final provider = context.read<ChatListProvider>();
+            provider.markRoomRead(_currentRoomId!);
+          } catch (_) {}
+
+          // 背景刷新一次快照，確保跨分頁一致
+          // ignore: discarded_futures
+          NotificationCenter().service.refreshSnapshot();
+
           debugPrint('✅ 標記所有訊息為已讀，最後訊息 ID: $msgId');
         }
       } catch (e) {
@@ -939,6 +952,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           _chatData = chatData;
           _userRole = chatData['user_role'] ?? 'participant';
           _currentRoomId = roomId;
+          _isBlocked = chatData['is_blocked'] ?? false;
         });
 
         // 初始化圖片上傳管理器
@@ -1059,17 +1073,30 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         final rid = _currentRoomId!;
         _socketService.joinRoom(rid);
         _socketService.markRoomAsRead(rid);
+        // 本地先行將 Provider 未讀設為 0，提升體感一致性
+        try {
+          final provider = context.read<ChatListProvider>();
+          provider.markRoomRead(rid);
+        } catch (_) {}
         // 每次建立/切換聊天室時，解析一次對方身份與頭像
         _resolveOpponentIdentity();
         // 延時重試一次（若初次連線仍在建立中）
         Future.delayed(const Duration(milliseconds: 400), () {
           _socketService.joinRoom(rid);
           _socketService.markRoomAsRead(rid);
+          try {
+            final provider = context.read<ChatListProvider>();
+            provider.markRoomRead(rid);
+          } catch (_) {}
         });
         // 再延時一次 1 秒做最終保險
         Future.delayed(const Duration(seconds: 1), () {
           _socketService.joinRoom(rid);
           _socketService.markRoomAsRead(rid);
+          try {
+            final provider = context.read<ChatListProvider>();
+            provider.markRoomRead(rid);
+          } catch (_) {}
         });
       }
 
@@ -1554,6 +1581,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           NotificationCenter()
               .service
               .markRoomRead(roomId: _currentRoomId!, upToMessageId: '$lastId');
+          // 立即同步 Provider
+          try {
+            final provider = context.read<ChatListProvider>();
+            provider.markRoomRead(_currentRoomId!);
+          } catch (_) {}
         }
       }
     } catch (_) {}
@@ -2029,89 +2061,119 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
     // 已移除 buildMyMessageBubble - 使用 _buildTextMessage 替代
 
-    final isInputDisabled = _task?['status']?['code'] == 'completed' ||
+    final isInputDisabled = _isBlocked ||
+        _task?['status']?['code'] == 'completed' ||
         _task?['status']?['code'] == 'rejected_tasker' ||
         _task?['status']?['code'] == 'completed_tasker';
     // --- ALERT BAR SWITCH-CASE 重構 ---
     // 預設 alert bar 不會顯示，只有在特定狀態下才顯示
     Widget? alertContent;
-    final statusCode = _task?['status']?['code'];
-    switch (statusCode) {
-      case 'applying_tasker':
-        alertContent = const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Text(
-            'Waiting for poster to respond to your application.',
-            style: TextStyle(
-                fontSize: 12,
-                color: Colors.black87,
-                fontWeight: FontWeight.w500),
-            textAlign: TextAlign.center,
-          ),
-        );
-        break;
-      case 'rejected_tasker':
-        alertContent = const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Text(
-            'Unfortunately, the poster has chosen another candidate or declined your application.',
-            style: TextStyle(
-                fontSize: 12,
-                color: Colors.black87,
-                fontWeight: FontWeight.w500),
-            textAlign: TextAlign.center,
-          ),
-        );
-        break;
-      case 'pending_confirmation_tasker':
-        alertContent = Column(
+
+    // 優先檢查封鎖狀態
+    if (_isBlocked) {
+      alertContent = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        color: Colors.red[50],
+        child: Row(
           children: [
-            Text(
-              '⏰ ${remainingTime.inDays}d ${remainingTime.inHours.remainder(24).toString().padLeft(2, '0')}:${remainingTime.inMinutes.remainder(60).toString().padLeft(2, '0')}:${remainingTime.inSeconds.remainder(60).toString().padLeft(2, '0')} until auto complete',
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 14, color: Colors.red),
-            ),
-            const SizedBox(height: 4),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+            Icon(Icons.block, color: Colors.red[700], size: 20),
+            const SizedBox(width: 8),
+            Expanded(
               child: Text(
-                'Dear Poster, please confirm as soon as possible that the Tasker has completed the task. Otherwise, after the countdown ends, the payment will be automatically transferred to the Tasker.',
+                '此聊天室已被限制，您只能查看歷史訊息，無法發送新訊息或圖片。',
                 style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.red,
-                    fontWeight: FontWeight.w500),
-                textAlign: TextAlign.center,
+                  fontSize: 12,
+                  color: Colors.red[700],
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
-        );
-        break;
-      case 'pending_confirmation':
-        alertContent = Column(
-          children: [
-            Text(
-              '⏰ ${remainingTime.inDays}d ${remainingTime.inHours.remainder(24).toString().padLeft(2, '0')}:${remainingTime.inMinutes.remainder(60).toString().padLeft(2, '0')}:${remainingTime.inSeconds.remainder(60).toString().padLeft(2, '0')} until auto complete',
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 14, color: Colors.red),
+        ),
+      );
+    } else {
+      final statusCode = _task?['status']?['code'];
+      switch (statusCode) {
+        case 'applying_tasker':
+          alertContent = const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              'Waiting for poster to respond to your application.',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w500),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 4),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'Dear Poster, please confirm as soon as possible that the Tasker has completed the task. Otherwise, after the countdown ends, the payment will be automatically transferred to the Tasker.',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.red,
-                    fontWeight: FontWeight.w500),
-                textAlign: TextAlign.center,
+          );
+          break;
+        case 'rejected_tasker':
+          alertContent = const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              'Unfortunately, the poster has chosen another candidate or declined your application.',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w500),
+              textAlign: TextAlign.center,
+            ),
+          );
+          break;
+        case 'pending_confirmation_tasker':
+          alertContent = Column(
+            children: [
+              Text(
+                '⏰ ${remainingTime.inDays}d ${remainingTime.inHours.remainder(24).toString().padLeft(2, '0')}:${remainingTime.inMinutes.remainder(60).toString().padLeft(2, '0')}:${remainingTime.inSeconds.remainder(60).toString().padLeft(2, '0')} until auto complete',
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Colors.red),
               ),
-            ),
-          ],
-        );
-        break;
-      default:
-        // 預設 alertContent 為 null, 不顯示 alert bar
-        alertContent = null;
+              const SizedBox(height: 4),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Dear Poster, please confirm as soon as possible that the Tasker has completed the task. Otherwise, after the countdown ends, the payment will be automatically transferred to the Tasker.',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red,
+                      fontWeight: FontWeight.w500),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          );
+          break;
+        case 'pending_confirmation':
+          alertContent = Column(
+            children: [
+              Text(
+                '⏰ ${remainingTime.inDays}d ${remainingTime.inHours.remainder(24).toString().padLeft(2, '0')}:${remainingTime.inMinutes.remainder(60).toString().padLeft(2, '0')}:${remainingTime.inSeconds.remainder(60).toString().padLeft(2, '0')} until auto complete',
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Colors.red),
+              ),
+              const SizedBox(height: 4),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Dear Poster, please confirm as soon as possible that the Tasker has completed the task. Otherwise, after the countdown ends, the payment will be automatically transferred to the Tasker.',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red,
+                      fontWeight: FontWeight.w500),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          );
+          break;
+        default:
+          // 預設 alertContent 為 null, 不顯示 alert bar
+          alertContent = null;
+      }
     }
     // --- END ALERT BAR SWITCH-CASE ---
 
@@ -2515,7 +2577,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     };
   }
 
-  /// 處理申訴
+  /// 處理申訴 TODO: 建立申訴表單
   Future<void> _handleDispute() async {
     if (_task == null) return;
 

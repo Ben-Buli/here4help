@@ -24,8 +24,7 @@ require_once __DIR__ . '/../../utils/Response.php';
 // 載入環境配置
 require_once __DIR__ . '/../../config/env_loader.php';
 
-// 啟動 session 管理
-session_start();
+// 此端點不依賴 PHP Session，避免在某些環境下的相容性警告
 
 try {
     // 獲取 POST 資料
@@ -98,13 +97,20 @@ try {
     // 檢查推薦碼（如果提供了）
     if (!empty($referralCode)) {
         $stmt = $db->query(
-            "SELECT * FROM users WHERE referral_code = ?",
+            "SELECT id, name, status, permission FROM users WHERE referral_code = ?",
             [$referralCode]
         );
         
         $referrer = $stmt->fetch();
         if (!$referrer) {
             throw new Exception('Invalid referral code');
+        }
+
+        // 需同時符合：擁有者為 active/verified 且 permission > 0
+        $isStatusValid = in_array(strtolower($referrer['status']), ['active', 'verified'], true);
+        $isPermissionValid = (int)($referrer['permission'] ?? 0) > 0;
+        if (!($isStatusValid && $isPermissionValid)) {
+            throw new Exception('Referral code owner is not active verified');
         }
     }
     

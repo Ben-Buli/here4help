@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:here4help/config/app_config.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:here4help/auth/services/auth_service.dart';
+import 'package:here4help/chat/providers/chat_list_provider.dart';
 
 /// 未讀訊息通知服務介面
 abstract class NotificationService {
@@ -435,7 +436,15 @@ class NotificationCenter {
     _service = service;
     _s1 = _service.observeTotalUnread().listen(_totalUnreadForwarder.add);
     _s2 = _service.observeUnreadByTask().listen(_byTaskForwarder.add);
-    _s3 = _service.observeUnreadByRoom().listen(_byRoomForwarder.add);
+    _s3 = _service.observeUnreadByRoom().listen((byRoom) {
+      // 轉發原事件
+      _byRoomForwarder.add(byRoom);
+      // 同步到 Provider（快照覆蓋），保證底部導航即使未開啟分頁也能準確顯示
+      try {
+        final provider = ChatListProvider.instance;
+        provider?.replaceUnreadByRoom(byRoom);
+      } catch (_) {}
+    });
     _s4 = _service.observeConnectionStatus().listen(_statusForwarder.add);
 
     // 標記為已初始化

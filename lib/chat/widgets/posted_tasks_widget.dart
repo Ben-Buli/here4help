@@ -15,7 +15,9 @@ import 'package:here4help/chat/utils/avatar_error_cache.dart';
 import 'package:flutter/foundation.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:here4help/chat/services/chat_navigation_service.dart';
+import 'package:here4help/chat/services/socket_service.dart';
 import 'package:here4help/chat/services/chat_preload_service.dart';
+import 'package:here4help/config/environment_config.dart';
 
 const bool verboseSearchLog = false; // 控制搜尋相關的詳細日誌
 
@@ -88,17 +90,18 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       } else {
         debugPrint('⏳ [Posted Tasks] Provider 未初始化，等待初始化完成');
         // 等待 Provider 初始化完成
-        chatProvider?.addListener(() {
+        _initializationListener = () {
           if (!mounted) return;
           if (chatProvider?.isInitialized == true) {
             debugPrint('✅ [Posted Tasks] Provider 初始化完成，檢查分頁狀態');
             _checkAndLoadIfNeeded();
           }
-        });
+        };
+        chatProvider?.addListener(_initializationListener!);
       }
 
       // 監聽快取載入完成事件
-      chatProvider?.addListener(() {
+      _cacheLoadListener = () {
         if (!mounted) return;
         if ((chatProvider?.lastEvent) == 'cache_loaded') {
           debugPrint('📡 [Posted Tasks] 收到快取載入完成事件，重新載入數據');
@@ -109,7 +112,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           debugPrint('📡 [Posted Tasks] 分頁載入完成 (tab_loaded_0)，載入任務清單');
           _fetchAllTasks();
         }
-      });
+      };
+      chatProvider?.addListener(_cacheLoadListener!);
     });
   }
 
@@ -184,6 +188,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
   // Provider 監聽器
   StreamSubscription<Map<String, int>>? _unreadSub;
 
+  // 匿名監聽器的引用，用於在 dispose 時移除
+  VoidCallback? _initializationListener;
+  VoidCallback? _cacheLoadListener;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -195,6 +203,17 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     final staticInstance = ChatListProvider.instance;
     if (staticInstance != null) {
       return staticInstance;
+    }
+
+    // 檢查 widget 是否仍然在 widget tree 中
+    if (!mounted) return null;
+
+    // 額外檢查：確保 context 仍然有效
+    try {
+      if (!context.mounted) return null;
+    } catch (e) {
+      // context 可能已經無效
+      return null;
     }
 
     // 回退：僅在需要時才透過 context 取得，降低在 deactivated 階段觸發錯誤的機率
@@ -283,11 +302,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           debugPrint('📡 [Posted Tasks] 收到未讀數據更新: ${unreadData.length} 個房間');
         }
 
-        // 更新 Provider 中的未讀數據
+        // 更新 Provider：以快照覆蓋，避免舊房間殘留
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           try {
-            // 安全地獲取 Provider
             ChatListProvider? provider;
             try {
               provider = _getChatProvider();
@@ -296,8 +314,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                   '⚠️ [Posted Tasks][_setupUnreadListener()] 無法獲取 ChatListProvider，跳過未讀數據更新');
               return;
             }
-
-            provider?.updateUnreadByRoom(unreadData);
+            provider?.replaceUnreadByRoom(unreadData);
           } catch (e) {
             debugPrint('❌ [Posted Tasks] 更新未讀數據失敗: $e');
           }
@@ -401,12 +418,12 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               .toList();
 
           if (missingFields.isNotEmpty) {
-            applicantData[i] = {
+            applicantData.add({
               'missingFields': '❌ 應徵者 $i 缺少欄位: $missingFields',
               'ApplicantDataComplete': false
-            };
+            });
           } else {
-            applicantData[i] = {'ApplicantDataComplete': true};
+            applicantData.add({'ApplicantDataComplete': true});
           }
         }
         debugPrint('🔍 [Posted Tasks] 應徵者資料載入完成: $applicantData');
@@ -441,7 +458,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           return;
         }
 
-        provider?.updateUnreadByRoom(unreadData);
+        provider?.replaceUnreadByRoom(unreadData);
 
         if (kDebugMode && verboseSearchLog) {
           // debugPrint('✅ [Posted Tasks] 未讀數據載入完成: ${unreadData.length} 個房間');
@@ -456,18 +473,16 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     if (!mounted) return;
 
     try {
-      ChatListProvider? chatProvider;
-      try {
-        chatProvider = _getChatProvider();
-      } catch (e) {
+      final chatProvider = _getChatProvider();
+      if (chatProvider == null) {
         debugPrint(
             '⚠️ [Posted Tasks][_handleProviderChanges()] 無法獲取 ChatListProvider，跳過變化處理');
         return;
       }
 
       // 只有當前是 Posted Tasks 分頁時才刷新
-      if (chatProvider?.isPostedTasksTab == true) {
-        final currentSearchQuery = chatProvider!.searchQuery;
+      if (chatProvider.isPostedTasksTab == true) {
+        final currentSearchQuery = chatProvider.searchQuery;
         final currentLocations =
             Set<String>.from(chatProvider.selectedLocations);
         final currentStatuses = Set<String>.from(chatProvider.selectedStatuses);
@@ -591,6 +606,16 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       final chatProvider = ChatListProvider.instance;
       if (chatProvider != null) {
         chatProvider.removeListener(_handleProviderChanges);
+
+        // 移除匿名監聽器
+        if (_initializationListener != null) {
+          chatProvider.removeListener(_initializationListener!);
+          _initializationListener = null;
+        }
+        if (_cacheLoadListener != null) {
+          chatProvider.removeListener(_cacheLoadListener!);
+          _cacheLoadListener = null;
+        }
       }
     } catch (e) {
       debugPrint('⚠️ [Posted Tasks] 移除 Provider 監聽器失敗: $e');
@@ -609,10 +634,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       // debugPrint  ('🔍 [Posted Tasks] [_fetchAllTasks()] 開始從 API 獲取任務');
 
       // 安全地獲取 Provider
-      ChatListProvider? chatProvider;
-      try {
-        chatProvider = context.read<ChatListProvider>();
-      } catch (e) {
+      final chatProvider = _getChatProvider();
+      if (chatProvider == null) {
         debugPrint(
             '⚠️ [Posted Tasks][_fetchAllTasks()] 無法獲取 ChatListProvider，跳過任務獲取');
         return;
@@ -1129,9 +1152,19 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               'taskId': taskId,
               'name': applicant['applier_name'] ?? 'Anonymous',
               'avatar': applicant['applier_avatar'],
-              'rating': applicant['avg_rating'] ?? 0.0,
-              'reviewsCount': applicant['review_count'] ?? 0,
+              'rating': applicant['avg_rating'],
+              'reviewsCount': applicant['review_count'],
               'questionReply': applicant['cover_letter'] ?? '',
+              // 顯示最後一則訊息（或以 cover_letter 作為備援）
+              'latest_message_snippet': applicant['latest_message_snippet'] ??
+                  (applicant['cover_letter']?.toString().isNotEmpty == true
+                      ? applicant['cover_letter']
+                      : 'Applied for this task'),
+              // 兼容欄位（若有需要）
+              'first_message_snippet': applicant['first_message_snippet'] ??
+                  (applicant['cover_letter']?.toString().isNotEmpty == true
+                      ? applicant['cover_letter']
+                      : null),
               'sentMessages': [
                 applicant['latest_message_snippet'] ?? 'Applied for this task'
               ],
@@ -1301,11 +1334,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                               // 向 Provider 回報當前分頁是否有未讀（避免 build 期間 setState）
                               WidgetsBinding.instance.addPostFrameCallback((_) {
                                 try {
-                                  context
-                                      .read<ChatListProvider>()
-                                      .setTabHasUnread(
-                                          ChatListProvider.TAB_POSTED_TASKS,
-                                          hasUnread);
+                                  final provider = _getChatProvider();
+                                  provider?.setTabHasUnread(
+                                      ChatListProvider.TAB_POSTED_TASKS,
+                                      hasUnread);
                                 } catch (_) {}
                               });
 
@@ -1670,7 +1702,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               children: [
                 Expanded(
                   child: Text(
-                    applier['name'] ?? 'Unknown name',
+                    applier['name'] ?? 'Applier',
                     style: const TextStyle(
                         fontWeight: FontWeight.w500, fontSize: 14),
                     maxLines: 1,
@@ -1682,16 +1714,27 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.star, color: Colors.amber[600], size: 12),
-                    const SizedBox(width: 2),
-                    Text(
-                      '${applier['rating'] ?? 0.0}',
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
-                    ),
-                    Text(
-                      '(${applier['reviewsCount'] ?? 0})',
-                      style: const TextStyle(fontSize: 10, color: Colors.grey),
-                    ),
+                    if (_hasValidRating(applier['rating'])) ...[
+                      Icon(Icons.star, color: Colors.amber[600], size: 12),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${applier['rating']}',
+                        style:
+                            const TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                      Text(
+                        '(${applier['reviewsCount']})',
+                        style:
+                            const TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
+                    ] else ...[
+                      Icon(Icons.eco, color: Colors.lightGreen[600], size: 12),
+                      const SizedBox(width: 2),
+                      const Text(
+                        'Unreviewed',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ]
                   ],
                 ),
               ],
@@ -1738,7 +1781,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('無法進入與 ${applier['name']} 的聊天室'),
+                        content: Text(
+                            'Cannot enter chat room with ${applier['name']}'),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -1748,7 +1792,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('聊天室不可用: ${applier['name']}'),
+                      content:
+                          Text('Chat room unavailable: ${applier['name']}'),
                       backgroundColor: Colors.orange,
                     ),
                   );
@@ -1767,86 +1812,86 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     final List<SlidableAction> actions = [];
 
     // 根據應徵狀態決定可用的動作
-    switch (applicationStatus.toLowerCase()) {
-      case 'applied':
-        // 新應徵：可以標記已讀、拒絕、刪除
-        actions.addAll([
-          SlidableAction(
-            onPressed: (context) => _markAsRead(applier, taskId),
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            icon: Icons.mark_email_read,
-            label: 'Read',
-          ),
-          SlidableAction(
-            onPressed: (context) => _rejectApplication(applier, taskId),
-            backgroundColor: Colors.orange,
-            foregroundColor: Colors.white,
-            icon: Icons.close,
-            label: 'Reject',
-          ),
-          SlidableAction(
-            onPressed: (context) => _deleteApplication(applier, taskId),
-            backgroundColor: Colors.red,
-            foregroundColor: Colors.white,
-            icon: Icons.delete,
-            label: 'Delete',
-          ),
-        ]);
-        break;
+    // switch (applicationStatus.toLowerCase()) {
+    //   case 'applied':
+    //     // 新應徵：可以標記已讀、拒絕、刪除
+    //     actions.addAll([
+    //       SlidableAction(
+    //         onPressed: (context) => _markAsRead(applier, taskId),
+    //         backgroundColor: Colors.blue,
+    //         foregroundColor: Colors.white,
+    //         icon: Icons.mark_email_read,
+    //         label: 'Read',
+    //       ),
+    //       SlidableAction(
+    //         onPressed: (context) => _rejectApplication(applier, taskId),
+    //         backgroundColor: Colors.orange,
+    //         foregroundColor: Colors.white,
+    //         icon: Icons.close,
+    //         label: 'Reject',
+    //       ),
+    //       SlidableAction(
+    //         onPressed: (context) => _deleteApplication(applier, taskId),
+    //         backgroundColor: Colors.red,
+    //         foregroundColor: Colors.white,
+    //         icon: Icons.delete,
+    //         label: 'Delete',
+    //       ),
+    //     ]);
+    //     break;
 
-      case 'accepted':
-        // 已接受：可以標記已讀、取消接受
-        actions.addAll([
-          SlidableAction(
-            onPressed: (context) => _markAsRead(applier, taskId),
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            icon: Icons.mark_email_read,
-            label: 'Read',
-          ),
-          SlidableAction(
-            onPressed: (context) => _cancelAcceptance(applier, taskId),
-            backgroundColor: Colors.orange,
-            foregroundColor: Colors.white,
-            icon: Icons.undo,
-            label: 'Cancel',
-          ),
-        ]);
-        break;
+    //   case 'accepted':
+    //     // 已接受：可以標記已讀、取消接受
+    //     actions.addAll([
+    //       SlidableAction(
+    //         onPressed: (context) => _markAsRead(applier, taskId),
+    //         backgroundColor: Colors.blue,
+    //         foregroundColor: Colors.white,
+    //         icon: Icons.mark_email_read,
+    //         label: 'Read',
+    //       ),
+    //       SlidableAction(
+    //         onPressed: (context) => _cancelAcceptance(applier, taskId),
+    //         backgroundColor: Colors.orange,
+    //         foregroundColor: Colors.white,
+    //         icon: Icons.undo,
+    //         label: 'Cancel',
+    //       ),
+    //     ]);
+    //     break;
 
-      case 'rejected':
-        // 已拒絕：可以標記已讀、刪除
-        actions.addAll([
-          SlidableAction(
-            onPressed: (context) => _markAsRead(applier, taskId),
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            icon: Icons.mark_email_read,
-            label: 'Read',
-          ),
-          SlidableAction(
-            onPressed: (context) => _deleteApplication(applier, taskId),
-            backgroundColor: Colors.red,
-            foregroundColor: Colors.white,
-            icon: Icons.delete,
-            label: 'Delete',
-          ),
-        ]);
-        break;
+    //   case 'rejected':
+    //     // 已拒絕：可以標記已讀、刪除
+    //     actions.addAll([
+    //       SlidableAction(
+    //         onPressed: (context) => _markAsRead(applier, taskId),
+    //         backgroundColor: Colors.blue,
+    //         foregroundColor: Colors.white,
+    //         icon: Icons.mark_email_read,
+    //         label: 'Read',
+    //       ),
+    //       SlidableAction(
+    //         onPressed: (context) => _deleteApplication(applier, taskId),
+    //         backgroundColor: Colors.red,
+    //         foregroundColor: Colors.white,
+    //         icon: Icons.delete,
+    //         label: 'Delete',
+    //       ),
+    //     ]);
+    //     break;
 
-      default:
-        // 其他狀態：只能標記已讀
-        actions.add(
-          SlidableAction(
-            onPressed: (context) => _markAsRead(applier, taskId),
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            icon: Icons.mark_email_read,
-            label: 'Read',
-          ),
-        );
-    }
+    //   default:
+    //     // 其他狀態：只能標記已讀
+    //     actions.add(
+    //       SlidableAction(
+    //         onPressed: (context) => _markAsRead(applier, taskId),
+    //         backgroundColor: Colors.blue,
+    //         foregroundColor: Colors.white,
+    //         icon: Icons.mark_email_read,
+    //         label: 'Read',
+    //       ),
+    //     );
+    // }
 
     return actions;
   }
@@ -2450,13 +2495,32 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     _applyFiltersAndSort();
   }
 
+  /// 檢查是否有有效的評分
+  bool _hasValidRating(dynamic rating) {
+    if (rating == null) return false;
+
+    // 處理數字類型
+    if (rating is num) {
+      return rating > 0;
+    }
+
+    // 處理字符串類型
+    if (rating is String) {
+      final parsedRating = double.tryParse(rating);
+      return parsedRating != null && parsedRating > 0;
+    }
+
+    return false;
+  }
+
   /// 建構實時消息副標題
   Widget _buildRealTimeMessageSubtitle(Map<String, dynamic> applier) {
     final roomId = applier['chat_room_id']?.toString();
+    String initialText = applier['latest_message_snippet'] ?? 'No messages';
 
     if (roomId == null || roomId.isEmpty) {
       return Text(
-        'No messages',
+        initialText,
         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -2464,15 +2528,16 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     }
 
     return StreamBuilder<Map<String, dynamic>>(
-      stream: _getLatestMessageStream(roomId),
+      stream: SocketService().messagesForRoom(roomId),
       builder: (context, snapshot) {
-        String messageText = applier['latest_message_snippet'] ??
-            applier['first_message_snippet'] ??
-            'No messages';
+        String messageText = initialText;
 
         if (snapshot.hasData && snapshot.data != null) {
           final messageData = snapshot.data!;
-          final text = messageData['text']?.toString() ?? '';
+          final text = messageData['text']?.toString() ??
+              messageData['content']?.toString() ??
+              messageData['message']?.toString() ??
+              '';
           if (text.isNotEmpty) {
             messageText = text;
           }
@@ -2486,13 +2551,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         );
       },
     );
-  }
-
-  /// 獲取最新消息的 Stream
-  Stream<Map<String, dynamic>> _getLatestMessageStream(String roomId) {
-    // 這裡可以連接到 Socket 服務或其他實時消息源
-    // 暫時返回一個空的 Stream，實際實現需要連接到 Socket
-    return Stream.empty();
   }
 }
 
@@ -2520,23 +2578,26 @@ class _AvatarWithFallbackState extends State<_AvatarWithFallback> {
   @override
   Widget build(BuildContext context) {
     final avatarPath = widget.avatarPath;
+    // 正規化頭像路徑：相對路徑轉為完整 URL，assets/ 保持不變
+    final String resolvedPath = (avatarPath == null || avatarPath.isEmpty)
+        ? ''
+        : EnvironmentConfig.getFullImageUrl(avatarPath);
 
     // 如果沒有頭像路徑、已發生錯誤，或 URL 在失敗快取中，直接顯示首字母
-    if (avatarPath == null ||
-        avatarPath.isEmpty ||
+    if (resolvedPath.isEmpty ||
         _hasError ||
-        AvatarErrorCache.isFailedUrl(avatarPath)) {
+        AvatarErrorCache.isFailedUrl(resolvedPath)) {
       return _buildInitialsAvatar();
     }
 
     // 如果是相對路徑 (assets)
-    if (avatarPath.startsWith('assets/')) {
+    if (resolvedPath.startsWith('assets/')) {
       return CircleAvatar(
         radius: widget.radius,
         backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
-        backgroundImage: AssetImage(avatarPath),
+        backgroundImage: AssetImage(resolvedPath),
         onBackgroundImageError: (exception, stackTrace) {
-          AvatarErrorCache.addFailedUrl(avatarPath);
+          AvatarErrorCache.addFailedUrl(resolvedPath);
           if (mounted) {
             // 使用 addPostFrameCallback 避免在繪製過程中調用 setState
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2553,14 +2614,15 @@ class _AvatarWithFallbackState extends State<_AvatarWithFallback> {
     }
 
     // 如果是網路 URL
-    if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
+    if (resolvedPath.startsWith('http://') ||
+        resolvedPath.startsWith('https://')) {
       return CircleAvatar(
         radius: widget.radius,
         backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
-        backgroundImage: NetworkImage(avatarPath),
+        backgroundImage: NetworkImage(resolvedPath),
         onBackgroundImageError: (exception, stackTrace) {
-          AvatarErrorCache.addFailedUrl(avatarPath);
-          debugPrint('🔴 Avatar load error (cached): $avatarPath');
+          AvatarErrorCache.addFailedUrl(resolvedPath);
+          debugPrint('🔴 Avatar load error (cached): $resolvedPath');
           if (mounted) {
             // 使用 addPostFrameCallback 避免在繪製過程中調用 setState
             WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -86,12 +86,9 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     if (!mounted) return;
 
     // 安全地獲取 ChatListProvider
-    ChatListProvider? chatProvider;
-    try {
-      chatProvider = context.read<ChatListProvider>();
-    } catch (e) {
-      debugPrint(
-          '⚠️ [My Works] _checkAndLoadIfNeeded 無法獲取 ChatListProvider: $e');
+    final chatProvider = _getChatProvider();
+    if (chatProvider == null) {
+      debugPrint('⚠️ [My Works] _checkAndLoadIfNeeded 無法獲取 ChatListProvider');
       return;
     }
 
@@ -124,6 +121,25 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     }
   }
 
+  /// 安全地獲取 ChatListProvider
+  ChatListProvider? _getChatProvider() {
+    if (!mounted) return null;
+
+    // 先嘗試使用靜態實例，避免在 deactivated 階段透過 context 查找祖先
+    final staticInstance = ChatListProvider.instance;
+    if (staticInstance != null) {
+      return staticInstance;
+    }
+
+    // 回退：僅在需要時才透過 context 取得，降低在 deactivated 階段觸發錯誤的機率
+    try {
+      return Provider.of<ChatListProvider>(context, listen: false);
+    } catch (e) {
+      debugPrint('⚠️ [My Works] 無法獲取 ChatListProvider: $e');
+      return null;
+    }
+  }
+
   void _updateMyWorksTabUnreadFlag() {
     if (!mounted) {
       debugPrint('⚠️ [My Works] Widget 未掛載，跳過未讀狀態更新');
@@ -134,11 +150,9 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       debugPrint('🔄 [My Works] 開始更新 Tab 未讀狀態...');
 
       // 安全地獲取 Provider
-      final ChatListProvider provider;
-      try {
-        provider = context.read<ChatListProvider>();
-      } catch (e) {
-        debugPrint('❌ [My Works] 無法獲取 ChatListProvider: $e');
+      final provider = _getChatProvider();
+      if (provider == null) {
+        debugPrint('❌ [My Works] 無法獲取 ChatListProvider，跳過未讀狀態更新');
         return;
       }
 
@@ -217,11 +231,15 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       if (!mounted) return;
 
       try {
-        final chatProvider = context.read<ChatListProvider>();
-        chatProvider.addListener(_handleProviderChanges);
+        final chatProvider = _getChatProvider();
+        if (chatProvider != null) {
+          chatProvider.addListener(_handleProviderChanges);
 
-        // 檢查並按需載入數據
-        _checkAndLoadIfNeeded();
+          // 檢查並按需載入數據
+          _checkAndLoadIfNeeded();
+        } else {
+          debugPrint('⚠️ [My Works] initState 中無法獲取 ChatListProvider');
+        }
       } catch (e) {
         debugPrint('❌ [My Works] initState 中設置 Provider listener 失敗: $e');
       }
@@ -239,15 +257,14 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
           if (!mounted) return;
 
           // 安全地獲取 Provider
-          ChatListProvider? safeProvider;
-          try {
-            safeProvider = context.read<ChatListProvider>();
-          } catch (e) {
+          final safeProvider = _getChatProvider();
+          if (safeProvider == null) {
             debugPrint('⚠️ [My Works] PostFrame 中無法獲取 ChatListProvider');
             return;
           }
 
-          safeProvider.updateUnreadByRoom(map);
+          // 使用快照覆蓋，避免舊房間殘留造成未讀膨脹
+          safeProvider.replaceUnreadByRoom(map);
           debugPrint('✅ [My Works] 未讀數據已同步完成');
         } catch (e) {
           debugPrint('❌ [My Works] 更新未讀數據失敗: $e');
@@ -281,7 +298,12 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     if (!mounted) return;
 
     try {
-      final chatProvider = context.read<ChatListProvider>();
+      final chatProvider = _getChatProvider();
+      if (chatProvider == null) {
+        debugPrint(
+            '⚠️ [My Works] _handleProviderChanges 無法獲取 ChatListProvider');
+        return;
+      }
 
       // 只有當前是 My Works 分頁時才刷新
       if (chatProvider.isMyWorksTab) {
@@ -313,8 +335,9 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
   void dispose() {
     // 移除 provider listener
     try {
-      if (mounted) {
-        final chatProvider = context.read<ChatListProvider>();
+      // 使用靜態實例而不是 context，避免在 dispose 中訪問 context
+      final chatProvider = ChatListProvider.instance;
+      if (chatProvider != null) {
         chatProvider.removeListener(_handleProviderChanges);
       }
     } catch (e) {
@@ -468,8 +491,10 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       children: [
         RefreshIndicator(
           onRefresh: () async {
-            final chatProvider = context.read<ChatListProvider>();
-            await chatProvider.cacheManager.forceRefresh();
+            final chatProvider = _getChatProvider();
+            if (chatProvider != null) {
+              await chatProvider.cacheManager.forceRefresh();
+            }
             _pagingController.refresh();
           },
           child: PagedListView<int, Map<String, dynamic>>(
@@ -547,11 +572,8 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
                   ? currentUserId
                   : int.tryParse('$currentUserId') ?? 0;
 
-              debugPrint('🔍 [My Works] 進入聊天室參數檢查:');
-              debugPrint('  - task_id: $taskId');
-              debugPrint('  - creator_id: $creatorId');
-              debugPrint('  - participant_id: $participantId');
-              debugPrint('  - 現有 chat_room_id: ${task['chat_room_id']}');
+              debugPrint(
+                  '  - task_id: $taskId,creator_id: $creatorId,participant_id: $participantId,existing_room_id: ${task['chat_room_id']}');
 
               if (taskId.isEmpty || creatorId <= 0 || participantId <= 0) {
                 debugPrint(
@@ -580,7 +602,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
               if (!success && mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('無法進入聊天室'),
+                    content: Text('Cannot enter chat room'),
                     backgroundColor: Colors.red,
                   ),
                 );

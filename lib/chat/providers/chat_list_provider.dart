@@ -771,6 +771,18 @@ class ChatListProvider extends ChangeNotifier {
     }
   }
 
+  /// 使用快照覆蓋未讀數（全量替換，不保留舊房間）
+  void replaceUnreadByRoom(Map<String, int> snapshot) {
+    debugPrint('🧹 [ChatListProvider] 以快照覆蓋未讀數: ${snapshot.length} 個房間');
+    // 全量替換，確保不在快照中的房間被移除
+    _unreadByRoom
+      ..clear()
+      ..addAll(snapshot.map((k, v) => MapEntry(k, v < 0 ? 0 : v)));
+
+    // 廣播更新
+    _emit('room_unread_replace');
+  }
+
   /// Socket 事件處理方法
   /// 處理 new_message 事件
   void handleNewMessage(String roomId) {

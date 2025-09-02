@@ -173,26 +173,14 @@ try {
                 COALESCE(
                     (SELECT ROUND(AVG(tr.rating), 1)
                      FROM task_ratings tr 
-                     WHERE tr.tasker_id = ta.user_id
-                     AND tr.task_id IN (
-                         SELECT ta2.task_id 
-                         FROM task_applications ta2 
-                         WHERE ta2.user_id = ta.user_id 
-                         AND ta2.status = 'accepted'
-                     )),
-                    4.0
+                     WHERE tr.tasker_id = ta.user_id),
+                    0.0
                 ) AS avg_rating,
                 
                 COALESCE(
                     (SELECT COUNT(*)
                      FROM task_ratings tr 
-                     WHERE tr.tasker_id = ta.user_id
-                     AND tr.task_id IN (
-                         SELECT ta2.task_id 
-                         FROM task_applications ta2 
-                         WHERE ta2.user_id = ta.user_id 
-                         AND ta2.status = 'accepted'
-                     )),
+                     WHERE tr.tasker_id = ta.user_id),
                     0
                 ) AS review_count,
                 

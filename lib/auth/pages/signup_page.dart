@@ -235,6 +235,16 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             'OAuth token not found. Please restart the login process.');
       }
 
+      // 送出前：若推薦碼非空且尚未驗證為 valid，阻擋送出
+      final referral = referralCodeController.text.trim();
+      if (referral.isNotEmpty && referralCodeStatus != 'valid') {
+        _showErrorSnackBar('Referral code is invalid or not verified');
+        setState(() {
+          isLoading = false;
+        });
+        return;
+      }
+
       // 準備註冊資料（使用新的 token 化 API）
       final registrationData = {
         'oauth_token': oauthToken,
@@ -1784,6 +1794,20 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     });
 
     try {
+      // 送出前：若推薦碼非空且尚未驗證為 valid，阻擋送出
+      final referral = referralCodeController.text.trim();
+      if (referral.isNotEmpty && referralCodeStatus != 'valid') {
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Referral code is invalid or not verified'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        return;
+      }
       // 檢查是否有 OAuth token，決定使用哪種註冊方式
       final uri = Uri.base;
       final oauthToken = uri.queryParameters['token'] ??

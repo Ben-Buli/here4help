@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/config/app_config.dart';
@@ -14,6 +15,10 @@ class SocketService {
   String? _currentUserId;
   final Set<String> _pendingJoinRooms = <String>{};
   String? _lastRoomIdToJoin;
+
+  // 廣播新訊息的 Stream（支援多處監聽）
+  final StreamController<Map<String, dynamic>> _messageController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   // 監聽器
   Function(Map<String, dynamic>)? onMessageReceived;
@@ -108,6 +113,13 @@ class SocketService {
     // 收到新訊息
     _socket!.on('message', (data) {
       debugPrint('📨 Received message: $data');
+      try {
+        final messageData = Map<String, dynamic>.from(data as Map);
+        // 廣播到通用訊息流
+        _messageController.add(messageData);
+      } catch (e) {
+        debugPrint('❌ Error broadcasting message data: $e');
+      }
       if (onMessageReceived != null) {
         try {
           final messageData = Map<String, dynamic>.from(data as Map);
@@ -296,4 +308,16 @@ class SocketService {
 
   /// 獲取當前用戶ID
   String? get currentUserId => _currentUserId;
+
+  /// 提供指定房間的即時訊息 Stream（會自動嘗試連線並加入房間）
+  Stream<Map<String, dynamic>> messagesForRoom(String roomId) {
+    // 確保連線（背景連線即可）
+    // ignore: discarded_futures
+    connect();
+    // 嘗試加入房間（若未連線會排入佇列）
+    joinRoom(roomId);
+    // 過濾該房間的訊息
+    return _messageController.stream.where(
+        (m) => (m['roomId']?.toString() ?? m['room_id']?.toString()) == roomId);
+  }
 }

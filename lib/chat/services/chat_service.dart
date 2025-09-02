@@ -475,14 +475,14 @@ class ChatService {
       final uri = Uri.parse(AppConfig.api('/chat/get_chat_detail_data.php'))
           .replace(queryParameters: queryParams);
 
-      debugPrint('🌐 [ChatService] 請求 URL: $uri');
+      // debugPrint('🌐 [ChatService] 請求 URL: $uri');
 
-      final headers = {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      };
+      // final headers = {
+      //   'Authorization': 'Bearer $token',
+      //   'Content-Type': 'application/json',
+      // };
 
-      debugPrint('📤 [ChatService] 請求標頭: $headers');
+      // debugPrint('📤 [ChatService] 請求標頭: $headers');
 
       final response = await HttpClientService.get(uri.toString());
 

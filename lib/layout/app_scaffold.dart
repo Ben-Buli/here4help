@@ -826,10 +826,10 @@ class _ChatBadgeDotIconState extends State<_ChatBadgeDotIcon> {
         final currentUserId = userService.currentUser?.id.toString();
 
         // 調試：打印未讀數據
-        debugPrint('🔍 [底部導航] 調試未讀數據:');
-        debugPrint('  - 當前用戶 ID: $currentUserId');
-        debugPrint('  - 總聊天室數: ${chatProvider.unreadByRoom.length}');
-        debugPrint('  - 未讀數據: ${chatProvider.unreadByRoom}');
+        // debugPrint('🔍 [底部導航] 調試未讀數據:');
+        // debugPrint('  - 當前用戶 ID: $currentUserId');
+        // debugPrint('  - 總聊天室數: ${chatProvider.unreadByRoom.length}');
+        // debugPrint('  - 未讀數據: ${chatProvider.unreadByRoom}');
 
         if (currentUserId != null) {
           // 只統計當前用戶有權限的聊天室
@@ -857,38 +857,15 @@ class _ChatBadgeDotIconState extends State<_ChatBadgeDotIcon> {
             const Icon(Icons.message),
             if (totalUnread > 0)
               Positioned(
-                right: totalUnread > 99 ? -2 : 0,
-                top: totalUnread > 99 ? -2 : 0,
+                right: 0,
+                top: 0,
                 child: Container(
-                  width: totalUnread > 99 ? 16 : (totalUnread > 9 ? 12 : 8),
-                  height: totalUnread > 99 ? 16 : (totalUnread > 9 ? 12 : 8),
+                  width: 8,
+                  height: 8,
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.error,
                     shape: BoxShape.circle,
                   ),
-                  child: totalUnread > 99
-                      ? const Center(
-                          child: Text(
-                            '99+',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 7,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        )
-                      : totalUnread > 9
-                          ? Center(
-                              child: Text(
-                                totalUnread.toString(),
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            )
-                          : null,
                 ),
               ),
           ],

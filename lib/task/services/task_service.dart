@@ -1,7 +1,7 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../config/app_config.dart';
 import '../../auth/services/auth_service.dart';
 import '../../services/http_client_service.dart';
@@ -131,66 +131,84 @@ class TaskService extends ChangeNotifier {
 
       debugPrint('🔍 [Posted Tasks Aggregated] API URL: $uri');
 
-      // 獲取認證 token
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('auth_token');
+      // 獲取認證 token（統一使用 AuthService）
+      final token = await AuthService.getToken();
+      if (token == null) {
+        debugPrint('⚠️ [Posted Tasks Aggregated] 沒有認證 token');
+        return (tasks: <Map<String, dynamic>>[], hasMore: false);
+      }
 
       final headers = <String, String>{
         'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
       };
 
-      if (token != null && token.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $token';
-        // debugPrint(
-        //     '🔐 [Posted Tasks Aggregated] 使用認證 token: ${token.substring(0, 20)}...');
-        // debugPrint('🔐 [Posted Tasks Aggregated] 完整 headers: $headers');
-      } else {
-        // debugPrint('⚠️ [Posted Tasks Aggregated] 沒有認證 token');
-        // debugPrint('⚠️ [Posted Tasks Aggregated] token 值: $token');
-      }
+      debugPrint(
+          '🔐 [Posted Tasks Aggregated] 使用認證 token: ${token.substring(0, math.min(20, token.length))}...');
 
       final resp = await http
           .get(uri, headers: headers)
           .timeout(const Duration(seconds: 30));
 
-      // debugPrint(
-      //     '🔍 [Posted Tasks Aggregated] Response Status: ${resp.statusCode}');
+      debugPrint(
+          '🔍 [Posted Tasks Aggregated] Response Status: ${resp.statusCode}');
+      // debugPrint('🔍 [Posted Tasks Aggregated] Response Body: ${resp.body}');
+
       if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body);
-        // debugPrint(
-        //     '🔍 [Posted Tasks Aggregated] Response Success: ${data['success']}');
-        if (data['success'] == true) {
-          final payload = data['data'] ?? {};
-          final itemsRaw = payload['tasks'] ?? [];
-          final List<Map<String, dynamic>> items = (itemsRaw is List)
-              ? itemsRaw.map((e) => Map<String, dynamic>.from(e)).toList()
-              : [];
-          final hasMore = (payload['pagination']?['has_more'] ?? false) == true;
-          // debugPrint('🔍 [Posted Tasks Aggregated] 成功獲取 ${items.length} 個任務');
+        if (resp.body.isEmpty) {
+          debugPrint('❌ [Posted Tasks Aggregated] Empty response body');
+          return (tasks: <Map<String, dynamic>>[], hasMore: false);
+        }
 
-          // 調試：顯示前幾個任務的詳細數據
-          for (int i = 0; i < items.length && i < 3; i++) {
-            final task = items[i];
-            // debugPrint('📋 任務 [$i] 詳細數據:');
-            debugPrint('  - ID: ${task['id']}');
-            // debugPrint('  - Title: "${task['title']}"');
-            // debugPrint('  - Description: "${task['description']}"');
-            // debugPrint('  - Location: "${task['location']}"');
-            // debugPrint('  - Status: "${task['status']}"');
-            // debugPrint('  - Status Display: "${task['status_display']}"');
-            // debugPrint('  - 所有鍵: ${task.keys.toList()}');
-          }
-
-          return (tasks: items, hasMore: hasMore);
-        } else {
+        try {
+          final data = jsonDecode(resp.body);
           debugPrint(
-              '❌ [Posted Tasks Aggregated] API Error: ${data['message']}');
+              '🔍 [Posted Tasks Aggregated] Response Success: ${data['success']}');
+
+          if (data['success'] == true) {
+            final payload = data['data'] ?? {};
+            final itemsRaw = payload['tasks'] ?? [];
+            final List<Map<String, dynamic>> items = (itemsRaw is List)
+                ? itemsRaw.map((e) => Map<String, dynamic>.from(e)).toList()
+                : [];
+            final hasMore =
+                (payload['pagination']?['has_more'] ?? false) == true;
+            debugPrint('🔍 [Posted Tasks Aggregated] 成功獲取 ${items.length} 個任務');
+
+            // 調試：顯示前幾個任務的詳細數據
+            for (int i = 0; i < items.length && i < 3; i++) {
+              final task = items[i];
+              debugPrint('📋 任務 [$i] ID: ${task['id']}');
+            }
+
+            return (tasks: items, hasMore: hasMore);
+          } else {
+            debugPrint(
+                '❌ [Posted Tasks Aggregated] API Error: ${data['message']}');
+            return (tasks: <Map<String, dynamic>>[], hasMore: false);
+          }
+        } catch (jsonError) {
+          debugPrint(
+              '❌ [Posted Tasks Aggregated] JSON Parse Error: $jsonError');
+          debugPrint('❌ [Posted Tasks Aggregated] Raw Response: ${resp.body}');
+          return (tasks: <Map<String, dynamic>>[], hasMore: false);
         }
       } else {
         debugPrint(
-            '❌ [Posted Tasks Aggregated] HTTP Error: ${resp.statusCode} - ${resp.body}');
+            '❌ [Posted Tasks Aggregated] HTTP Error: ${resp.statusCode}');
+        debugPrint('❌ [Posted Tasks Aggregated] Response Body: ${resp.body}');
+
+        // 嘗試解析錯誤響應
+        try {
+          final errorData = jsonDecode(resp.body);
+          debugPrint(
+              '❌ [Posted Tasks Aggregated] Error Details: ${errorData['message']}');
+        } catch (_) {
+          debugPrint('❌ [Posted Tasks Aggregated] Cannot parse error response');
+        }
+
+        return (tasks: <Map<String, dynamic>>[], hasMore: false);
       }
-      return (tasks: <Map<String, dynamic>>[], hasMore: false);
     } catch (e) {
       debugPrint('fetchPostedTasksAggregated error: $e');
       return (tasks: <Map<String, dynamic>>[], hasMore: false);
@@ -223,8 +241,7 @@ class TaskService extends ChangeNotifier {
     bool preview = false,
   }) async {
     // 獲取用戶 token
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = await AuthService.getToken();
     if (token == null) {
       throw Exception('User not authenticated');
     }
@@ -260,8 +277,7 @@ class TaskService extends ChangeNotifier {
     String? reason,
   }) async {
     // 獲取用戶 token
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = await AuthService.getToken();
     if (token == null) {
       throw Exception('User not authenticated');
     }
@@ -299,8 +315,7 @@ class TaskService extends ChangeNotifier {
     required String paymentCode2,
   }) async {
     // 獲取用戶 token
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = await AuthService.getToken();
     if (token == null) {
       throw Exception('User not authenticated');
     }
@@ -345,8 +360,7 @@ class TaskService extends ChangeNotifier {
     required String posterId,
   }) async {
     // 獲取用戶 token
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = await AuthService.getToken();
     if (token == null) {
       throw Exception('User not authenticated');
     }
@@ -520,8 +534,7 @@ class TaskService extends ChangeNotifier {
     String? comment,
   }) async {
     // 獲取用戶 token
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
+    final token = await AuthService.getToken();
     if (token == null) {
       throw Exception('User not authenticated');
     }

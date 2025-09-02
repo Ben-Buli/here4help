@@ -39,33 +39,45 @@ try {
     $db = Database::getInstance();
     
     // 檢查推薦碼是否存在且擁有者為有效用戶（status 有效且 permission > 0）
+    // 注意：部分資料庫內可能將 verified 與 active 作為不同標記，這裡兩者皆視為可用
     $stmt = $db->query(
-        "SELECT id, name, status, permission FROM users 
-         WHERE referral_code = ? 
-           AND (status = 'active' OR status = 'verified')
-           AND permission > 0",
+        "SELECT id, name, nickname, email, status, permission FROM users 
+         WHERE referral_code = ?",
         [$referralCode]
     );
     
     $user = $stmt->fetch();
     
-    if ($user) {
-        // 推薦碼有效
-        echo json_encode([
-            'success' => true,
-            'message' => 'Referral code is valid',
-            'data' => [
-                'referrer_id' => $user['id'],
-                'referrer_name' => $user['name']
-            ]
-        ]);
-    } else {
-        // 推薦碼無效或不存在
+    if (!$user) {
         echo json_encode([
             'success' => false,
             'message' => 'Referral code is invalid or does not exist'
         ]);
+        exit;
     }
+
+    // 條件：擁有者狀態需為 active 或 verified，且 permission > 0（視為通過管理員核可的正式用戶）
+    $isStatusValid = in_array(strtolower($user['status']), ['active', 'verified'], true);
+    $isPermissionValid = (int)($user['permission'] ?? 0) > 0;
+
+    if (!($isStatusValid && $isPermissionValid)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Referral code owner is not an active verified user'
+        ]);
+        exit;
+    }
+
+    // 推薦碼有效
+    echo json_encode([
+        'success' => true,
+        'message' => 'Referral code is valid',
+        'data' => [
+            'referrer_id' => (int)$user['id'],
+            'referrer_name' => ($user['nickname'] ?: $user['name']) ?? '',
+            'referrer_email' => $user['email'] ?? ''
+        ]
+    ]);
     
 } catch (Exception $e) {
     http_response_code(400);

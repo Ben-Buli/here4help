@@ -55,51 +55,24 @@ try {
     Response::error('Chat room not found', 404);
   }
 
-  // Block messaging for completed/closed/cancelled/rejected tasks（相容多種欄位）
-  if (!empty($existingRoom['task_id'])) {
-    try {
-      $task = $db->fetch("SELECT * FROM tasks WHERE id = ?", [$existingRoom['task_id']]);
-      if ($task) {
-        $statusCandidates = [];
-        foreach (['status', 'status_code', 'status_display'] as $k) {
-          if (isset($task[$k]) && $task[$k] !== '') $statusCandidates[] = strtolower((string)$task[$k]);
-        }
-        if (isset($task['status_id']) && $task['status_id'] !== null) {
-          $statusCandidates[] = 'id:'.(string)$task['status_id'];
-        }
-        $st = implode(' ', $statusCandidates);
-        if (
-          strpos($st, 'complete') !== false ||
-          strpos($st, 'close') !== false ||
-          strpos($st, 'cancel') !== false ||
-          strpos($st, 'reject') !== false
-        ) {
-          Response::error('Messaging disabled for this task status', 403);
-        }
-      }
-    } catch (Exception $e) {
-      // 若任務欄位不同步，不阻斷發送（放行）
-    }
-  }
+  // 移除任務狀態和應徵狀態的限制 - 允許所有狀態進入聊天室
 
-  // 封鎖檢查：若雙方有任一方封鎖對方，禁止發送（若表不存在則自動建立）
-  $opponentIdRow = $db->fetch("SELECT CASE WHEN creator_id = ? THEN participant_id ELSE creator_id END AS opponent_id FROM chat_rooms WHERE id = ?", [$user_id, $room_id]);
-  if ($opponentIdRow && isset($opponentIdRow['opponent_id'])) {
-    $oppId = (int)$opponentIdRow['opponent_id'];
-    // 確保 user_blocks 表存在
-    try {
-      $db->query("CREATE TABLE IF NOT EXISTS user_blocks (
-        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        user_id BIGINT UNSIGNED NOT NULL,
-        target_user_id BIGINT UNSIGNED NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY uq_user_target (user_id, target_user_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-    } catch (Exception $e) {}
-
-    $blocked = $db->fetch("SELECT 1 FROM user_blocks WHERE (user_id = ? AND target_user_id = ?) OR (user_id = ? AND target_user_id = ?) LIMIT 1", [$user_id, $oppId, $oppId, $user_id]);
-    if ($blocked) {
-      Response::error('Messaging blocked between users', 403);
+  // 封鎖檢查：基於 user_blocks 表檢查聊天室雙方是否互相封鎖
+  $roomUsers = $db->fetch("SELECT creator_id, participant_id FROM chat_rooms WHERE id = ?", [$room_id]);
+  if ($roomUsers) {
+    $creatorId = (int)$roomUsers['creator_id'];
+    $participantId = (int)$roomUsers['participant_id'];
+    
+    // 檢查聊天室雙方是否有封鎖關係（不分角色）
+    $blockCheck = $db->fetch(
+      "SELECT COUNT(*) as block_count FROM user_blocks 
+       WHERE (user_id = ? AND target_user_id = ?) 
+          OR (user_id = ? AND target_user_id = ?)",
+      [$creatorId, $participantId, $participantId, $creatorId]
+    );
+    
+    if ($blockCheck && $blockCheck['block_count'] > 0) {
+      Response::error('Cannot send message: Users are blocked', 403);
     }
   }
 

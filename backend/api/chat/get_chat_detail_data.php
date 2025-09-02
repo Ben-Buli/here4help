@@ -117,6 +117,23 @@ try {
     Response::error('Room not found or access denied', 404);
   }
 
+  // 檢查是否被對方封鎖（雙向檢查）
+  $creatorId = (int)$row['creator_id'];
+  $participantId = (int)$row['participant_id'];
+  $isBlocked = false;
+  
+  // 檢查聊天室雙方是否互相封鎖
+  $blockCheck = $db->fetch(
+    "SELECT COUNT(*) as block_count FROM user_blocks 
+     WHERE (user_id = ? AND target_user_id = ?) 
+        OR (user_id = ? AND target_user_id = ?)",
+    [$creatorId, $participantId, $participantId, $creatorId]
+  );
+  
+  if ($blockCheck && $blockCheck['block_count'] > 0) {
+    $isBlocked = true;
+  }
+
   // 決定當前使用者角色
   $user_role = ($row['creator_id'] == $user_id) ? 'creator' : 'participant';
 
@@ -175,6 +192,7 @@ try {
     'task' => $task,
     'user_role' => $user_role,
     'chat_partner_info' => $partner,
+    'is_blocked' => $isBlocked,
   ], 'Chat detail loaded');
 
 } catch (Throwable $e) {

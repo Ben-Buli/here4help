@@ -23,7 +23,7 @@ class ChatPreloadService {
     }
 
     if (_instance._preloadedData.containsKey(roomId)) {
-      debugPrint('✅ [ChatPreloadService] 房間 $roomId 數據已預載入');
+      // debugPrint('✅ [ChatPreloadService] 房間 $roomId 數據已預載入');
       return;
     }
 
@@ -36,7 +36,7 @@ class ChatPreloadService {
 
       if (chatData.isNotEmpty) {
         _instance._preloadedData[roomId] = chatData;
-        debugPrint('✅ [ChatPreloadService] 房間 $roomId 數據預載入成功');
+        // debugPrint('✅ [ChatPreloadService] 房間 $roomId 數據預載入成功');
       } else {
         debugPrint('❌ [ChatPreloadService] 房間 $roomId 數據預載入失敗');
       }

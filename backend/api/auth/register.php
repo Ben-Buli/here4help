@@ -38,6 +38,22 @@ try {
         exit;
     }
     
+    // 可選：推薦碼驗證（如有輸入）
+    $referralCode = trim($input['referral_code'] ?? '');
+    if (!empty($referralCode)) {
+        $ref = $db->fetch("SELECT id, status, permission FROM users WHERE referral_code = ?", [$referralCode]);
+        if (!$ref) {
+            Response::error('Invalid referral code');
+            exit;
+        }
+        $isStatusValid = in_array(strtolower($ref['status']), ['active', 'verified'], true);
+        $isPermissionValid = (int)($ref['permission'] ?? 0) > 0;
+        if (!($isStatusValid && $isPermissionValid)) {
+            Response::error('Referral code owner is not active verified');
+            exit;
+        }
+    }
+
     // 開始資料庫交易
     $connection = $db->getConnection();
     $connection->beginTransaction();
@@ -50,9 +66,9 @@ try {
         $userSql = "INSERT INTO users (
             name, nickname, email, password, phone, points, status,
             payment_password, date_of_birth, gender, country,
-            address, is_permanent_address, primary_language,
+            address, is_permanent_address, primary_language, referral_code,
             created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 0, 'active', ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+        ) VALUES (?, ?, ?, ?, ?, 0, 'active', ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
         
         $db->query($userSql, [
             $input['name'],
@@ -66,7 +82,8 @@ try {
             $input['country'],
             $input['address'],
             $input['is_permanent_address'] ? 1 : 0,
-            $input['primary_language']
+            $input['primary_language'],
+            $referralCode
         ]);
         
         $userId = $db->lastInsertId();
