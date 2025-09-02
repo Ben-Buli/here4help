@@ -28,11 +28,9 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
           <select v-model="filters.status" @change="() => loadIssues()" class="admin-input">
             <option value="">All</option>
-            <option value="open">Open</option>
+            <option value="submitted">Submitted</option>
             <option value="in_progress">In Progress</option>
-            <option value="waiting_customer">Waiting Customer</option>
             <option value="resolved">Resolved</option>
-            <option value="closed">Closed</option>
           </select>
         </div>
         <div>
@@ -97,10 +95,36 @@
               <td class="text-sm text-gray-500">{{ formatDateTime(it.last_message_at) }}</td>
               <td>
                 <div class="flex items-center space-x-2">
-                  <button @click="accept(it)" class="text-primary-600 hover:text-primary-900 text-sm">Claim</button>
-                  <button @click="markWaiting(it)" class="text-gray-600 hover:text-gray-900 text-sm">Wait</button>
-                  <button @click="resolve(it)" class="text-green-600 hover:text-green-900 text-sm">Resolve</button>
-                  <button @click="closeIssue(it)" class="text-red-600 hover:text-red-900 text-sm">Close</button>
+                  <!-- 動態顯示 Claim/Room 按鈕 -->
+                  <button 
+                    v-if="!it.is_claimed" 
+                    @click="claimIssue(it)" 
+                    class="text-primary-600 hover:text-primary-900 text-sm font-medium"
+                  >
+                    Claim
+                  </button>
+                  <button 
+                    v-else-if="it.admin_id === currentAdminId" 
+                    @click="openChatRoom(it)" 
+                    class="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                  >
+                    Room
+                  </button>
+                  <span 
+                    v-else 
+                    class="text-gray-400 text-sm cursor-not-allowed"
+                  >
+                    Claimed
+                  </span>
+                  
+                  <!-- 狀態操作按鈕 -->
+                  <button 
+                    v-if="it.status === 'in_progress'" 
+                    @click="updateStatus(it, 'resolved')" 
+                    class="text-green-600 hover:text-green-900 text-sm"
+                  >
+                    Resolve
+                  </button>
                 </div>
               </td>
             </tr>
@@ -137,6 +161,22 @@ const isLoading = ref(false)
 const items = ref<any[]>([])
 const pagination = ref({ current_page: 1, per_page: 15, total: 0, last_page: 1 })
 const filters = reactive({ type: 'all', status: '', search: '' })
+
+// 當前管理員 ID（從 localStorage 或 store 獲取）
+const currentAdminId = ref<string | null>(null)
+
+// 初始化當前管理員 ID
+const initCurrentAdmin = () => {
+  try {
+    const adminUser = localStorage.getItem('admin_user')
+    if (adminUser) {
+      const user = JSON.parse(adminUser)
+      currentAdminId.value = String(user.id || user.admin_id || '')
+    }
+  } catch (e) {
+    console.warn('Failed to get current admin ID:', e)
+  }
+}
 
 const loadIssues = async (page = 1) => {
   try {
@@ -175,29 +215,76 @@ const debouncedSearch = () => {
   timer = setTimeout(() => loadIssues(1), 400)
 }
 
+// 管理員接手客服事件
+const claimIssue = async (it: any) => {
+  try {
+    isLoading.value = true
+    const result = await supportApi.claimIssue(String(it.room_id))
+    
+    if (result.data.success) {
+      // 顯示成功訊息
+      console.log('Issue claimed successfully:', result.data.data?.message)
+      
+      // 重新載入列表以更新狀態
+      await refreshData()
+    }
+  } catch (error: any) {
+    console.error('Failed to claim issue:', error)
+    
+    // 顯示錯誤訊息
+    const message = error.response?.data?.message || 'Failed to claim issue'
+    alert(`Error: ${message}`)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// 開啟聊天室（僅接手管理員可用）
+const openChatRoom = (it: any) => {
+  // TODO: 實現跳轉到管理員聊天室頁面
+  // 這裡需要根據實際的路由設計來實現
+  console.log('Opening chat room for:', it.room_id)
+  
+  // 暫時使用 alert 提示
+  alert(`Opening chat room ${it.room_id} - This feature will be implemented later`)
+}
+
+// 更新事件狀態
+const updateStatus = async (it: any, newStatus: string) => {
+  try {
+    isLoading.value = true
+    
+    // 使用 event_id 而不是 room_id
+    const result = await supportApi.updateEventStatus(String(it.event_id), newStatus as any)
+    
+    if (result.data.success) {
+      console.log('Status updated successfully:', result.data.data?.message)
+      await refreshData()
+    }
+  } catch (error: any) {
+    console.error('Failed to update status:', error)
+    
+    const message = error.response?.data?.message || 'Failed to update status'
+    alert(`Error: ${message}`)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// 向後相容的舊方法（標記為 deprecated）
+/** @deprecated 使用 claimIssue 替代 */
 const accept = async (it: any) => {
-  await supportApi.accept(String(it.room_id))
-  refreshData()
-}
-const markWaiting = async (it: any) => {
-  await supportApi.updateStatus(String(it.room_id), 'waiting_customer')
-  refreshData()
-}
-const resolve = async (it: any) => {
-  await supportApi.updateStatus(String(it.room_id), 'resolved')
-  refreshData()
-}
-const closeIssue = async (it: any) => {
-  await supportApi.updateStatus(String(it.room_id), 'closed')
-  refreshData()
+  await claimIssue(it)
 }
 
 const statusClass = (s: string) => {
   const map: Record<string, string> = {
-    open: 'bg-yellow-100 text-yellow-800',
+    submitted: 'bg-yellow-100 text-yellow-800',
     in_progress: 'bg-blue-100 text-blue-800',
-    waiting_customer: 'bg-purple-100 text-purple-800',
     resolved: 'bg-green-100 text-green-800',
+    // 向後相容的舊狀態
+    open: 'bg-yellow-100 text-yellow-800',
+    waiting_customer: 'bg-purple-100 text-purple-800',
     closed: 'bg-gray-100 text-gray-800',
   }
   return map[s] || 'bg-gray-100 text-gray-800'
@@ -209,7 +296,10 @@ const formatDateTime = (d?: string) => {
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`
 }
 
-onMounted(() => loadIssues())
+onMounted(() => {
+  initCurrentAdmin()
+  loadIssues()
+})
 </script>
 
 

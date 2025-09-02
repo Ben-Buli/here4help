@@ -36,23 +36,19 @@ class _IssueStatusPageState extends State<IssueStatusPage> {
 
   final List<String> _filterOptions = [
     'all',
-    'open',
+    'submitted',
     'in_progress',
-    'resolved',
-    'closed_by_customer',
   ];
 
   @override
   void initState() {
     super.initState();
-    // 如果有 chatRoomId，載入客服事件；否則顯示靜態狀態
-    if (widget.chatRoomId != null) {
-      _loadEvents();
-    }
+    // 載入使用者的客服事件
+    _loadEvents();
   }
 
   Future<void> _loadEvents() async {
-    if (_isLoading || widget.chatRoomId == null) return;
+    if (_isLoading) return;
 
     setState(() {
       _isLoading = true;
@@ -60,9 +56,9 @@ class _IssueStatusPageState extends State<IssueStatusPage> {
     });
 
     try {
-      final events = await SupportEventApi.getEvents(
-        chatRoomId: widget.chatRoomId!,
-      );
+      // TODO: 實現獲取使用者所有客服事件的 API
+      // 暫時使用空列表，等待後端 API 實現
+      final events = <Map<String, dynamic>>[];
 
       if (mounted) {
         setState(() {
@@ -81,25 +77,23 @@ class _IssueStatusPageState extends State<IssueStatusPage> {
   }
 
   List<Map<String, dynamic>> get _filteredEvents {
+    // 只顯示非 resolved 的事件（活躍事件）
+    final activeEvents =
+        _events.where((event) => event['status'] != 'resolved').toList();
+
     if (_selectedFilter == 'all') {
-      return _events;
+      return activeEvents;
     }
-    return _events
+    return activeEvents
         .where((event) => event['status'] == _selectedFilter)
         .toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    // 如果沒有 chatRoomId，顯示原有的靜態狀態
-    if (widget.chatRoomId == null) {
-      return _buildLegacyIssueStatus();
-    }
-
-    // 新的客服事件系統
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title ?? 'Support Events'),
+        title: const Text('Support Cases'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 1,
@@ -112,7 +106,7 @@ class _IssueStatusPageState extends State<IssueStatusPage> {
       ),
       body: Column(
         children: [
-          // 篩選器
+          // 篩選器（僅顯示活躍狀態）
           _buildFilterBar(),
 
           // 事件列表
@@ -121,70 +115,12 @@ class _IssueStatusPageState extends State<IssueStatusPage> {
           ),
         ],
       ),
-    );
-  }
-
-  /// 原有的靜態 issue status 顯示（向後相容）
-  Widget _buildLegacyIssueStatus() {
-    return widget.hasIssue
-        ? Center(
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 8,
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildStep('Submitted', 0, widget.status,
-                      date: widget.submittedDate),
-                  _buildStep('In Progress', 1, widget.status),
-                  _buildStep('Resolved', 2, widget.status),
-                ],
-              ),
-            ),
-          )
-        : const Center(
-            child: Text(
-              'No issues pending at the moment.',
-              style: TextStyle(fontSize: 16, color: Colors.black54),
-            ),
-          );
-  }
-
-  Widget _buildStep(String label, int step, int current, {String? date}) {
-    final isActive = current >= step;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Icon(
-          isActive ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-          color: isActive ? AppColors.primary : Colors.grey,
-        ),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: isActive ? AppColors.primary : Colors.grey,
-          ),
-        ),
-        if (date != null)
-          Padding(
-            padding: const EdgeInsets.only(left: 8),
-            child: Text(
-              date,
-              style: const TextStyle(color: Colors.black54, fontSize: 12),
-            ),
-          ),
-      ],
+      // 新增 FAB 建立客服事件
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showCreateIssueDialog,
+        backgroundColor: AppColors.primary,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 
@@ -278,8 +214,8 @@ class _IssueStatusPageState extends State<IssueStatusPage> {
             const SizedBox(height: 16),
             Text(
               _selectedFilter == 'all'
-                  ? 'No events found'
-                  : 'No ${_getFilterDisplayName(_selectedFilter).toLowerCase()} events',
+                  ? 'No active support cases'
+                  : 'No ${_getFilterDisplayName(_selectedFilter).toLowerCase()} cases',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey[600],
@@ -287,7 +223,7 @@ class _IssueStatusPageState extends State<IssueStatusPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Events will appear here when they are created',
+              'Tap the + button to create a new support case',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[500],
@@ -319,17 +255,30 @@ class _IssueStatusPageState extends State<IssueStatusPage> {
     switch (filter) {
       case 'all':
         return 'All';
-      case 'open':
-        return 'Open';
+      case 'submitted':
+        return 'Submitted';
       case 'in_progress':
         return 'In Progress';
-      case 'resolved':
-        return 'Resolved';
-      case 'closed_by_customer':
-        return 'Closed';
       default:
         return filter;
     }
+  }
+
+  /// 顯示建立客服事件的 Dialog
+  void _showCreateIssueDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => _CreateIssueDialog(
+        onCreated: (roomId) {
+          // 重新載入事件列表
+          _loadEvents();
+          // 導航至聊天室
+          Navigator.of(context).pushNamed('/chat/detail', arguments: {
+            'room_id': roomId,
+          });
+        },
+      ),
+    );
   }
 
   void _showEventDetail(Map<String, dynamic> event) {
@@ -733,6 +682,137 @@ class _RateEventDialogState extends State<_RateEventDialog> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Text('Submit Rating'),
+        ),
+      ],
+    );
+  }
+}
+
+/// 建立客服事件 Dialog
+class _CreateIssueDialog extends StatefulWidget {
+  final Function(String roomId) onCreated;
+
+  const _CreateIssueDialog({
+    required this.onCreated,
+  });
+
+  @override
+  State<_CreateIssueDialog> createState() => _CreateIssueDialogState();
+}
+
+class _CreateIssueDialogState extends State<_CreateIssueDialog> {
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitIssue() async {
+    final title = _titleController.text.trim();
+    final description = _descriptionController.text.trim();
+
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a title')),
+      );
+      return;
+    }
+
+    if (description.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a description')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final result = await SupportEventApi.createIssue(
+        title: title,
+        description: description,
+      );
+
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Support case created successfully')),
+        );
+        widget.onCreated(result['room_id']);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create support case: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Create Support Case'),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Subject / Title *',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                hintText: 'Brief description of your issue',
+                border: OutlineInputBorder(),
+              ),
+              maxLength: 100,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Description *',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _descriptionController,
+              decoration: const InputDecoration(
+                hintText: 'Please describe your issue in detail',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 4,
+              maxLength: 500,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isLoading ? null : _submitIssue,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Create Case'),
         ),
       ],
     );

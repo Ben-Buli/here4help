@@ -30,15 +30,20 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
-    // JWT 認證
+    // JWT 認證（支援 Header 或 URL 參數）
+    $token = null;
     $headers = getallheaders();
     $authHeader = $headers['Authorization'] ?? '';
     
-    if (!$authHeader || !preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
-        Response::error('Missing or invalid authorization header', 401);
+    if ($authHeader && preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+        $token = $matches[1];
+    } elseif (isset($_GET['token'])) {
+        $token = $_GET['token'];
     }
     
-    $token = $matches[1];
+    if (!$token) {
+        Response::error('Missing or invalid authorization header', 401);
+    }
     $jwtManager = new JWTManager();
     $payload = $jwtManager->validateToken($token);
     
@@ -64,8 +69,17 @@ try {
         Response::error('event_id is required', 400);
     }
     
+    // 強制 rating 和 review 必填
+    if ($rating === null || $rating === '') {
+        Response::error('Rating is required (1-5)', 400);
+    }
+    
+    if (empty($review)) {
+        Response::error('Review is required', 400);
+    }
+    
     // 驗證評分範圍
-    if ($rating !== null && ($rating < 1 || $rating > 5)) {
+    if ($rating < 1 || $rating > 5) {
         Response::error('Rating must be between 1 and 5', 400);
     }
     
@@ -75,7 +89,7 @@ try {
     $eventStmt = $db->prepare("
         SELECT se.*, cr.creator_id, cr.participant_id
         FROM support_events se
-        JOIN chat_rooms cr ON se.chat_room_id = cr.id
+        JOIN support_chat_rooms cr ON se.support_chat_room_id = cr.id
         WHERE se.id = ? AND cr.type = 'support'
     ");
     $eventStmt->execute([$eventId]);
@@ -90,9 +104,9 @@ try {
         Response::error('Only the customer can close this event', 403);
     }
     
-    // 狀態檢查：只有 resolved 狀態的事件可以被客戶結案
-    if ($event['status'] !== 'resolved') {
-        Response::error('Only resolved events can be closed by customer', 400);
+    // 狀態檢查：只有 submitted 或 in_progress 狀態的事件可以被客戶結案
+    if (!in_array($event['status'], ['submitted', 'in_progress'])) {
+        Response::error('Only submitted or in_progress events can be closed by customer', 400);
     }
     
     try {
@@ -102,7 +116,7 @@ try {
         $updateStmt = $db->prepare("
             UPDATE support_events 
             SET 
-                status = 'closed_by_customer',
+                status = 'resolved',
                 closed_at = NOW(),
                 rating = ?,
                 review = ?,
@@ -119,15 +133,40 @@ try {
                 old_status,
                 new_status,
                 created_at
-            ) VALUES (?, NULL, 'resolved', 'closed_by_customer', NOW())
+            ) VALUES (?, NULL, ?, 'resolved', NOW())
         ");
-        $logStmt->execute([$eventId]);
+        $logStmt->execute([$eventId, $event['status']]);
         
         $db->commit();
         
+        // 觸發 Socket 事件通知
+        try {
+            $socketUrl = 'http://localhost:3001/support/event/closed';
+            $socketData = [
+                'chatRoomId' => $event['support_chat_room_id'],
+                'eventId' => $eventId,
+                'rating' => $rating,
+                'review' => $review
+            ];
+            
+            // 非阻塞式 Socket 通知
+            $context = stream_context_create([
+                'http' => [
+                    'method' => 'POST',
+                    'header' => 'Content-Type: application/json',
+                    'content' => json_encode($socketData),
+                    'timeout' => 1
+                ]
+            ]);
+            
+            @file_get_contents($socketUrl, false, $context);
+        } catch (Exception $e) {
+            error_log("Support Event Socket notification failed: " . $e->getMessage());
+        }
+        
         Response::success([
             'event_id' => $eventId,
-            'status' => 'closed_by_customer',
+            'status' => 'resolved',
             'rating' => $rating,
             'review' => $review,
             'message' => 'Event closed successfully'

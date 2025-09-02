@@ -226,8 +226,8 @@ class SupportEventHandler {
           u_customer.name as customer_name,
           u_admin.name as admin_name
         FROM support_events se
-        LEFT JOIN chat_rooms cr ON se.chat_room_id = cr.id
-        LEFT JOIN users u_customer ON se.customer_id = u_customer.id
+        LEFT JOIN chat_rooms cr ON se.support_chat_room_id = cr.id AND cr.type = 'support'
+        LEFT JOIN users u_customer ON se.user_id = u_customer.id
         LEFT JOIN users u_admin ON se.admin_id = u_admin.id
         WHERE se.id = ?
       `, [eventId]);

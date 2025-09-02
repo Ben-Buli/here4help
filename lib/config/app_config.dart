@@ -88,6 +88,19 @@ class AppConfig {
 
   static String get chatBlockUserUrl => api('/chat/block_user.php');
 
+  // 客服相關 API
+  static String get supportCreateIssueUrl => api('/support/create_issue.php');
+
+  static String get supportEventsUrl => api('/support/events.php');
+
+  static String get supportCloseEventUrl => api('/support/events_close.php');
+
+  static String get supportRatingUrl => api('/support/events_rating.php');
+
+  static String get supportIssuesListUrl => api('/support/issues.php');
+
+  static String get supportClaimUrl => api('/support/claim.php');
+
   // 大學列表 API
   static String get universitiesListUrl => api('/universities/list.php');
 

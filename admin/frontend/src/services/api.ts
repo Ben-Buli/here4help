@@ -150,18 +150,65 @@ export const taskApi = {
 
 // 支援/客服 API
 export const supportApi = {
+  // 獲取客服事件列表（對接新的 issues.php API）
   listIssues: (params?: {
     page?: number
     per_page?: number
     type?: 'all' | 'support' | 'dispute'
-    status?: 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed'
+    status?: 'submitted' | 'in_progress' | 'resolved'
     search?: string
-  }) => api.get<PaginatedResponse<any>>('/api/admin/support/issues', { params }),
+  }) => api.get<PaginatedResponse<any>>('/api/support/issues.php', { params }),
 
+  // 管理員接手客服事件（對接新的 claim.php API）
+  claimIssue: (roomId: string) => 
+    api.post<ApiResponse<{
+      room_id: string
+      event_id: string
+      admin_id: string
+      status: string
+      old_status: string
+      message: string
+    }>>('/api/support/claim.php', { room_id: roomId }),
+
+  // 更新事件狀態（對接現有的 events.php PATCH API）
+  updateEventStatus: (eventId: string, status: 'submitted' | 'in_progress' | 'resolved') =>
+    api.patch<ApiResponse<{
+      event_id: string
+      status: string
+      message: string
+    }>>('/api/support/events.php', { event_id: eventId, status }),
+
+  // 獲取事件詳情和時間線（對接現有的 events.php GET API）
+  getEventDetails: (chatRoomId: string) =>
+    api.get<ApiResponse<{
+      events: Array<{
+        id: string
+        title: string
+        description: string
+        status: string
+        closed_at?: string
+        rating?: number
+        review?: string
+        created_at: string
+        updated_at: string
+        customer_name?: string
+        admin_name?: string
+        logs: Array<{
+          old_status?: string
+          new_status: string
+          created_at: string
+          admin_name?: string
+        }>
+      }>
+      chat_room_id: string
+    }>>(`/api/support/events.php?chat_room_id=${chatRoomId}`),
+
+  // 向後相容的舊方法（標記為 deprecated）
+  /** @deprecated 使用 claimIssue 替代 */
   accept: (roomId: string) => api.post<ApiResponse>(`/api/admin/support/issues/${roomId}/accept`),
-  transfer: (roomId: string, target_admin_id: number) =>
-    api.post<ApiResponse>(`/api/admin/support/issues/${roomId}/transfer`, { target_admin_id }),
-  updateStatus: (roomId: string, status: 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed') =>
+  
+  /** @deprecated 使用 updateEventStatus 替代 */
+  updateStatus: (roomId: string, status: string) =>
     api.post<ApiResponse>(`/api/admin/support/issues/${roomId}/status`, { status }),
 }
 
@@ -253,7 +300,7 @@ export const userActivityApi = {
     search?: string
     sort_by?: string
     sort_order?: 'asc' | 'desc'
-  }) => api.get<PaginatedResponse<any>>('/api/admin/user-activities', { params }),
+  }) => api.get<PaginatedResponse<any>>('/api/admin/user-activities.php', { params }),
 
   show: (userId: number, params?: {
     page?: number
@@ -261,7 +308,9 @@ export const userActivityApi = {
     action?: string
     date_from?: string
     date_to?: string
-  }) => api.get<PaginatedResponse<any>>(`/api/admin/user-activities/${userId}`, { params }),
+  }) => api.get<PaginatedResponse<any>>('/api/admin/user-activities-by-user.php', { 
+    params: { ...params, user_id: userId } 
+  }),
 }
 
 // 使用者交易紀錄 API

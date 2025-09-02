@@ -50,7 +50,7 @@ try {
   }
 
   // Ensure room exists & fetch related task
-  $existingRoom = $db->fetch("SELECT id, task_id FROM chat_rooms WHERE id = ?", [$room_id]);
+  $existingRoom = $db->fetch("SELECT id, task_id, type FROM chat_rooms WHERE id = ?", [$room_id]);
   if (!$existingRoom) {
     Response::error('Chat room not found', 404);
   }
@@ -73,6 +73,22 @@ try {
     
     if ($blockCheck && $blockCheck['block_count'] > 0) {
       Response::error('Cannot send message: Users are blocked', 403);
+    }
+  }
+
+  // Support 聊天室只讀檢查：檢查是否已結案
+  if ($existingRoom['type'] === 'support') {
+    // 查詢最新的 support_events 狀態
+    $supportEventCheck = $db->fetch(
+      "SELECT status FROM support_events 
+       WHERE support_chat_room_id = ? 
+       ORDER BY created_at DESC 
+       LIMIT 1",
+      [$room_id]
+    );
+    
+    if ($supportEventCheck && $supportEventCheck['status'] === 'resolved') {
+      Response::error('Cannot send message: Support case is closed', 403);
     }
   }
 

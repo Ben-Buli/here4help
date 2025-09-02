@@ -5,7 +5,49 @@ import 'package:here4help/services/http_client_service.dart';
 
 /// 客服事件 API 服務
 class SupportEventApi {
-  static String get _baseUrl => '${AppConfig.apiBaseUrl}/support';
+  /// 建立客服事件（整合 API）
+  static Future<Map<String, dynamic>> createIssue({
+    required String title,
+    required String description,
+  }) async {
+    try {
+      if (kDebugMode) {
+        debugPrint('SupportEventApi: 建立客服事件: title=$title');
+      }
+
+      final response = await HttpClientService.post(
+        AppConfig.supportCreateIssueUrl,
+        body: {
+          'title': title,
+          'description': description,
+        },
+      );
+
+      if (kDebugMode) {
+        debugPrint('SupportEventApi: 建立事件回應: ${response.statusCode}');
+      }
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          if (kDebugMode) {
+            debugPrint('SupportEventApi: 事件建立成功: ${data['data']}');
+          }
+          return data['data'];
+        } else {
+          throw Exception(data['message'] ?? '建立客服事件失敗');
+        }
+      } else {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? '建立客服事件失敗');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('SupportEventApi: 建立事件錯誤: $e');
+      }
+      rethrow;
+    }
+  }
 
   /// 獲取聊天室內事件列表
   static Future<List<Map<String, dynamic>>> getEvents({
@@ -17,7 +59,7 @@ class SupportEventApi {
       }
 
       final response = await HttpClientService.get(
-        '$_baseUrl/events.php?chat_room_id=$chatRoomId',
+        '${AppConfig.supportEventsUrl}?chat_room_id=$chatRoomId',
       );
 
       if (kDebugMode) {
@@ -60,7 +102,7 @@ class SupportEventApi {
       }
 
       final response = await HttpClientService.post(
-        '$_baseUrl/events.php',
+        AppConfig.supportEventsUrl,
         body: {
           'chat_room_id': chatRoomId,
           'title': title,
@@ -105,7 +147,7 @@ class SupportEventApi {
       }
 
       final response = await HttpClientService.patch(
-        '$_baseUrl/events.php',
+        AppConfig.supportEventsUrl,
         body: {
           'event_id': eventId,
           'status': status,
@@ -150,7 +192,7 @@ class SupportEventApi {
       }
 
       final response = await HttpClientService.post(
-        '$_baseUrl/events_close.php',
+        AppConfig.supportCloseEventUrl,
         body: {
           'event_id': eventId,
           if (rating != null) 'rating': rating,
@@ -196,7 +238,7 @@ class SupportEventApi {
       }
 
       final response = await HttpClientService.post(
-        '$_baseUrl/events_rating.php',
+        AppConfig.supportRatingUrl,
         body: {
           'event_id': eventId,
           'rating': rating,

@@ -36,7 +36,9 @@ import 'package:here4help/chat/services/image_processing_service.dart';
 import 'package:here4help/chat/widgets/image_tray.dart';
 import 'package:here4help/chat/widgets/pending_image_message.dart';
 import 'package:here4help/utils/error_message_mapper.dart';
-import 'package:here4help/chat/utils/application_status_utils.dart';
+import 'package:here4help/services/api/support_event_api.dart';
+import 'package:here4help/widgets/support_timeline_dialog.dart';
+import 'package:here4help/widgets/support_solved_dialog.dart';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, this.data});
@@ -2316,18 +2318,20 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           thickness: 2,
         ),
         // Action Bar 區域
-        if (_showActionBar && _task != null)
-          DynamicActionBar(
-            taskStatus: ActionBarConfigManager.parseTaskStatus(
-                _task!['status']?['code']),
-            userRole: ActionBarConfigManager.parseUserRole(_userRole),
-            actionCallbacks: _buildActionCallbacks(),
-            showStatusBar: true,
-            statusDisplayName: _task!['status']?['display_name'],
-            progressRatio: double.tryParse(
-                _task!['status']?['progress_ratio']?.toString() ?? '0'),
-            backgroundColor: _glassNavColor(context),
-          ),
+        if (_showActionBar && (_task != null || _isSupportRoom))
+          _isSupportRoom
+              ? _buildSupportActionBar()
+              : DynamicActionBar(
+                  taskStatus: ActionBarConfigManager.parseTaskStatus(
+                      _task!['status']?['code']),
+                  userRole: ActionBarConfigManager.parseUserRole(_userRole),
+                  actionCallbacks: _buildActionCallbacks(),
+                  showStatusBar: true,
+                  statusDisplayName: _task!['status']?['display_name'],
+                  progressRatio: double.tryParse(
+                      _task!['status']?['progress_ratio']?.toString() ?? '0'),
+                  backgroundColor: _glassNavColor(context),
+                ),
         // ActionBar + Input 區塊採用與 AppBar 相同的背景/前景配色，並提供 hover/pressed/focus 覆蓋色
         Builder(builder: (context) {
           final theme = Theme.of(context);
@@ -2574,7 +2578,144 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       'paid_info': () => _showPaidInfo(),
       'review': () => _openReviewDialog(readOnlyIfExists: true),
       'dispute': () => _handleDispute(),
+      // Support 相關動作
+      'issue': () => _handleShowSupportTimeline(),
+      'solved': () => _handleSupportSolved(),
     };
+  }
+
+  /// 構建支援聊天室的 Action Bar
+  Widget _buildSupportActionBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: _glassNavColor(context),
+        border: const Border(
+          bottom: BorderSide(color: Colors.grey, width: 0.5),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Issue 按鈕 - 顯示事件時間線
+          _buildSupportActionButton(
+            icon: Icons.timeline,
+            label: 'Issue',
+            onTap: _handleShowSupportTimeline,
+          ),
+          // Solved 按鈕 - 客戶結案
+          _buildSupportActionButton(
+            icon: Icons.check_circle,
+            label: 'Solved',
+            onTap: _handleSupportSolved,
+            backgroundColor: Colors.green,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 構建支援動作按鈕
+  Widget _buildSupportActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color? backgroundColor,
+  }) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: ElevatedButton.icon(
+          onPressed: onTap,
+          icon: Icon(icon, size: 18),
+          label: Text(label),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: backgroundColor ?? Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 處理顯示支援事件時間線
+  Future<void> _handleShowSupportTimeline() async {
+    if (!_isSupportRoom || _currentRoomId == null) return;
+
+    try {
+      // 獲取支援事件詳情和時間線
+      final events =
+          await SupportEventApi.getEvents(chatRoomId: _currentRoomId!);
+
+      if (!mounted) return;
+
+      // 使用專門的 SupportTimelineDialog
+      await showDialog(
+        context: context,
+        builder: (context) => SupportTimelineDialog(
+          events: events,
+          title: 'Support Event Timeline',
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load support timeline: $e')),
+      );
+    }
+  }
+
+  /// 處理支援事件結案
+  Future<void> _handleSupportSolved() async {
+    if (!_isSupportRoom || _currentRoomId == null) return;
+
+    try {
+      // 獲取最新的支援事件以取得標題
+      final events =
+          await SupportEventApi.getEvents(chatRoomId: _currentRoomId!);
+
+      if (events.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No support events found')),
+        );
+        return;
+      }
+
+      final latestEvent = events.first;
+      final eventTitle = latestEvent['title'] ?? 'Support Case';
+
+      // 使用專門的 SupportSolvedDialog
+      await showSupportSolvedDialog(
+        context: context,
+        eventTitle: eventTitle,
+        onSubmit: (rating, review) async {
+          final eventId = latestEvent['id'].toString();
+          await SupportEventApi.closeEvent(
+            eventId: eventId,
+            rating: rating,
+            review: review,
+          );
+        },
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Support case closed successfully')),
+      );
+
+      // 刷新聊天室數據
+      await _initializeChat();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to close support case: $e')),
+      );
+    }
   }
 
   /// 處理申訴 TODO: 建立申訴表單
@@ -3587,6 +3728,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   }
 
   Map<String, dynamic>? get _application => _chatData?['application'];
+
+  /// 檢查是否為支援聊天室
+  bool get _isSupportRoom => _room?['type'] == 'support';
   Map<String, dynamic>? get _chatPartnerInfo => _chatData?['chat_partner_info'];
   List<Map<String, dynamic>> get _applicationQuestions =>
       (_chatData?['application_questions'] as List<dynamic>?)

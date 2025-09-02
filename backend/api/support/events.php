@@ -110,7 +110,7 @@ function handleGetEvents($db, $userId) {
         FROM support_events se
         LEFT JOIN users u ON se.user_id = u.id
         LEFT JOIN admins a ON se.admin_id = a.id
-        WHERE se.chat_room_id = ?
+        WHERE se.support_chat_room_id = ?
         ORDER BY se.created_at DESC
     ");
     $eventsStmt->execute([$chatRoomId]);
@@ -183,7 +183,7 @@ function handleCreateEvent($db, $userId) {
         // 插入事件記錄
         $insertStmt = $db->prepare("
             INSERT INTO support_events (
-                chat_room_id, 
+                support_chat_room_id, 
                 user_id, 
                 admin_id, 
                 title, 
@@ -191,7 +191,7 @@ function handleCreateEvent($db, $userId) {
                 status,
                 created_at,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, 'open', NOW(), NOW())
+            ) VALUES (?, ?, ?, ?, ?, 'submitted', NOW(), NOW())
         ");
         $insertStmt->execute([
             $chatRoomId,
@@ -211,7 +211,7 @@ function handleCreateEvent($db, $userId) {
                 old_status,
                 new_status,
                 created_at
-            ) VALUES (?, ?, NULL, 'open', NOW())
+            ) VALUES (?, ?, NULL, 'submitted', NOW())
         ");
         $logStmt->execute([$eventId, $userId]);
         
@@ -276,7 +276,7 @@ function handleUpdateEvent($db, $userId) {
     }
     
     // 驗證狀態值
-    $validStatuses = ['open', 'in_progress', 'resolved', 'closed_by_customer'];
+    $validStatuses = ['submitted', 'in_progress', 'resolved'];
     if (!in_array($newStatus, $validStatuses)) {
         Response::error('Invalid status. Must be one of: ' . implode(', ', $validStatuses), 400);
     }
@@ -285,7 +285,7 @@ function handleUpdateEvent($db, $userId) {
     $eventStmt = $db->prepare("
         SELECT se.*, cr.creator_id, cr.participant_id
         FROM support_events se
-        JOIN chat_rooms cr ON se.chat_room_id = cr.id
+        JOIN chat_rooms cr ON se.support_chat_room_id = cr.id
         WHERE se.id = ?
     ");
     $eventStmt->execute([$eventId]);

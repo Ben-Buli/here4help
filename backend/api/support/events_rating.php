@@ -74,7 +74,7 @@ try {
     $eventStmt = $db->prepare("
         SELECT se.*, cr.creator_id, cr.participant_id
         FROM support_events se
-        JOIN chat_rooms cr ON se.chat_room_id = cr.id
+        JOIN chat_rooms cr ON se.support_chat_room_id = cr.id
         WHERE se.id = ? AND cr.type = 'support'
     ");
     $eventStmt->execute([$eventId]);

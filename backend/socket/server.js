@@ -529,6 +529,52 @@ app.get('/api/users/status', async (req, res) => {
 // 暴露客服事件處理器給外部使用（供 PHP API 調用）
 global.supportEventHandler = supportEventHandler;
 
+// 添加客服事件通知端點
+app.post('/support/event/new', express.json(), async (req, res) => {
+  try {
+    const { chatRoomId, eventData } = req.body;
+    if (supportEventHandler) {
+      await supportEventHandler.broadcastEventNew(chatRoomId, eventData);
+      res.json({ success: true, message: 'Event notification sent' });
+    } else {
+      res.status(503).json({ error: 'Support event handler not available' });
+    }
+  } catch (error) {
+    console.error('Support event new notification error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/support/event/update', express.json(), async (req, res) => {
+  try {
+    const { chatRoomId, eventId, oldStatus, newStatus, adminId } = req.body;
+    if (supportEventHandler) {
+      await supportEventHandler.broadcastEventUpdate(chatRoomId, eventId, oldStatus, newStatus, adminId);
+      res.json({ success: true, message: 'Event update notification sent' });
+    } else {
+      res.status(503).json({ error: 'Support event handler not available' });
+    }
+  } catch (error) {
+    console.error('Support event update notification error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/support/event/closed', express.json(), async (req, res) => {
+  try {
+    const { chatRoomId, eventId, rating, review } = req.body;
+    if (supportEventHandler) {
+      await supportEventHandler.broadcastEventClosed(chatRoomId, eventId, rating, review);
+      res.json({ success: true, message: 'Event closed notification sent' });
+    } else {
+      res.status(503).json({ error: 'Support event handler not available' });
+    }
+  } catch (error) {
+    console.error('Support event closed notification error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 server.listen(PORT, () => {
   console.log(`Socket.IO Gateway listening on :${PORT}`);
   console.log(`Database mode: ${dbPool ? 'connected' : 'in-memory'}`);
