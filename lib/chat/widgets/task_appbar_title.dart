@@ -57,7 +57,7 @@ class TaskAppBarTitle extends StatelessWidget {
         }
 
         // 獲取任務狀態顯示
-        String statusDisplay = _getStatusDisplay();
+        // String statusDisplay = _getStatusDisplay();
 
         return GestureDetector(
           onTap: () => _showTaskInfoDialog(context),
@@ -83,25 +83,25 @@ class TaskAppBarTitle extends StatelessWidget {
                         TextStyle(fontSize: 12, color: subtitleColor),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (statusDisplay.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(themeManager.effectiveTheme),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        statusDisplay,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
+                  // if (statusDisplay.isNotEmpty) ...[
+                  //   const SizedBox(width: 8),
+                  //   Container(
+                  //     padding: const EdgeInsets.symmetric(
+                  //         horizontal: 6, vertical: 2),
+                  //     decoration: BoxDecoration(
+                  //       color: _getStatusColor(themeManager.effectiveTheme),
+                  //       borderRadius: BorderRadius.circular(8),
+                  //     ),
+                  //     child: Text(
+                  //       statusDisplay,
+                  //       style: const TextStyle(
+                  //         fontSize: 10,
+                  //         color: Colors.white,
+                  //         fontWeight: FontWeight.w500,
+                  //       ),
+                  //     ),
+                  //   ),
+                  // ],
                 ],
               ),
             ],
@@ -112,67 +112,67 @@ class TaskAppBarTitle extends StatelessWidget {
   }
 
   /// 獲取任務狀態顯示文字
-  String _getStatusDisplay() {
-    // 如果是 participant 角色，優先使用 application_status
-    if (userRole == 'participant') {
-      final applicationStatus = task['application_status']?.toString();
-      if (applicationStatus != null && applicationStatus.isNotEmpty) {
-        return ApplicationStatusUtils.getDisplayName(applicationStatus);
-      }
-    }
+  // String _getStatusDisplay() {
+  //   // 如果是 participant 角色，優先使用 application_status
+  //   if (userRole == 'participant') {
+  //     final applicationStatus = task['application_status']?.toString();
+  //     if (applicationStatus != null && applicationStatus.isNotEmpty) {
+  //       return ApplicationStatusUtils.getDisplayName(applicationStatus);
+  //     }
+  //   }
 
-    // 優先使用 mapped_status（後端計算的角色視角狀態）
-    if (task['mapped_status'] != null &&
-        task['mapped_status'].toString().isNotEmpty) {
-      return task['mapped_status'].toString();
-    }
+  //   // 優先使用 mapped_status（後端計算的角色視角狀態）
+  //   if (task['mapped_status'] != null &&
+  //       task['mapped_status'].toString().isNotEmpty) {
+  //     return task['mapped_status'].toString();
+  //   }
 
-    // 備用：使用 status.display_name
-    final status = task['status'];
-    if (status is Map<String, dynamic> && status['display_name'] != null) {
-      return status['display_name'].toString();
-    }
+  //   // 備用：使用 status.display_name
+  //   final status = task['status'];
+  //   if (status is Map<String, dynamic> && status['display_name'] != null) {
+  //     return status['display_name'].toString();
+  //   }
 
-    // 最後備用：使用舊的 status 字段
-    if (task['status'] != null && task['status'].toString().isNotEmpty) {
-      return TaskStatus.getDisplayStatus(task['status'].toString());
-    }
+  //   // 最後備用：使用舊的 status 字段
+  //   if (task['status'] != null && task['status'].toString().isNotEmpty) {
+  //     return TaskStatus.getDisplayStatus(task['status'].toString());
+  //   }
 
-    return '';
-  }
+  //   return '';
+  // }
 
-  /// 獲取狀態標籤的顏色
-  Color _getStatusColor(ThemeScheme themeScheme) {
-    // 如果是 participant 角色，使用 ApplicationStatusUtils 的顏色
-    if (userRole == 'participant') {
-      final applicationStatus = task['application_status']?.toString();
-      if (applicationStatus != null && applicationStatus.isNotEmpty) {
-        return ApplicationStatusUtils.getStatusColor(applicationStatus);
-      }
-    }
+  // /// 獲取狀態標籤的顏色
+  // Color _getStatusColor(ThemeScheme themeScheme) {
+  //   // 如果是 participant 角色，使用 ApplicationStatusUtils 的顏色
+  //   if (userRole == 'participant') {
+  //     final applicationStatus = task['application_status']?.toString();
+  //     if (applicationStatus != null && applicationStatus.isNotEmpty) {
+  //       return ApplicationStatusUtils.getStatusColor(applicationStatus);
+  //     }
+  //   }
 
-    final status = _getStatusDisplay();
+  //   final status = _getStatusDisplay();
 
-    switch (status.toLowerCase()) {
-      case 'open':
-        return themeScheme.primary;
-      case 'in progress':
-        return themeScheme.secondary;
-      case 'pending confirmation':
-      case 'pending review':
-        return themeScheme.accent;
-      case 'completed':
-        return Colors.green;
-      case 'dispute':
-        return themeScheme.error;
-      case 'rejected':
-        return Colors.red;
-      case 'cancelled':
-        return Colors.grey;
-      default:
-        return themeScheme.primary;
-    }
-  }
+  //   switch (status.toLowerCase()) {
+  //     case 'open':
+  //       return themeScheme.primary;
+  //     case 'in progress':
+  //       return themeScheme.secondary;
+  //     case 'pending confirmation':
+  //     case 'pending review':
+  //       return themeScheme.accent;
+  //     case 'completed':
+  //       return Colors.green;
+  //     case 'dispute':
+  //       return themeScheme.error;
+  //     case 'rejected':
+  //       return Colors.red;
+  //     case 'cancelled':
+  //       return Colors.grey;
+  //     default:
+  //       return themeScheme.primary;
+  //   }
+  // }
 
   void _showTaskInfoDialog(BuildContext context) {
     showDialog(
@@ -192,38 +192,47 @@ class TaskAppBarTitle extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold)),
               Text(
                 task['reward_point'] != null
-                    ? 'NT\$${task['reward_point']}'
+                    ? '${task['reward_point']} Points'
                     : task['salary'] != null
-                        ? 'NT\$${task['salary']}'
+                        ? '${task['salary']} Points'
                         : 'N/A',
               ),
               const SizedBox(height: 8),
               const Text('Request Language:',
                   style: TextStyle(fontWeight: FontWeight.bold)),
-              Text((task['language_requirement'] as String?) ?? '—'),
+              Text((task['language_requirement'] as String?) ??
+                  'No language requirement'),
               const SizedBox(height: 8),
               const Text('Location:',
                   style: TextStyle(fontWeight: FontWeight.bold)),
-              Text((task['location'] as String?) ?? '—'),
+              Text((task['location'] as String?) ?? 'No location'),
               const SizedBox(height: 8),
               const Text('Task Date:',
                   style: TextStyle(fontWeight: FontWeight.bold)),
-              Text((task['task_date'] as String?) ?? '—'),
+              Text((task['task_date'] as String?) ?? 'No task date'),
               const SizedBox(height: 8),
               const Text('Application Question:',
                   style: TextStyle(fontWeight: FontWeight.bold)),
-              Text((task['application_question'] as String?) ?? '—'),
+              Text((task['application_question'] as String?) ??
+                  'No application question'),
               const SizedBox(height: 8),
               const Text('Posted by:',
                   style: TextStyle(fontWeight: FontWeight.bold)),
-              Text('UserName: ${chatPartnerName ?? '—'}'),
+              Text('UserName: ${chatPartnerName ?? 'No user name'}'),
               Row(
                 children: [
-                  const Icon(Icons.star,
-                      color: Color.fromARGB(255, 255, 187, 0), size: 16),
-                  const SizedBox(width: 4),
-                  Text('${rating ?? 0.0}'),
-                  Text(' (${reviewsCount ?? 0} reviews)'),
+                  if ((rating ?? 0.0) == 0.0) ...[
+                    const Icon(Icons.eco,
+                        color: Color.fromARGB(255, 106, 151, 112), size: 16),
+                    const SizedBox(width: 4),
+                    const Text('No reviews yet.')
+                  ] else ...[
+                    const Icon(Icons.star,
+                        color: Color.fromARGB(255, 255, 187, 0), size: 16),
+                    const SizedBox(width: 4),
+                    Text('$rating'),
+                    Text(' ($reviewsCount reviews)'),
+                  ]
                 ],
               ),
             ],

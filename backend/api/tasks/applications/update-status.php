@@ -45,7 +45,7 @@ try {
     }
     
     // 驗證狀態值
-    $allowedStatuses = ['applied', 'accepted', 'rejected', 'cancelled'];
+    $allowedStatuses = ['applied', 'accepted', 'rejected', 'cancelled', 'withdrawn'];
     if (!in_array($newStatus, $allowedStatuses)) {
         throw new Exception('Invalid status. Allowed values: ' . implode(', ', $allowedStatuses));
     }
@@ -68,9 +68,24 @@ try {
         throw new Exception('Application not found');
     }
     
-    // 檢查權限：只有任務創建者可以更新應徵狀態
-    if ($application['creator_id'] != $userId) {
+    // 檢查權限：
+    // - 任務創建者可以更新應徵狀態（除了 withdrawn）
+    // - 應徵者只能將自己的應徵狀態改為 withdrawn 或 cancelled
+    $isCreator = ($application['creator_id'] == $userId);
+    $isApplicant = ($application['user_id'] == $userId);
+    
+    if (!$isCreator && !$isApplicant) {
         throw new Exception('You do not have permission to update this application');
+    }
+    
+    // 應徵者只能撤回自己的應徵
+    if ($isApplicant && !in_array($newStatus, ['withdrawn', 'cancelled'])) {
+        throw new Exception('Applicants can only withdraw or cancel their own applications');
+    }
+    
+    // 任務創建者不能將應徵狀態改為 withdrawn（這是應徵者的專屬操作）
+    if ($isCreator && $newStatus === 'withdrawn') {
+        throw new Exception('Only applicants can withdraw their applications');
     }
     
     // 檢查當前狀態是否允許更新

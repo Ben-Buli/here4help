@@ -296,18 +296,18 @@ class DatabaseStructureFixer {
             CREATE TABLE task_applications (
                 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
                 task_id BIGINT UNSIGNED NOT NULL,
-                applicant_id BIGINT UNSIGNED NOT NULL,
-                status ENUM('pending', 'approved', 'rejected', 'withdrawn') DEFAULT 'pending',
+                user_id BIGINT UNSIGNED NOT NULL,
+                status VARCHAR(50) NOT NULL DEFAULT 'applied' COMMENT 'Allowed values: applied, accepted, rejected, pending, completed, cancelled, dispute, withdrawn',
                 message TEXT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 PRIMARY KEY (id),
-                UNIQUE KEY unique_task_applicant (task_id, applicant_id),
+                UNIQUE KEY unique_task_applicant (task_id, user_id),
                 INDEX idx_task (task_id),
-                INDEX idx_applicant (applicant_id),
+                INDEX idx_applicant (user_id),
                 INDEX idx_status (status),
                 FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
-                FOREIGN KEY (applicant_id) REFERENCES users(id) ON DELETE CASCADE
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
     }

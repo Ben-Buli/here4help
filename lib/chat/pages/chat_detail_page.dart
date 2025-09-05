@@ -294,11 +294,21 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   /// 取得對方顯示名稱（依對方 userId 判斷應取哪一側欄位）
   String _getOpponentDisplayName() {
     try {
+      // 優先從 chat_partner_info 獲取對方資訊
+      final chatPartnerInfo = _chatPartnerInfo;
+      if (chatPartnerInfo != null && chatPartnerInfo['name'] != null) {
+        final name = chatPartnerInfo['name'].toString().trim();
+        if (name.isNotEmpty) {
+          debugPrint('✅ 從 chat_partner_info 獲取對方名稱: $name');
+          return name;
+        }
+      }
+
+      // 備用方案：從 room 和 task 數據中獲取
       final room = _room;
       final task = _task;
-      final partner = room?['chat_partner'] as Map<String, dynamic>?;
-      final participantObj = room?['participant'] as Map<String, dynamic>?;
       if (room == null) return 'User';
+
       final int? opponentId = _getOpponentUserId();
       final int? participantId = (room['participant_id'] is int)
           ? room['participant_id']
@@ -319,8 +329,6 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         name = firstNonEmpty([
           room['participant_nickname'],
           room['participant_name'],
-          participantObj?['nickname'],
-          participantObj?['name'],
           task?['participant_name'],
         ]);
       } else {
@@ -328,19 +336,41 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         name = firstNonEmpty([
           room['creator_nickname'],
           room['creator_name'],
-          partner?['nickname'],
-          partner?['name'],
           task?['creator_name'],
         ]);
       }
-      return (name == null || name.isEmpty) ? 'User' : name;
-    } catch (_) {
+
+      final result = (name == null || name.isEmpty) ? 'User' : name;
+      debugPrint('⚠️ 從備用方案獲取對方名稱: $result');
+      return result;
+    } catch (e) {
+      debugPrint('❌ 獲取對方名稱失敗: $e');
       return 'User';
     }
   }
 
   /// 嘗試從多個來源擷取對方評分（平均星等、評論數）
   (double avg, int count) _getOpponentRating() {
+    // 優先從 chat_partner_info 獲取評分數據
+    final chatPartnerInfo = _chatPartnerInfo;
+    if (chatPartnerInfo != null) {
+      final rating = chatPartnerInfo['rating'];
+      final reviewsCount = chatPartnerInfo['reviewsCount'];
+
+      if (rating != null && reviewsCount != null) {
+        final avgRating = rating is double
+            ? rating
+            : (rating is num ? rating.toDouble() : 0.0);
+        final count = reviewsCount is int
+            ? reviewsCount
+            : (reviewsCount is num ? reviewsCount.toInt() : 0);
+        debugPrint('✅ 從 chat_partner_info 獲取評分: $avgRating ($count 評論)');
+        return (avgRating, count);
+      }
+    }
+
+    // 備用方案：使用緩存的評分數據
+    debugPrint('⚠️ 使用緩存的評分數據: $_opponentAvgRating ($_opponentReviewsCount 評論)');
     return (_opponentAvgRating, _opponentReviewsCount);
   }
 

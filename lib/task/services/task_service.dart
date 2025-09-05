@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../config/app_config.dart';
 import '../../auth/services/auth_service.dart';
+import '../../auth/services/user_service.dart';
 import '../../services/http_client_service.dart';
 
 class TaskService extends ChangeNotifier {
@@ -1056,7 +1057,7 @@ class TaskService extends ChangeNotifier {
     }
   }
 
-  /// 拒絕應徵者（Poster 操作）
+  /// 拒絕應徵者（Task Creator 操作）
   Future<Map<String, dynamic>> rejectApplication({
     required String taskId,
     required int userId,
@@ -1191,5 +1192,134 @@ class TaskService extends ChangeNotifier {
       debugPrint('TaskService loadApplicationsByTask error: $e');
     }
     return [];
+  }
+
+  /// 撤回當前用戶的應徵（Participant 操作）
+  Future<Map<String, dynamic>> withdrawCurrentApplication({
+    required String taskId,
+  }) async {
+    try {
+      // 獲取用戶 token
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // 獲取當前用戶 ID
+      final userService = UserService();
+      final currentUser = userService.currentUser;
+      if (currentUser == null) {
+        throw Exception('Current user not found');
+      }
+
+      final userId = currentUser.id;
+
+      // 首先查找當前用戶在該任務的應徵記錄
+      final applicationsResponse = await http.get(
+        Uri.parse('${AppConfig.myWorkApplicationsUrl}?user_id=$userId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 30));
+
+      if (applicationsResponse.statusCode != 200) {
+        throw Exception('Failed to fetch user applications');
+      }
+
+      final applicationsData = jsonDecode(applicationsResponse.body);
+      if (applicationsData['success'] != true) {
+        throw Exception(
+            applicationsData['message'] ?? 'Failed to fetch applications');
+      }
+
+      // 查找該任務的應徵記錄
+      final applications = applicationsData['data'] is List
+          ? applicationsData['data']
+          : applicationsData['applications'] ?? [];
+
+      Map<String, dynamic>? targetApplication;
+      for (final app in applications) {
+        if (app['task_id'].toString() == taskId && app['status'] == 'applied') {
+          targetApplication = app;
+          break;
+        }
+      }
+
+      if (targetApplication == null) {
+        throw Exception('No active application found for this task');
+      }
+
+      final applicationId = targetApplication['id']?.toString() ??
+          targetApplication['application_id']?.toString();
+
+      if (applicationId == null) {
+        throw Exception('Application ID not found');
+      }
+
+      // 使用 update-status API 將狀態更新為 withdrawn
+      final body = {
+        'application_id': applicationId,
+        'status': 'withdrawn',
+      };
+
+      final response = await http
+          .put(
+            Uri.parse(AppConfig.api('/tasks/applications/update-status.php')),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          return Map<String, dynamic>.from(data['data'] ?? {});
+        }
+        throw Exception(data['message'] ?? 'Withdraw application failed');
+      } else {
+        throw Exception(
+            'HTTP ${response.statusCode}: Withdraw application failed');
+      }
+    } catch (e) {
+      debugPrint('TaskService withdrawCurrentApplication error: $e');
+      throw Exception('Failed to withdraw application: $e');
+    }
+  }
+
+  /// 從聊天室上下文拒絕應徵者（Task Creator 操作）
+  Future<Map<String, dynamic>> rejectApplicationFromChat({
+    required String taskId,
+    required int applicantUserId,
+  }) async {
+    try {
+      // 獲取用戶 token
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // 獲取當前用戶 ID 作為 poster_id
+      final userService = UserService();
+      final currentUser = userService.currentUser;
+      if (currentUser == null) {
+        throw Exception('Current user not found');
+      }
+
+      final posterId = currentUser.id;
+
+      // 調用現有的 rejectApplication 方法
+      return await rejectApplication(
+        taskId: taskId,
+        userId: applicantUserId,
+        posterId: posterId,
+      );
+    } catch (e) {
+      debugPrint('TaskService rejectApplicationFromChat error: $e');
+      throw Exception('Failed to reject application: $e');
+    }
   }
 }
