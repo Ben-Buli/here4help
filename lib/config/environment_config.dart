@@ -7,8 +7,9 @@ class EnvironmentConfig {
 
   /// 檢測是否為 Android 模擬器
   static bool _isAndroidEmulator() {
-    // 在 Web 平台不使用模擬器配置（最小改動修正）
+    // 在 Web 平台不使用模擬器配置
     if (kIsWeb) return false;
+
     // 檢查環境變數
     const androidEmulator =
         bool.fromEnvironment('ANDROID_EMULATOR', defaultValue: false);
@@ -17,9 +18,8 @@ class EnvironmentConfig {
       return true;
     }
 
-    // 檢查是否在 Android 平台上運行且不是 Web
-    if (!kIsWeb) {
-      // 在 Android 平台上，默認使用模擬器配置
+    // 檢查是否在 Android 平台上運行
+    if (defaultTargetPlatform == TargetPlatform.android) {
       debugPrint('🔧 檢測到 Android 平台，使用模擬器配置');
       return true;
     }
@@ -29,20 +29,29 @@ class EnvironmentConfig {
 
   /// 檢測是否為 iOS 模擬器
   static bool _isIOSSimulator() {
-    // 在 Web 平台不使用模擬器配置（最小改動修正）
+    // 在 Web 平台不使用模擬器配置
     if (kIsWeb) return false;
+
     // 檢查環境變數
     const iosSimulator =
         bool.fromEnvironment('IOS_SIMULATOR', defaultValue: false);
-    if (iosSimulator) return true;
+    if (iosSimulator) {
+      debugPrint('🔧 檢測到 IOS_SIMULATOR 環境變數');
+      return true;
+    }
 
-    // 檢查是否在 iOS 平台上運行且不是 Web
-    if (!kIsWeb) {
-      // 需要更精確的檢測，不能默認所有非 Web 平台都是 iOS
-      return false;
+    // 檢查是否在 iOS 平台上運行
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      debugPrint('🔧 檢測到 iOS 平台，使用模擬器配置');
+      return true;
     }
 
     return false;
+  }
+
+  /// 檢測是否為 Web 平台
+  static bool _isWebPlatform() {
+    return kIsWeb;
   }
 
   /// 獲取正確的網路地址
@@ -69,16 +78,22 @@ class EnvironmentConfig {
         defaultValue: 'development',
       );
 
+      // 檢測 Web 平台並使用相應配置
+      if (_isWebPlatform()) {
+        environment = 'web';
+        if (kDebugMode) {
+          print('🌐 檢測到 Web 平台，使用 web 配置');
+        }
+      }
       // 檢測 Android 模擬器並使用相應配置
-      if (_isAndroidEmulator()) {
+      else if (_isAndroidEmulator()) {
         environment = 'android_emulator';
         if (kDebugMode) {
           print('🤖 檢測到 Android 模擬器，使用 android_emulator 配置');
         }
       }
-
       // 檢測 iOS 模擬器並使用相應配置
-      if (_isIOSSimulator()) {
+      else if (_isIOSSimulator()) {
         environment = 'ios_simulator';
         if (kDebugMode) {
           print('🍎 檢測到 iOS 模擬器，使用 ios_simulator 配置');

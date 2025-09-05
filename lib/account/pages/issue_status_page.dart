@@ -56,9 +56,8 @@ class _IssueStatusPageState extends State<IssueStatusPage> {
     });
 
     try {
-      // TODO: 實現獲取使用者所有客服事件的 API
-      // 暫時使用空列表，等待後端 API 實現
-      final events = <Map<String, dynamic>>[];
+      // 實現獲取使用者所有客服事件的 API
+      final events = await SupportEventApi.getUserEvents();
 
       if (mounted) {
         setState(() {
@@ -214,8 +213,8 @@ class _IssueStatusPageState extends State<IssueStatusPage> {
             const SizedBox(height: 16),
             Text(
               _selectedFilter == 'all'
-                  ? 'No active support cases'
-                  : 'No ${_getFilterDisplayName(_selectedFilter).toLowerCase()} cases',
+                  ? 'No issues pending at the moment'
+                  : 'No ${_getFilterDisplayName(_selectedFilter).toLowerCase()} issues',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey[600],
@@ -223,7 +222,7 @@ class _IssueStatusPageState extends State<IssueStatusPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Tap the + button to create a new support case',
+              'Tap the + button to create a new issue',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[500],
@@ -273,7 +272,7 @@ class _IssueStatusPageState extends State<IssueStatusPage> {
           // 重新載入事件列表
           _loadEvents();
           // 導航至聊天室
-          Navigator.of(context).pushNamed('/chat/detail', arguments: {
+          Navigator.of(context).pushNamed('/account/support/chat', arguments: {
             'room_id': roomId,
           });
         },

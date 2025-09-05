@@ -143,8 +143,19 @@ try {
                     mt_rand(0, 0x3fff) | 0x8000,
                     mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
                 );
-                $questionSql = "INSERT INTO application_questions (id, task_id, application_question, created_at, updated_at) VALUES (?, ?, ?, NOW(), NOW())";
-                $db->query($questionSql, [$questionId, $taskId, $question]);
+                
+                // 處理問題內容（支援字串或物件格式）
+                $questionText = '';
+                if (is_string($question)) {
+                    $questionText = $question;
+                } elseif (is_array($question) && isset($question['application_question'])) {
+                    $questionText = $question['application_question'];
+                }
+                
+                if (!empty($questionText)) {
+                    $questionSql = "INSERT INTO application_questions (id, task_id, application_question, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())";
+                    $db->query($questionSql, [$questionId, $taskId, $questionText, $index + 1]);
+                }
             }
         }
     }
@@ -157,7 +168,7 @@ try {
     $task = $db->fetch($taskSql, [$taskId]);
     
     // 獲取申請問題
-    $questionsSql = "SELECT * FROM application_questions WHERE task_id = ?";
+    $questionsSql = "SELECT * FROM application_questions WHERE task_id = ? ORDER BY sort_order ASC";
     $questions = $db->fetchAll($questionsSql, [$taskId]);
     $task['application_questions'] = $questions;
     

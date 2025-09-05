@@ -576,9 +576,19 @@ class _TaskPreviewPageState extends State<TaskPreviewPage> {
                             [];
                     if (questions.isNotEmpty) {
                       taskDataForApi['application_questions'] = questions
-                          .map((q) =>
-                              q['application_question']?.toString() ?? '')
-                          .where((q) => q.trim().isNotEmpty)
+                          .map((q) {
+                            // 處理不同格式的問題資料
+                            if (q is String) {
+                              return q.trim();
+                            } else if (q is Map &&
+                                q['application_question'] != null) {
+                              return q['application_question']
+                                  .toString()
+                                  .trim();
+                            }
+                            return '';
+                          })
+                          .where((q) => q.isNotEmpty)
                           .toList();
                       debugPrint(
                           '   application_questions: ${taskDataForApi['application_questions']}');

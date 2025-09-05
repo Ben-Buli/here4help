@@ -106,6 +106,28 @@ const router = createRouter({
       ],
     },
     {
+      path: '/task-disputes',
+      component: () => import('../components/AppLayout.vue'),
+      meta: { requiresAuth: true, permission: 'disputes.list' },
+      children: [
+        {
+          path: '',
+          name: 'task-disputes',
+          component: () => import('../views/TaskDisputesView.vue'),
+          meta: { title: 'Task Disputes' },
+        },
+        {
+          path: ':disputeId/chat-room',
+          name: 'admin-dispute-chat-room',
+          component: () => import('../views/AdminChatRoomView.vue'),
+          meta: { 
+            title: 'Dispute Chat Room',
+            permission: 'disputes.view'
+          },
+        },
+      ],
+    },
+    {
       path: '/settings',
       component: () => import('../components/AppLayout.vue'),
       meta: { requiresAuth: true },

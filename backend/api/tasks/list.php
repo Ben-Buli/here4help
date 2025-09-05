@@ -120,7 +120,7 @@ try {
     
     // 為每個任務獲取相關的申請問題和應徵人數
     foreach ($tasks as &$task) {
-        $questionsSql = "SELECT * FROM application_questions WHERE task_id = ?";
+        $questionsSql = "SELECT * FROM application_questions WHERE task_id = ? ORDER BY sort_order ASC";
         $questions = $db->fetchAll($questionsSql, [$task['id']]);
         $task['application_questions'] = $questions;
         

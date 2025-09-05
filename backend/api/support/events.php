@@ -8,6 +8,14 @@
  * - PATCH: 更新事件狀態
  * 
  * 路徑：/api/support/events
+ * 
+ * TODO:
+ * 重新調整issue event的邏輯 handleGetEvents() 應該調整管理員跟客戶端不同的資料處理或驗證邏輯
+ * 1. 事件的產生由 Flutter APP Users(客戶）提交，chat_rooms.creator_id=user_id，系統建立事件，狀態為submitted
+ * 2. 管理員可以接手(Claim)事件，狀態改為in_progress，chat_rooms.participant_id=admin_id
+ * 3. 管理員可以評分事件，回答必填評分後，狀態改為resolved
+ * 4. 只有客戶端可以結案事件，狀態改為resolved
+ * 5. 客戶端同時最多有三則事件，狀態為submitted或in_progress
  */
 
 require_once __DIR__ . '/../../config/database.php';
@@ -172,7 +180,7 @@ function handleCreateEvent($db, $userId) {
     }
     
     // 檢查用戶是否為管理員（這裡簡化處理，實際應該檢查 admins 表）
-    // TODO: 實作完整的管理員權限檢查
+    // TODO: 實作完整的管理員權限檢查 
     
     // 確定客戶 ID（非管理員的那一方）
     $customerId = ($room['creator_id'] == $userId) ? $room['participant_id'] : $room['creator_id'];

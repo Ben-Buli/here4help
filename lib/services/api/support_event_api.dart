@@ -12,7 +12,7 @@ class SupportEventApi {
   }) async {
     try {
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 建立客服事件: title=$title');
+        debugPrint('SupportEventApi: create issue: title=$title');
       }
 
       final response = await HttpClientService.post(
@@ -24,26 +24,67 @@ class SupportEventApi {
       );
 
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 建立事件回應: ${response.statusCode}');
+        debugPrint(
+            'SupportEventApi: create issue response: ${response.statusCode}');
       }
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
           if (kDebugMode) {
-            debugPrint('SupportEventApi: 事件建立成功: ${data['data']}');
+            debugPrint(
+                'SupportEventApi: create issue success: ${data['data']}');
           }
-          return data['data'];
+          return Map<String, dynamic>.from(data['data']);
         } else {
-          throw Exception(data['message'] ?? '建立客服事件失敗');
+          throw Exception(data['message'] ?? 'Create issue failed');
         }
       } else {
         final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? '建立客服事件失敗');
+        throw Exception(errorData['message'] ?? 'Create issue failed');
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 建立事件錯誤: $e');
+        debugPrint('SupportEventApi: create issue error: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// 獲取用戶的所有客服事件
+  static Future<List<Map<String, dynamic>>> getUserEvents() async {
+    try {
+      if (kDebugMode) {
+        debugPrint('SupportEventApi: get user events');
+      }
+
+      final response = await HttpClientService.get(
+        AppConfig.supportUserEventsUrl,
+      );
+
+      if (kDebugMode) {
+        debugPrint(
+            'SupportEventApi: get user events response: ${response.statusCode}');
+      }
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          if (kDebugMode) {
+            debugPrint(
+                'SupportEventApi: get user events success: ${data['data']['events'].length} 筆');
+          }
+          return List<Map<String, dynamic>>.from(data['data']['events']);
+        } else {
+          throw Exception(data['message'] ?? 'Get user events failed');
+        }
+      } else {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'Get user events failed');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('SupportEventApi: get user events error: $e');
       }
       rethrow;
     }
@@ -55,7 +96,7 @@ class SupportEventApi {
   }) async {
     try {
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 獲取事件列表: chatRoomId=$chatRoomId');
+        debugPrint('SupportEventApi: get events: chatRoomId=$chatRoomId');
       }
 
       final response = await HttpClientService.get(
@@ -63,7 +104,8 @@ class SupportEventApi {
       );
 
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 事件列表回應: ${response.statusCode}');
+        debugPrint(
+            'SupportEventApi: get events response: ${response.statusCode}');
       }
 
       if (response.statusCode == 200) {
@@ -71,19 +113,19 @@ class SupportEventApi {
         if (data['success'] == true) {
           if (kDebugMode) {
             debugPrint(
-                'SupportEventApi: 事件列表獲取成功: ${data['data']['events'].length} 筆');
+                'SupportEventApi: get events success: ${data['data']['events'].length} 筆');
           }
           return List<Map<String, dynamic>>.from(data['data']['events']);
         } else {
-          throw Exception(data['message'] ?? '獲取事件列表失敗');
+          throw Exception(data['message'] ?? 'Get events failed');
         }
       } else {
         final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? '獲取事件列表失敗');
+        throw Exception(errorData['message'] ?? 'Get events failed');
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 獲取事件列表錯誤: $e');
+        debugPrint('SupportEventApi: get events error: $e');
       }
       rethrow;
     }
@@ -98,7 +140,7 @@ class SupportEventApi {
     try {
       if (kDebugMode) {
         debugPrint(
-            'SupportEventApi: 新增事件: chatRoomId=$chatRoomId, title=$title');
+            'SupportEventApi: create event: chatRoomId=$chatRoomId, title=$title');
       }
 
       final response = await HttpClientService.post(
@@ -111,26 +153,28 @@ class SupportEventApi {
       );
 
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 新增事件回應: ${response.statusCode}');
+        debugPrint(
+            'SupportEventApi: create event response: ${response.statusCode}');
       }
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
           if (kDebugMode) {
-            debugPrint('SupportEventApi: 事件新增成功: ${data['data']}');
+            debugPrint(
+                'SupportEventApi: create event success: ${data['data']}');
           }
-          return data['data'];
+          return Map<String, dynamic>.from(data['data']);
         } else {
-          throw Exception(data['message'] ?? '新增事件失敗');
+          throw Exception(data['message'] ?? 'Create event failed');
         }
       } else {
         final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? '新增事件失敗');
+        throw Exception(errorData['message'] ?? 'Create event failed');
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 新增事件錯誤: $e');
+        debugPrint('SupportEventApi: create event error: $e');
       }
       rethrow;
     }
@@ -143,7 +187,8 @@ class SupportEventApi {
   }) async {
     try {
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 更新事件狀態: eventId=$eventId, status=$status');
+        debugPrint(
+            'SupportEventApi: update event status: eventId=$eventId, status=$status');
       }
 
       final response = await HttpClientService.patch(
@@ -155,26 +200,28 @@ class SupportEventApi {
       );
 
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 更新事件狀態回應: ${response.statusCode}');
+        debugPrint(
+            'SupportEventApi: update event status response: ${response.statusCode}');
       }
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
           if (kDebugMode) {
-            debugPrint('SupportEventApi: 事件狀態更新成功: ${data['data']}');
+            debugPrint(
+                'SupportEventApi: update event status success: ${data['data']}');
           }
-          return data['data'];
+          return Map<String, dynamic>.from(data['data']);
         } else {
-          throw Exception(data['message'] ?? '更新事件狀態失敗');
+          throw Exception(data['message'] ?? 'Update event status failed');
         }
       } else {
         final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? '更新事件狀態失敗');
+        throw Exception(errorData['message'] ?? 'Update event status failed');
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 更新事件狀態錯誤: $e');
+        debugPrint('SupportEventApi: update event status error: $e');
       }
       rethrow;
     }
@@ -188,7 +235,8 @@ class SupportEventApi {
   }) async {
     try {
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 結案事件: eventId=$eventId, rating=$rating');
+        debugPrint(
+            'SupportEventApi: close event: eventId=$eventId, rating=$rating');
       }
 
       final response = await HttpClientService.post(
@@ -201,26 +249,27 @@ class SupportEventApi {
       );
 
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 結案事件回應: ${response.statusCode}');
+        debugPrint(
+            'SupportEventApi: close event response: ${response.statusCode}');
       }
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
           if (kDebugMode) {
-            debugPrint('SupportEventApi: 事件結案成功: ${data['data']}');
+            debugPrint('SupportEventApi: close event success: ${data['data']}');
           }
-          return data['data'];
+          return Map<String, dynamic>.from(data['data']);
         } else {
-          throw Exception(data['message'] ?? '結案事件失敗');
+          throw Exception(data['message'] ?? 'Close event failed');
         }
       } else {
         final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? '結案事件失敗');
+        throw Exception(errorData['message'] ?? 'Close event failed');
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 結案事件錯誤: $e');
+        debugPrint('SupportEventApi: close event error: $e');
       }
       rethrow;
     }
@@ -234,7 +283,8 @@ class SupportEventApi {
   }) async {
     try {
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 提交評分: eventId=$eventId, rating=$rating');
+        debugPrint(
+            'SupportEventApi: submit rating: eventId=$eventId, rating=$rating');
       }
 
       final response = await HttpClientService.post(
@@ -247,26 +297,28 @@ class SupportEventApi {
       );
 
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 提交評分回應: ${response.statusCode}');
+        debugPrint(
+            'SupportEventApi: submit rating response: ${response.statusCode}');
       }
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
           if (kDebugMode) {
-            debugPrint('SupportEventApi: 評分提交成功: ${data['data']}');
+            debugPrint(
+                'SupportEventApi: submit rating success: ${data['data']}');
           }
-          return data['data'];
+          return Map<String, dynamic>.from(data['data']);
         } else {
-          throw Exception(data['message'] ?? '提交評分失敗');
+          throw Exception(data['message'] ?? 'Submit rating failed');
         }
       } else {
         final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? '提交評分失敗');
+        throw Exception(errorData['message'] ?? 'Submit rating failed');
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('SupportEventApi: 提交評分錯誤: $e');
+        debugPrint('SupportEventApi: submit rating error: $e');
       }
       rethrow;
     }

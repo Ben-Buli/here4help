@@ -137,8 +137,6 @@ class RatingService {
       final uri =
           Uri.parse('$userStatsUrl${userId != null ? '?user_id=$userId' : ''}');
 
-      print('🔍 RatingService: API URL: $uri');
-
       final response = await http.get(
         uri,
         headers: {
@@ -147,25 +145,22 @@ class RatingService {
         },
       );
 
-      print('🔍 RatingService: Response status: ${response.statusCode}');
-      print('🔍 RatingService: Response body: ${response.body}');
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
-          print('✅ RatingService: Successfully got rating stats');
+          // print('✅ RatingService: Successfully got rating stats');
           return RatingStats.fromJson(data['data']);
         } else {
-          print('❌ RatingService: API returned error: ${data['message']}');
+          // print('❌ RatingService: API returned error: ${data['message']}');
           throw Exception(data['message'] ?? 'Failed to get rating stats');
         }
       } else {
-        print(
-            '❌ RatingService: HTTP error ${response.statusCode}: ${response.body}');
+        // print(
+        //     '❌ RatingService: HTTP error ${response.statusCode}: ${response.body}');
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      print('❌ RatingService: Error getting user rating stats: $e');
+      // print('❌ RatingService: Error getting user rating stats: $e');
       return null;
     }
   }

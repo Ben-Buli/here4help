@@ -120,8 +120,7 @@ class UserService extends ChangeNotifier {
         throw Exception('No user data returned from database');
       }
 
-      debugPrint('🔍 從資料庫獲取的原始資料: $userData');
-      debugPrint('🔍 avatar_url 欄位值: ${userData['avatar_url']}');
+      // debugPrint('🔍 從資料庫獲取的原始資料: $userData');
 
       await setUser(UserModel.fromJson(userData));
     } catch (e) {

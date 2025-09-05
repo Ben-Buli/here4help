@@ -1,13 +1,13 @@
 <template>
   <div class="all-user-transactions-page">
     <div class="page-header">
-      <h1>用戶點數記錄</h1>
+      <h1>User Point Records</h1>
       <div class="header-actions">
         <button @click="exportTransactions" class="btn btn-success" :disabled="loading">
-          <i class="icon-download"></i> 匯出記錄
+          <i class="icon-download"></i> Export Records
         </button>
         <button @click="refreshData" class="btn btn-secondary" :disabled="loading">
-          <i class="icon-refresh"></i> 刷新
+          <i class="icon-refresh"></i> Refresh
         </button>
       </div>
     </div>
@@ -16,37 +16,37 @@
     <div class="filters-section">
       <div class="filter-row">
         <div class="filter-group">
-          <label>用戶搜尋:</label>
+          <label>User Search:</label>
           <input 
             type="text" 
             v-model="filters.userSearch"
             @input="debounceSearch"
-            placeholder="輸入用戶ID、姓名或郵箱"
+            placeholder="Enter User ID, Name or Email"
             class="user-search-input"
           />
         </div>
         
         <div class="filter-group">
-          <label>交易類型:</label>
+          <label>Transaction Type:</label>
           <select v-model="filters.transactionType" @change="loadTransactions">
-            <option value="">全部類型</option>
-            <option value="earn">任務收入</option>
-            <option value="spend">任務支出</option>
-            <option value="deposit">儲值</option>
-            <option value="fee">手續費</option>
-            <option value="refund">退款</option>
-            <option value="adjustment">調整</option>
+            <option value="">All Types</option>
+            <option value="earn">Task Income</option>
+            <option value="spend">Task Expense</option>
+            <option value="deposit">Deposit</option>
+            <option value="fee">Fee</option>
+            <option value="refund">Refund</option>
+            <option value="adjustment">Adjustment</option>
           </select>
         </div>
 
         <div class="filter-group">
-          <label>日期範圍:</label>
+          <label>Date Range:</label>
           <input 
             type="date" 
             v-model="filters.fromDate" 
             @change="loadTransactions"
           />
-          <span>至</span>
+          <span>to</span>
           <input 
             type="date" 
             v-model="filters.toDate" 
@@ -57,10 +57,10 @@
 
       <div class="filter-row">
         <div class="quick-filters">
-          <button @click="setQuickFilter('today')" class="btn btn-outline btn-sm">今日</button>
-          <button @click="setQuickFilter('week')" class="btn btn-outline btn-sm">本週</button>
-          <button @click="setQuickFilter('month')" class="btn btn-outline btn-sm">本月</button>
-          <button @click="clearFilters" class="btn btn-outline btn-sm">清除篩選</button>
+          <button @click="setQuickFilter('today')" class="btn btn-outline btn-sm">Today</button>
+          <button @click="setQuickFilter('week')" class="btn btn-outline btn-sm">This Week</button>
+          <button @click="setQuickFilter('month')" class="btn btn-outline btn-sm">This Month</button>
+          <button @click="clearFilters" class="btn btn-outline btn-sm">Clear Filters</button>
         </div>
       </div>
     </div>
@@ -69,22 +69,22 @@
     <div class="summary-section" v-if="transactionData && transactionData.summary">
       <div class="summary-cards">
         <div class="summary-card">
-          <h3>總交易筆數</h3>
+          <h3>Total Transactions</h3>
           <div class="summary-value">{{ transactionData.summary.total_transactions.toLocaleString() }}</div>
         </div>
         
         <div class="summary-card income">
-          <h3>總收入</h3>
+          <h3>Total Income</h3>
           <div class="summary-value">{{ formatPoints(transactionData.summary.total_income) }}</div>
         </div>
         
         <div class="summary-card expense">
-          <h3>總支出</h3>
+          <h3>Total Expense</h3>
           <div class="summary-value">{{ formatPoints(transactionData.summary.total_expense) }}</div>
         </div>
         
         <div class="summary-card net">
-          <h3>淨變動</h3>
+          <h3>Net Change</h3>
           <div class="summary-value" :class="getNetChangeClass(transactionData.summary.net_change)">
             {{ formatPoints(transactionData.summary.net_change, true) }}
           </div>
@@ -97,15 +97,15 @@
       <table class="transactions-table" v-if="!loading && transactions.length > 0">
         <thead>
           <tr>
-            <th>交易ID</th>
-            <th>用戶資訊</th>
-            <th>交易類型</th>
-            <th>金額</th>
-            <th>交易後餘額</th>
-            <th>描述</th>
-            <th>相關任務</th>
-            <th>狀態</th>
-            <th>交易時間</th>
+            <th>Transaction ID</th>
+            <th>User Info</th>
+            <th>Transaction Type</th>
+            <th>Amount</th>
+            <th>Balance After</th>
+            <th>Description</th>
+            <th>Related Task</th>
+            <th>Status</th>
+            <th>Transaction Time</th>
           </tr>
         </thead>
         <tbody>
@@ -130,7 +130,7 @@
               <span :class="getAmountClass(transaction.is_income)">
                 {{ transaction.formatted_amount }}
               </span>
-              <span class="currency">點數</span>
+              <span class="currency">points</span>
             </td>
             
         
@@ -165,14 +165,14 @@
       <!-- 載入狀態 -->
       <div v-if="loading" class="loading-state">
         <div class="spinner"></div>
-        <p>載入交易記錄中...</p>
+        <p>Loading transaction records...</p>
       </div>
 
       <!-- 空狀態 -->
       <div v-if="!loading && transactions.length === 0" class="empty-state">
         <i class="icon-empty"></i>
-        <h3>暫無交易記錄</h3>
-        <p>沒有符合篩選條件的交易記錄</p>
+        <h3>No Transaction Records</h3>
+        <p>No transaction records match the filter criteria</p>
       </div>
     </div>
 
@@ -183,7 +183,7 @@
         :disabled="pagination.current_page === 1 || loading"
         class="btn btn-secondary btn-sm"
       >
-        首頁
+        First
       </button>
       
       <button 
@@ -191,12 +191,12 @@
         :disabled="!pagination.has_prev_page || loading"
         class="btn btn-secondary btn-sm"
       >
-        上一頁
+        Previous
       </button>
       
       <div class="page-info">
-        <span>第 {{ pagination.current_page }} 頁，共 {{ pagination.total_pages }} 頁</span>
-        <span class="total-info">(總計 {{ pagination.total }} 筆記錄)</span>
+        <span>Page {{ pagination.current_page }} of {{ pagination.total_pages }}</span>
+        <span class="total-info">(Total {{ pagination.total }} records)</span>
       </div>
       
       <button 
@@ -204,7 +204,7 @@
         :disabled="!pagination.has_next_page || loading"
         class="btn btn-secondary btn-sm"
       >
-        下一頁
+        Next
       </button>
       
       <button 
@@ -212,13 +212,13 @@
         :disabled="pagination.current_page === pagination.total_pages || loading"
         class="btn btn-secondary btn-sm"
       >
-        末頁
+        Last
       </button>
     </div>
 
     <!-- 交易類型統計 -->
     <div class="type-statistics" v-if="transactionData && transactionData.summary.by_type">
-      <h2>交易類型統計</h2>
+      <h2>Transaction Type Statistics</h2>
       <div class="type-stats-grid">
         <div 
           v-for="(stats, type) in transactionData.summary.by_type" 
@@ -230,19 +230,19 @@
           </div>
           <div class="type-stats">
             <div class="stat-item">
-              <label>交易筆數:</label>
+              <label>Transaction Count:</label>
               <span>{{ stats.count.toLocaleString() }}</span>
             </div>
             <div class="stat-item">
-              <label>總收入:</label>
+              <label>Total Income:</label>
               <span class="income">{{ formatPoints(stats.total_income) }}</span>
             </div>
             <div class="stat-item">
-              <label>總支出:</label>
+              <label>Total Expense:</label>
               <span class="expense">{{ formatPoints(stats.total_expense) }}</span>
             </div>
             <div class="stat-item">
-              <label>平均金額:</label>
+              <label>Average Amount:</label>
               <span>{{ stats.avg_amount }}</span>
             </div>
           </div>
@@ -293,94 +293,38 @@ export default {
         if (filters.fromDate) params.from = filters.fromDate
         if (filters.toDate) params.to = filters.toDate
         
-        // TODO: 實際API調用
-        // const response = await api.get('/admin/users/point-transactions', { params })
+        // 實際API調用
+        const response = await api.get('/api/admin/user-transactions', { params })
         
-        // 模擬數據
-        const mockResponse = {
-          success: true,
-          data: {
-            transactions: [
-              {
-                id: 1001,
-                user_id: 123,
-                user_info: {
-                  name: '張三',
-                  nickname: '小張',
-                  email: 'zhang@example.com',
-                  display_name: '小張'
-                },
-                transaction_type: 'earn',
-                amount: 500,
-                description: 'Task completed: 網站開發專案',
-                related_task_id: 'T001',
-                related_order_id: null,
-                status: 'completed',
-                created_at: '2024-01-15 14:30:00',
-                formatted_amount: '+500',
-                is_income: true,
-                display_type: 'Task Earnings'
-              },
-              {
-                id: 1002,
-                user_id: 456,
-                user_info: {
-                  name: '李四',
-                  nickname: null,
-                  email: 'li@example.com',
-                  display_name: '李四'
-                },
-                transaction_type: 'spend',
-                amount: -300,
-                description: 'Task payment: UI設計任務',
-                related_task_id: 'T002',
-                related_order_id: null,
-                status: 'completed',
-                created_at: '2024-01-15 13:20:00',
-                formatted_amount: '-300',
-                is_income: false,
-                display_type: 'Task Spending'
-              }
-            ],
-            pagination: {
-              current_page: 1,
-              total_pages: 5,
-              total: 98,
-              has_prev_page: false,
-              has_next_page: true
-            },
+        if (response.data && response.data.success && response.data.data) {
+          // 適配後端回應格式
+          const data = response.data.data
+          transactions.value = data.items || []
+          
+          // 適配分頁格式
+          pagination.value = {
+            current_page: data.pagination?.current_page || 1,
+            total_pages: data.pagination?.last_page || 1,
+            total: data.pagination?.total || 0,
+            has_prev_page: (data.pagination?.current_page || 1) > 1,
+            has_next_page: (data.pagination?.current_page || 1) < (data.pagination?.last_page || 1)
+          }
+          
+          // 適配統計格式
+          transactionData.value = {
             summary: {
-              total_transactions: 98,
-              total_income: 25000,
-              total_expense: 18000,
-              net_change: 7000,
-              by_type: {
-                earn: {
-                  count: 45,
-                  total_income: 15000,
-                  total_expense: 0,
-                  avg_amount: 333.33,
-                  display_name: 'Task Earnings'
-                },
-                spend: {
-                  count: 30,
-                  total_income: 0,
-                  total_expense: 12000,
-                  avg_amount: 400,
-                  display_name: 'Task Spending'
-                }
-              }
+              total_transactions: data.stats?.total_transactions || 0,
+              total_income: data.stats?.total_income || 0,
+              total_expense: data.stats?.total_expense || 0,
+              net_change: (data.stats?.total_income || 0) - (data.stats?.total_expense || 0),
+              by_type: data.type_stats || {}
             }
           }
         }
         
-        transactions.value = mockResponse.data.transactions
-        pagination.value = mockResponse.data.pagination
-        transactionData.value = mockResponse.data
-        
       } catch (error) {
-        console.error('載入交易記錄失敗:', error)
-        // TODO: 顯示錯誤提示
+        console.error('Failed to load transaction records:', error)
+        // TODO: Show error message
       } finally {
         loading.value = false
       }
@@ -445,14 +389,14 @@ export default {
     
     // 匯出交易記錄
     const exportTransactions = () => {
-      // TODO: 實現匯出功能
-      console.log('匯出交易記錄')
+              // TODO: Implement export functionality
+        console.log('Export transaction records')
     }
     
     // 查看任務詳情
     const viewTask = (taskId) => {
-      // TODO: 跳轉到任務詳情頁面
-      console.log('查看任務:', taskId)
+              // TODO: Navigate to task detail page
+        console.log('View task:', taskId)
     }
     
     // 工具函數

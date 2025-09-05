@@ -279,6 +279,7 @@ const ChatBubbleLeftRightIcon = 'svg'
 const CreditCardIcon = 'svg'
 const CurrencyDollarIcon = 'svg'
 const BanknotesIcon = 'svg'
+const ExclamationTriangleIcon = 'svg'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -299,6 +300,7 @@ const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Users', href: '/users', icon: UsersIcon },
   { name: 'Issues', href: '/issues', icon: ChatBubbleLeftRightIcon },
+  { name: 'Task Disputes', href: '/task-disputes', icon: ExclamationTriangleIcon },
   { 
     name: 'Payments', 
     href: '/payments/requests', 

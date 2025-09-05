@@ -12,9 +12,21 @@ class QuestionDisplayHelper {
       final questions =
           taskData['application_questions'] as List<dynamic>? ?? [];
       return questions
-          .map((q) =>
-              (q as Map<String, dynamic>)['application_question']?.toString() ??
-              '')
+          .map((q) {
+            // 處理物件格式：{'application_question': '...'}
+            if (q is Map<String, dynamic> &&
+                q['application_question'] != null) {
+              return q['application_question'].toString();
+            }
+            // 處理字串格式：'...'
+            else if (q is String) {
+              return q;
+            }
+            // 其他格式轉為字串
+            else {
+              return q?.toString() ?? '';
+            }
+          })
           .where((q) => q.trim().isNotEmpty)
           .toList();
     }

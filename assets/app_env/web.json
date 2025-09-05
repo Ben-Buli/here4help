@@ -1,5 +1,5 @@
 {
-  "environment": "ios_simulator",
+  "environment": "web",
   "public": {
     "api_origin": "http://127.0.0.1:8888",
     "api_prefix": "/here4help/backend/api",

@@ -93,6 +93,8 @@ class AppConfig {
 
   static String get supportEventsUrl => api('/support/events.php');
 
+  static String get supportUserEventsUrl => api('/support/user_events.php');
+
   static String get supportCloseEventUrl => api('/support/events_close.php');
 
   static String get supportRatingUrl => api('/support/events_rating.php');

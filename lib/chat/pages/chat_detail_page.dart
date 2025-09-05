@@ -2720,12 +2720,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   /// 處理申訴 TODO: 建立申訴表單
   Future<void> _handleDispute() async {
-    if (_task == null) return;
+    if (_task == null || _currentRoomId == null) return;
 
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => DisputeDialog(
         taskId: _task!['id'].toString(),
+        chatRoomId: _currentRoomId!, // 新增必要的 chatRoomId 參數
         taskTitle: _task!['title']?.toString() ?? 'Unknown Task',
         onDisputeSubmitted: () {
           // 刷新任務資料

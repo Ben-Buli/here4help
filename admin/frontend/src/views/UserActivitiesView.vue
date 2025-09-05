@@ -3,8 +3,8 @@
     <!-- 頁面標題 -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">使用者活動紀錄</h1>
-        <p class="text-sm text-gray-600">監控所有使用者的系統活動和操作記錄</p>
+        <h1 class="text-2xl font-bold text-gray-900">User Activities</h1>
+        <p class="text-sm text-gray-600">Monitor all user system activities and operation logs</p>
       </div>
     </div>
 
@@ -20,7 +20,7 @@
             </div>
           </div>
           <div class="ml-4">
-            <p class="text-sm font-medium text-gray-500">總活動數</p>
+            <p class="text-sm font-medium text-gray-500">Total Activities</p>
             <p class="text-2xl font-semibold text-gray-900">{{ stats.total_activities || 0 }}</p>
           </div>
         </div>
@@ -36,7 +36,7 @@
             </div>
           </div>
           <div class="ml-4">
-            <p class="text-sm font-medium text-gray-500">活躍使用者</p>
+            <p class="text-sm font-medium text-gray-500">Active Users</p>
             <p class="text-2xl font-semibold text-gray-900">{{ stats.unique_users || 0 }}</p>
           </div>
         </div>
@@ -52,7 +52,7 @@
             </div>
           </div>
           <div class="ml-4">
-            <p class="text-sm font-medium text-gray-500">活動類型</p>
+            <p class="text-sm font-medium text-gray-500">Activity Types</p>
             <p class="text-2xl font-semibold text-gray-900">{{ stats.unique_actions || 0 }}</p>
           </div>
         </div>
@@ -62,28 +62,28 @@
     <!-- 篩選器 -->
     <div class="bg-white rounded-lg shadow">
       <div class="p-6 border-b border-gray-200">
-        <h3 class="text-lg font-medium text-gray-900">篩選條件</h3>
+        <h3 class="text-lg font-medium text-gray-900">Filter Conditions</h3>
       </div>
       <div class="p-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <!-- 使用者 ID -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">使用者 ID</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">User ID</label>
             <input
-              v-model="filters.user_id"
+              v-model.number="filters.user_id"
               type="number"
-              placeholder="輸入使用者 ID"
+              placeholder="Enter User ID"
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
 
           <!-- 活動類型 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">活動類型</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Activity Type</label>
             <input
               v-model="filters.action"
               type="text"
-              placeholder="搜尋活動類型"
+              placeholder="Search activity type"
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
@@ -95,27 +95,27 @@
               v-model="filters.actor_type"
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             >
-              <option value="">全部</option>
-              <option value="user">使用者</option>
-              <option value="admin">管理員</option>
-              <option value="system">系統</option>
+              <option value="">All</option>
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+              <option value="system">System</option>
             </select>
           </div>
 
           <!-- 搜尋 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">搜尋</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
             <input
               v-model="filters.search"
               type="text"
-              placeholder="搜尋使用者名稱、Email 或原因"
+              placeholder="Search user name, email or reason"
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
 
           <!-- 日期範圍 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">開始日期</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
             <input
               v-model="filters.date_from"
               type="date"
@@ -124,7 +124,7 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">結束日期</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
             <input
               v-model="filters.date_to"
               type="date"
@@ -134,16 +134,16 @@
 
           <!-- 每頁顯示數量 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">每頁顯示</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Per Page</label>
             <select
               v-model="pagination.per_page"
               @change="handlePerPageChange"
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             >
-              <option value="15">15 筆</option>
-              <option value="25">25 筆</option>
-              <option value="50">50 筆</option>
-              <option value="100">100 筆</option>
+              <option value="15">15 items</option>
+              <option value="25">25 items</option>
+              <option value="50">50 items</option>
+              <option value="100">100 items</option>
             </select>
           </div>
 
@@ -153,13 +153,13 @@
               @click="loadActivities"
               class="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2"
             >
-              搜尋
+              Search
             </button>
             <button
               @click="resetFilters"
               class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
             >
-              重置
+              Reset
             </button>
           </div>
         </div>
@@ -169,7 +169,7 @@
     <!-- 活動列表 -->
     <div class="bg-white rounded-lg shadow">
       <div class="p-6 border-b border-gray-200">
-        <h3 class="text-lg font-medium text-gray-900">活動紀錄列表</h3>
+        <h3 class="text-lg font-medium text-gray-900">Activity Log List</h3>
       </div>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
@@ -179,25 +179,25 @@
                 ID
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                使用者
+                User
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                活動類型
+                Activity Type
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                操作者
+                Actor
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                變更欄位
+                Changed Field
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                原因
+                Reason
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                IP 位址
+                IP Address
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                時間
+                Time
               </th>
             </tr>
           </thead>
@@ -216,7 +216,7 @@
                     </div>
                   </div>
                   <div class="ml-4">
-                    <div class="text-sm font-medium text-gray-900">{{ activity.user_name || '未知使用者' }}</div>
+                    <div class="text-sm font-medium text-gray-900">{{ activity.user_name || 'Unknown User' }}</div>
                     <div class="text-sm text-gray-500">{{ activity.user_email }}</div>
                   </div>
                 </div>
@@ -230,13 +230,13 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm text-gray-900">
                   <span v-if="activity.actor_type === 'admin'">
-                    {{ activity.admin_full_name || activity.admin_username || '管理員' }}
+                    {{ activity.admin_full_name || activity.admin_username || 'Admin' }}
                   </span>
                   <span v-else-if="activity.actor_type === 'user'">
-                    {{ activity.user_name || '使用者' }}
+                    {{ activity.user_name || 'User' }}
                   </span>
                   <span v-else>
-                    系統
+                    System
                   </span>
                 </div>
                 <div class="text-sm text-gray-500">{{ activity.actor_type }}</div>
@@ -245,9 +245,9 @@
                 <div v-if="activity.field">
                   <div class="font-medium">{{ activity.field }}</div>
                   <div v-if="activity.old_value || activity.new_value" class="text-xs text-gray-500">
-                    <span v-if="activity.old_value">舊值: {{ activity.old_value }}</span>
+                    <span v-if="activity.old_value">Old: {{ activity.old_value }}</span>
                     <span v-if="activity.old_value && activity.new_value"> → </span>
-                    <span v-if="activity.new_value">新值: {{ activity.new_value }}</span>
+                    <span v-if="activity.new_value">New: {{ activity.new_value }}</span>
                   </div>
                 </div>
                 <span v-else class="text-gray-400">-</span>
@@ -270,7 +270,7 @@
       <div class="px-6 py-4 border-t border-gray-200">
         <div class="flex items-center justify-between">
           <div class="flex items-center text-sm text-gray-700">
-            <span>顯示第 {{ paginationInfo.from }} 到 {{ paginationInfo.to }} 筆，共 {{ paginationInfo.total }} 筆結果</span>
+            <span>Showing {{ paginationInfo.from }} to {{ paginationInfo.to }} of {{ paginationInfo.total }} results</span>
           </div>
           <div class="flex items-center space-x-2">
             <button
@@ -278,31 +278,31 @@
               :disabled="pagination.current_page === 1"
               class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              第一頁
+              First
             </button>
             <button
               @click="goToPage(pagination.current_page - 1)"
               :disabled="pagination.current_page === 1"
               class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              上一頁
+              Previous
             </button>
             <span class="px-3 py-1 text-sm text-gray-700">
-              第 {{ pagination.current_page }} 頁，共 {{ pagination.last_page }} 頁
+              Page {{ pagination.current_page }} of {{ pagination.last_page }}
             </span>
             <button
               @click="goToPage(pagination.current_page + 1)"
               :disabled="pagination.current_page === pagination.last_page"
               class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              下一頁
+              Next
             </button>
             <button
               @click="goToPage(pagination.last_page)"
               :disabled="pagination.current_page === pagination.last_page"
               class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              最後頁
+              Last
             </button>
           </div>
         </div>
@@ -312,7 +312,7 @@
     <!-- 載入中 -->
     <div v-if="loading" class="flex justify-center items-center py-8">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-600"></div>
-      <span class="ml-2 text-gray-600">載入中...</span>
+      <span class="ml-2 text-gray-600">Loading...</span>
     </div>
   </div>
 </template>
@@ -336,9 +336,9 @@ const pagination = reactive({
 
 // 篩選條件
 const filters = reactive({
-  user_id: '',
+  user_id: null as number | null,
   action: '',
-  actor_type: '',
+  actor_type: '' as '' | 'user' | 'admin' | 'system',
   date_from: '',
   date_to: '',
   search: '',
@@ -360,19 +360,28 @@ const loadActivities = async () => {
     const params = {
       page: pagination.current_page,
       per_page: pagination.per_page,
-      ...filters
+      ...(filters.user_id && { user_id: filters.user_id }),
+      ...(filters.action && { action: filters.action }),
+      ...(filters.actor_type && { actor_type: filters.actor_type }),
+      ...(filters.date_from && { date_from: filters.date_from }),
+      ...(filters.date_to && { date_to: filters.date_to }),
+      ...(filters.search && { search: filters.search }),
+      sort_by: filters.sort_by,
+      sort_order: filters.sort_order
     }
     
     const response = await userActivityApi.list(params)
     
-    if (response.data.success) {
-      activities.value = response.data.data.items
-      pagination.total = response.data.data.pagination.total
-      pagination.last_page = response.data.data.pagination.last_page
-      stats.value = response.data.data.stats
+    if (response.data && response.data.success && response.data.data) {
+      activities.value = response.data.data.items || []
+      if (response.data.data.pagination) {
+        pagination.total = response.data.data.pagination.total
+        pagination.last_page = response.data.data.pagination.last_page
+      }
+      stats.value = response.data.data.stats || null
     }
   } catch (error) {
-    console.error('載入活動紀錄失敗:', error)
+    console.error('Failed to load activities:', error)
   } finally {
     loading.value = false
   }
@@ -392,14 +401,14 @@ const handlePerPageChange = () => {
 // 重置篩選條件
 const resetFilters = () => {
   Object.assign(filters, {
-    user_id: '',
+    user_id: null,
     action: '',
-    actor_type: '',
+    actor_type: '' as '' | 'user' | 'admin' | 'system',
     date_from: '',
     date_to: '',
     search: '',
     sort_by: 'created_at',
-    sort_order: 'desc'
+    sort_order: 'desc' as 'asc' | 'desc'
   })
   pagination.current_page = 1
   loadActivities()
@@ -427,14 +436,14 @@ const getActionBadgeClass = (action: string) => {
 
 const getActionText = (action: string) => {
   const actionMap: Record<string, string> = {
-    'register': '註冊',
-    'login': '登入',
-    'logout': '登出',
-    'permission_change': '權限變更',
-    'status_change': '狀態變更',
-    'task_completion_reward': '任務獎勵',
-    'task_completion_fee': '任務手續費',
-    'update_profile': '更新資料'
+    'register': 'Register',
+    'login': 'Login',
+    'logout': 'Logout',
+    'permission_change': 'Permission Change',
+    'status_change': 'Status Change',
+    'task_completion_reward': 'Task Reward',
+    'task_completion_fee': 'Task Fee',
+    'update_profile': 'Update Profile'
   }
   return actionMap[action] || action
 }

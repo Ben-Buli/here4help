@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:here4help/services/api/dispute_api.dart';
 
-/// 申訴對話框
+/// 任務爭議對話框
 class DisputeDialog extends StatefulWidget {
   final String taskId;
+  final String chatRoomId; // 新增
   final String taskTitle;
   final VoidCallback? onDisputeSubmitted;
 
   const DisputeDialog({
     super.key,
     required this.taskId,
+    required this.chatRoomId, // 新增
     required this.taskTitle,
     this.onDisputeSubmitted,
   });
@@ -21,25 +23,71 @@ class DisputeDialog extends StatefulWidget {
 
 class _DisputeDialogState extends State<DisputeDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController(); // 新增
   final _descriptionController = TextEditingController();
 
-  String _selectedReason = 'task_not_completed';
+  int _titleCharCount = 0; // 新增字數統計
+  int _descriptionCharCount = 0; // 新增字數統計
+
+  // 預先檢查是否已存在爭議
+  Map<String, dynamic>? _existingDispute;
+  bool _isLoading = true;
   bool _isSubmitting = false;
 
-  // 申訴原因選項
-  final Map<String, String> _reasonOptions = {
-    'task_not_completed': '任務未完成',
-    'poor_quality': '工作品質不佳',
-    'communication_issue': '溝通問題',
-    'payment_dispute': '付款爭議',
-    'safety_concern': '安全顧慮',
-    'other': '其他',
-  };
+  @override
+  void initState() {
+    super.initState();
+    _checkExistingDispute();
+
+    // 添加字數統計監聽器
+    _titleController.addListener(() {
+      setState(() {
+        _titleCharCount = _titleController.text.length;
+      });
+    });
+
+    _descriptionController.addListener(() {
+      setState(() {
+        _descriptionCharCount = _descriptionController.text.length;
+      });
+    });
+  }
 
   @override
   void dispose() {
+    _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  /// 檢查是否已存在爭議
+  Future<void> _checkExistingDispute() async {
+    try {
+      final result = await DisputeApi.checkExistingDispute(
+        chatRoomId: widget.chatRoomId,
+      );
+
+      setState(() {
+        _existingDispute = result['exists'] ? result['dispute'] : null;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (kDebugMode) debugPrint('DisputeDialog: 檢查現有爭議失敗: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// 格式化日期時間
+  String _formatDateTime(String? dateTimeStr) {
+    if (dateTimeStr == null) return '';
+    try {
+      final dateTime = DateTime.parse(dateTimeStr);
+      return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return dateTimeStr;
+    }
   }
 
   Future<void> _submitDispute() async {
@@ -54,17 +102,18 @@ class _DisputeDialogState extends State<DisputeDialog> {
     try {
       await DisputeApi.submitDispute(
         taskId: widget.taskId,
-        reason: _selectedReason,
+        chatRoomId: widget.chatRoomId,
+        title: _titleController.text.trim(),
         description: _descriptionController.text.trim(),
       );
 
       if (mounted) {
-        Navigator.of(context).pop(true); // 返回 true 表示申訴成功
+        Navigator.of(context).pop(true); // 返回 true 表示爭議提交成功
 
         // 顯示成功訊息
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('申訴已提交，任務狀態已更改為爭議中'),
+            content: Text('爭議已提交，任務狀態已更改為爭議中'),
             backgroundColor: Colors.green,
           ),
         );
@@ -73,12 +122,12 @@ class _DisputeDialogState extends State<DisputeDialog> {
         widget.onDisputeSubmitted?.call();
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('DisputeDialog: 申訴提交失敗: $e');
+      if (kDebugMode) debugPrint('DisputeDialog: 爭議提交失敗: $e');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('申訴提交失敗: $e'),
+            content: Text('爭議提交失敗: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -94,8 +143,76 @@ class _DisputeDialogState extends State<DisputeDialog> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const AlertDialog(
+        content: SizedBox(
+          height: 100,
+          child: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      );
+    }
+
+    // 如果已存在爭議，顯示現有爭議資訊
+    if (_existingDispute != null) {
+      return AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.orange),
+            SizedBox(width: 8),
+            Text('爭議已存在'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('此任務已經提交過爭議，無法重複提交。'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '爭議 ID: ${_existingDispute!['id']}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '狀態: ${_existingDispute!['status']}',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '提交時間: ${_formatDateTime(_existingDispute!['created_at'])}',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('確定'),
+          ),
+        ],
+      );
+    }
+
+    // 如果沒有現有爭議，顯示提交表單
     return AlertDialog(
-      title: const Text('提交申訴'),
+      title: const Text('提交任務爭議'),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -134,9 +251,9 @@ class _DisputeDialogState extends State<DisputeDialog> {
 
               const SizedBox(height: 16),
 
-              // 申訴原因
+              // 爭議標題
               const Text(
-                '申訴原因 *',
+                '爭議標題 *',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -144,29 +261,21 @@ class _DisputeDialogState extends State<DisputeDialog> {
               ),
               const SizedBox(height: 8),
 
-              DropdownButtonFormField<String>(
-                value: _selectedReason,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              TextFormField(
+                controller: _titleController,
+                maxLength: 255,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  hintText: '請簡要描述爭議的主要問題...',
+                  contentPadding: const EdgeInsets.all(12),
+                  counterText: '$_titleCharCount/255',
                 ),
-                items: _reasonOptions.entries.map((entry) {
-                  return DropdownMenuItem<String>(
-                    value: entry.key,
-                    child: Text(entry.value),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _selectedReason = value;
-                    });
-                  }
-                },
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '請選擇申訴原因';
+                  if (value == null || value.trim().isEmpty) {
+                    return '請輸入爭議標題';
+                  }
+                  if (value.trim().length < 5) {
+                    return '標題至少需要5個字符';
                   }
                   return null;
                 },
@@ -187,18 +296,19 @@ class _DisputeDialogState extends State<DisputeDialog> {
               TextFormField(
                 controller: _descriptionController,
                 maxLines: 4,
-                maxLength: 500,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: '請詳細描述申訴的原因和情況...',
-                  contentPadding: EdgeInsets.all(12),
+                maxLength: 1000,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  hintText: '請詳細描述爭議的原因、經過和您的訴求...',
+                  contentPadding: const EdgeInsets.all(12),
+                  counterText: '$_descriptionCharCount/1000',
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return '請輸入詳細說明';
                   }
-                  if (value.trim().length < 10) {
-                    return '說明至少需要10個字符';
+                  if (value.trim().length < 20) {
+                    return '說明至少需要20個字符';
                   }
                   return null;
                 },
@@ -225,7 +335,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '提交申訴後，任務將進入爭議狀態，自動完成倒數將停止。管理員將審核您的申訴並做出裁決。',
+                        '提交爭議後，任務將進入爭議狀態，自動完成倒數將停止。管理員將審核您的爭議並做出裁決。',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.orange,
@@ -263,22 +373,24 @@ class _DisputeDialogState extends State<DisputeDialog> {
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 )
-              : const Text('提交申訴'),
+              : const Text('提交爭議'),
         ),
       ],
     );
   }
 }
 
-/// 快速申訴按鈕
+/// 快速爭議按鈕
 class QuickDisputeButton extends StatelessWidget {
   final String taskId;
+  final String chatRoomId; // 新增
   final String taskTitle;
   final VoidCallback? onDisputeSubmitted;
 
   const QuickDisputeButton({
     super.key,
     required this.taskId,
+    required this.chatRoomId, // 新增
     required this.taskTitle,
     this.onDisputeSubmitted,
   });
@@ -288,6 +400,7 @@ class QuickDisputeButton extends StatelessWidget {
       context: context,
       builder: (context) => DisputeDialog(
         taskId: taskId,
+        chatRoomId: chatRoomId, // 新增
         taskTitle: taskTitle,
         onDisputeSubmitted: onDisputeSubmitted,
       ),
@@ -299,7 +412,7 @@ class QuickDisputeButton extends StatelessWidget {
     return ElevatedButton.icon(
       onPressed: () => _showDisputeDialog(context),
       icon: const Icon(Icons.report_problem, size: 16),
-      label: const Text('申訴'),
+      label: const Text('爭議'),
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.red[50],
         foregroundColor: Colors.red[700],

@@ -363,6 +363,18 @@ final List<Map<String, dynamic>> shellPages = [
     'permission': 0, // 新用戶可查看問題狀態
   },
   {
+    'path': '/account/support/chat',
+    'builder': (context, data) {
+      return ChatDetailWrapper(data: data as Map<String, dynamic>?);
+    },
+    'title': 'Support Chat',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'icon': Icons.chat,
+    'permission': 1, // 需已認證用戶
+  },
+  {
     'path': '/account/support/issues',
     'child': const SupportIssuesPage(),
     'title': 'My Support Issues',

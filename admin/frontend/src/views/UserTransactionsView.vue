@@ -3,8 +3,8 @@
     <!-- 頁面標題 -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">使用者交易紀錄</h1>
-        <p class="text-sm text-gray-600">監控所有使用者的點數交易和財務活動</p>
+        <h1 class="text-2xl font-bold text-gray-900">User Transactions</h1>
+        <p class="text-sm text-gray-600">Monitor all user point transactions and financial activities</p>
       </div>
     </div>
 
@@ -20,7 +20,7 @@
             </div>
           </div>
           <div class="ml-4">
-            <p class="text-sm font-medium text-gray-500">總交易數</p>
+            <p class="text-sm font-medium text-gray-500">Total Transactions</p>
             <p class="text-2xl font-semibold text-gray-900">{{ stats.total_transactions || 0 }}</p>
           </div>
         </div>
@@ -36,7 +36,7 @@
             </div>
           </div>
           <div class="ml-4">
-            <p class="text-sm font-medium text-gray-500">活躍使用者</p>
+            <p class="text-sm font-medium text-gray-500">Active Users</p>
             <p class="text-2xl font-semibold text-gray-900">{{ stats.unique_users || 0 }}</p>
           </div>
         </div>
@@ -52,7 +52,7 @@
             </div>
           </div>
           <div class="ml-4">
-            <p class="text-sm font-medium text-gray-500">總收入</p>
+            <p class="text-sm font-medium text-gray-500">Total Income</p>
             <p class="text-2xl font-semibold text-green-600">{{ formatPoints(stats.total_income || 0) }}</p>
           </div>
         </div>
@@ -68,7 +68,7 @@
             </div>
           </div>
           <div class="ml-4">
-            <p class="text-sm font-medium text-gray-500">總支出</p>
+            <p class="text-sm font-medium text-gray-500">Total Expense</p>
             <p class="text-2xl font-semibold text-red-600">{{ formatPoints(stats.total_expense || 0) }}</p>
           </div>
         </div>
@@ -78,7 +78,7 @@
     <!-- 交易類型統計 -->
     <div class="bg-white rounded-lg shadow" v-if="typeStats && typeStats.length > 0">
       <div class="p-6 border-b border-gray-200">
-        <h3 class="text-lg font-medium text-gray-900">交易類型統計</h3>
+        <h3 class="text-lg font-medium text-gray-900">Transaction Type Statistics</h3>
       </div>
       <div class="p-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -101,67 +101,67 @@
     <!-- 篩選器 -->
     <div class="bg-white rounded-lg shadow">
       <div class="p-6 border-b border-gray-200">
-        <h3 class="text-lg font-medium text-gray-900">篩選條件</h3>
+        <h3 class="text-lg font-medium text-gray-900">Filter Conditions</h3>
       </div>
       <div class="p-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <!-- 使用者 ID -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">使用者 ID</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">User ID</label>
             <input
               v-model="filters.user_id"
               type="number"
-              placeholder="輸入使用者 ID"
+              placeholder="Enter User ID"
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
 
           <!-- 交易類型 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">交易類型</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Transaction Type</label>
             <select
               v-model="filters.transaction_type"
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             >
-              <option value="">全部</option>
-              <option value="earn">收入</option>
-              <option value="spend">支出</option>
-              <option value="deposit">儲值</option>
-              <option value="fee">手續費</option>
-              <option value="refund">退款</option>
-              <option value="adjustment">調整</option>
+              <option value="">All</option>
+              <option value="earn">Income</option>
+              <option value="spend">Expense</option>
+              <option value="deposit">Deposit</option>
+              <option value="fee">Fee</option>
+              <option value="refund">Refund</option>
+              <option value="adjustment">Adjustment</option>
             </select>
           </div>
 
           <!-- 搜尋 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">搜尋</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
             <input
               v-model="filters.search"
               type="text"
-              placeholder="搜尋使用者名稱、Email 或描述"
+              placeholder="Search user name, email or description"
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
 
           <!-- 每頁顯示數量 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">每頁顯示</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Per Page</label>
             <select
               v-model="pagination.per_page"
               @change="handlePerPageChange"
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             >
-              <option value="15">15 筆</option>
-              <option value="25">25 筆</option>
-              <option value="50">50 筆</option>
-              <option value="100">100 筆</option>
+              <option value="15">15 items</option>
+              <option value="25">25 items</option>
+              <option value="50">50 items</option>
+              <option value="100">100 items</option>
             </select>
           </div>
 
           <!-- 日期範圍 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">開始日期</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
             <input
               v-model="filters.date_from"
               type="date"
@@ -170,7 +170,7 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">結束日期</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
             <input
               v-model="filters.date_to"
               type="date"
@@ -184,13 +184,13 @@
               @click="loadTransactions"
               class="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2"
             >
-              搜尋
+              Search
             </button>
             <button
               @click="resetFilters"
               class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
             >
-              重置
+              Reset
             </button>
           </div>
         </div>
@@ -200,7 +200,7 @@
     <!-- 交易列表 -->
     <div class="bg-white rounded-lg shadow">
       <div class="p-6 border-b border-gray-200">
-        <h3 class="text-lg font-medium text-gray-900">交易紀錄列表</h3>
+        <h3 class="text-lg font-medium text-gray-900">Transaction Records</h3>
       </div>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
@@ -210,25 +210,25 @@
                 ID
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                使用者
+                User
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                交易類型
+                Transaction Type
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                金額
+                Amount
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                描述
+                Description
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                相關任務
+                Related Task
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                狀態
+                Status
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                時間
+                Time
               </th>
             </tr>
           </thead>
@@ -247,9 +247,9 @@
                     </div>
                   </div>
                   <div class="ml-4">
-                    <div class="text-sm font-medium text-gray-900">{{ transaction.user_name || '未知使用者' }}</div>
+                    <div class="text-sm font-medium text-gray-900">{{ transaction.user_name || 'Unknown User' }}</div>
                     <div class="text-sm text-gray-500">{{ transaction.user_email }}</div>
-                    <div class="text-xs text-gray-400">餘額: {{ formatPoints(transaction.current_balance) }}</div>
+                    <div class="text-xs text-gray-400">Balance: {{ formatPoints(transaction.current_balance) }}</div>
                   </div>
                 </div>
               </td>
@@ -294,7 +294,7 @@
       <div class="px-6 py-4 border-t border-gray-200">
         <div class="flex items-center justify-between">
           <div class="flex items-center text-sm text-gray-700">
-            <span>顯示第 {{ paginationInfo.from }} 到 {{ paginationInfo.to }} 筆，共 {{ paginationInfo.total }} 筆結果</span>
+            <span>Showing {{ paginationInfo.from }} to {{ paginationInfo.to }} of {{ paginationInfo.total }} results</span>
           </div>
           <div class="flex items-center space-x-2">
             <button
@@ -302,31 +302,31 @@
               :disabled="pagination.current_page === 1"
               class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              第一頁
+              First
             </button>
             <button
               @click="goToPage(pagination.current_page - 1)"
               :disabled="pagination.current_page === 1"
               class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              上一頁
+              Previous
             </button>
             <span class="px-3 py-1 text-sm text-gray-700">
-              第 {{ pagination.current_page }} 頁，共 {{ pagination.last_page }} 頁
+              Page {{ pagination.current_page }} of {{ pagination.last_page }}
             </span>
             <button
               @click="goToPage(pagination.current_page + 1)"
               :disabled="pagination.current_page === pagination.last_page"
               class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              下一頁
+              Next
             </button>
             <button
               @click="goToPage(pagination.last_page)"
               :disabled="pagination.current_page === pagination.last_page"
               class="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              最後頁
+              Last
             </button>
           </div>
         </div>
@@ -336,7 +336,7 @@
     <!-- 載入中 -->
     <div v-if="loading" class="flex justify-center items-center py-8">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-600"></div>
-      <span class="ml-2 text-gray-600">載入中...</span>
+      <span class="ml-2 text-gray-600">Loading...</span>
     </div>
   </div>
 </template>
@@ -389,15 +389,17 @@ const loadTransactions = async () => {
     
     const response = await userTransactionApi.list(params)
     
-    if (response.data.success) {
-      transactions.value = response.data.data.items
-      pagination.total = response.data.data.pagination.total
-      pagination.last_page = response.data.data.pagination.last_page
-      stats.value = response.data.data.stats
+    if (response.data && response.data.success && response.data.data) {
+      transactions.value = response.data.data.items || []
+      if (response.data.data.pagination) {
+        pagination.total = response.data.data.pagination.total
+        pagination.last_page = response.data.data.pagination.last_page
+      }
+      stats.value = response.data.data.stats || null
       typeStats.value = response.data.data.type_stats || []
     }
   } catch (error) {
-    console.error('載入交易紀錄失敗:', error)
+    console.error('Failed to load transactions:', error)
   } finally {
     loading.value = false
   }
@@ -449,12 +451,12 @@ const getTransactionTypeBadgeClass = (type: string) => {
 
 const getTransactionTypeText = (type: string) => {
   const typeMap: Record<string, string> = {
-    'earn': '收入',
-    'spend': '支出',
-    'deposit': '儲值',
-    'fee': '手續費',
-    'refund': '退款',
-    'adjustment': '調整'
+    'earn': 'Income',
+    'spend': 'Expense',
+    'deposit': 'Deposit',
+    'fee': 'Fee',
+    'refund': 'Refund',
+    'adjustment': 'Adjustment'
   }
   return typeMap[type] || type
 }
@@ -470,15 +472,15 @@ const getStatusBadgeClass = (status: string) => {
 
 const getStatusText = (status: string) => {
   const statusMap: Record<string, string> = {
-    'completed': '已完成',
-    'pending': '處理中',
-    'cancelled': '已取消'
+    'completed': 'Completed',
+    'pending': 'Pending',
+    'cancelled': 'Cancelled'
   }
   return statusMap[status] || status
 }
 
 const formatPoints = (points: number) => {
-  return points.toLocaleString() + ' 點'
+  return points.toLocaleString() + ' pts'
 }
 
 const formatDate = (dateString: string) => {

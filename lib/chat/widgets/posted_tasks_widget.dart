@@ -1731,7 +1731,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                       Icon(Icons.eco, color: Colors.lightGreen[600], size: 12),
                       const SizedBox(width: 2),
                       const Text(
-                        'Unreviewed',
+                        'New Tasker', // Unreviewed
                         style: TextStyle(fontSize: 11, color: Colors.grey),
                       ),
                     ]

@@ -300,7 +300,7 @@ export const userActivityApi = {
     search?: string
     sort_by?: string
     sort_order?: 'asc' | 'desc'
-  }) => api.get<PaginatedResponse<any>>('/api/admin/user-activities.php', { params }),
+  }) => api.get<PaginatedResponse<any>>('/api/admin/user-activities', { params }),
 
   show: (userId: number, params?: {
     page?: number
@@ -334,6 +334,31 @@ export const userTransactionApi = {
     date_from?: string
     date_to?: string
   }) => api.get<PaginatedResponse<any>>(`/api/admin/user-transactions/${userId}`, { params }),
+}
+
+// 任務爭議 API
+export const disputeApi = {
+  list: (params?: {
+    page?: number
+    per_page?: number
+    status?: string
+    date_from?: string
+    date_to?: string
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
+  }) => api.get<PaginatedResponse<any>>('/api/admin/task-disputes.php', { params }),
+
+  show: (id: string) => api.get<ApiResponse<any>>(`/api/admin/task-disputes/${id}.php`),
+
+  resolve: (id: string, decision: string, note: string) =>
+    api.patch<ApiResponse>(`/api/admin/task-disputes/resolve.php?id=${id}`, { 
+      decision_result: decision, 
+      decision_note: note 
+    }),
+
+  // 管理員查看聊天室
+  getChatRoom: (disputeId: string) => 
+    api.get<ApiResponse<any>>(`/api/admin/task-disputes/chat-room.php?dispute_id=${disputeId}`),
 }
 
 export default api
