@@ -19,49 +19,46 @@ class ChatListProvider extends ChangeNotifier {
   TabController? _externalTabController;
 
   // 搜索和篩選狀態 - 分頁獨立
-  final Map<int, String> _searchQueries = {
-    TAB_POSTED_TASKS: '',
-    TAB_MY_WORKS: ''
-  };
+  final Map<int, String> _searchQueries = {tabPostedTasks: '', tabMyWorks: ''};
   final Map<int, Set<String>> _selectedLocations = {
-    TAB_POSTED_TASKS: <String>{},
-    TAB_MY_WORKS: <String>{}
+    tabPostedTasks: <String>{},
+    tabMyWorks: <String>{}
   };
   final Map<int, Set<String>> _selectedStatuses = {
-    TAB_POSTED_TASKS: <String>{},
-    TAB_MY_WORKS: <String>{}
+    tabPostedTasks: <String>{},
+    tabMyWorks: <String>{}
   };
 
   // 排序狀態 - 分頁獨立
   final Map<int, String> _currentSortBy = {
-    TAB_POSTED_TASKS: 'status_id', // 改為 status_id，與後端 SQL 排序一致
-    TAB_MY_WORKS: 'status_id' // 統一使用狀態優先級排序
+    tabPostedTasks: 'status_id', // 改為 status_id，與後端 SQL 排序一致
+    tabMyWorks: 'status_id' // 統一使用狀態優先級排序
   };
   final Map<int, bool> _sortAscending = {
-    TAB_POSTED_TASKS: true, // status_id 使用升序排序（1,2,3...）
-    TAB_MY_WORKS: true // 與後端 ASC 排序一致
+    tabPostedTasks: true, // status_id 使用升序排序（1,2,3...）
+    tabMyWorks: true // 與後端 ASC 排序一致
   };
 
   // 相關性搜尋狀態
   final Map<int, bool> _crossLocationSearch = {
-    TAB_POSTED_TASKS: false,
-    TAB_MY_WORKS: false
+    tabPostedTasks: false,
+    tabMyWorks: false
   };
 
   // 追蹤用戶是否手動選擇過排序
   final Map<int, bool> _hasManualSortOverride = {
-    TAB_POSTED_TASKS: false,
-    TAB_MY_WORKS: false
+    tabPostedTasks: false,
+    tabMyWorks: false
   };
 
   // 分頁常數定義
-  static const int TAB_POSTED_TASKS = 0;
-  static const int TAB_MY_WORKS = 1;
+  static const int tabPostedTasks = 0;
+  static const int tabMyWorks = 1;
 
   // 分頁未讀提示（小圓點）
   final Map<int, bool> _tabHasUnread = {
-    TAB_POSTED_TASKS: false,
-    TAB_MY_WORKS: false
+    tabPostedTasks: false,
+    tabMyWorks: false
   };
 
   // 房間級別未讀數管理
@@ -69,18 +66,18 @@ class ChatListProvider extends ChangeNotifier {
 
   // 未讀事件防抖處理
   final Map<int, Timer?> _unreadDebounceTimers = {
-    TAB_POSTED_TASKS: null,
-    TAB_MY_WORKS: null
+    tabPostedTasks: null,
+    tabMyWorks: null
   };
   final Map<int, bool?> _pendingTabUnread = {
-    TAB_POSTED_TASKS: null,
-    TAB_MY_WORKS: null
+    tabPostedTasks: null,
+    tabMyWorks: null
   };
 
   // 防抖狀態追蹤
   final Map<int, DateTime> _lastUnreadUpdate = {
-    TAB_POSTED_TASKS: DateTime.now(),
-    TAB_MY_WORKS: DateTime.now()
+    tabPostedTasks: DateTime.now(),
+    tabMyWorks: DateTime.now()
   };
 
   // 載入狀態（全域狀態，只用於全量刷新操作）
@@ -89,17 +86,11 @@ class ChatListProvider extends ChangeNotifier {
 
   // 分頁級別的載入狀態管理
   final Map<int, bool> _tabIsLoading = {
-    TAB_POSTED_TASKS: false,
-    TAB_MY_WORKS: false
+    tabPostedTasks: false,
+    tabMyWorks: false
   };
-  final Map<int, bool> _tabLoaded = {
-    TAB_POSTED_TASKS: false,
-    TAB_MY_WORKS: false
-  };
-  final Map<int, String?> _tabErrors = {
-    TAB_POSTED_TASKS: null,
-    TAB_MY_WORKS: null
-  };
+  final Map<int, bool> _tabLoaded = {tabPostedTasks: false, tabMyWorks: false};
+  final Map<int, String?> _tabErrors = {tabPostedTasks: null, tabMyWorks: null};
 
   // 快取管理
   late ChatCacheManager _cacheManager;
@@ -143,23 +134,21 @@ class ChatListProvider extends ChangeNotifier {
 
   /// 獲取過濾後的已發布任務列表
   List<Map<String, dynamic>> get filteredPostedTasks {
-    if (!isTabLoaded(TAB_POSTED_TASKS)) {
+    if (!isTabLoaded(tabPostedTasks)) {
       debugPrint('⚠️ [ChatListProvider] Posted Tasks 分頁尚未載入完成');
       return [];
     }
 
     var tasks = List<Map<String, dynamic>>.from(_cacheManager.postedTasksCache);
 
-    // 應用搜尋過濾
+    // 應用搜尋過濾（僅任務標題）
     final query = searchQuery.trim().toLowerCase();
     if (query.isNotEmpty) {
       tasks = tasks.where((task) {
         final title = (task['title'] ?? '').toString().toLowerCase();
-        final description =
-            (task['description'] ?? '').toString().toLowerCase();
-        return title.contains(query) || description.contains(query);
+        return title.contains(query);
       }).toList();
-      debugPrint('🔍 [ChatListProvider] 搜尋過濾後任務數量: ${tasks.length}');
+      debugPrint('🔍 [ChatListProvider] 標題搜尋過濾後任務數量: ${tasks.length}');
     }
 
     // 應用位置過濾
@@ -182,33 +171,8 @@ class ChatListProvider extends ChangeNotifier {
       debugPrint('📊 [ChatListProvider] 狀態過濾後任務數量: ${tasks.length}');
     }
 
-    // 應用排序
-    switch (currentSortBy) {
-      case 'updated_time':
-        tasks.sort((a, b) {
-          final aTime =
-              DateTime.tryParse(a['updated_at'] ?? '') ?? DateTime(1970);
-          final bTime =
-              DateTime.tryParse(b['updated_at'] ?? '') ?? DateTime(1970);
-          return sortAscending
-              ? aTime.compareTo(bTime)
-              : bTime.compareTo(aTime);
-        });
-        break;
-      case 'status_order':
-        // 根據狀態排序（需要實現狀態優先級邏輯）
-        break;
-      case 'popularity':
-        // 根據應徵數量排序
-        tasks.sort((a, b) {
-          final aCount = _applicationsByTask[a['id']?.toString()]?.length ?? 0;
-          final bCount = _applicationsByTask[b['id']?.toString()]?.length ?? 0;
-          return sortAscending
-              ? aCount.compareTo(bCount)
-              : bCount.compareTo(aCount);
-        });
-        break;
-    }
+    // 應用混合排序（未讀優先 + 用戶選擇的排序）
+    tasks = _applyUnreadPrioritySort(tasks, currentSortBy, sortAscending);
 
     debugPrint('✅ [ChatListProvider] 過濾後的 Posted Tasks 數量: ${tasks.length}');
     return tasks;
@@ -216,23 +180,21 @@ class ChatListProvider extends ChangeNotifier {
 
   /// 獲取過濾後的我的工作列表
   List<Map<String, dynamic>> get filteredMyWorks {
-    if (!isTabLoaded(TAB_MY_WORKS)) {
+    if (!isTabLoaded(tabMyWorks)) {
       debugPrint('⚠️ [ChatListProvider] My Works 分頁尚未載入完成');
       return [];
     }
 
     var works = List<Map<String, dynamic>>.from(_myWorksApplications);
 
-    // 應用搜尋過濾
+    // 應用搜尋過濾（僅任務標題）
     final query = searchQuery.trim().toLowerCase();
     if (query.isNotEmpty) {
       works = works.where((work) {
         final title = (work['title'] ?? '').toString().toLowerCase();
-        final description =
-            (work['description'] ?? '').toString().toLowerCase();
-        return title.contains(query) || description.contains(query);
+        return title.contains(query);
       }).toList();
-      debugPrint('🔍 [ChatListProvider] My Works 搜尋過濾後數量: ${works.length}');
+      debugPrint('🔍 [ChatListProvider] My Works 標題搜尋過濾後數量: ${works.length}');
     }
 
     // 應用位置過濾
@@ -253,26 +215,8 @@ class ChatListProvider extends ChangeNotifier {
       debugPrint('📊 [ChatListProvider] My Works 狀態過濾後數量: ${works.length}');
     }
 
-    // 應用排序
-    switch (currentSortBy) {
-      case 'updated_time':
-        works.sort((a, b) {
-          final aTime =
-              DateTime.tryParse(a['updated_at'] ?? '') ?? DateTime(1970);
-          final bTime =
-              DateTime.tryParse(b['updated_at'] ?? '') ?? DateTime(1970);
-          return sortAscending
-              ? aTime.compareTo(bTime)
-              : bTime.compareTo(aTime);
-        });
-        break;
-      case 'status_order':
-        // 根據狀態排序
-        break;
-      case 'popularity':
-        // 根據應徵數量排序（對於 My Works 可能不太適用）
-        break;
-    }
+    // 應用混合排序（未讀優先 + 用戶選擇的排序）
+    works = _applyUnreadPrioritySort(works, currentSortBy, sortAscending);
 
     debugPrint('✅ [ChatListProvider] 過濾後的 My Works 數量: ${works.length}');
     return works;
@@ -281,9 +225,9 @@ class ChatListProvider extends ChangeNotifier {
   /// 獲取當前分頁的過濾後數據
   List<Map<String, dynamic>> get currentTabData {
     switch (_currentTabIndex) {
-      case TAB_POSTED_TASKS:
+      case tabPostedTasks:
         return filteredPostedTasks;
-      case TAB_MY_WORKS:
+      case tabMyWorks:
         return filteredMyWorks;
       default:
         return [];
@@ -292,6 +236,92 @@ class ChatListProvider extends ChangeNotifier {
 
   /// 獲取當前分頁的數據總數
   int get currentTabDataCount => currentTabData.length;
+
+  /// 應用混合排序（未讀優先 + 用戶選擇的排序）
+  List<Map<String, dynamic>> _applyUnreadPrioritySort(
+      List<Map<String, dynamic>> items, String baseSortBy, bool ascending) {
+    return items
+      ..sort((a, b) {
+        // 1. 首先按未讀狀態排序（有未讀的優先）
+        final aHasUnread = _hasUnreadMessages(a);
+        final bHasUnread = _hasUnreadMessages(b);
+
+        if (aHasUnread && !bHasUnread) return -1;
+        if (!aHasUnread && bHasUnread) return 1;
+
+        // 2. 未讀狀態相同時，按原有排序邏輯
+        return _compareBySortType(a, b, baseSortBy, ascending);
+      });
+  }
+
+  /// 檢查項目是否有未讀訊息
+  bool _hasUnreadMessages(Map<String, dynamic> item) {
+    // Posted Tasks: 檢查任一應徵者聊天室有未讀
+    if (_currentTabIndex == tabPostedTasks) {
+      final taskId = item['id']?.toString();
+      final applicants = _applicationsByTask[taskId] ?? [];
+      return applicants.any((app) {
+        final roomId = app['chat_room_id']?.toString();
+        return roomId != null && (_unreadByRoom[roomId] ?? 0) > 0;
+      });
+    }
+
+    // My Works: 檢查聊天室有未讀
+    if (_currentTabIndex == tabMyWorks) {
+      final roomId = item['chat_room_id']?.toString();
+      return roomId != null && (_unreadByRoom[roomId] ?? 0) > 0;
+    }
+
+    return false;
+  }
+
+  /// 根據排序類型比較兩個項目
+  int _compareBySortType(Map<String, dynamic> a, Map<String, dynamic> b,
+      String sortBy, bool ascending) {
+    switch (sortBy) {
+      case 'updated_time':
+        final aTime =
+            DateTime.tryParse(a['updated_at'] ?? '') ?? DateTime(1970);
+        final bTime =
+            DateTime.tryParse(b['updated_at'] ?? '') ?? DateTime(1970);
+        return ascending ? aTime.compareTo(bTime) : bTime.compareTo(aTime);
+
+      case 'status_id':
+        final aStatus = int.tryParse(a['status_id']?.toString() ?? '0') ?? 0;
+        final bStatus = int.tryParse(b['status_id']?.toString() ?? '0') ?? 0;
+        return ascending
+            ? aStatus.compareTo(bStatus)
+            : bStatus.compareTo(aStatus);
+
+      case 'popularity':
+        // Posted Tasks: 根據應徵數量排序
+        if (_currentTabIndex == tabPostedTasks) {
+          final aCount = _applicationsByTask[a['id']?.toString()]?.length ?? 0;
+          final bCount = _applicationsByTask[b['id']?.toString()]?.length ?? 0;
+          return ascending
+              ? aCount.compareTo(bCount)
+              : bCount.compareTo(aCount);
+        }
+        // My Works: 不適用，使用預設排序
+        return 0;
+
+      case 'relevance':
+        // 相關性排序（僅在搜尋時使用）
+        final aRelevance = a['_relevance'] ?? 0;
+        final bRelevance = b['_relevance'] ?? 0;
+        return ascending
+            ? aRelevance.compareTo(bRelevance)
+            : bRelevance.compareTo(aRelevance);
+
+      default:
+        // 預設按更新時間排序
+        final aTime =
+            DateTime.tryParse(a['updated_at'] ?? '') ?? DateTime(1970);
+        final bTime =
+            DateTime.tryParse(b['updated_at'] ?? '') ?? DateTime(1970);
+        return bTime.compareTo(aTime); // 降序
+    }
+  }
 
   /// 設置分頁載入狀態（只在變動時 notify）
   void setTabLoading(int tab, bool value) {
@@ -340,11 +370,11 @@ class ChatListProvider extends ChangeNotifier {
       selectedStatuses.isNotEmpty ||
       searchQuery.isNotEmpty;
 
-  bool get taskerFilterEnabled => _currentTabIndex == TAB_MY_WORKS;
+  bool get taskerFilterEnabled => _currentTabIndex == tabMyWorks;
 
   // 分頁類型判斷
-  bool get isPostedTasksTab => _currentTabIndex == TAB_POSTED_TASKS;
-  bool get isMyWorksTab => _currentTabIndex == TAB_MY_WORKS;
+  bool get isPostedTasksTab => _currentTabIndex == tabPostedTasks;
+  bool get isMyWorksTab => _currentTabIndex == tabMyWorks;
 
   // 未讀數管理 getters
   int unreadForRoom(String roomId) => _unreadByRoom[roomId] ?? 0;
@@ -362,7 +392,7 @@ class ChatListProvider extends ChangeNotifier {
 
   /// 初始化 TabController
   void initializeTabController(TickerProvider vsync,
-      {int initialTab = TAB_POSTED_TASKS}) {
+      {int initialTab = tabPostedTasks}) {
     if (_isInitialized) return;
 
     _tabController = TabController(
@@ -505,7 +535,7 @@ class ChatListProvider extends ChangeNotifier {
 
     try {
       switch (tabIndex) {
-        case TAB_POSTED_TASKS:
+        case tabPostedTasks:
           debugPrint('📡 [ChatListProvider] 開始載入 Posted Tasks 數據');
 
           // 先載入任務清單和狀態，否則 tasks.length 永遠是 0
@@ -517,7 +547,7 @@ class ChatListProvider extends ChangeNotifier {
           await _loadApplicationsForPostedTasks();
           debugPrint('✅ [ChatListProvider] Posted Tasks 數據載入完成');
           break;
-        case TAB_MY_WORKS:
+        case tabMyWorks:
           debugPrint('📡 [ChatListProvider] 開始載入 My Works 數據');
           await _loadMyWorksData();
           debugPrint('✅ [ChatListProvider] My Works 數據載入完成');
@@ -590,21 +620,48 @@ class ChatListProvider extends ChangeNotifier {
     _emit('criteria');
   }
 
-  /// 設置排序方式
-  void setSortOrder(String sortBy, {bool ascending = false}) {
-    if (_currentSortBy[_currentTabIndex] != sortBy ||
-        _sortAscending[_currentTabIndex] != ascending) {
+  /// 設置排序方式（支援 toggle 功能）
+  void setSortOrder(String sortBy, {bool? ascending}) {
+    final currentSortBy = _currentSortBy[_currentTabIndex];
+    final currentAscending = _sortAscending[_currentTabIndex] ?? false;
+
+    // 如果選擇相同的排序方式，則 toggle 升序/降序
+    if (currentSortBy == sortBy && ascending == null) {
+      _sortAscending[_currentTabIndex] = !currentAscending;
+      debugPrint(
+          '🔄 [ChatListProvider] Toggle 排序方向: ${!currentAscending ? "升序" : "降序"}');
+    } else {
+      // 選擇不同的排序方式，使用預設方向或指定方向
       _currentSortBy[_currentTabIndex] = sortBy;
-      _sortAscending[_currentTabIndex] = ascending;
+      _sortAscending[_currentTabIndex] =
+          ascending ?? _getDefaultAscending(sortBy);
+      debugPrint(
+          '🔄 [ChatListProvider] 切換排序方式: $sortBy (${(_sortAscending[_currentTabIndex] ?? false) ? "升序" : "降序"})');
+    }
 
-      // 追蹤用戶手動選擇的排序
-      if (sortBy != 'relevance' ||
-          _searchQueries[_currentTabIndex]?.isNotEmpty == true) {
-        _hasManualSortOverride[_currentTabIndex] = true;
-        debugPrint('🔍 [ChatListProvider] 用戶手動選擇排序: $sortBy');
-      }
+    // 追蹤用戶手動選擇的排序
+    if (sortBy != 'relevance' ||
+        _searchQueries[_currentTabIndex]?.isNotEmpty == true) {
+      _hasManualSortOverride[_currentTabIndex] = true;
+      debugPrint('🔍 [ChatListProvider] 用戶手動選擇排序: $sortBy');
+    }
 
-      _emit('sort_changed');
+    _emit('sort_changed');
+  }
+
+  /// 獲取排序方式的預設升序/降序設定
+  bool _getDefaultAscending(String sortBy) {
+    switch (sortBy) {
+      case 'status_id':
+        return true; // 狀態 ID 升序
+      case 'updated_time':
+        return false; // 更新時間降序（最新的在前）
+      case 'relevance':
+        return false; // 相關性降序（最相關的在前）
+      case 'applicant_count':
+        return false; // 應徵者數量降序（最多的在前）
+      default:
+        return false; // 預設降序
     }
   }
 
@@ -810,7 +867,7 @@ class ChatListProvider extends ChangeNotifier {
     _applicationsByTask.clear();
 
     // 重新載入 Posted Tasks 分頁數據
-    await _loadTabData(TAB_POSTED_TASKS);
+    await _loadTabData(tabPostedTasks);
 
     debugPrint('✅ [ChatListProvider] Posted Tasks 應徵數據刷新完成');
   }
@@ -844,12 +901,12 @@ class ChatListProvider extends ChangeNotifier {
   /// 獲取分頁的 ID 綁定規則
   Map<String, String> getTabIdBindingRules(int tabIndex) {
     switch (tabIndex) {
-      case TAB_POSTED_TASKS:
+      case tabPostedTasks:
         return {
           'task_card': 'task_id',
           'applicant_card': 'room_id',
         };
-      case TAB_MY_WORKS:
+      case tabMyWorks:
         return {
           'task_card': 'room_id',
         };
@@ -861,9 +918,9 @@ class ChatListProvider extends ChangeNotifier {
   /// 檢查當前分頁狀態
   String getCurrentTabDescription() {
     switch (_currentTabIndex) {
-      case TAB_POSTED_TASKS:
+      case tabPostedTasks:
         return 'Posted Tasks (任務列表)';
-      case TAB_MY_WORKS:
+      case tabMyWorks:
         return 'My Works (我的應徵)';
       default:
         return 'Unknown Tab';
@@ -881,8 +938,8 @@ class ChatListProvider extends ChangeNotifier {
       'my_works_count': _cacheManager.myWorksCache.length,
       'unread_rooms_count': _unreadByRoom.length,
       'tab_has_unread': {
-        'posted_tasks': _tabHasUnread[TAB_POSTED_TASKS] ?? false,
-        'my_works': _tabHasUnread[TAB_MY_WORKS] ?? false,
+        'posted_tasks': _tabHasUnread[tabPostedTasks] ?? false,
+        'my_works': _tabHasUnread[tabMyWorks] ?? false,
       },
     };
   }
@@ -892,12 +949,12 @@ class ChatListProvider extends ChangeNotifier {
     if (!_cacheManager.isCacheValid) return false;
 
     switch (tabIndex) {
-      case TAB_POSTED_TASKS:
+      case tabPostedTasks:
         final hasPostedTasks = _cacheManager.postedTasksCache.isNotEmpty;
         debugPrint(
             '🔍 [Cache Check] Posted Tasks: $hasPostedTasks (${_cacheManager.postedTasksCache.length})');
         return hasPostedTasks;
-      case TAB_MY_WORKS:
+      case tabMyWorks:
         final hasMyWorks = _cacheManager.myWorksCache.isNotEmpty;
         debugPrint(
             '🔍 [Cache Check] My Works: $hasMyWorks (${_cacheManager.myWorksCache.length})');
@@ -956,7 +1013,7 @@ class ChatListProvider extends ChangeNotifier {
         _checkForUpdatesAfterEnter();
       } else {
         debugPrint('🔄 快取無效或為空，執行完整載入...');
-        await _loadChatData();
+        await _loadChatDataDeprecated();
       }
     } catch (e) {
       debugPrint('❌ 快取初始化失敗: $e');
@@ -1059,8 +1116,8 @@ class ChatListProvider extends ChangeNotifier {
   }
 
   /// 同步載入所有聊天相關數據（已棄用，改用分頁級別載入）
-  @deprecated
-  Future<void> _loadChatData() async {
+  @Deprecated('Use tab-specific loading methods instead')
+  Future<void> _loadChatDataDeprecated() async {
     try {
       debugPrint('🔄 [DEPRECATED] 開始同步載入聊天數據...');
 
@@ -1183,7 +1240,7 @@ class ChatListProvider extends ChangeNotifier {
   }
 
   /// 強制刷新所有數據（已棄用，改用分頁級別刷新）
-  @deprecated
+  @Deprecated('Use tab-specific refresh methods instead')
   Future<void> forceRefresh() async {
     debugPrint('🔄 [DEPRECATED] 強制刷新所有數據');
 

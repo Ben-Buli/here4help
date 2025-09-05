@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:here4help/chat/utils/action_bar_config.dart';
+import 'package:here4help/chat/widgets/task_card_components.dart';
+import 'package:here4help/chat/utils/application_status_utils.dart';
 
 /// 動態 Action Bar 組件
 /// 根據任務狀態和用戶角色動態顯示操作按鈕
@@ -12,6 +14,7 @@ class DynamicActionBar extends StatelessWidget {
   final String? statusDisplayName;
   final double? progressRatio;
   final Color? backgroundColor;
+  final String? colorScheme; // 新增：指定配色方案 ('posted_tasks' 或 'my_works')
 
   const DynamicActionBar({
     super.key,
@@ -22,6 +25,7 @@ class DynamicActionBar extends StatelessWidget {
     this.statusDisplayName,
     this.progressRatio,
     this.backgroundColor,
+    this.colorScheme, // 新增參數
   });
 
   @override
@@ -130,13 +134,14 @@ class DynamicActionBar extends StatelessWidget {
   Widget _buildActionBar(BuildContext context, List<ActionBarAction> actions) {
     debugPrint('🔍 [DynamicActionBar] _buildActionBar() 開始');
     debugPrint('  - actions 數量: ${actions.length}');
+    debugPrint('  - colorScheme: $colorScheme');
 
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: Container(
           decoration: BoxDecoration(
-            color: backgroundColor ?? _getGlassNavColor(context),
+            color: _getContextualBackgroundColor(context),
           ),
           padding: const EdgeInsets.only(top: 12, bottom: 10),
           child: Row(
@@ -248,6 +253,98 @@ class DynamicActionBar extends StatelessWidget {
     );
   }
 
+  /// 獲取上下文相關的背景顏色
+  /// 根據配色方案和任務狀態返回適當的背景色
+  Color _getContextualBackgroundColor(BuildContext context) {
+    // 如果指定了配色方案，使用對應的配色邏輯
+    debugPrint(
+        '🔍 [_getContextualBackgroundColor()] colorScheme: $colorScheme');
+    if (colorScheme != null) {
+      switch (colorScheme) {
+        case 'posted_tasks':
+          return _getPostedTasksBackgroundColor(context);
+        case 'my_works':
+          return _getMyWorksBackgroundColor(context);
+        default:
+          return _getGlassNavColor(context);
+      }
+    }
+
+    // 預設使用玻璃效果導航顏色
+    return _getGlassNavColor(context);
+  }
+
+  /// 獲取 Posted Tasks 分頁的背景色（基於 tasks.status_id）
+  Color _getPostedTasksBackgroundColor(BuildContext context) {
+    // 將 TaskStatus 轉換為對應的狀態字符串
+    final statusString = _taskStatusToString(taskStatus);
+
+    // 使用 TaskCardUtils.getProgressData 獲取配色
+    final progressData = TaskCardUtils.getProgressData(statusString);
+    final baseColor = progressData['color'] as Color?;
+
+    if (baseColor != null) {
+      // 使用狀態對應的顏色，但降低透明度以保持玻璃效果
+      return baseColor.withOpacity(0.3);
+    }
+
+    // 備用方案
+    return _getGlassNavColor(context);
+  }
+
+  /// 獲取 My Works 分頁的背景色（基於 task_applications.status）
+  Color _getMyWorksBackgroundColor(BuildContext context) {
+    // 將 TaskStatus 轉換為對應的應用狀態字符串
+    final applicationStatus = _taskStatusToApplicationStatus(taskStatus);
+
+    // 使用 ApplicationStatusUtils.getStatusColor 獲取配色
+    final statusColor =
+        ApplicationStatusUtils.getStatusColor(applicationStatus);
+
+    // 使用狀態對應的顏色，但降低透明度以保持玻璃效果
+    return statusColor.withOpacity(0.3);
+  }
+
+  /// 將 TaskStatus 轉換為狀態字符串
+  String _taskStatusToString(TaskStatus status) {
+    switch (status) {
+      case TaskStatus.open:
+        return 'Open';
+      case TaskStatus.inProgress:
+        return 'In Progress';
+      case TaskStatus.pendingConfirmation:
+        return 'Pending Confirmation';
+      case TaskStatus.completed:
+        return 'Completed';
+      case TaskStatus.dispute:
+        return 'Dispute';
+      case TaskStatus.cancelled:
+        return 'Cancelled';
+      case TaskStatus.rejected:
+        return 'Rejected';
+    }
+  }
+
+  /// 將 TaskStatus 轉換為應用狀態字符串
+  String _taskStatusToApplicationStatus(TaskStatus status) {
+    switch (status) {
+      case TaskStatus.open:
+        return 'applied'; // 任務開放時，應徵者狀態為已投遞
+      case TaskStatus.inProgress:
+        return 'accepted'; // 任務進行中時，應徵者狀態為已接受
+      case TaskStatus.pendingConfirmation:
+        return 'pending'; // 等待確認時，應徵者狀態為待確認
+      case TaskStatus.completed:
+        return 'completed'; // 任務完成時，應徵者狀態為已完成
+      case TaskStatus.dispute:
+        return 'dispute'; // 爭議時，應徵者狀態為爭議中
+      case TaskStatus.cancelled:
+        return 'cancelled'; // 任務取消時，應徵者狀態為已取消
+      case TaskStatus.rejected:
+        return 'rejected'; // 任務拒絕時，應徵者狀態為被拒絕
+    }
+  }
+
   /// 獲取玻璃效果導航顏色
   Color _getGlassNavColor(BuildContext context) {
     final theme = Theme.of(context);
@@ -278,8 +375,6 @@ class DynamicActionBar extends StatelessWidget {
         return 'Cancelled';
       case TaskStatus.rejected:
         return 'Rejected';
-      default:
-        return 'Unknown';
     }
   }
 }
@@ -350,6 +445,7 @@ class ActionBarBuilder {
     String? statusDisplayName,
     double? progressRatio,
     Color? backgroundColor,
+    String? colorScheme, // 新增配色方案參數
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -362,6 +458,7 @@ class ActionBarBuilder {
             showStatusBar: true,
             statusDisplayName: statusDisplayName,
             progressRatio: progressRatio,
+            colorScheme: colorScheme, // 傳遞配色方案
           ),
         if (_actions.isNotEmpty)
           ClipRect(
@@ -377,11 +474,12 @@ class ActionBarBuilder {
                   children: _actions
                       .map(
                         (action) => Expanded(
-                          child: const DynamicActionBar(
+                          child: DynamicActionBar(
                             taskStatus: TaskStatus.open, // 佔位符
                             userRole: UserRole.participant, // 佔位符
                             actionCallbacks: {},
                             showStatusBar: false,
+                            colorScheme: colorScheme, // 傳遞配色方案
                           )._buildActionButton(context, action),
                         ),
                       )

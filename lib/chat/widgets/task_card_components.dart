@@ -78,6 +78,8 @@ class TaskCardUtils {
     final displayStatus = TaskStatus.statusString[status] ?? status;
 
     const int colorRates = 200;
+
+    /// (Tasker)備註的是已棄用的舊狀態命名方式，請使用新的狀態命名方式
     switch (displayStatus) {
       case 'Open':
         return {'progress': 0.0, 'color': Colors.blue[colorRates]!};
@@ -89,14 +91,13 @@ class TaskCardUtils {
         return {'progress': 1.0, 'color': Colors.lightGreen[colorRates]!};
       case 'Dispute':
         return {'progress': 0.75, 'color': Colors.brown[colorRates]!};
-      case 'Applying (Tasker)':
-        return {'progress': 0.0, 'color': Colors.lightGreenAccent[colorRates]!};
-      case 'In Progress (Tasker)':
-        return {'progress': 0.25, 'color': Colors.orange[colorRates]!};
-      case 'Completed (Tasker)':
-        return {'progress': 1.0, 'color': Colors.green[colorRates]!};
-      case 'Rejected (Tasker)':
+      case 'Rejected':
         return {'progress': 1.0, 'color': Colors.blueGrey[colorRates]!};
+      case 'Cancelled':
+        return {
+          'progress': 1.0,
+          'color': const Color.fromARGB(255, 114, 119, 122)
+        };
       default:
         return {
           'progress': null,

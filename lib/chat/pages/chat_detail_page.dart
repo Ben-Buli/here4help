@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:here4help/constants/task_status.dart' as TaskStatusConstants;
 import 'package:here4help/chat/widgets/dynamic_action_bar.dart';
 import 'package:here4help/chat/utils/action_bar_config.dart';
+import 'package:here4help/chat/utils/application_status_utils.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -218,6 +219,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     );
   }
 
+  /// 取得玻璃導航顏色
   Color _glassNavColor(BuildContext context) {
     try {
       final themeManager =
@@ -226,6 +228,61 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     } catch (_) {
       final appBarBg = Theme.of(context).appBarTheme.backgroundColor;
       return (appBarBg ?? Colors.white).withOpacity(0.3);
+    }
+  }
+
+  /// 根據用戶角色獲取配色方案
+  String _getColorSchemeForUserRole() {
+    // 根據用戶角色決定使用哪種配色方案
+    switch (_userRole.toLowerCase()) {
+      case 'creator':
+        return 'posted_tasks'; // 發布者使用 Posted Tasks 配色（基於 tasks.status_id）
+      case 'participant':
+        return 'my_works'; // 應徵者使用 My Works 配色（基於 task_applications.status）
+      default:
+        return 'posted_tasks'; // 預設使用 Posted Tasks 配色
+    }
+  }
+
+  /// 根據用戶角色獲取狀態顯示名稱
+  String? _getStatusDisplayNameForUserRole() {
+    debugPrint('🔍 [_getStatusDisplayNameForUserRole] 用戶角色: $_userRole');
+
+    switch (_userRole.toLowerCase()) {
+      case 'creator':
+        // 發布者：顯示任務狀態（來自 tasks.status）
+        final taskStatusDisplay = _task?['status']?['display_name'];
+        debugPrint(
+            '🔍 [_getStatusDisplayNameForUserRole] Creator - 任務狀態: $taskStatusDisplay');
+        return taskStatusDisplay;
+      case 'participant':
+        // 應徵者：顯示應徵狀態（來自 task_applications.status）
+        // 後端 API 將 application_status 放在 task 物件中
+        final applicationStatus = _task?['application_status']?.toString();
+        debugPrint(
+            '🔍 [_getStatusDisplayNameForUserRole] Participant - 應徵狀態: $applicationStatus');
+        debugPrint(
+            '🔍 [_getStatusDisplayNameForUserRole] Participant - _task: $_task');
+
+        if (applicationStatus != null && applicationStatus.isNotEmpty) {
+          // 使用 ApplicationStatusUtils 獲取顯示名稱
+          final displayName =
+              ApplicationStatusUtils.getDisplayName(applicationStatus);
+          debugPrint(
+              '🔍 [_getStatusDisplayNameForUserRole] Participant - 轉換後顯示名稱: $displayName');
+          return displayName;
+        }
+        // 備用方案：如果沒有應徵狀態，使用任務狀態
+        final fallbackStatus = _task?['status']?['display_name'];
+        debugPrint(
+            '🔍 [_getStatusDisplayNameForUserRole] Participant - 備用任務狀態: $fallbackStatus');
+        return fallbackStatus;
+      default:
+        // 預設使用任務狀態
+        final defaultStatus = _task?['status']?['display_name'];
+        debugPrint(
+            '🔍 [_getStatusDisplayNameForUserRole] Default - 任務狀態: $defaultStatus');
+        return defaultStatus;
     }
   }
 
@@ -2253,15 +2310,15 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     final messageData = _chatMessages[adjustedIndex];
 
                     // 添加除錯資訊
-                    debugPrint(
-                        '🔍 [Chat Detail] 訊息資料: messageData=$messageData');
-                    debugPrint(
-                        '🔍 [Chat Detail] 訊息來源: messageFromUserId=${messageData['from_user_id']}, currentUserId=$_currentUserId');
+                    // debugPrint(
+                    //     '🔍 [Chat Detail] 訊息資料: messageData=$messageData');
+                    // debugPrint(
+                    //     '🔍 [Chat Detail] 訊息來源: messageFromUserId=${messageData['from_user_id']}, currentUserId=$_currentUserId');
 
                     // 檢查是否為我發送的訊息
                     final isFromMe = _currentUserId != null &&
                         messageData['from_user_id'] == _currentUserId;
-                    debugPrint('🔍 [Chat Detail] 是否為我的訊息: $isFromMe');
+                    // debugPrint('🔍 [Chat Detail] 是否為我的訊息: $isFromMe');
 
                     // 使用新的統一訊息渲染方法
                     return _buildMessageItem(messageData);
@@ -2357,10 +2414,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                   userRole: ActionBarConfigManager.parseUserRole(_userRole),
                   actionCallbacks: _buildActionCallbacks(),
                   showStatusBar: true,
-                  statusDisplayName: _task!['status']?['display_name'],
+                  statusDisplayName:
+                      _getStatusDisplayNameForUserRole(), // 根據用戶角色獲取狀態顯示名稱
                   progressRatio: double.tryParse(
                       _task!['status']?['progress_ratio']?.toString() ?? '0'),
                   backgroundColor: _glassNavColor(context),
+                  colorScheme: _getColorSchemeForUserRole(), // 根據用戶角色設定配色方案
                 ),
         // ActionBar + Input 區塊採用與 AppBar 相同的背景/前景配色，並提供 hover/pressed/focus 覆蓋色
         Builder(builder: (context) {
@@ -2499,7 +2558,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                                     border: InputBorder.none,
                                     // 調整內邊距：左側加 8，並垂直置中
                                     contentPadding: EdgeInsets.only(
-                                        left: 8, top: 12, bottom: 12),
+                                        left: 14, top: 12, bottom: 12),
                                     hintText: 'Type a message',
                                   ),
                                   style: TextStyle(color: fg),
@@ -2835,11 +2894,15 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         posterId: _currentUserId.toString(),
       );
 
+      debugPrint('✅ [Accept] API 調用成功，結果: $result');
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Congratulations! You\'ve been selected as the tasker for this task. Let\'s get started!'),
+          SnackBar(
+            content:
+                Text(result['message'] ?? 'Application accepted successfully!'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -2885,11 +2948,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           if (provider != null) {
             // 根據用戶角色刷新對應的標籤頁
             if (_userRole == 'creator') {
-              provider
-                  .checkAndTriggerTabLoad(ChatListProvider.TAB_POSTED_TASKS);
+              provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
               debugPrint('✅ [Accept] 已通知 Provider 刷新 POSTED_TASKS');
             } else {
-              provider.checkAndTriggerTabLoad(ChatListProvider.TAB_MY_WORKS);
+              provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
               debugPrint('✅ [Accept] 已通知 Provider 刷新 MY_WORKS');
             }
             // 強制刷新快取
@@ -2901,9 +2963,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               // 透過 Provider 的事件機制定義：這裡只呼叫既有方法，
               // 具體分頁元件會在 build 中使用 RefreshIndicator 與 PagingController.refresh()
               // 因此這裡不直接持有 controller，避免相依。
-              provider
-                  .checkAndTriggerTabLoad(ChatListProvider.TAB_POSTED_TASKS);
-              provider.checkAndTriggerTabLoad(ChatListProvider.TAB_MY_WORKS);
+              provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+              provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
             } catch (_) {}
           }
         } catch (e) {
@@ -2913,8 +2974,28 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     } catch (e) {
       debugPrint('❌ Accept application failed: $e');
       if (mounted) {
+        // 顯示具體的錯誤訊息
+        String errorMessage = 'Failed to accept application';
+        if (e.toString().contains('already been assigned')) {
+          errorMessage =
+              'This user has already been assigned as the tasker for this task.';
+        } else if (e.toString().contains('already has an assigned tasker')) {
+          errorMessage =
+              'This task already has an assigned tasker. Cannot accept another application.';
+        } else if (e.toString().contains('must be in open status')) {
+          errorMessage = 'Task must be in open status to accept applications.';
+        } else if (e.toString().contains('Only task creator can accept')) {
+          errorMessage = 'Only task creator can accept applications.';
+        } else {
+          errorMessage = e.toString().replaceFirst('Exception: ', '');
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to accept application: $e')),
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     }

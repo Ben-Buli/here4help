@@ -17,7 +17,7 @@ const REJECT_MESSAGE = "Unfortunately, you were not selected as the tasker for t
 
 try {
   if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Method not allowed', 405);
+    Response::methodNotAllowed('Method not allowed');
   }
 
   // Auth（取得操作者）
@@ -47,17 +47,29 @@ try {
     [$task_id]
   );
   if (!$task) {
-    Response::error('Task not found', 404);
+    Response::notFound('Task not found');
   }
 
   // 驗證操作者是否為任務創建者
   if ((int)$task['creator_id'] !== (int)$poster_id) {
-    Response::error('Only task creator can accept applications', 403);
+    Response::forbidden('Only task creator can accept applications');
   }
 
   // 驗證任務狀態必須為 open
   if ($task['status_code'] !== 'open') {
-    Response::error('Task must be in open status to accept applications', 400);
+    // 檢查是否已經有參與者
+    if (!empty($task['participant_id'])) {
+      $existingParticipant = $db->fetch("SELECT name FROM users WHERE id = ?", [$task['participant_id']]);
+      $participantName = $existingParticipant ? $existingParticipant['name'] : 'Unknown User';
+      
+      if ((int)$task['participant_id'] === (int)$target_user_id) {
+        Response::badRequest("This user has already been assigned as the tasker for this task. Current participant: $participantName");
+      } else {
+        Response::badRequest("This task already has an assigned tasker. Cannot accept another application. Current participant: $participantName");
+      }
+    } else {
+      Response::badRequest('Task must be in open status to accept applications');
+    }
   }
 
   // 確定要指派的用戶ID
@@ -71,7 +83,7 @@ try {
       [$application_id, $task_id]
     );
     if (!$application) {
-      Response::error('Application not found', 404);
+      Response::notFound('Application not found');
     }
     $target_user_id = $application['user_id'];
   }
@@ -79,7 +91,7 @@ try {
   // 驗證目標用戶存在
   $targetUser = $db->fetch("SELECT id, name FROM users WHERE id = ?", [$target_user_id]);
   if (!$targetUser) {
-    Response::error('Target user not found', 404);
+    Response::notFound('Target user not found');
   }
 
   // 開始資料庫交易
@@ -92,7 +104,7 @@ try {
         $db->query("UPDATE tasks SET status_id = ?, participant_id = ?, updated_at = NOW() WHERE id = ?", 
           [2, $target_user_id, $task_id]);
       } catch (Exception $e) {
-        Response::error('Failed to update task status to in_progress(id: 2): ' . $e->getMessage(), 500);
+        Response::serverError('Failed to update task status to in_progress(id: 2): ' . $e->getMessage());
       }
    
 
@@ -266,6 +278,6 @@ try {
   }
 
 } catch (Exception $e) {
-  Response::error('Server error: ' . $e->getMessage(), 500);
+  Response::serverError('Server error: ' . $e->getMessage());
 }
 ?>

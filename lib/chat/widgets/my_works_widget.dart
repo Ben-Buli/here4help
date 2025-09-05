@@ -12,6 +12,7 @@ import 'package:here4help/chat/utils/avatar_error_cache.dart';
 import 'package:here4help/chat/services/smart_refresh_strategy.dart';
 import 'package:here4help/chat/services/chat_navigation_service.dart';
 import 'package:here4help/chat/utils/application_status_utils.dart';
+import 'package:here4help/chat/widgets/highlighted_text.dart';
 
 /// My Works 分頁組件
 /// 從原 ChatListPage 中抽取的 My Works 相關功能
@@ -102,17 +103,17 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     if (chatProvider.isMyWorksTab) {
       debugPrint('🔍 [My Works] 當前為 My Works 分頁，檢查載入狀態');
       debugPrint(
-          '  - 分頁載入狀態: ${chatProvider.isTabLoading(ChatListProvider.TAB_MY_WORKS)}');
+          '  - 分頁載入狀態: ${chatProvider.isTabLoading(ChatListProvider.tabMyWorks)}');
       debugPrint(
-          '  - 分頁載入完成: ${chatProvider.isTabLoaded(ChatListProvider.TAB_MY_WORKS)}');
+          '  - 分頁載入完成: ${chatProvider.isTabLoaded(ChatListProvider.tabMyWorks)}');
       debugPrint(
-          '  - 分頁錯誤: ${chatProvider.getTabError(ChatListProvider.TAB_MY_WORKS)}');
+          '  - 分頁錯誤: ${chatProvider.getTabError(ChatListProvider.tabMyWorks)}');
 
       // 如果分頁尚未載入且不在載入中，觸發載入
-      if (!chatProvider.isTabLoaded(ChatListProvider.TAB_MY_WORKS) &&
-          !chatProvider.isTabLoading(ChatListProvider.TAB_MY_WORKS)) {
+      if (!chatProvider.isTabLoaded(ChatListProvider.tabMyWorks) &&
+          !chatProvider.isTabLoading(ChatListProvider.tabMyWorks)) {
         debugPrint('🚀 [My Works] 觸發分頁數據載入');
-        chatProvider.checkAndTriggerTabLoad(ChatListProvider.TAB_MY_WORKS);
+        chatProvider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
       } else {
         debugPrint('✅ [My Works] 分頁已載入或正在載入中');
       }
@@ -172,7 +173,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       debugPrint(
           '🔍 [My Works] 未讀統計: 總房間=${provider.unreadByRoom.length}, 有未讀房間=$roomsWithUnread, 總未讀數=$totalUnreadCount');
 
-      final oldState = provider.hasUnreadForTab(ChatListProvider.TAB_MY_WORKS);
+      final oldState = provider.hasUnreadForTab(ChatListProvider.tabMyWorks);
       debugPrint('🔍 [My Works] 狀態變化: $oldState -> $hasUnread');
 
       // 使用智能刷新策略的狀態更新器
@@ -187,7 +188,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
           }
           try {
             debugPrint('✅ [My Works] 執行 Tab 未讀狀態更新: $hasUnread');
-            provider.setTabHasUnread(ChatListProvider.TAB_MY_WORKS, hasUnread);
+            provider.setTabHasUnread(ChatListProvider.tabMyWorks, hasUnread);
             debugPrint('✅ [My Works] Tab 未讀狀態更新完成');
           } catch (e) {
             debugPrint('❌ [My Works] setTabHasUnread 失敗: $e');
@@ -218,11 +219,14 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       }
     });
 
-    // 主動載入第一頁數據
+    // 主動載入數據到 ChatListProvider
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        debugPrint('🚀 [My Works] 初始化時主動載入第一頁數據');
-        _fetchMyWorksPage(0);
+        debugPrint('🚀 [My Works] 初始化時載入數據到 ChatListProvider');
+        final chatProvider = _getChatProvider();
+        if (chatProvider != null) {
+          _refreshMyWorksData(chatProvider);
+        }
       }
     });
 
@@ -307,21 +311,25 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
       // 只有當前是 My Works 分頁時才刷新
       if (chatProvider.isMyWorksTab) {
-        // 使用智能刷新策略決策
+        // 搜尋和篩選變化時，不需要重新載入數據，只需要觸發 UI 重建
+        // 因為篩選邏輯已經在 ChatListProvider.filteredMyWorks 中處理
+        debugPrint('✅ [My Works] 篩選條件變化，觸發 UI 重建');
+
+        // 使用智能刷新策略決策（僅在必要時重新載入數據）
         SmartRefreshStrategy.executeSmartRefresh(
           refreshKey: 'MyWorks-Provider',
           refreshCallback: () {
             if (!mounted) return;
             try {
-              debugPrint('✅ [My Works] 執行智能刷新');
-              _pagingController.refresh();
+              debugPrint('✅ [My Works] 執行數據重新載入');
+              _refreshMyWorksData(chatProvider);
             } catch (e) {
-              debugPrint('❌ [My Works] 智能刷新失敗: $e');
+              debugPrint('❌ [My Works] 數據重新載入失敗: $e');
             }
           },
           hasActiveFilters: chatProvider.hasActiveFilters,
           searchQuery: chatProvider.searchQuery,
-          isUnreadUpdate: true, // 假設這是未讀狀態更新觸發的
+          isUnreadUpdate: false, // 這不是未讀狀態更新
           forceRefresh: false,
           enableDebounce: true,
         );
@@ -485,37 +493,88 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     }).toList();
   }
 
+  /// 刷新 My Works 數據到 ChatListProvider
+  Future<void> _refreshMyWorksData(ChatListProvider chatProvider) async {
+    try {
+      debugPrint('🔄 [My Works] 開始刷新數據到 ChatListProvider...');
+
+      // 安全地獲取 UserService
+      UserService? userService;
+      try {
+        userService = context.read<UserService>();
+      } catch (e) {
+        debugPrint('⚠️ [My Works] 無法獲取 UserService: $e');
+        return;
+      }
+
+      final currentUserId = userService.currentUser?.id;
+      if (currentUserId == null) {
+        debugPrint('❌ [My Works] 用戶未登入，無法刷新數據');
+        return;
+      }
+
+      // 載入所有 My Works 數據（不分頁）
+      final taskService = TaskService();
+      final page = await taskService.fetchMyWorksApplications(
+        userId: currentUserId.toString(),
+        limit: 100, // 載入更多數據
+        offset: 0,
+      );
+
+      final processedData = _processApplicationsFromService(page.items);
+
+      // 更新 ChatListProvider 的 My Works 快取
+      chatProvider.myWorksApplications.clear();
+      chatProvider.myWorksApplications.addAll(processedData);
+
+      debugPrint('✅ [My Works] 數據刷新完成: ${processedData.length} 個任務');
+    } catch (e) {
+      debugPrint('❌ [My Works] 刷新數據失敗: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        RefreshIndicator(
-          onRefresh: () async {
-            final chatProvider = _getChatProvider();
-            if (chatProvider != null) {
-              await chatProvider.cacheManager.forceRefresh();
-            }
-            _pagingController.refresh();
-          },
-          child: PagedListView<int, Map<String, dynamic>>(
-            padding: const EdgeInsets.only(
-              left: 12,
-              right: 12,
-              top: 12,
-              bottom: 80, // 保留底部距離，避免被 scroll to top button 遮擋
-            ),
-            pagingController: _pagingController,
-            builderDelegate: PagedChildBuilderDelegate<Map<String, dynamic>>(
-              itemBuilder: (context, task, index) {
-                return _buildTaskCard(task);
+        // 使用 ChatListProvider 的篩選結果（支援即時搜尋和篩選）
+        Consumer<ChatListProvider>(
+          builder: (context, chatProvider, child) {
+            final filteredWorks = chatProvider.filteredMyWorks;
+
+            debugPrint(
+                '🔍 [My Works] 使用 ChatListProvider 篩選結果: ${filteredWorks.length} 個任務');
+            debugPrint('  - 搜尋查詢: "${chatProvider.searchQuery}"');
+            debugPrint('  - 選中位置: ${chatProvider.selectedLocations}');
+            debugPrint('  - 選中狀態: ${chatProvider.selectedStatuses}');
+
+            return RefreshIndicator(
+              onRefresh: () async {
+                try {
+                  await chatProvider.cacheManager.forceRefresh();
+                  // 重新載入 My Works 數據到 Provider 的快取中
+                  await _refreshMyWorksData(chatProvider);
+                } catch (e) {
+                  debugPrint('❌ [My Works] 刷新失敗: $e');
+                }
               },
-              firstPageProgressIndicatorBuilder: (context) =>
-                  _buildLoadingAnimation(),
-              newPageProgressIndicatorBuilder: (context) =>
-                  _buildPaginationLoadingAnimation(),
-              noItemsFoundIndicatorBuilder: (context) => _buildEmptyState(),
-            ),
-          ),
+              child: filteredWorks.isEmpty
+                  ? _buildEmptyState()
+                  : ListView.builder(
+                      padding: const EdgeInsets.only(
+                        left: 12,
+                        right: 12,
+                        top: 12,
+                        bottom: 80,
+                      ),
+                      itemCount: filteredWorks.length,
+                      itemBuilder: (context, index) {
+                        final task = filteredWorks[index];
+                        return _buildTaskCard(task);
+                      },
+                    ),
+            );
+          },
         ),
         // Scroll to top button
         _buildScrollToTopButton(),
@@ -646,14 +705,29 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                task['title'] ?? 'Untitled Task',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              child: Consumer<ChatListProvider>(
+                                builder: (context, chatProvider, child) {
+                                  return HighlightedText(
+                                    text: task['title'] ?? 'Untitled Task',
+                                    highlight: chatProvider.searchQuery,
+                                    normalStyle: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black,
+                                    ),
+                                    highlightStyle: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      backgroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .primaryContainer,
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  );
+                                },
                               ),
                             ),
                           ],

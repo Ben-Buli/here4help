@@ -18,6 +18,7 @@ import 'package:here4help/chat/services/chat_navigation_service.dart';
 import 'package:here4help/chat/services/socket_service.dart';
 import 'package:here4help/chat/services/chat_preload_service.dart';
 import 'package:here4help/config/environment_config.dart';
+import 'package:here4help/chat/widgets/highlighted_text.dart';
 
 const bool verboseSearchLog = false; // 控制搜尋相關的詳細日誌
 
@@ -139,19 +140,19 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     if (chatProvider.isPostedTasksTab) {
       debugPrint('🔍 [Posted Tasks] 當前為 Posted Tasks 分頁，檢查載入狀態');
       debugPrint(
-          '  - 分頁載入狀態: ${chatProvider.isTabLoading(ChatListProvider.TAB_POSTED_TASKS)}');
+          '  - 分頁載入狀態: ${chatProvider.isTabLoading(ChatListProvider.tabPostedTasks)}');
       debugPrint(
-          '  - 分頁載入完成: ${chatProvider.isTabLoaded(ChatListProvider.TAB_POSTED_TASKS)}');
+          '  - 分頁載入完成: ${chatProvider.isTabLoaded(ChatListProvider.tabPostedTasks)}');
       debugPrint(
-          '  - 分頁錯誤: ${chatProvider.getTabError(ChatListProvider.TAB_POSTED_TASKS)}');
+          '  - 分頁錯誤: ${chatProvider.getTabError(ChatListProvider.tabPostedTasks)}');
 
       // 如果分頁尚未載入且不在載入中，觸發載入
-      if (!chatProvider.isTabLoaded(ChatListProvider.TAB_POSTED_TASKS) &&
-          !chatProvider.isTabLoading(ChatListProvider.TAB_POSTED_TASKS)) {
+      if (!chatProvider.isTabLoaded(ChatListProvider.tabPostedTasks) &&
+          !chatProvider.isTabLoading(ChatListProvider.tabPostedTasks)) {
         debugPrint('🚀 [Posted Tasks] 觸發分頁數據載入');
 
         // 先觸發 Provider 的載入
-        chatProvider.checkAndTriggerTabLoad(ChatListProvider.TAB_POSTED_TASKS);
+        chatProvider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
 
         // 同時直接載入任務數據
         debugPrint('🚀 [Posted Tasks] 直接調用 _fetchAllTasks() 載入任務數據');
@@ -251,7 +252,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       }
 
       final oldState =
-          provider.hasUnreadForTab(ChatListProvider.TAB_POSTED_TASKS);
+          provider.hasUnreadForTab(ChatListProvider.tabPostedTasks);
 
       // 只有狀態真正改變時才更新
       if (oldState != hasUnread) {
@@ -276,7 +277,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
             }
 
             safeProvider?.setTabHasUnread(
-                ChatListProvider.TAB_POSTED_TASKS, hasUnread);
+                ChatListProvider.tabPostedTasks, hasUnread);
           } catch (e) {
             debugPrint('❌ [Posted Tasks] 設置未讀狀態失敗: $e');
           }
@@ -701,11 +702,15 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       }
 
       if (mounted) {
+        // 將數據載入到 ChatListProvider 的快取中
+        chatProvider.cacheManager.postedTasksCache.clear();
+        chatProvider.cacheManager.postedTasksCache.addAll(result.tasks);
+
         setState(() {
           _allTasks.clear();
           _allTasks.addAll(result.tasks);
-          // debugPrint(
-          // '🔍 [Posted Tasks] [_fetchAllTasks()] 已更新 _allTasks，長度: ${_allTasks.length}');
+          debugPrint(
+              '🔍 [Posted Tasks] [_fetchAllTasks()] 已更新 ChatListProvider 快取和本地 _allTasks，長度: ${_allTasks.length}');
         });
 
         // 載入應徵者數據
@@ -714,12 +719,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         // 預載入聊天室數據
         _preloadChatData();
 
-        // 應用篩選和排序
-        _applyFiltersAndSort();
-
-        // debugPrint('🔍 [Posted Tasks] [_fetchAllTasks()] 任務獲取完成');
-        // debugPrint('  - _allTasks 最終長度: ${_allTasks.length}');
-        // debugPrint('  - _sortedTasks 最終長度: ${_sortedTasks.length}');
+        debugPrint('🔍 [Posted Tasks] [_fetchAllTasks()] 任務獲取完成');
+        debugPrint(
+            '  - ChatListProvider 快取長度: ${chatProvider.postedTasks.length}');
+        debugPrint('  - 篩選後任務長度: ${chatProvider.filteredPostedTasks.length}');
       }
     } catch (e) {
       debugPrint('❌ [Posted Tasks] [_fetchAllTasks()] 獲取任務失敗: $e');
@@ -766,25 +769,22 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       final nStatus = _normalizeSearchText(statusDisplay);
       final nTags = _normalizeSearchText(hashtags);
 
-      // 搜尋：多欄位匹配
+      // 搜尋：僅任務標題匹配
       bool matchQuery = true;
       int relevanceScore = 0;
 
       if (hasSearchQuery) {
-        // 計算相關性分數
-        if (nTitle.contains(normalizedQuery)) relevanceScore += 3;
-        if (nTags.contains(normalizedQuery)) relevanceScore += 2;
-        if (nDesc.contains(normalizedQuery)) relevanceScore += 1;
-        if (nLoc.contains(normalizedQuery)) relevanceScore += 1;
-        if (nLang.contains(normalizedQuery)) relevanceScore += 1;
-        if (nStatus.contains(normalizedQuery)) relevanceScore += 1;
-
-        // 必須至少命中一個欄位
-        matchQuery = relevanceScore > 0;
+        // 僅檢查標題匹配
+        if (nTitle.contains(normalizedQuery)) {
+          relevanceScore = 3; // 標題匹配固定 3 分
+          matchQuery = true;
+        } else {
+          matchQuery = false;
+        }
 
         if (!matchQuery) {
           if (kDebugMode && verboseSearchLog) {
-            debugPrint('  ❌ 任務 "${task['title']}" 不符合搜尋條件 (多欄位)');
+            debugPrint('  ❌ 任務 "${task['title']}" 標題不符合搜尋條件');
           }
           return false;
         }
@@ -829,106 +829,86 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     return filteredTasks;
   }
 
-  /// 排序任務列表（簡化版：優先使用後端排序）
+  /// 排序任務列表（混合排序：釘選 > 未讀 > 用戶選擇）
   List<Map<String, dynamic>> _sortTasks(
       List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
-    debugPrint('🔄 [Posted Tasks] 開始排序任務: ${tasks.length} 個任務');
+    debugPrint('🔄 [Posted Tasks] 開始混合排序任務: ${tasks.length} 個任務');
     debugPrint('  - 排序方式: ${chatProvider.currentSortBy}');
     debugPrint('  - 排序方向: ${chatProvider.sortAscending ? "升序" : "降序"}');
 
-    // 首先按釘選狀態排序（釘選的任務優先）
+    // 混合排序：釘選 > 未讀 > 用戶選擇的排序
     final sortedTasks = List<Map<String, dynamic>>.from(tasks);
     sortedTasks.sort((a, b) {
+      // 1. 首先按釘選狀態排序（釘選的任務優先）
       final aPinned = _isTaskPinned(a['id'].toString());
       final bPinned = _isTaskPinned(b['id'].toString());
 
-      // 釘選的任務排在前面
       if (aPinned && !bPinned) return -1;
       if (!aPinned && bPinned) return 1;
 
-      // 如果釘選狀態相同，則按原有邏輯排序
-      return 0;
+      // 2. 釘選狀態相同時，按未讀狀態排序（有未讀的優先）
+      final aHasUnread = _taskHasUnreadMessages(a);
+      final bHasUnread = _taskHasUnreadMessages(b);
+
+      if (aHasUnread && !bHasUnread) return -1;
+      if (!aHasUnread && bHasUnread) return 1;
+
+      // 3. 未讀狀態相同時，按用戶選擇的排序方式
+      return _compareByUserSortChoice(a, b, chatProvider);
     });
 
-    // 簡化邏輯：只有搜尋相關性需要前端排序，其他使用後端排序
-    if (chatProvider.searchQuery.isNotEmpty &&
-        chatProvider.currentSortBy == 'relevance') {
-      debugPrint('🔍 [Posted Tasks] 使用前端相關性排序');
-      return _sortByRelevance(sortedTasks, chatProvider);
-    }
-
-    // 其他情況直接使用後端排序（後端已按 status_id ASC, updated_at DESC, id ASC 排序）
-    debugPrint('✅ [Posted Tasks] 使用後端排序，跳過前端重排序');
-
-    // 如果用戶選擇了非預設排序，才進行前端排序
-    if (chatProvider.currentSortBy != 'status_id') {
-      debugPrint(
-          '⚠️ [Posted Tasks] 用戶選擇非預設排序，執行前端排序: ${chatProvider.currentSortBy}');
-      return _sortByUserChoice(sortedTasks, chatProvider);
-    }
-
-    return sortedTasks; // 直接使用後端排序結果
+    debugPrint('✅ [Posted Tasks] 混合排序完成');
+    return sortedTasks;
   }
 
-  /// 搜尋相關性排序
-  List<Map<String, dynamic>> _sortByRelevance(
-      List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
-    final sortedTasks = List<Map<String, dynamic>>.from(tasks);
+  /// 檢查任務是否有未讀訊息
+  bool _taskHasUnreadMessages(Map<String, dynamic> task) {
+    final taskId = task['id'].toString();
+    final applicants = _applicationsByTask[taskId] ?? [];
 
-    sortedTasks.sort((a, b) {
-      final relevanceA = a['_relevance'] ?? 0;
-      final relevanceB = b['_relevance'] ?? 0;
-      int comparison = relevanceB.compareTo(relevanceA); // 相關性降序
+    return applicants.any((app) {
+      final roomId = app['chat_room_id']?.toString();
+      if (roomId == null || roomId.isEmpty) return false;
 
-      // 相關性相同時，使用 updated_at 作為次鍵
-      if (comparison == 0) {
-        final timeA =
+      final chatProvider = _getChatProvider();
+      return (chatProvider?.unreadForRoom(roomId) ?? 0) > 0;
+    });
+  }
+
+  /// 根據用戶選擇的排序方式比較兩個任務
+  int _compareByUserSortChoice(Map<String, dynamic> a, Map<String, dynamic> b,
+      ChatListProvider chatProvider) {
+    switch (chatProvider.currentSortBy) {
+      case 'relevance':
+        final aRelevance = a['_relevance'] ?? 0;
+        final bRelevance = b['_relevance'] ?? 0;
+        return bRelevance.compareTo(aRelevance); // 相關性降序
+
+      case 'updated_time':
+        final aTime =
             DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
-        final timeB =
+        final bTime =
             DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
-        comparison = timeB.compareTo(timeA); // 時間降序
-      }
+        return chatProvider.sortAscending
+            ? aTime.compareTo(bTime)
+            : bTime.compareTo(aTime);
 
-      return comparison;
-    });
+      case 'applicant_count':
+        final aCount = (_applicationsByTask[a['id']?.toString()] ?? []).length;
+        final bCount = (_applicationsByTask[b['id']?.toString()] ?? []).length;
+        return chatProvider.sortAscending
+            ? aCount.compareTo(bCount)
+            : bCount.compareTo(aCount);
 
-    return sortedTasks;
-  }
-
-  /// 用戶自選排序
-  List<Map<String, dynamic>> _sortByUserChoice(
-      List<Map<String, dynamic>> tasks, ChatListProvider chatProvider) {
-    final sortedTasks = List<Map<String, dynamic>>.from(tasks);
-
-    sortedTasks.sort((a, b) {
-      int comparison = 0;
-
-      switch (chatProvider.currentSortBy) {
-        case 'updated_time':
-          final timeA =
-              DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
-          final timeB =
-              DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
-          comparison = timeA.compareTo(timeB);
-          break;
-
-        case 'applicant_count':
-          final countA =
-              (_applicationsByTask[a['id']?.toString()] ?? []).length;
-          final countB =
-              (_applicationsByTask[b['id']?.toString()] ?? []).length;
-          comparison = countA.compareTo(countB);
-          break;
-
-        default:
-          // 其他排序選項暫時不支援，使用預設排序
-          return 0;
-      }
-
-      return chatProvider.sortAscending ? comparison : -comparison;
-    });
-
-    return sortedTasks;
+      case 'status_id':
+      default:
+        // 預設按更新時間降序
+        final aTime =
+            DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
+        final bTime =
+            DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
+        return bTime.compareTo(aTime);
+    }
   }
 
   String _displayStatus(Map<String, dynamic> task) {
@@ -997,35 +977,44 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                   '🔍 [Posted Tasks] [build()] 顯示錯誤狀態: ${chatProvider.getTabError(0)}');
               return _buildErrorState(chatProvider);
             }
-            // 使用分頁清單（支援下拉刷新）
-            return RefreshIndicator(
-              onRefresh: () async {
-                try {
-                  final provider = _getChatProvider();
-                  await provider?.cacheManager.forceRefresh();
-                } catch (_) {}
-                _applicationsByTask.clear();
-                _allTasks.clear();
-                _pagingController.refresh();
+            // 使用 ChatListProvider 的篩選結果（支援即時搜尋和篩選）
+            return Consumer<ChatListProvider>(
+              builder: (context, chatProvider, child) {
+                final filteredTasks = chatProvider.filteredPostedTasks;
+
+                debugPrint(
+                    '🔍 [Posted Tasks] 使用 ChatListProvider 篩選結果: ${filteredTasks.length} 個任務');
+                debugPrint('  - 搜尋查詢: "${chatProvider.searchQuery}"');
+                debugPrint('  - 選中位置: ${chatProvider.selectedLocations}');
+                debugPrint('  - 選中狀態: ${chatProvider.selectedStatuses}');
+
+                return RefreshIndicator(
+                  onRefresh: () async {
+                    try {
+                      await chatProvider.cacheManager.forceRefresh();
+                      // 重新載入任務數據到 Provider 的快取中
+                      await _fetchAllTasks();
+                    } catch (e) {
+                      debugPrint('❌ [Posted Tasks] 刷新失敗: $e');
+                    }
+                  },
+                  child: filteredTasks.isEmpty
+                      ? _buildEmptyState()
+                      : ListView.builder(
+                          padding: const EdgeInsets.only(
+                            left: 12,
+                            right: 12,
+                            top: 12,
+                            bottom: 80,
+                          ),
+                          itemCount: filteredTasks.length,
+                          itemBuilder: (context, index) {
+                            final task = filteredTasks[index];
+                            return _buildTaskCard(task);
+                          },
+                        ),
+                );
               },
-              child: PagedListView<int, Map<String, dynamic>>(
-                padding: const EdgeInsets.only(
-                  left: 12,
-                  right: 12,
-                  top: 12,
-                  bottom: 80,
-                ),
-                pagingController: _pagingController,
-                builderDelegate:
-                    PagedChildBuilderDelegate<Map<String, dynamic>>(
-                  itemBuilder: (context, task, index) => _buildTaskCard(task),
-                  firstPageProgressIndicatorBuilder: (context) =>
-                      _buildLoadingState(),
-                  newPageProgressIndicatorBuilder: (context) =>
-                      _buildPaginationLoadingAnimation(),
-                  noItemsFoundIndicatorBuilder: (context) => _buildEmptyState(),
-                ),
-              ),
             );
           },
         );
@@ -1268,15 +1257,31 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Expanded(
-                                  child: Text(
-                                    task['title'] ?? 'Untitled Task',
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    maxLines: null,
-                                    softWrap: true,
-                                    overflow: TextOverflow.visible,
+                                  child: Consumer<ChatListProvider>(
+                                    builder: (context, chatProvider, child) {
+                                      return HighlightedText(
+                                        text: task['title'] ?? 'Untitled Task',
+                                        highlight: chatProvider.searchQuery,
+                                        normalStyle: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black,
+                                        ),
+                                        highlightStyle: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          backgroundColor: Theme.of(context)
+                                              .colorScheme
+                                              .primaryContainer,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary,
+                                        ),
+                                        maxLines: null,
+                                        softWrap: true,
+                                        overflow: TextOverflow.visible,
+                                      );
+                                    },
                                   ),
                                 ),
                               ],
@@ -1336,7 +1341,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                                 try {
                                   final provider = _getChatProvider();
                                   provider?.setTabHasUnread(
-                                      ChatListProvider.TAB_POSTED_TASKS,
+                                      ChatListProvider.tabPostedTasks,
                                       hasUnread);
                                 } catch (_) {}
                               });
@@ -2462,7 +2467,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: () => chatProvider
-                .checkAndTriggerTabLoad(ChatListProvider.TAB_POSTED_TASKS),
+                .checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks),
             child: const Text('Retry'),
           ),
         ],
