@@ -124,7 +124,7 @@ function handleUpdateSettings($db, $adminUserId) {
     try {
         // 停用所有現有設定
         $deactivateQuery = "UPDATE task_completion_points_fee_settings SET is_active = 0";
-        $db->execute($deactivateQuery);
+        $db->query($deactivateQuery);
         
         // 插入新設定
         $insertQuery = "
@@ -133,7 +133,7 @@ function handleUpdateSettings($db, $adminUserId) {
             ) VALUES (?, ?, 1, ?, NOW(), NOW())
         ";
         
-        $db->execute($insertQuery, [$rate, $description, $adminUserId]);
+        $db->query($insertQuery, [$rate, $description, $adminUserId]);
         $settingsId = $db->lastInsertId();
         
         // 提交交易

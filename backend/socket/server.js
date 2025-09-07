@@ -53,6 +53,7 @@ try {
 
 const app = express();
 app.use(cors());
+app.use(express.json()); // 添加 JSON 解析中間件
 
 const server = http.createServer(app);
 const io = new Server(server, {

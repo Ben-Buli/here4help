@@ -9,6 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/socket_notifier.php';
 
 try {
   if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -54,6 +55,70 @@ try {
 
   // 支付（最小可用）：直接將任務狀態切 Completed（後續補：點數轉移與交易紀錄）
   $db->query("UPDATE tasks SET status = 'Completed', updated_at = NOW() WHERE id = ?", [$task_id]);
+
+  // 獲取操作者ID（從 token 驗證）
+  $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+  $actor_id = 1; // 預設系統ID
+  if (!empty($auth_header) && preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
+    try {
+      $validatedActorId = TokenValidator::validateAuthHeader($auth_header);
+      if ($validatedActorId) {
+        $actor_id = (int)$validatedActorId;
+      }
+    } catch (Exception $e) {
+      // 如果驗證失敗，使用預設系統ID
+    }
+  }
+
+  // 發送系統訊息到聊天室
+  try {
+    $room = $db->fetch(
+      "SELECT id FROM chat_rooms WHERE task_id = ? ORDER BY id DESC LIMIT 1",
+      [$task_id]
+    );
+    if ($room && isset($room['id'])) {
+      $content = sprintf(
+        'Task has been paid and reviewed. Ratings: Service %d/5, Attitude %d/5, Experience %d/5%s',
+        $service, $attitude, $experience,
+        $comment ? '. Comment: ' . substr($comment, 0, 50) . (strlen($comment) > 50 ? '...' : '') : ''
+      );
+      $db->query(
+        "INSERT INTO chat_messages (room_id, from_user_id, content, kind, created_at) VALUES (?, ?, ?, 'system', NOW())",
+        [(int)$room['id'], $actor_id, $content]
+      );
+      
+      // 獲取插入的訊息ID
+      $messageId = $db->lastInsertId();
+    }
+  } catch (Exception $e) {
+    error_log("Failed to insert system message: " . $e->getMessage());
+  }
+
+  // 發送 Socket 通知
+  try {
+    $socketNotifier = SocketNotifier::getInstance();
+    $userIds = $socketNotifier->getTaskUserIds($task_id);
+    $room = $db->fetch(
+      "SELECT id FROM chat_rooms WHERE task_id = ? ORDER BY id DESC LIMIT 1",
+      [$task_id]
+    );
+    $roomId = $room ? $room['id'] : null;
+    
+    $statusData = [
+      'code' => 'completed',
+      'display_name' => 'Completed',
+      'progress_ratio' => 1.0
+    ];
+    
+    $socketNotifier->notifyTaskStatusUpdate($task_id, $roomId, $statusData, $userIds);
+    
+    // 發送新訊息通知（如果有插入系統訊息）
+    if (isset($messageId) && $messageId && $roomId) {
+      $socketNotifier->notifyNewMessage($roomId, $messageId, $content, $actor_id, 'system', $userIds);
+    }
+  } catch (Exception $e) {
+    error_log("Socket notification failed: " . $e->getMessage());
+  }
 
   $task = $db->fetch("SELECT * FROM tasks WHERE id = ?", [$task_id]);
   Response::success(['task' => $task], 'Paid and reviewed');

@@ -43,7 +43,7 @@ class SocketNotifier {
             ]
         ];
         
-        $this->sendSocketEvent($eventData, $userIds);
+        return $this->sendSocketEvent($eventData, $userIds);
     }
     
     /**
@@ -64,7 +64,32 @@ class SocketNotifier {
             ]
         ];
         
-        $this->sendSocketEvent($eventData, $userIds);
+        return $this->sendSocketEvent($eventData, $userIds);
+    }
+    
+    /**
+     * 發送新訊息通知事件
+     * @param string $roomId 聊天室ID
+     * @param int $messageId 訊息ID
+     * @param string $content 訊息內容
+     * @param int $fromUserId 發送者ID
+     * @param string $kind 訊息類型 (system, user, etc.)
+     * @param array $userIds 需要通知的用戶ID列表
+     */
+    public function notifyNewMessage($roomId, $messageId, $content, $fromUserId, $kind = 'user', $userIds = []) {
+        $eventData = [
+            'event' => 'new_message',
+            'data' => [
+                'room_id' => $roomId,
+                'message_id' => $messageId,
+                'content' => $content,
+                'from_user_id' => $fromUserId,
+                'kind' => $kind,
+                'timestamp' => date('Y-m-d H:i:s'),
+            ]
+        ];
+        
+        return $this->sendSocketEvent($eventData, $userIds);
     }
     
     /**
@@ -74,9 +99,8 @@ class SocketNotifier {
      */
     private function sendSocketEvent($eventData, $userIds) {
         try {
-            // 構建請求數據
+            // 構建請求數據（移除 token，改用 Authorization header）
             $requestData = [
-                'token' => $this->socketToken,
                 'event' => $eventData['event'],
                 'data' => $eventData['data'],
                 'userIds' => $userIds,
@@ -92,20 +116,31 @@ class SocketNotifier {
                         'Content-Length: ' . strlen(json_encode($requestData))
                     ],
                     'content' => json_encode($requestData),
-                    'timeout' => 5
+                    'timeout' => 3,
+                    'ignore_errors' => true  // 忽略 HTTP 錯誤，避免 PHP Warning
                 ]
             ]);
             
-            $response = file_get_contents($this->socketUrl . '/api/notify', false, $context);
+            // 使用 @ 抑制 PHP Warning
+            $response = @file_get_contents($this->socketUrl . '/api/notify', false, $context);
             
             if ($response !== false) {
                 error_log("[SocketNotifier] Event sent successfully: " . $eventData['event']);
+                return true;
             } else {
-                error_log("[SocketNotifier] Failed to send event");
+                // 檢查 HTTP 回應碼（如果可用）
+                if (isset($http_response_header) && !empty($http_response_header)) {
+                    $statusLine = $http_response_header[0];
+                    error_log("[SocketNotifier] Failed to send event to {$this->socketUrl}: $statusLine");
+                } else {
+                    error_log("[SocketNotifier] Failed to send event to {$this->socketUrl}: Connection failed");
+                }
+                return false;
             }
             
         } catch (Exception $e) {
             error_log("[SocketNotifier] Error sending socket event: " . $e->getMessage());
+            return false;
         }
     }
     

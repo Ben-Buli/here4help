@@ -23,15 +23,25 @@ function sendSocketNotification($event, $data, $roomId = null) {
         $socketUrl = $_ENV['SOCKET_URL'] ?? 'http://localhost:3001';
         $socketToken = $_ENV['SOCKET_TOKEN'] ?? 'default-socket-token';
         
+        // 從聊天室獲取用戶ID列表
+        $userIds = [];
+        if ($roomId) {
+            global $db;
+            $roomUsers = $db->fetchAll(
+                "SELECT creator_id, participant_id FROM chat_rooms WHERE id = ?",
+                [$roomId]
+            );
+            if (!empty($roomUsers)) {
+                $room = $roomUsers[0];
+                $userIds = [$room['creator_id'], $room['participant_id']];
+            }
+        }
+        
         $notificationData = [
             'event' => $event,
-            'data' => $data
+            'data' => $data,
+            'userIds' => $userIds
         ];
-        
-        // 如果有 roomId，發送到特定房間
-        if ($roomId) {
-            $notificationData['room'] = $roomId;
-        }
         
         $ch = curl_init($socketUrl . '/api/notify');
         curl_setopt($ch, CURLOPT_POST, true);

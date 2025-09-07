@@ -102,7 +102,7 @@ try {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
         ";
         
-        $db->execute($insertQuery, [
+        $db->query($insertQuery, [
             'task_completion',
             $srcTransactionId,
             $taskId,

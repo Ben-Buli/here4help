@@ -1,4 +1,9 @@
 <?php
+/**
+ * POST /api/points/deduct-fee.php
+ * 扣除手續費AP
+ */
+
 require_once dirname(__DIR__, 2) . '/config/database.php'; 
 require_once dirname(__DIR__, 2) . '/utils/response.php';
 require_once dirname(__DIR__, 2) . '/utils/JWTManager.php';
@@ -54,7 +59,7 @@ try {
     
     $userId = (int)$input['user_id'];
     $amount = (int)$input['amount'];
-    $taskId = (int)$input['task_id'];
+    $taskId = $input['task_id']; // ✅ 保持字符串格式，因為 tasks.id 是 varchar(36)
     $feeRate = (float)$input['fee_rate'];
     $transactionType = $input['transaction_type'];
     
@@ -96,19 +101,19 @@ try {
         
         // 扣除用戶點數
         $updateUserSql = "UPDATE users SET points = points - ? WHERE id = ?";
-        $db->execute($updateUserSql, [$amount, $userId]);
+        $db->query($updateUserSql, [$amount, $userId]);
         
         // 記錄交易
         $transactionSql = "INSERT INTO point_transactions (
-            user_id, amount, type, task_id, description, created_at
-        ) VALUES (?, ?, ?, ?, ?, NOW())";
+            user_id, transaction_type, amount, description, related_task_id, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, 'completed', NOW())";
         
-        $db->execute($transactionSql, [
+        $db->query($transactionSql, [
             $userId,
+            'fee', // 使用 enum 值：fee
             -$amount,
-            $transactionType,
-            $taskId,
-            "Task completion fee (${(float)$feeRate * 100}%)"
+            "Task completion fee (${(float)$feeRate * 100}%)",
+            $taskId
         ]);
         
         // 提交事務

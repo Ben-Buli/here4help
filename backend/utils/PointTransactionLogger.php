@@ -57,7 +57,7 @@ class PointTransactionLogger
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ";
         
-        $db->execute($insertQuery, [
+        $db->query($insertQuery, [
             $userId,
             $transactionType,
             $amount,

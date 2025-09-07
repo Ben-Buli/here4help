@@ -1069,6 +1069,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
           // 檢查是否已有評分
           _hasExistingReview = chatData['has_existing_review'] ?? false;
+
+          // 動態檢查評分狀態（如果任務已完成）
+          if (_task != null && _task!['status_code'] == 'completed') {
+            _checkReviewStatus();
+          }
         });
 
         // 初始化圖片上傳管理器
@@ -1391,12 +1396,53 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final statusCode = _task!['status']?['code'];
     if (statusCode != 'pending_confirmation') return;
 
-    // 如果已經在倒數計時，不重複開始
-    if (countdownTicker.isActive) return;
+    // 停止現有的倒數計時
+    if (countdownTicker.isActive) {
+      countdownTicker.stop();
+    }
 
-    debugPrint(
-        '🕐 [ChatDetailPage] Starting countdown for pending_confirmation');
-    countdownTicker.start();
+    // 重新計算倒數計時參數
+    final taskUpdatedAt = _task!['updated_at'];
+    if (taskUpdatedAt != null) {
+      try {
+        final updatedAt = DateTime.parse(taskUpdatedAt);
+        final now = DateTime.now();
+        final timeSinceUpdate = now.difference(updatedAt);
+
+        // 計算剩餘時間：updated_at + 7天 - 當下時間
+        const totalPendingTime = Duration(days: 7);
+        final remainingTimeFromUpdate = totalPendingTime - timeSinceUpdate;
+
+        if (remainingTimeFromUpdate > Duration.zero) {
+          // 還有剩餘時間，啟動倒數計時
+          setState(() {
+            taskPendingStart = updatedAt;
+            taskPendingEnd = updatedAt.add(totalPendingTime);
+            remainingTime = remainingTimeFromUpdate;
+            countdownCompleted = false; // 重置完成標記
+          });
+
+          countdownTicker = Ticker(_onTick)..start();
+          debugPrint(
+              '⏰ 重新啟動 pending_confirmation 倒數計時: ${remainingTime.inDays}天 ${remainingTime.inHours.remainder(24)}小時 ${remainingTime.inMinutes.remainder(60)}分鐘');
+        } else {
+          // 時間已到，應該自動完成
+          setState(() {
+            remainingTime = Duration.zero;
+          });
+          debugPrint('⏰ pending_confirmation 時間已到，應該自動完成任務');
+        }
+      } catch (e) {
+        debugPrint('❌ 解析任務更新時間失敗: $e');
+        setState(() {
+          remainingTime = const Duration();
+        });
+      }
+    } else {
+      setState(() {
+        remainingTime = const Duration();
+      });
+    }
   }
 
   /// 停止倒數計時
@@ -2604,7 +2650,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '您已撤銷此任務的應徵申請。',
+                    'You have withdrawn your application for this task.',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[700],
@@ -2779,8 +2825,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                             const SizedBox(width: 6),
                             Text(
                               _unseenCount > 0
-                                  ? '有未讀訊息（$_unseenCount）— 點擊前往最新'
-                                  : '有未讀訊息 — 點擊前往最新',
+                                  ? 'There are $_unseenCount unread messages — click to view the latest messages'
+                                  : 'There are unread messages — click to view the latest messages',
                               style: const TextStyle(
                                   color: Colors.white, fontSize: 12),
                             ),
@@ -2864,9 +2910,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     }),
                   ),
                 ),
+                // Theme 級別的 inputDecorationTheme 設定
                 inputDecorationTheme: theme.inputDecorationTheme.copyWith(
                   filled: true,
                   fillColor: bg.withOpacity(0.08),
+                  // fillColor: bg.withOpacity(0.08),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(24),
                     borderSide: BorderSide(color: fg.withOpacity(0.24)),
@@ -2947,7 +2995,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                                 padding:
                                     const EdgeInsets.symmetric(horizontal: 12),
                                 decoration: BoxDecoration(
-                                  color: bg.withOpacity(0.08),
+                                  color: Colors.transparent,
                                   borderRadius: BorderRadius.circular(24),
                                 ),
                                 child: TextField(
@@ -3395,16 +3443,17 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('撤銷應徵申請'),
-          content: const Text('確定要撤銷此任務的應徵申請嗎？撤銷後將無法再次應徵此任務。'),
+          title: const Text('Withdraw Application'),
+          content: const Text(
+              'Are you sure you want to withdraw this task\'s application? Once withdrawn, you will not be able to apply for this task again.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('取消'),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('確認撤銷'),
+              child: const Text('Confirm Withdraw'),
             ),
           ],
         ),
@@ -3414,7 +3463,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         await ChatService().withdrawApplication(taskId: taskId);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('已撤銷應徵申請')),
+            const SnackBar(content: Text('The application has been withdrawn')),
           );
           // 重新載入聊天室狀態
           await _initializeChat();
@@ -3440,7 +3489,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         context: context,
         builder: (context) => BlockUserDialog(
           targetUserId: opponentId.toString(),
-          targetUserName: opponentName ?? '用戶',
+          targetUserName: opponentName ?? 'User',
           isCurrentlyBlocked: false,
           onBlockStatusChanged: () {
             // 重新載入聊天室狀態
@@ -3451,7 +3500,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
       if (result == true && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User blocked successfully')),
+          const SnackBar(content: Text('✅ User blocked successfully')),
         );
       }
     } catch (e) {
@@ -3488,7 +3537,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         context: context,
         builder: (context) => BlockUserDialog(
           targetUserId: opponentId.toString(),
-          targetUserName: opponentName ?? '用戶',
+          targetUserName: opponentName ?? 'User',
           isCurrentlyBlocked: true,
           onBlockStatusChanged: () {
             // 重新載入聊天室狀態
@@ -3499,7 +3548,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
       if (result == true && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Block removed successfully')),
+          const SnackBar(content: Text('✅ Block removed successfully')),
         );
       }
     } catch (e) {
@@ -3511,7 +3560,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             errorMessage.contains('404')) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('No block relationship found to remove'),
+              content: Text('❌ No block relationship found to remove'),
               backgroundColor: Colors.orange,
             ),
           );
@@ -4068,7 +4117,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return _ConfirmPayDialog(task: _task);
+        return _ConfirmPayDialog(task: _task, room: _room);
       },
     );
   }
@@ -4089,7 +4138,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   }
 
   /// 開啟評分對話框
-  void _openReviewDialog() {
+  void _openReviewDialog() async {
     final taskId = _task?['id']?.toString();
     final taskerId = _getOpponentUserId()?.toString();
     final taskerName = _getOpponentDisplayName();
@@ -4102,23 +4151,69 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       return;
     }
 
-    showDialog(
-      context: context,
-      builder: (context) => ReviewDialog(
-        taskId: taskId,
-        taskerId: taskerId,
-        taskerName: taskerName,
-        taskTitle: taskTitle,
-        onReviewSubmitted: () {
-          // 重新載入聊天室狀態以更新 Action Bar
-          _initializeChat();
-        },
-      ),
-    );
+    // 檢查任務狀態和是否已有評分
+    try {
+      final existingReview = await TaskService().getReview(taskId: taskId);
+
+      if (existingReview != null) {
+        // 已有評分，顯示唯讀模式
+        _viewExistingReview(existingReview);
+      } else {
+        // 沒有評分，顯示評分對話框
+        showDialog(
+          context: context,
+          builder: (context) => ReviewDialog(
+            taskId: taskId,
+            taskerId: taskerId,
+            taskerName: taskerName,
+            taskTitle: taskTitle,
+            onReviewSubmitted: () {
+              // 重新載入聊天室狀態以更新 Action Bar
+              _initializeChat();
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error checking review status: $e');
+      // 發生錯誤時，預設顯示評分對話框
+      showDialog(
+        context: context,
+        builder: (context) => ReviewDialog(
+          taskId: taskId,
+          taskerId: taskerId,
+          taskerName: taskerName,
+          taskTitle: taskTitle,
+          onReviewSubmitted: () {
+            _initializeChat();
+          },
+        ),
+      );
+    }
+  }
+
+  /// 動態檢查評分狀態
+  Future<void> _checkReviewStatus() async {
+    final taskId = _task?['id']?.toString();
+    if (taskId == null) return;
+
+    try {
+      final existingReview = await TaskService().getReview(taskId: taskId);
+      if (mounted) {
+        setState(() {
+          _hasExistingReview = existingReview != null;
+        });
+        debugPrint(
+            '🔍 [Review Status] Task $taskId has review: $_hasExistingReview');
+      }
+    } catch (e) {
+      debugPrint('❌ Error checking review status: $e');
+      // 發生錯誤時保持原狀態
+    }
   }
 
   /// 查看現有評分
-  void _viewExistingReview() {
+  void _viewExistingReview([Map<String, dynamic>? reviewData]) async {
     final taskId = _task?['id']?.toString();
     final taskerId = _getOpponentUserId()?.toString();
     final taskerName = _getOpponentDisplayName();
@@ -4131,11 +4226,27 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       return;
     }
 
-    // TODO: 從後端獲取現有評分資料
-    final existingReview = {
-      'rating': 4.0,
-      'comment': '服務很好，準時完成任務。',
-    };
+    Map<String, dynamic>? existingReview = reviewData;
+
+    // 如果沒有傳入評分資料，從後端獲取
+    if (existingReview == null) {
+      try {
+        existingReview = await TaskService().getReview(taskId: taskId);
+      } catch (e) {
+        debugPrint('❌ Error fetching review: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('無法獲取評分資料')),
+        );
+        return;
+      }
+    }
+
+    if (existingReview == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('沒有找到評分記錄')),
+      );
+      return;
+    }
 
     showDialog(
       context: context,
@@ -4265,7 +4376,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     strokeWidth: 2, color: Colors.white),
               ),
               SizedBox(width: 12),
-              Text('正在下載圖片...'),
+              Text('Downloading image...'),
             ],
           ),
           duration: Duration(seconds: 2),
@@ -4285,7 +4396,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
               children: [
                 Icon(Icons.check_circle, color: Colors.green, size: 20),
                 SizedBox(width: 12),
-                Text('圖片下載完成'),
+                Text('✅ Image downloaded successfully'),
               ],
             ),
             backgroundColor: Colors.green[700],
@@ -4297,7 +4408,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('下載失敗: $e'),
+            content: Text('❌ Image download failed: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -5097,32 +5208,34 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
     switch (statusCode) {
       case 'in_progress':
-        message = '任務已開始進行';
+        message = 'Task has started in progress';
         backgroundColor = Colors.blue;
         icon = Icons.play_arrow;
         break;
       case 'pending_confirmation':
-        message = '任務已標記完成，等待確認';
+        message = 'The tasker requested confirmation for completion';
         backgroundColor = Colors.orange;
         icon = Icons.hourglass_empty;
         break;
       case 'completed':
-        message = '任務已確認完成！';
+        message = 'Task has been confirmed as completed!';
         backgroundColor = Colors.green;
         icon = Icons.check_circle;
         break;
       case 'dispute':
-        message = '任務進入爭議處理';
+        message = 'Task has entered dispute resolution';
         backgroundColor = Colors.red;
         icon = Icons.warning;
         break;
       case 'cancelled':
-        message = '任務已取消';
+        message = 'Task has been cancelled';
         backgroundColor = Colors.grey;
         icon = Icons.cancel;
         break;
       default:
-        message = displayName != null ? '任務狀態已更新為：$displayName' : '任務狀態已更新';
+        message = displayName != null
+            ? 'Task status updated to: $displayName'
+            : 'Task status updated';
         backgroundColor = Theme.of(context).colorScheme.primary;
         icon = Icons.info;
     }
@@ -5156,36 +5269,35 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
     switch (applicationStatus) {
       case 'accepted':
-        message = '應徵已被接受！';
+        message = '✅Application accepted!';
         backgroundColor = Colors.green;
         icon = Icons.check_circle;
         break;
       case 'rejected':
-        message = '應徵已被拒絕';
+        message = '❌ Application rejected';
         backgroundColor = Colors.red;
         icon = Icons.cancel;
         break;
       case 'withdrawn':
-        message = '應徵已撤銷';
+        message = '🔄 Application withdrawn';
         backgroundColor = Colors.orange;
         icon = Icons.undo;
         break;
       case 'cancelled':
-        message = '應徵已取消';
+        message = '❌ Application cancelled';
         backgroundColor = Colors.grey;
         icon = Icons.cancel;
         break;
       case 'pending':
-        message = '應徵狀態已更新';
+        message = '🔄 Application status updated';
         backgroundColor = Colors.blue;
         icon = Icons.hourglass_empty;
         break;
       default:
-        message = '應徵狀態已更新';
+        message = '🔄 Application status updated';
         backgroundColor = Theme.of(context).colorScheme.primary;
         icon = Icons.info;
     }
-
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -5213,8 +5325,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 /// 確認付款對話框
 class _ConfirmPayDialog extends StatefulWidget {
   final Map<String, dynamic>? task;
+  final Map<String, dynamic>? room;
 
-  const _ConfirmPayDialog({required this.task});
+  const _ConfirmPayDialog({required this.task, required this.room});
 
   @override
   State<_ConfirmPayDialog> createState() => _ConfirmPayDialogState();
@@ -5331,48 +5444,68 @@ class _ConfirmPayDialogState extends State<_ConfirmPayDialog> {
     });
 
     try {
-      // 1. 驗證付款密碼
+      // 調試：輸出任務數據
+      debugPrint('🔍 [_ConfirmPayDialog] widget.task: ${widget.task}');
+      debugPrint(
+          '🔍 [_ConfirmPayDialog] widget.task keys: ${widget.task?.keys.toList()}');
+
+      // 步驟1: 驗證付款密碼
+      debugPrint('🔐 [Payment Flow] Step 1: Verifying payment password...');
       await TaskService().verifyPaymentPassword(
         paymentPassword: _paymentCode1Controller.text,
       );
+      debugPrint('✅ [Payment Flow] Step 1: Payment password verified');
 
-      // 2. 執行完整的付款流程
+      // 步驟2-4: 執行完整的付款流程
       if (widget.task != null) {
         final taskId = widget.task!['id'].toString();
         final rewardPoints = _safeParseInt(widget.task!['reward_point']);
-        final creatorId = _safeParseInt(widget.task!['creator_id']);
-        final participantId = _safeParseInt(widget.task!['participant_id']);
 
-        // 點數轉移
-        await TaskService().transferPoints(
-          fromUserId: creatorId,
-          toUserId: participantId,
-          amount: rewardPoints,
-          taskId: taskId,
-        );
+        // 🔧 修復：直接從 widget.room 獲取 creator_id 和 participant_id
+        final room = widget.room;
 
-        // 扣除手續費（如果有）
-        final feeAmount = _calculateFee();
-        if (feeAmount > 0) {
-          final feeRate = _feeSettings!.rate;
-          await TaskService().deductCompletionFee(
-            userId: creatorId,
-            amount: feeAmount,
-            taskId: taskId,
-            feeRate: feeRate,
-          );
+        final creatorId = _safeParseInt(room?['creator_id']);
+        final participantId = _safeParseInt(room?['participant_id']);
+
+        debugPrint('🔍 [Payment Flow] 提取的參數:');
+        debugPrint('🔍 [Payment Flow] taskId: $taskId');
+        debugPrint('🔍 [Payment Flow] rewardPoints: $rewardPoints');
+        debugPrint('🔍 [Payment Flow] creatorId: $creatorId');
+        debugPrint('🔍 [Payment Flow] participantId: $participantId');
+
+        // 🚨 添加數據驗證和錯誤處理
+        if (room == null) {
+          throw Exception('Room data is null. Cannot proceed with payment.');
+        }
+        if (creatorId == 0) {
+          throw Exception(
+              'Invalid creator_id: $creatorId. Room data may be incomplete.');
+        }
+        if (participantId == 0) {
+          throw Exception(
+              'Invalid participant_id: $participantId. Room data may be incomplete.');
         }
 
-        // 提交評分（使用現有的 payAndReview API 或新的 submitReview）
+        // 步驟2: 確認任務完成 (包含點數轉移和手續費處理)
+        debugPrint(
+            '📋 [Payment Flow] Step 2: Confirming task completion (includes point transfer and fee deduction)...');
+        await TaskService().confirmCompletion(
+          taskId: taskId,
+        );
+        debugPrint(
+            '✅ [Payment Flow] Step 2: Task completed - points transferred, fees deducted, status updated');
+
+        // 步驟3: 提交評分和評論
+        debugPrint('⭐ [Payment Flow] Step 3: Submitting review...');
         await TaskService().submitReview(
           taskId: taskId,
-          ratingService: _rating.round(),
-          ratingAttitude: _rating.round(),
-          ratingExperience: _rating.round(),
+          taskerId: participantId.toString(),
+          rating: _rating.round(),
           comment: _commentController.text.trim().isEmpty
               ? null
               : _commentController.text.trim(),
         );
+        debugPrint('✅ [Payment Flow] Step 3: Review submitted successfully');
 
         if (mounted) {
           Navigator.of(context).pop();

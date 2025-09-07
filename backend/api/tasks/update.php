@@ -24,6 +24,16 @@ if (!$taskId) { $taskId = $input['id'] ?? null; }
 if (!$taskId) { Response::error('Task id is required', 400); }
 
 try {
+    // 身份驗證 - 獲取操作者ID
+    $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+    $actorId = null;
+    if (!empty($auth_header) && preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
+        $actorId = TokenValidator::validateAuthHeader($auth_header);
+        if ($actorId) {
+            $actorId = (int)$actorId;
+        }
+    }
+    
     $db = Database::getInstance();
 
     // 允許更新的欄位
@@ -94,6 +104,27 @@ try {
                 [$taskId]
             );
             
+            // 插入系統訊息到聊天室
+            try {
+                $room = $db->fetch(
+                    "SELECT id FROM chat_rooms WHERE task_id = ? ORDER BY id DESC LIMIT 1",
+                    [$taskId]
+                );
+                if ($room && isset($room['id'])) {
+                    $content = 'Task marked as completed and is now pending confirmation.';
+                    $systemUserId = $actorId ?: 1; // 使用操作者ID，如果沒有則使用系統ID 1
+                    $db->query(
+                        "INSERT INTO chat_messages (room_id, from_user_id, content, kind, created_at) VALUES (?, ?, ?, 'system', NOW())",
+                        [(int)$room['id'], $systemUserId, $content]
+                    );
+                    
+                    // 獲取插入的訊息ID
+                    $messageId = $db->lastInsertId();
+                }
+            } catch (Exception $e) {
+                error_log("Failed to insert system message: " . $e->getMessage());
+            }
+            
             // 發送 Socket 通知 - 任務狀態更新為 pending_confirmation
             try {
                 $socketNotifier = SocketNotifier::getInstance();
@@ -111,6 +142,12 @@ try {
                 ];
                 
                 $socketNotifier->notifyTaskStatusUpdate($taskId, $roomId, $statusData, $userIds);
+                
+                // 發送新訊息通知（如果有插入系統訊息）
+                if (isset($messageId) && $messageId && $roomId) {
+                    $systemUserId = $actorId ?: 1; // 使用操作者ID，如果沒有則使用系統ID 1
+                    $socketNotifier->notifyNewMessage($roomId, $messageId, $content, $systemUserId, 'system', $userIds);
+                }
             } catch (Exception $e) {
                 error_log("Socket notification failed: " . $e->getMessage());
             }

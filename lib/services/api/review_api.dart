@@ -21,7 +21,8 @@ class ReviewApi {
 
       final response = await HttpClientService.post(
         AppConfig.api('/tasks/reviews_submit.php'),
-        body: jsonEncode(body),
+        body: body,
+        useQueryParamToken: true, // MAMP 兼容性：使用查詢參數傳遞 token
       );
 
       if (response.statusCode == 200) {
@@ -42,6 +43,7 @@ class ReviewApi {
     try {
       final response = await HttpClientService.get(
         '${AppConfig.api('/tasks/reviews_get.php')}?task_id=$taskId',
+        useQueryParamToken: true, // MAMP 兼容性：使用查詢參數傳遞 token
       );
 
       if (response.statusCode == 200) {

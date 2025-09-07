@@ -55,6 +55,22 @@ try {
     Response::forbidden('Only task creator can accept applications');
   }
 
+  // 確定要指派的用戶ID（先定義變數）
+  $target_user_id = null;
+  if ($user_id !== '') {
+    $target_user_id = $user_id;
+  } else {
+    // 從 application_id 取得 user_id
+    $application = $db->fetch(
+      "SELECT user_id FROM task_applications WHERE id = ? AND task_id = ?",
+      [$application_id, $task_id]
+    );
+    if (!$application) {
+      Response::notFound('Application not found');
+    }
+    $target_user_id = $application['user_id'];
+  }
+
   // 驗證任務狀態必須為 open
   if ($task['status_code'] !== 'open') {
     // 檢查是否已經有參與者
@@ -70,22 +86,6 @@ try {
     } else {
       Response::badRequest('Task must be in open status to accept applications');
     }
-  }
-
-  // 確定要指派的用戶ID
-  $target_user_id = null;
-  if ($user_id !== '') {
-    $target_user_id = $user_id;
-  } else {
-    // 從 application_id 取得 user_id
-    $application = $db->fetch(
-      "SELECT user_id FROM task_applications WHERE id = ? AND task_id = ?",
-      [$application_id, $task_id]
-    );
-    if (!$application) {
-      Response::notFound('Application not found');
-    }
-    $target_user_id = $application['user_id'];
   }
 
   // 驗證目標用戶存在

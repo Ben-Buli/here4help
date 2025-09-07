@@ -11,6 +11,7 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/socket_notifier.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -248,6 +249,27 @@ try {
         
         // 提交交易
         $db->commit();
+        
+        // 發送 Socket 通知
+        try {
+            $socketNotifier = SocketNotifier::getInstance();
+            $userIds = $socketNotifier->getTaskUserIds($taskId);
+            $room = $db->query(
+                "SELECT id FROM chat_rooms WHERE task_id = ? ORDER BY id DESC LIMIT 1",
+                [$taskId]
+            )->fetch(PDO::FETCH_ASSOC);
+            $roomId = $room ? $room['id'] : null;
+            
+            $statusData = [
+                'code' => 'dispute',
+                'display_name' => 'Dispute',
+                'progress_ratio' => 0.5
+            ];
+            
+            $socketNotifier->notifyTaskStatusUpdate($taskId, $roomId, $statusData, $userIds);
+        } catch (Exception $e) {
+            error_log("Socket notification failed: " . $e->getMessage());
+        }
         
         Response::success([
             'dispute_id' => $disputeId,

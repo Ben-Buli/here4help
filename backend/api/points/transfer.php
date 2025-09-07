@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/../../utils/database.php';
-require_once __DIR__ . '/../../utils/response.php';
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../utils/Response.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 
 header('Content-Type: application/json');
@@ -18,14 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
-    // 驗證 JWT
+    // 驗證 JWT - 使用標準的 $_SERVER 方式
+    $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
     $token = $_GET['token'] ?? $_POST['token'] ?? null;
-    if (!$token) {
-        $headers = getallheaders();
-        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-        if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
-            $token = $matches[1];
-        }
+    
+    if (!$token && !empty($auth_header) && preg_match('/Bearer\s+(.*)$/i', $auth_header, $matches)) {
+        $token = $matches[1];
     }
     
     if (!$token) {
@@ -55,7 +53,7 @@ try {
     $fromUserId = (int)$input['from_user_id'];
     $toUserId = (int)$input['to_user_id'];
     $amount = (int)$input['amount'];
-    $taskId = (int)$input['task_id'];
+    $taskId = $input['task_id']; // ✅ 保持字符串格式，因為 tasks.id 是 varchar(36)
     $transactionType = $input['transaction_type'];
     
     // 驗證金額
@@ -64,7 +62,8 @@ try {
     }
     
     // 驗證用戶權限（只能轉移自己的點數）
-    if ($fromUserId !== (int)$userData['id']) {
+    $authenticatedUserId = (int)($userData['user_id'] ?? $userData['id'] ?? 0);
+    if ($fromUserId !== $authenticatedUserId) {
         Response::forbidden('You can only transfer your own points');
     }
     
@@ -104,34 +103,34 @@ try {
         
         // 更新轉出用戶的點數
         $updateFromUserSql = "UPDATE users SET points = points - ? WHERE id = ?";
-        $db->execute($updateFromUserSql, [$amount, $fromUserId]);
+        $db->query($updateFromUserSql, [$amount, $fromUserId]);
         
         // 更新轉入用戶的點數
         $updateToUserSql = "UPDATE users SET points = points + ? WHERE id = ?";
-        $db->execute($updateToUserSql, [$amount, $toUserId]);
+        $db->query($updateToUserSql, [$amount, $toUserId]);
         
         // 記錄交易
         $transactionSql = "INSERT INTO point_transactions (
-            user_id, amount, type, task_id, description, created_at
-        ) VALUES (?, ?, ?, ?, ?, NOW())";
+            user_id, transaction_type, amount, description, related_task_id, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, 'completed', NOW())";
         
         // 記錄轉出交易
-        $db->execute($transactionSql, [
+        $db->query($transactionSql, [
             $fromUserId,
+            'spend', // 使用 enum 值：spend
             -$amount,
-            $transactionType . '_out',
-            $taskId,
-            "Payment for task ID: $taskId"
+            "Payment for task ID: $taskId",
+            $taskId
         ]);
         $outTransactionId = $db->lastInsertId();
         
         // 記錄轉入交易
-        $db->execute($transactionSql, [
+        $db->query($transactionSql, [
             $toUserId,
+            'earn', // 使用 enum 值：earn
             $amount,
-            $transactionType . '_in',
-            $taskId,
-            "Payment received for task ID: $taskId"
+            "Payment received for task ID: $taskId",
+            $taskId
         ]);
         $inTransactionId = $db->lastInsertId();
         

@@ -16,13 +16,22 @@ try {
     Response::error('Method not allowed', 405);
   }
 
-  // Auth（取得操作者）
+  // Auth（取得操作者）- 支持 MAMP 兼容性
   $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
-  if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
-    throw new Exception('Authorization header required');
+  $token = $_GET['token'] ?? $_POST['token'] ?? null;
+  
+  if (!$token && !empty($auth_header) && preg_match('/Bearer\s+(.*)$/i', $auth_header, $matches)) {
+    $token = $matches[1];
   }
-  $actor_id = TokenValidator::validateAuthHeader($auth_header);
-  if (!$actor_id) { throw new Exception('Invalid or expired token'); }
+  
+  if (!$token) {
+    Response::unauthorized('No token provided');
+  }
+  
+  $actor_id = TokenValidator::validateToken($token);
+  if (!$actor_id) { 
+    Response::unauthorized('Invalid or expired token'); 
+  }
   $actor_id = (int)$actor_id;
 
   $input = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -53,8 +62,8 @@ try {
   }
 
   // 狀態檢查：只有 pending_confirmation 狀態的任務可以被確認完成
-  if ($task['status_code'] !== 'pending_confirmation') {
-    Response::error("Task status must be 'pending_confirmation' to confirm completion. Current status: " . ($task['status_code'] ?? 'unknown'), 400);
+  if ($task['status_code'] !== 'pending_confirmation' && $task['status_code'] !== 'in_progress') {
+    Response::error("Task status must be 'pending_confirmation' or 'in_progress' to confirm completion. Current status: " . ($task['status_code'] ?? 'unknown'), 400);
   }
 
   // 檢查任務是否有參與者
@@ -161,7 +170,7 @@ try {
             amount_points, rate, note, created_at
           ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
         ";
-        $db->execute($feeRecordSql, [
+        $db->query($feeRecordSql, [
           'task_completion',
           $feeTransactionId ?? $rewardTransactionId,
           $task_id,
@@ -186,7 +195,7 @@ try {
       ]);
       
       // 支出獎勵記錄
-      $db->execute("
+      $db->query("
         INSERT INTO user_active_log (
           user_id, actor_type, actor_id, action, field, old_value, new_value, 
           reason, metadata, ip, created_at
@@ -196,7 +205,7 @@ try {
       
       // 支出手續費記錄
       if ($feeAmount > 0) {
-        $db->execute("
+        $db->query("
           INSERT INTO user_active_log (
             user_id, actor_type, actor_id, action, field, old_value, new_value, 
             reason, metadata, ip, created_at
@@ -206,13 +215,13 @@ try {
       }
       
       // 6. 更新用戶點數餘額
-      $db->execute("
+      $db->query("
         UPDATE users 
         SET points = points - ? 
         WHERE id = ?
       ", [(int)$amount, $creatorId]);
       
-      $db->execute("
+      $db->query("
         UPDATE users 
         SET points = points + ? 
         WHERE id = ?

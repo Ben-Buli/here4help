@@ -241,34 +241,25 @@ class TaskService extends ChangeNotifier {
     required String taskId,
     bool preview = false,
   }) async {
-    // 獲取用戶 token
-    final token = await AuthService.getToken();
-    if (token == null) {
-      throw Exception('User not authenticated');
-    }
-
     final body = {
       'task_id': taskId,
       if (preview) 'preview': 1,
     };
-    final resp = await http
-        .post(
-          Uri.parse(AppConfig.taskConfirmCompletionUrl),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 30));
-    if (resp.statusCode == 200) {
-      final data = jsonDecode(resp.body);
+
+    final resp = await HttpClientService.post(
+      AppConfig.taskConfirmCompletionUrl,
+      body: body,
+      useQueryParamToken: true, // MAMP 兼容性：使用查詢參數傳遞 token
+    );
+
+    if (HttpClientService.isSuccessResponse(resp)) {
+      final data = HttpClientService.parseJsonResponse(resp);
       if (data['success'] == true) {
         return Map<String, dynamic>.from(data['data'] ?? {});
       }
-      throw Exception(data['message'] ?? 'Confirm failed');
+      throw Exception(data['message'] ?? 'Confirm completion failed');
     } else {
-      throw Exception('HTTP ${resp.statusCode}: Confirm failed');
+      throw Exception('HTTP ${resp.statusCode}: Confirm completion failed');
     }
   }
 
@@ -385,19 +376,38 @@ class TaskService extends ChangeNotifier {
         .timeout(const Duration(seconds: 30));
 
     if (resp.statusCode == 200) {
-      final data = jsonDecode(resp.body);
-      debugPrint('🔍 TaskService acceptApplication: 回應內容: $data');
-      if (data['success'] == true) {
-        return Map<String, dynamic>.from(data['data'] ?? {});
+      try {
+        final data = jsonDecode(resp.body);
+        debugPrint('🔍 TaskService acceptApplication: 回應內容: $data');
+        if (data['success'] == true) {
+          return Map<String, dynamic>.from(data['data'] ?? {});
+        }
+        throw Exception(data['message'] ?? 'Accept application failed');
+      } catch (e) {
+        // JSON 解析失敗，檢查是否為 HTML 錯誤
+        final responseBody = resp.body;
+        if (responseBody.contains('<html>') ||
+            responseBody.contains('<br />') ||
+            responseBody.contains('<!DOCTYPE')) {
+          debugPrint('❌ TaskService acceptApplication: 後端返回 HTML 錯誤頁面');
+          debugPrint(
+              '❌ 回應內容: ${responseBody.length > 500 ? responseBody.substring(0, 500) : responseBody}...');
+          throw Exception(
+              'Backend server error: PHP error occurred. Please check server logs.');
+        }
+        throw Exception('Invalid JSON response: $e');
       }
-      throw Exception(data['message'] ?? 'Accept application failed');
     } else {
       // 檢查是否返回 HTML 錯誤頁面
       final responseBody = resp.body;
-      if (responseBody.contains('<html>') || responseBody.contains('<br />')) {
+      if (responseBody.contains('<html>') ||
+          responseBody.contains('<br />') ||
+          responseBody.contains('<!DOCTYPE')) {
         debugPrint('❌ TaskService acceptApplication: 後端返回 HTML 錯誤頁面');
-        debugPrint('❌ 回應內容: ${responseBody.substring(0, 200)}...');
-        throw Exception('Backend server error: Invalid response format');
+        debugPrint(
+            '❌ 回應內容: ${responseBody.length > 500 ? responseBody.substring(0, 500) : responseBody}...');
+        throw Exception(
+            'Backend server error: PHP error occurred. Please check server logs.');
       }
       throw Exception('HTTP ${resp.statusCode}: Accept application failed');
     }
@@ -421,6 +431,7 @@ class TaskService extends ChangeNotifier {
     final resp = await HttpClientService.post(
       AppConfig.api('/points/transfer.php'),
       body: body,
+      useQueryParamToken: true, // MAMP 兼容性：使用查詢參數傳遞 token
     );
 
     if (HttpClientService.isSuccessResponse(resp)) {
@@ -452,6 +463,7 @@ class TaskService extends ChangeNotifier {
     final resp = await HttpClientService.post(
       AppConfig.api('/points/deduct-fee.php'),
       body: body,
+      useQueryParamToken: true, // MAMP 兼容性：使用查詢參數傳遞 token
     );
 
     if (HttpClientService.isSuccessResponse(resp)) {
@@ -486,6 +498,7 @@ class TaskService extends ChangeNotifier {
     final resp = await HttpClientService.post(
       AppConfig.api('/fees/record.php'),
       body: body,
+      useQueryParamToken: true, // MAMP 兼容性：使用查詢參數傳遞 token
     );
 
     if (HttpClientService.isSuccessResponse(resp)) {
@@ -510,6 +523,7 @@ class TaskService extends ChangeNotifier {
     final resp = await HttpClientService.post(
       AppConfig.api('/account/verify-payment-password.php'),
       body: body,
+      useQueryParamToken: true, // MAMP 兼容性：使用查詢參數傳遞 token
     );
 
     if (HttpClientService.isSuccessResponse(resp)) {
@@ -529,38 +543,25 @@ class TaskService extends ChangeNotifier {
   /// 送出或更新評論
   Future<Map<String, dynamic>> submitReview({
     required String taskId,
-    required int ratingService,
-    required int ratingAttitude,
-    required int ratingExperience,
+    required String taskerId,
+    required int rating,
     String? comment,
   }) async {
-    // 獲取用戶 token
-    final token = await AuthService.getToken();
-    if (token == null) {
-      throw Exception('User not authenticated');
-    }
-
     final body = {
       'task_id': taskId,
-      'ratings': {
-        'service': ratingService,
-        'attitude': ratingAttitude,
-        'experience': ratingExperience,
-      },
+      'tasker_id': taskerId,
+      'rating': rating,
       if (comment != null) 'comment': comment,
     };
-    final resp = await http
-        .post(
-          Uri.parse(AppConfig.taskReviewsSubmitUrl),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 30));
-    if (resp.statusCode == 200) {
-      final data = jsonDecode(resp.body);
+
+    final resp = await HttpClientService.post(
+      AppConfig.taskReviewsSubmitUrl,
+      body: body,
+      useQueryParamToken: true, // MAMP 兼容性：使用查詢參數傳遞 token
+    );
+
+    if (HttpClientService.isSuccessResponse(resp)) {
+      final data = HttpClientService.parseJsonResponse(resp);
       if (data['success'] == true) {
         return Map<String, dynamic>.from(data['data'] ?? {});
       }
@@ -574,12 +575,13 @@ class TaskService extends ChangeNotifier {
   Future<Map<String, dynamic>?> getReview({
     required String taskId,
   }) async {
-    final uri = Uri.parse('${AppConfig.taskReviewsGetUrl}?task_id=$taskId');
-    final resp = await http.get(uri, headers: {
-      'Content-Type': 'application/json'
-    }).timeout(const Duration(seconds: 30));
-    if (resp.statusCode == 200) {
-      final data = jsonDecode(resp.body);
+    final resp = await HttpClientService.get(
+      '${AppConfig.taskReviewsGetUrl}?task_id=$taskId',
+      useQueryParamToken: true, // MAMP 兼容性：使用查詢參數傳遞 token
+    );
+
+    if (HttpClientService.isSuccessResponse(resp)) {
+      final data = HttpClientService.parseJsonResponse(resp);
       if (data['success'] == true) {
         return data['data'] == null
             ? null

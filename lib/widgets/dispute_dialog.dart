@@ -113,7 +113,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
         // 顯示成功訊息
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('爭議已提交，任務狀態已更改為爭議中'),
+            content: Text('Dispute submitted, task status changed to dispute'),
             backgroundColor: Colors.green,
           ),
         );
@@ -122,12 +122,13 @@ class _DisputeDialogState extends State<DisputeDialog> {
         widget.onDisputeSubmitted?.call();
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('DisputeDialog: 爭議提交失敗: $e');
+      if (kDebugMode)
+        debugPrint('DisputeDialog: Dispute Submission Failed: $e');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('爭議提交失敗: $e'),
+            content: Text('Dispute Submission Failed: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -161,14 +162,15 @@ class _DisputeDialogState extends State<DisputeDialog> {
           children: [
             Icon(Icons.info_outline, color: Colors.orange),
             SizedBox(width: 8),
-            Text('爭議已存在'),
+            Text('Dispute Already Exists'),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('此任務已經提交過爭議，無法重複提交。'),
+            const Text(
+                'This task has already been submitted for dispute, and cannot be submitted again.'),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
@@ -180,7 +182,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '爭議 ID: ${_existingDispute!['id']}',
+                    'Dispute ID: ${_existingDispute!['id']}',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -188,12 +190,12 @@ class _DisputeDialogState extends State<DisputeDialog> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '狀態: ${_existingDispute!['status']}',
+                    'Status: ${_existingDispute!['status']}',
                     style: const TextStyle(fontSize: 14),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '提交時間: ${_formatDateTime(_existingDispute!['created_at'])}',
+                    'Submitted Time: ${_formatDateTime(_existingDispute!['created_at'])}',
                     style: const TextStyle(fontSize: 14),
                   ),
                 ],
@@ -204,7 +206,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('確定'),
+            child: const Text('OK'),
           ),
         ],
       );
@@ -212,7 +214,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
 
     // 如果沒有現有爭議，顯示提交表單
     return AlertDialog(
-      title: const Text('提交任務爭議'),
+      title: const Text('Submit Task Dispute'),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -231,7 +233,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      '任務',
+                      'Task',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey,
@@ -253,7 +255,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
 
               // 爭議標題
               const Text(
-                '爭議標題 *',
+                'Dispute Title *',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -263,19 +265,20 @@ class _DisputeDialogState extends State<DisputeDialog> {
 
               TextFormField(
                 controller: _titleController,
-                maxLength: 255,
+                maxLength: 100,
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
-                  hintText: '請簡要描述爭議的主要問題...',
+                  hintText:
+                      'Please briefly describe the main problem of the dispute...',
                   contentPadding: const EdgeInsets.all(12),
                   counterText: '$_titleCharCount/255',
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return '請輸入爭議標題';
+                    return 'Please enter a dispute title';
                   }
                   if (value.trim().length < 5) {
-                    return '標題至少需要5個字符';
+                    return 'Title must be at least 5 characters';
                   }
                   return null;
                 },
@@ -285,7 +288,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
 
               // 詳細說明
               const Text(
-                '詳細說明 *',
+                'Detailed Description *',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -299,16 +302,17 @@ class _DisputeDialogState extends State<DisputeDialog> {
                 maxLength: 1000,
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
-                  hintText: '請詳細描述爭議的原因、經過和您的訴求...',
+                  hintText:
+                      'Please describe the reason for the dispute, the process, and your demands...',
                   contentPadding: const EdgeInsets.all(12),
                   counterText: '$_descriptionCharCount/1000',
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return '請輸入詳細說明';
+                    return 'Please enter a detailed description';
                   }
                   if (value.trim().length < 20) {
-                    return '說明至少需要20個字符';
+                    return 'Description must be at least 20 characters';
                   }
                   return null;
                 },
@@ -335,7 +339,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '提交爭議後，任務將進入爭議狀態，自動完成倒數將停止。管理員將審核您的爭議並做出裁決。',
+                        'After submitting a dispute, the task will enter dispute status and the auto-complete countdown will stop. An administrator will review your dispute and make a decision.',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.orange,
@@ -356,7 +360,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
               : () {
                   Navigator.of(context).pop(false);
                 },
-          child: const Text('取消'),
+          child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: _isSubmitting ? null : _submitDispute,
@@ -373,7 +377,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 )
-              : const Text('提交爭議'),
+              : const Text('Submit'),
         ),
       ],
     );
@@ -412,7 +416,7 @@ class QuickDisputeButton extends StatelessWidget {
     return ElevatedButton.icon(
       onPressed: () => _showDisputeDialog(context),
       icon: const Icon(Icons.report_problem, size: 16),
-      label: const Text('爭議'),
+      label: const Text('Dispute'),
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.red[50],
         foregroundColor: Colors.red[700],

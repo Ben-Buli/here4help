@@ -12,90 +12,90 @@ class ErrorHandlerService {
         errorString.contains('connection') ||
         errorString.contains('timeout') ||
         errorString.contains('socket')) {
-      return '網路連線異常，請檢查您的網路設定';
+      return 'Network connection error, please check your network settings';
     }
 
     // HTTP 狀態碼錯誤
     if (errorString.contains('404')) {
-      return '請求的資源不存在，請稍後再試';
+      return 'The requested resource does not exist, please try again later';
     }
 
     if (errorString.contains('401') || errorString.contains('unauthorized')) {
-      return '登入已過期，請重新登入';
+      return 'Login expired, please log in again';
     }
 
     if (errorString.contains('403') || errorString.contains('forbidden')) {
-      return '您沒有權限執行此操作';
+      return 'You do not have permission to perform this action';
     }
 
     if (errorString.contains('500') ||
         errorString.contains('internal server')) {
-      return '伺服器暫時無法處理請求，請稍後再試';
+      return 'The server is temporarily unable to process the request, please try again later';
     }
 
     if (errorString.contains('502') || errorString.contains('bad gateway')) {
-      return '伺服器連線異常，請稍後再試';
+      return 'Server connection error, please try again later';
     }
 
     if (errorString.contains('503') ||
         errorString.contains('service unavailable')) {
-      return '服務暫時無法使用，請稍後再試';
+      return 'Service is temporarily unavailable, please try again later';
     }
 
     // 任務相關錯誤
     if (errorString.contains('task not found')) {
-      return '找不到指定的任務';
+      return 'The specified task could not be found';
     }
 
     if (errorString.contains('already rated') ||
         errorString.contains('already been rated')) {
-      return '您已經對此任務進行過評分';
+      return 'You have already rated this task';
     }
 
     if (errorString.contains('already been assigned') ||
         errorString.contains('already assigned')) {
-      return '此任務已經指派給其他人';
+      return 'This task has already been assigned to someone else';
     }
 
     if (errorString.contains('already has an assigned tasker')) {
-      return '此任務已經有執行者，無法再接受其他申請';
+      return 'This task already has a tasker and cannot accept more applications';
     }
 
     if (errorString.contains('must be in open status')) {
-      return '只有開放中的任務才能接受申請';
+      return 'Only open tasks can accept applications';
     }
 
     if (errorString.contains('only task creator can accept')) {
-      return '只有任務發布者才能接受申請';
+      return 'Only the task creator can accept applications';
     }
 
     // 驗證錯誤
     if (errorString.contains('validation') || errorString.contains('invalid')) {
-      return '輸入的資料格式不正確，請檢查後重試';
+      return 'The data format you entered is incorrect, please check and try again';
     }
 
     // JSON 解析錯誤
     if (errorString.contains('json') || errorString.contains('format')) {
-      return '資料格式錯誤，請稍後再試';
+      return 'Data format error, please try again later';
     }
 
     // 權限錯誤
     if (errorString.contains('permission')) {
-      return '您沒有執行此操作的權限';
+      return 'You do not have permission to perform this action';
     }
 
     // 檔案上傳錯誤
     if (errorString.contains('upload') || errorString.contains('file')) {
-      return '檔案上傳失敗，請檢查檔案格式和大小';
+      return 'File upload failed, please check the file format and size';
     }
 
     // 資料庫錯誤
     if (errorString.contains('database') || errorString.contains('sql')) {
-      return '資料處理異常，請稍後再試';
+      return 'Data processing error, please try again later';
     }
 
     // 預設錯誤訊息
-    return '操作失敗，請稍後再試';
+    return 'Operation failed, please try again later';
   }
 
   /// 記錄錯誤到控制台（僅在 debug 模式）
@@ -135,7 +135,7 @@ class ErrorHandlerService {
             .contains('already has an assigned tasker')) {
           return 'This task already has a tasker and cannot accept more applications';
         } else if (error.toString().contains('must be in open status')) {
-          return 'Only tasks that are open can accept applications';
+          return 'This task is no longer available for applications. It may have been assigned to another tasker.';
         } else if (error.toString().contains('Only task creator can accept')) {
           return 'Only the task creator can accept applications';
         }

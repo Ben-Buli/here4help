@@ -76,9 +76,9 @@ class AppConfig {
   static String get taskPayAndReviewUrl => api('/tasks/pay_and_review.php');
 
   // 任務評價相關 API
-  static String get taskReviewsSubmitUrl => api('/tasks/reviews/submit.php');
+  static String get taskReviewsSubmitUrl => api('/tasks/reviews_submit.php');
 
-  static String get taskReviewsGetUrl => api('/tasks/reviews/get.php');
+  static String get taskReviewsGetUrl => api('/tasks/reviews_get.php');
 
   // 聊天相關 API
   static String get chatUploadAttachmentUrl =>

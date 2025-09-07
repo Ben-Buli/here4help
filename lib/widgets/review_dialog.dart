@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:here4help/services/api/review_api.dart';
 import 'package:here4help/constants/app_colors.dart';
+import 'package:intl/intl.dart';
 
 class ReviewDialog extends StatefulWidget {
   final String taskId;
@@ -134,9 +135,9 @@ class _ReviewDialogState extends State<ReviewDialog> {
             ),
             const SizedBox(height: 16),
 
-            // 評論 - 必填
+            // 評論 - 選填
             const Text(
-              'Comment *',
+              'Comment (Optional)',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
@@ -149,11 +150,41 @@ class _ReviewDialogState extends State<ReviewDialog> {
               maxLength: 500, // 調整為 500 字
               enabled: !widget.readOnlyMode,
               decoration: const InputDecoration(
-                hintText: 'Please share your experience...',
+                hintText: 'Give your feedback to the tasker',
                 border: OutlineInputBorder(),
                 contentPadding: EdgeInsets.all(12),
               ),
             ),
+
+            // 時間戳記（唯讀模式）
+            if (widget.readOnlyMode && widget.existingReview != null)
+              Container(
+                margin: const EdgeInsets.only(top: 16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.schedule,
+                      size: 16,
+                      color: Colors.blue[600],
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Submitted: ${_formatDateTime(widget.existingReview!['created_at'])}',
+                      style: TextStyle(
+                        color: Colors.blue[600],
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             // 錯誤訊息
             if (_errorMessage != null)
@@ -220,6 +251,20 @@ class _ReviewDialogState extends State<ReviewDialog> {
     }
   }
 
+  String _formatDateTime(String? dateTimeString) {
+    if (dateTimeString == null || dateTimeString.isEmpty) {
+      return 'Unknown';
+    }
+
+    try {
+      final dateTime = DateTime.parse(dateTimeString);
+      final formatter = DateFormat('MMM dd, yyyy HH:mm');
+      return formatter.format(dateTime);
+    } catch (e) {
+      return dateTimeString;
+    }
+  }
+
   Future<void> _submitReview() async {
     // 驗證評分
     if (_rating < 1) {
@@ -229,21 +274,14 @@ class _ReviewDialogState extends State<ReviewDialog> {
       return;
     }
 
-    // 驗證評論必填
-    if (_commentController.text.trim().isEmpty) {
-      setState(() {
-        _errorMessage = 'Comment is required';
-      });
-      return;
-    }
-
-    // 驗證評論長度
-    if (_commentController.text.trim().length < 10) {
-      setState(() {
-        _errorMessage = 'Comment must be at least 10 characters';
-      });
-      return;
-    }
+    // 驗證評論長度（如果有填寫的話）
+    final comment = _commentController.text.trim();
+    // if (comment.isNotEmpty && comment.length < 10) {
+    //   setState(() {
+    //     _errorMessage = 'Comment must be at least 10 characters if provided';
+    //   });
+    //   return;
+    // }
 
     setState(() {
       _isSubmitting = true;
@@ -255,7 +293,7 @@ class _ReviewDialogState extends State<ReviewDialog> {
         taskId: widget.taskId,
         taskerId: widget.taskerId,
         rating: _rating.toInt(),
-        comment: _commentController.text.trim(),
+        comment: comment.isEmpty ? '' : comment,
       );
 
       if (mounted) {
