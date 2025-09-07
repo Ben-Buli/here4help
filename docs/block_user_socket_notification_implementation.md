@@ -1,19 +1,16 @@
-<?php
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+# Block User Socket 通知實作
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
+## 📋 實作概述
 
-require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/TokenValidator.php';
-require_once __DIR__ . '/../../utils/Response.php';
-require_once __DIR__ . '/../../config/env_loader.php';
+在 `backend/api/chat/block_user.php` 中新增完整的 socket 通知發送功能，當用戶進行封鎖/解除封鎖操作時，會即時通知相關聊天室的所有參與者。
 
-// 確保環境變數已載入
-EnvLoader::load();
+## 🚀 實作內容
 
+### **1. Socket 通知函數**
+
+新增 `sendSocketNotification()` 函數：
+
+```php
 /**
  * 發送 Socket 通知
  */
@@ -33,6 +30,7 @@ function sendSocketNotification($event, $data, $roomId = null) {
             $notificationData['room'] = $roomId;
         }
         
+        // cURL 發送通知到 Socket 服務
         $ch = curl_init($socketUrl . '/api/notify');
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($notificationData));
@@ -49,6 +47,7 @@ function sendSocketNotification($event, $data, $roomId = null) {
         $error = curl_error($ch);
         curl_close($ch);
         
+        // 錯誤處理和日誌記錄
         if ($error) {
             error_log("Socket notification cURL error: " . $error);
             return false;
@@ -67,51 +66,14 @@ function sendSocketNotification($event, $data, $roomId = null) {
         return false;
     }
 }
+```
 
+### **2. 封鎖操作通知**
 
-try {
-  if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Method not allowed', 405);
-  }
+當用戶執行封鎖操作時：
 
-  $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
-  if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
-    throw new Exception('Authorization header required');
-  }
-  $user_id = TokenValidator::validateAuthHeader($auth_header);
-  if (!$user_id) { throw new Exception('Invalid or expired token'); }
-  $user_id = (int)$user_id;
-
-  $input = json_decode(file_get_contents('php://input'), true) ?? [];
-  $target_user_id = isset($input['target_user_id']) ? (int)$input['target_user_id'] : 0;
-  $block = isset($input['block']) ? (int)$input['block'] : 1;
-  if ($target_user_id <= 0) Response::validationError(['target_user_id' => 'required']);
-  if ($target_user_id === $user_id) Response::validationError(['target_user_id' => 'cannot block yourself']);
-
-  $db = Database::getInstance();
-
-  // Create table if not exists
-  $db->query("CREATE TABLE IF NOT EXISTS user_blocks (
-    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT UNSIGNED NOT NULL,
-    target_user_id BIGINT UNSIGNED NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_user_target (user_id, target_user_id)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-
-  if ($block === 1) {
-    // 檢查是否已經存在封鎖關係（雙向檢查）
-    $existingBlock = $db->fetch(
-      "SELECT COUNT(*) as block_count FROM user_blocks 
-       WHERE (user_id = ? AND target_user_id = ?) 
-          OR (user_id = ? AND target_user_id = ?)",
-      [$user_id, $target_user_id, $target_user_id, $user_id]
-    );
-    
-    if ($existingBlock && $existingBlock['block_count'] > 0) {
-      Response::error('Block relationship already exists between these users', 409);
-    }
-    
+```php
+if ($block === 1) {
     // 新增封鎖記錄
     $db->query("INSERT INTO user_blocks (user_id, target_user_id) VALUES (?, ?)", [$user_id, $target_user_id]);
     
@@ -138,8 +100,15 @@ try {
     }
     
     error_log("Block notification sent for user $user_id blocking $target_user_id in " . count($chatRooms) . " rooms");
-    
-  } else {
+}
+```
+
+### **3. 解除封鎖操作通知**
+
+當用戶執行解除封鎖操作時：
+
+```php
+} else {
     // 解除封鎖
     $result = $db->query("DELETE FROM user_blocks WHERE user_id = ? AND target_user_id = ?", [$user_id, $target_user_id]);
     
@@ -170,11 +139,107 @@ try {
     }
     
     error_log("Unblock notification sent for user $user_id unblocking $target_user_id in " . count($chatRooms) . " rooms");
-  }
-
-  Response::success(['target_user_id' => $target_user_id, 'blocked' => $block === 1], 'Block updated');
-} catch (Exception $e) {
-  Response::error('Server error: ' . $e->getMessage(), 500);
 }
-?>
+```
 
+## 🔄 完整流程
+
+### **封鎖操作流程**
+
+1. **用戶 A（creator）點擊封鎖按鈕**
+2. **前端發送 POST 請求到 `/backend/api/chat/block_user.php`**
+3. **後端執行封鎖邏輯**：
+   - 檢查是否已存在封鎖關係
+   - 新增封鎖記錄到 `user_blocks` 表
+   - 查找相關聊天室
+   - 發送 socket 通知到每個聊天室
+4. **Socket 服務廣播通知**：
+   - 事件：`block_status_update`
+   - 數據：包含 room_id, blocked_by_user_id, target_user_id, is_blocked 等
+5. **用戶 B（participant）即時接收更新**：
+   - 前端 `_onBlockStatusUpdate()` 處理通知
+   - 立即更新本地封鎖狀態
+   - Alert Bar 顯示封鎖訊息
+   - Action Bar 按鈕消失
+   - 輸入功能被禁用
+   - 顯示 SnackBar 通知
+
+### **Socket 通知數據格式**
+
+#### **封鎖通知**
+```json
+{
+  "event": "block_status_update",
+  "data": {
+    "room_id": "123",
+    "blocked_by_user_id": 456,
+    "target_user_id": 789,
+    "is_blocked": true,
+    "timestamp": 1640995200,
+    "action": "block"
+  },
+  "room": "123"
+}
+```
+
+#### **解除封鎖通知**
+```json
+{
+  "event": "block_status_update",
+  "data": {
+    "room_id": "123",
+    "unblocked_by_user_id": 456,
+    "target_user_id": 789,
+    "is_blocked": false,
+    "timestamp": 1640995200,
+    "action": "unblock"
+  },
+  "room": "123"
+}
+```
+
+## ⚙️ 環境配置
+
+需要在 `.env` 檔案中配置 Socket 服務：
+
+```env
+# Socket 服務配置
+SOCKET_URL=http://localhost:3001
+SOCKET_TOKEN=your-secure-socket-token
+```
+
+## 🔧 技術特點
+
+### **1. 多聊天室支援**
+- 自動查找用戶間的所有聊天室
+- 向每個相關聊天室發送通知
+- 支援一對多的聊天室關係
+
+### **2. 錯誤處理**
+- cURL 錯誤處理
+- HTTP 狀態碼檢查
+- 異常捕獲和日誌記錄
+- 超時設定（連接 3 秒，執行 5 秒）
+
+### **3. 日誌記錄**
+- 成功發送日誌
+- 錯誤詳細日誌
+- 操作統計（影響的聊天室數量）
+
+### **4. 安全性**
+- 從環境變數讀取配置
+- Bearer Token 驗證
+- 輸入驗證和清理
+
+## ✅ 預期效果
+
+實作完成後，當 creator 封鎖 participant 時：
+
+1. ✅ **即時通知**：participant 立即收到封鎖通知
+2. ✅ **UI 更新**：Alert Bar 顯示「您已被此用戶封鎖」
+3. ✅ **功能禁用**：輸入框、發送按鈕、圖片按鈕全部禁用
+4. ✅ **按鈕變化**：Action Bar 中的封鎖相關按鈕消失
+5. ✅ **通知提示**：顯示 SnackBar 封鎖通知
+6. ✅ **雙向生效**：封鎖者和被封鎖者都無法發送訊息
+
+這個實作確保了封鎖功能的即時性和一致性，大幅提升了使用者體驗。

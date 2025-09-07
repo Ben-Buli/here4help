@@ -7,6 +7,7 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/socket_notifier.php';
 
 // CORS
 Response::setCorsHeaders();
@@ -80,6 +81,41 @@ try {
     $sql = 'UPDATE tasks SET ' . implode(', ', $set) . ' WHERE id = ?';
     $params[] = $taskId;
     $db->query($sql, $params);
+
+    // 如果狀態更新為 pending_confirmation (status_id = 3)，同步更新 task_applications.status
+    if ($statusId !== null && $statusId == 3) {
+        // 獲取 pending_confirmation 狀態的 code 來確認
+        $statusCodeRow = $db->fetch("SELECT code FROM task_statuses WHERE id = ?", [$statusId]);
+        if ($statusCodeRow && $statusCodeRow['code'] === 'pending_confirmation') {
+            // 更新該任務的所有 accepted 應徵狀態為 pending
+            $db->query(
+                "UPDATE task_applications SET status = 'pending', updated_at = NOW() 
+                 WHERE task_id = ? AND status = 'accepted'",
+                [$taskId]
+            );
+            
+            // 發送 Socket 通知 - 任務狀態更新為 pending_confirmation
+            try {
+                $socketNotifier = SocketNotifier::getInstance();
+                $userIds = $socketNotifier->getTaskUserIds($taskId);
+                $room = $db->fetch(
+                    "SELECT id FROM chat_rooms WHERE task_id = ? ORDER BY id DESC LIMIT 1",
+                    [$taskId]
+                );
+                $roomId = $room ? $room['id'] : null;
+                
+                $statusData = [
+                    'code' => 'pending_confirmation',
+                    'display_name' => 'Pending Confirmation',
+                    'progress_ratio' => 0.8
+                ];
+                
+                $socketNotifier->notifyTaskStatusUpdate($taskId, $roomId, $statusData, $userIds);
+            } catch (Exception $e) {
+                error_log("Socket notification failed: " . $e->getMessage());
+            }
+        }
+    }
 
     // 回傳最新資料
     $task = $db->fetch(

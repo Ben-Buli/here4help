@@ -589,7 +589,7 @@ class _PaymentDialogState extends State<PaymentDialog> {
         // 評分
         Row(
           children: [
-            Text(
+            const Text(
               'Rating: ',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
             ),

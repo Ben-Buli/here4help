@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -207,22 +208,93 @@ class CompactCountdownTimerWidget extends StatefulWidget {
 }
 
 class _CompactCountdownTimerWidgetState
-    extends State<CompactCountdownTimerWidget> {
+    extends State<CompactCountdownTimerWidget>
+    with SingleTickerProviderStateMixin {
   late Duration _remaining;
   late DateTime _endTime;
   late DateTime _startTime;
   bool _completed = false;
-  late Stream<int> _timerStream;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _startTime = DateTime.now();
-    _endTime = _startTime.add(const Duration(days: 7));
-    _remaining = _endTime.difference(DateTime.now());
+    _initializeCountdown();
+    _startTimer();
+  }
 
-    // 使用 Stream 來替代自定義 Ticker
-    _timerStream = Stream.periodic(const Duration(seconds: 1), (i) => i);
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      final now = DateTime.now();
+      final remain = _endTime.difference(now);
+
+      if (remain <= Duration.zero && !_completed) {
+        _completed = true;
+        timer.cancel();
+        widget.onCountdownComplete();
+        if (mounted) {
+          setState(() {
+            _remaining = Duration.zero;
+          });
+        }
+      } else if (!_completed && mounted) {
+        setState(() {
+          _remaining = remain > Duration.zero ? remain : Duration.zero;
+        });
+      }
+    });
+  }
+
+  void _initializeCountdown() {
+    final task = widget.task;
+    final taskUpdatedAt = task['updated_at'];
+
+    if (taskUpdatedAt != null) {
+      try {
+        final updatedAt = DateTime.parse(taskUpdatedAt);
+        final now = DateTime.now();
+        final timeSinceUpdate = now.difference(updatedAt);
+
+        // 計算剩餘時間：updated_at + 7天 - 當下時間
+        const totalPendingTime = Duration(days: 7);
+        final remainingTimeFromUpdate = totalPendingTime - timeSinceUpdate;
+
+        if (remainingTimeFromUpdate > Duration.zero) {
+          // 還有剩餘時間，啟動倒數計時
+          _startTime = updatedAt;
+          _endTime = updatedAt.add(totalPendingTime);
+          _remaining = remainingTimeFromUpdate;
+        } else {
+          // 時間已到，應該自動完成
+          _remaining = Duration.zero;
+          _startTime = updatedAt;
+          _endTime = updatedAt.add(totalPendingTime);
+        }
+      } catch (e) {
+        debugPrint('❌ 解析任務更新時間失敗: $e');
+        // 回退到預設值
+        _startTime = DateTime.now();
+        _endTime = _startTime.add(const Duration(days: 7));
+        _remaining = _endTime.difference(DateTime.now());
+      }
+    } else {
+      // 沒有 updated_at，使用預設值
+      _startTime = DateTime.now();
+      _endTime = _startTime.add(const Duration(days: 7));
+      _remaining = _endTime.difference(DateTime.now());
+    }
   }
 
   String _formatCompactDuration(Duration d) {
@@ -236,54 +308,38 @@ class _CompactCountdownTimerWidgetState
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<int>(
-      stream: _timerStream,
-      builder: (context, snapshot) {
-        final now = DateTime.now();
-        final remain = _endTime.difference(now);
-
-        if (remain <= Duration.zero && !_completed) {
-          _completed = true;
-          widget.onCountdownComplete();
-          _remaining = Duration.zero;
-        } else if (!_completed) {
-          _remaining = remain > Duration.zero ? remain : Duration.zero;
-        }
-
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.purple[50],
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.purple[200]!, width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.purple[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.purple[200]!, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.timer, color: Colors.purple[600], size: 12),
-              const SizedBox(width: 4),
-              Text(
-                _remaining > Duration.zero
-                    ? _formatCompactDuration(_remaining)
-                    : '00d 00:00:00',
-                style: TextStyle(
-                  color: Colors.purple[600],
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'monospace',
-                ),
-              ),
-            ],
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer, color: Colors.purple[600], size: 12),
+          const SizedBox(width: 4),
+          Text(
+            _remaining > Duration.zero
+                ? _formatCompactDuration(_remaining)
+                : '00d 00:00:00',
+            style: TextStyle(
+              color: Colors.purple[600],
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'monospace',
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }

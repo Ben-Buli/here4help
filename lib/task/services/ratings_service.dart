@@ -1,16 +1,15 @@
 import 'dart:convert';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/services/http_client_service.dart';
+import 'package:here4help/services/error_handler_service.dart';
 import 'package:here4help/task/models/task_card.dart';
 
 class RatingsService {
-  static final String _baseUrl = AppConfig.apiBaseUrl;
-
   /// 獲取發布的任務列表（發布者視角）
   static Future<Paged<TaskCard>> fetchPosted(int page) async {
     try {
       final response = await HttpClientService.get(
-        '$_baseUrl/backend/api/ratings/posted.php?page=$page&per_page=20',
+        '${AppConfig.api('/ratings/posted.php')}?page=$page&per_page=20',
         useQueryParamToken: true,
       );
 
@@ -29,7 +28,9 @@ class RatingsService {
         throw Exception(data['message'] ?? 'Failed to load posted tasks');
       }
     } catch (e) {
-      throw Exception('網路錯誤: $e');
+      ErrorHandlerService.logError('RatingsService.fetchPosted', e);
+      throw Exception(
+          ErrorHandlerService.getOperationErrorMessage('load_tasks', e));
     }
   }
 
@@ -37,7 +38,7 @@ class RatingsService {
   static Future<Paged<TaskCard>> fetchAccepted(int page) async {
     try {
       final response = await HttpClientService.get(
-        '$_baseUrl/backend/api/ratings/accepted.php?page=$page&per_page=20',
+        '${AppConfig.api('/ratings/accepted.php')}?page=$page&per_page=20',
         useQueryParamToken: true,
       );
 
@@ -56,7 +57,9 @@ class RatingsService {
         throw Exception(data['message'] ?? 'Failed to load accepted tasks');
       }
     } catch (e) {
-      throw Exception('網路錯誤: $e');
+      ErrorHandlerService.logError('RatingsService.fetchAccepted', e);
+      throw Exception(
+          ErrorHandlerService.getOperationErrorMessage('load_tasks', e));
     }
   }
 
@@ -64,7 +67,7 @@ class RatingsService {
   static Future<Paged<TaskCard>> fetchNotSelected(int page) async {
     try {
       final response = await HttpClientService.get(
-        '$_baseUrl/backend/api/ratings/not-selected.php?page=$page&per_page=20',
+        '${AppConfig.api('/ratings/not-selected.php')}?page=$page&per_page=20',
         useQueryParamToken: true,
       );
 
@@ -84,7 +87,9 @@ class RatingsService {
             data['message'] ?? 'Failed to load not selected applications');
       }
     } catch (e) {
-      throw Exception('網路錯誤: $e');
+      ErrorHandlerService.logError('RatingsService.fetchNotSelected', e);
+      throw Exception(
+          ErrorHandlerService.getOperationErrorMessage('load_tasks', e));
     }
   }
 
@@ -116,7 +121,7 @@ class RatingsService {
       }
 
       final response = await HttpClientService.post(
-        '$_baseUrl/backend/api/tasks/ratings.php?task_id=$taskId',
+        '${AppConfig.api('/tasks/ratings.php')}?task_id=$taskId',
         useQueryParamToken: true,
         body: {
           'rating': rating,
@@ -141,15 +146,9 @@ class RatingsService {
         }
       }
     } catch (e) {
-      if (e.toString().contains('409') ||
-          e.toString().contains('already rated')) {
-        throw Exception('You have already rated this task');
-      } else if (e.toString().contains('403') ||
-          e.toString().contains('permission')) {
-        throw Exception('You do not have permission to rate this task');
-      } else {
-        throw Exception('網路錯誤: $e');
-      }
+      ErrorHandlerService.logError('RatingsService.createRating', e);
+      throw Exception(
+          ErrorHandlerService.getOperationErrorMessage('submit_rating', e));
     }
   }
 }

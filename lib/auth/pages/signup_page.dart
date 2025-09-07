@@ -1948,8 +1948,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       debugPrint('❌ 註冊請求失敗: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text('Network error: Please check your connection and try again'),
+          content: const Text(
+              'Network error: Please check your connection and try again'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );

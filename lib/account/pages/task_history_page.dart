@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:here4help/constants/app_colors.dart';
 import 'package:here4help/services/api/review_api.dart';
+import 'package:here4help/services/error_handler_service.dart';
+import 'package:here4help/task/services/ratings_service.dart';
 import 'package:here4help/widgets/review_dialog.dart';
 
 class TaskHistoryPage extends StatefulWidget {
@@ -17,7 +19,7 @@ class _TaskHistoryPageState extends State<TaskHistoryPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -72,6 +74,10 @@ class _TaskHistoryPageState extends State<TaskHistoryPage>
                 icon: Icon(Icons.check),
                 text: 'Applied',
               ),
+              Tab(
+                icon: Icon(Icons.cancel_outlined),
+                text: 'Not Selected',
+              ),
             ],
           ),
         ),
@@ -83,6 +89,8 @@ class _TaskHistoryPageState extends State<TaskHistoryPage>
               _TaskHistoryList(type: 'posted'),
               // Applied 任務歷史
               _TaskHistoryList(type: 'applied'),
+              // Not Selected 申請歷史
+              _TaskHistoryList(type: 'not_selected'),
             ],
           ),
         ),
@@ -123,12 +131,48 @@ class _TaskHistoryListState extends State<_TaskHistoryList> {
     }
 
     try {
-      final role = widget.type == 'posted' ? 'poster' : 'acceptor';
-      final response = await TaskHistoryApi.getTaskHistory(
-        role: role,
-        page: _currentPage,
-        perPage: 20,
-      );
+      Map<String, dynamic> response;
+
+      if (widget.type == 'not_selected') {
+        // 使用 RatingsService 的 fetchNotSelected 方法
+        final result = await RatingsService.fetchNotSelected(_currentPage);
+        response = {
+          'success': true,
+          'data': {
+            'tasks': result.items
+                .map((item) => {
+                      'id': item.taskId,
+                      'title': item.title,
+                      'description': '', // TaskCard 沒有 description
+                      'reward_point': item.rewardPoint,
+                      'status_name': item.statusName,
+                      'status_code': '', // TaskCard 沒有 status_code
+                      'application_status': item.applicationStatus,
+                      'application_status_display':
+                          item.applicationStatus?.toUpperCase(),
+                      'creator': {
+                        'name': 'Unknown', // 需要從其他地方獲取
+                      },
+                      'can_review': 0, // Not Selected 不能評價
+                      'updated_at': item.taskDate.toIso8601String(),
+                    })
+                .toList(),
+            'pagination': {
+              'has_next': result.pagination.hasNextPage,
+            },
+            'stats': {
+              'unreviewed_count': 0, // Not Selected 不需要評價
+            }
+          }
+        };
+      } else {
+        final role = widget.type == 'posted' ? 'poster' : 'acceptor';
+        response = await TaskHistoryApi.getTaskHistory(
+          role: role,
+          page: _currentPage,
+          perPage: 20,
+        );
+      }
 
       if (response['success'] == true) {
         final data = response['data'];
@@ -146,8 +190,10 @@ class _TaskHistoryListState extends State<_TaskHistoryList> {
         throw Exception(response['message'] ?? 'Failed to load task history');
       }
     } catch (e) {
+      ErrorHandlerService.logError('TaskHistoryPage._loadTaskHistory', e);
       setState(() {
-        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _errorMessage =
+            ErrorHandlerService.getOperationErrorMessage('load_tasks', e);
         _isLoading = false;
       });
     }
@@ -167,6 +213,45 @@ class _TaskHistoryListState extends State<_TaskHistoryList> {
   void _onReviewSubmitted() {
     // 刷新列表
     _loadTaskHistory(isRefresh: true);
+  }
+
+  IconData _getEmptyStateIcon() {
+    switch (widget.type) {
+      case 'posted':
+        return Icons.assignment_outlined;
+      case 'applied':
+        return Icons.check;
+      case 'not_selected':
+        return Icons.cancel_outlined;
+      default:
+        return Icons.inbox_outlined;
+    }
+  }
+
+  String _getEmptyStateTitle() {
+    switch (widget.type) {
+      case 'posted':
+        return 'No posted tasks yet';
+      case 'applied':
+        return 'No applied tasks yet';
+      case 'not_selected':
+        return 'No rejected applications';
+      default:
+        return 'No tasks found';
+    }
+  }
+
+  String _getEmptyStateSubtitle() {
+    switch (widget.type) {
+      case 'posted':
+        return 'Start by creating your first task';
+      case 'applied':
+        return 'Browse available tasks to get started';
+      case 'not_selected':
+        return 'Applications that were not selected will appear here';
+      default:
+        return 'Check back later';
+    }
   }
 
   @override
@@ -203,15 +288,13 @@ class _TaskHistoryListState extends State<_TaskHistoryList> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              widget.type == 'posted' ? Icons.assignment_outlined : Icons.check,
+              _getEmptyStateIcon(),
               size: 64,
               color: Colors.grey[400],
             ),
             const SizedBox(height: 16),
             Text(
-              widget.type == 'posted'
-                  ? 'No posted tasks yet'
-                  : 'No applied tasks yet',
+              _getEmptyStateTitle(),
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey[600],
@@ -220,9 +303,7 @@ class _TaskHistoryListState extends State<_TaskHistoryList> {
             ),
             const SizedBox(height: 8),
             Text(
-              widget.type == 'posted'
-                  ? 'Start by creating your first task'
-                  : 'Browse available tasks to get started',
+              _getEmptyStateSubtitle(),
               style: TextStyle(color: Colors.grey[500]),
             ),
           ],
@@ -311,12 +392,13 @@ class _TaskHistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canReview = task['can_review'] == 1;
+    final canReview = type != 'not_selected' && task['can_review'] == 1;
     final hasReviewed = type == 'posted'
         ? task['has_reviewed_acceptor'] == 1
-        : task['has_reviewed_poster'] == 1;
-    final receivedRating =
-        type == 'posted' ? task['received_rating'] : task['received_rating'];
+        : (type == 'applied' ? task['has_reviewed_poster'] == 1 : false);
+    final receivedRating = type != 'not_selected'
+        ? (type == 'posted' ? task['received_rating'] : task['received_rating'])
+        : null;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -341,11 +423,15 @@ class _TaskHistoryCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(task['status_code']),
+                    color: type == 'not_selected'
+                        ? _getApplicationStatusColor(task['application_status'])
+                        : _getStatusColor(task['status_code']),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    task['status_name'] ?? 'Unknown',
+                    type == 'not_selected'
+                        ? task['application_status_display'] ?? 'Unknown'
+                        : task['status_name'] ?? 'Unknown',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -368,13 +454,13 @@ class _TaskHistoryCard extends StatelessWidget {
             const SizedBox(height: 8),
 
             // 對方資訊
-            if (type == 'posted' && task['acceptor_name'] != null)
+            if (type == 'posted' && task['participant_name'] != null)
               Row(
                 children: [
                   Icon(Icons.person, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 4),
                   Text(
-                    'Applied by: ${task['acceptor_name']}',
+                    'Applied by: ${task['participant_name']}',
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                 ],
@@ -386,6 +472,17 @@ class _TaskHistoryCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   Text(
                     'Posted by: ${task['poster_name']}',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                ],
+              )
+            else if (type == 'not_selected' && task['creator'] != null)
+              Row(
+                children: [
+                  Icon(Icons.person, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Posted by: ${task['creator']['name']}',
                     style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
                 ],
@@ -405,7 +502,7 @@ class _TaskHistoryCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    '${task['reward_points']} pts',
+                    '${task['reward_point']} pts',
                     style: const TextStyle(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w500,
@@ -434,10 +531,10 @@ class _TaskHistoryCard extends StatelessWidget {
                   QuickReviewButton(
                     taskId: task['id'],
                     taskerId: type == 'posted'
-                        ? task['acceptor_id'].toString()
+                        ? task['participant_id'].toString()
                         : task['poster_id'].toString(),
                     taskerName: type == 'posted'
-                        ? task['acceptor_name'] ?? 'Unknown'
+                        ? task['participant_name'] ?? 'Unknown'
                         : task['poster_name'] ?? 'Unknown',
                     taskTitle: task['title'] ?? 'Untitled Task',
                     onReviewSubmitted: onReviewSubmitted,
@@ -488,6 +585,19 @@ class _TaskHistoryCard extends StatelessWidget {
         return Colors.blue;
       case 'pending':
         return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Color _getApplicationStatusColor(String? status) {
+    switch (status) {
+      case 'rejected':
+        return Colors.red;
+      case 'cancelled':
+        return Colors.grey;
+      case 'withdrawn':
+        return Colors.blue;
       default:
         return Colors.grey;
     }

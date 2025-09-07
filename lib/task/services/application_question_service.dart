@@ -25,7 +25,7 @@ class ApplicationQuestionService extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      String url = '${AppConfig.apiBaseUrl}/backend/api/tasks/questions.php';
+      String url = AppConfig.api('/tasks/questions.php');
       if (taskId != null) {
         url += '?task_id=$taskId';
       }
@@ -72,8 +72,7 @@ class ApplicationQuestionService extends ChangeNotifier {
 
       final response = await http
           .post(
-            Uri.parse(
-                '${AppConfig.apiBaseUrl}/backend/api/tasks/questions.php'),
+            Uri.parse(AppConfig.api('/tasks/questions.php')),
             headers: {
               'Content-Type': 'application/json',
             },
@@ -110,8 +109,7 @@ class ApplicationQuestionService extends ChangeNotifier {
     try {
       final response = await http
           .put(
-            Uri.parse(
-                '${AppConfig.apiBaseUrl}/backend/api/tasks/questions.php/$questionId'),
+            Uri.parse(AppConfig.api('/tasks/questions.php/$questionId')),
             headers: {
               'Content-Type': 'application/json',
             },

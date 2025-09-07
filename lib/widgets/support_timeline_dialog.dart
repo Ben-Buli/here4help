@@ -38,7 +38,7 @@ class SupportTimelineDialog extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.timeline,
                     color: Colors.white,
                     size: 24,
@@ -348,14 +348,14 @@ class SupportTimelineDialog extends StatelessWidget {
                     style: const TextStyle(fontSize: 13, color: Colors.black87),
                     children: [
                       if (oldStatus != null) ...[
-                        TextSpan(text: 'Status changed from '),
+                        const TextSpan(text: 'Status changed from '),
                         TextSpan(
                           text: _formatStatus(oldStatus),
                           style: const TextStyle(fontWeight: FontWeight.w500),
                         ),
-                        TextSpan(text: ' to '),
+                        const TextSpan(text: ' to '),
                       ] else
-                        TextSpan(text: 'Status set to '),
+                        const TextSpan(text: 'Status set to '),
                       TextSpan(
                         text: _formatStatus(newStatus),
                         style: TextStyle(

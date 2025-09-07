@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:here4help/services/theme_config_manager.dart';
-import 'package:here4help/constants/task_status.dart';
-import 'package:here4help/constants/theme_schemes.dart';
-import 'package:here4help/chat/utils/application_status_utils.dart';
 import 'package:provider/provider.dart';
 
 /// 任務標題（AppBar 專用）

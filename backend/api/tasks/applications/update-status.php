@@ -2,6 +2,8 @@
 require_once __DIR__ . '/../../../config/env_loader.php';
 require_once __DIR__ . '/../../../utils/Response.php';
 require_once __DIR__ . '/../../../utils/JWTManager.php';
+require_once __DIR__ . '/../../../utils/socket_notifier.php';
+require_once __DIR__ . '/../../../config/database.php';
 
 header('Content-Type: application/json');
 
@@ -153,6 +155,42 @@ try {
         
         // 提交交易
         $pdo->commit();
+        
+        // 發送 Socket 通知
+        try {
+            $socketNotifier = SocketNotifier::getInstance();
+            $userIds = $socketNotifier->getTaskUserIds($application['task_id']);
+            $db = Database::getInstance();
+            $room = $db->fetch(
+                "SELECT id FROM chat_rooms WHERE task_id = ? ORDER BY id DESC LIMIT 1",
+                [$application['task_id']]
+            );
+            $roomId = $room ? $room['id'] : null;
+            
+            // 通知應徵狀態更新
+            $socketNotifier->notifyApplicationStatusUpdate(
+                $application['task_id'], 
+                $roomId, 
+                $newStatus, 
+                $userIds
+            );
+            
+            // 如果是撤銷應徵，可能需要額外的任務狀態通知
+            if ($newStatus === 'withdrawn') {
+                // 檢查是否還有其他應徵者
+                $remainingApplications = $db->fetch(
+                    "SELECT COUNT(*) as count FROM task_applications WHERE task_id = ? AND status = 'applied'",
+                    [$application['task_id']]
+                );
+                
+                // 如果沒有其他應徵者，任務可能需要回到 open 狀態
+                if ($remainingApplications && $remainingApplications['count'] == 0) {
+                    // 這裡可以添加任務狀態更新邏輯，如果需要的話
+                }
+            }
+        } catch (Exception $e) {
+            error_log("Socket notification failed: " . $e->getMessage());
+        }
         
         $response = [
             'success' => true,

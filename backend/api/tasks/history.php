@@ -41,9 +41,9 @@ try {
                 t.updated_at,
                 ts.display_name as status_name,
                 ts.code as status_code,
-                ta.user_id as acceptor_id,
-                u.name as acceptor_name,
-                u.avatar_url as acceptor_avatar,
+                ta.user_id as participant_id,
+                u.name as participant_name,
+                u.avatar_url as participant_avatar,
                 CASE 
                     WHEN tr_poster.id IS NOT NULL THEN 1 
                     ELSE 0 
@@ -62,7 +62,7 @@ try {
                 END as can_review
             FROM tasks t
             LEFT JOIN task_statuses ts ON t.status_id = ts.id
-            LEFT JOIN task_applications ta ON t.id = ta.task_id AND ta.status = 'accepted'
+            LEFT JOIN task_applications ta ON t.id = ta.task_id AND ta.status in ('applied', 'accepted', 'in_progress', 'pending', 'dispute', 'completed')
             LEFT JOIN users u ON ta.user_id = u.id
             LEFT JOIN task_ratings tr_poster ON t.id = tr_poster.task_id AND tr_poster.rater_id = ? AND tr_poster.tasker_id = ta.user_id
             LEFT JOIN task_ratings tr_acceptor ON t.id = tr_acceptor.task_id AND tr_acceptor.rater_id = ta.user_id AND tr_acceptor.tasker_id = ?
@@ -107,7 +107,7 @@ try {
                     ELSE 0
                 END as can_review
             FROM tasks t
-            INNER JOIN task_applications ta ON t.id = ta.task_id AND ta.user_id = ? AND ta.status = 'accepted'
+            INNER JOIN task_applications ta ON t.id = ta.task_id AND ta.user_id = ? AND ta.status in ('applied', 'accepted', 'in_progress', 'pending', 'dispute', 'completed')
             LEFT JOIN task_statuses ts ON t.status_id = ts.id
             LEFT JOIN users u ON t.creator_id = u.id
             LEFT JOIN task_ratings tr_acceptor ON t.id = tr_acceptor.task_id AND tr_acceptor.rater_id = ? AND tr_acceptor.tasker_id = t.creator_id
@@ -132,7 +132,7 @@ try {
         $countSql = "
             SELECT COUNT(*) as total 
             FROM tasks t
-            INNER JOIN task_applications ta ON t.id = ta.task_id AND ta.user_id = ? AND ta.status = 'accepted'
+            INNER JOIN task_applications ta ON t.id = ta.task_id AND ta.user_id = ? AND ta.status in ('applied', 'accepted', 'in_progress', 'pending', 'dispute', 'completed')
             WHERE t.deleted_at IS NULL
         ";
         $countStmt = $pdo->prepare($countSql);

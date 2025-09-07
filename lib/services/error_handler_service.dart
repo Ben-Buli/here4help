@@ -1,200 +1,173 @@
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 
-/// 錯誤處理服務
+/// 統一的錯誤處理服務
+/// 將技術性錯誤訊息轉換為使用者友善的訊息
 class ErrorHandlerService {
-  static const String _errorLogKey = 'error_log';
-  static const int _maxRetries = 3;
-  static const Duration _retryDelay = Duration(seconds: 2);
-
-  /// 顯示用戶友好的錯誤信息
-  static void showError(BuildContext context, String message, {String? title}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        duration: const Duration(seconds: 4),
-        action: SnackBarAction(
-          label: '關閉',
-          textColor: Colors.white,
-          onPressed: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          },
-        ),
-      ),
-    );
-  }
-
-  /// 顯示成功信息
-  static void showSuccess(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  /// 顯示警告信息
-  static void showWarning(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.orange,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
-  /// 顯示加載中信息
-  static void showLoading(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(child: Text(message)),
-          ],
-        ),
-        backgroundColor: Colors.blue,
-        duration: const Duration(seconds: 10),
-      ),
-    );
-  }
-
-  /// 隱藏當前的 SnackBar
-  static void hideCurrent(BuildContext context) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-  }
-
-  /// 記錄錯誤到本地存儲
-  static Future<void> logError(String error, {String? context}) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final now = DateTime.now().toIso8601String();
-      final errorLog = prefs.getStringList(_errorLogKey) ?? [];
-
-      errorLog.add('[$now] ${context ?? 'Unknown'}: $error');
-
-      // 只保留最近 100 條錯誤記錄
-      if (errorLog.length > 100) {
-        errorLog.removeRange(0, errorLog.length - 100);
-      }
-
-      await prefs.setStringList(_errorLogKey, errorLog);
-    } catch (e) {
-      // 忽略記錄錯誤時的錯誤
-    }
-  }
-
-  /// 獲取錯誤日誌
-  static Future<List<String>> getErrorLog() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getStringList(_errorLogKey) ?? [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  /// 清除錯誤日誌
-  static Future<void> clearErrorLog() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_errorLogKey);
-    } catch (e) {
-      // 忽略清除錯誤時的錯誤
-    }
-  }
-
-  /// 帶重試機制的函數執行器
-  static Future<T> executeWithRetry<T>({
-    required Future<T> Function() operation,
-    int maxRetries = _maxRetries,
-    Duration retryDelay = _retryDelay,
-    String? operationName,
-    bool Function(Exception)? shouldRetry,
-  }) async {
-    int attempts = 0;
-    Exception? lastException;
-
-    while (attempts < maxRetries) {
-      try {
-        return await operation();
-      } catch (e) {
-        attempts++;
-        lastException = e is Exception ? e : Exception(e.toString());
-
-        // 檢查是否應該重試
-        if (shouldRetry != null && !shouldRetry(lastException)) {
-          break;
-        }
-
-        // 記錄錯誤
-        await logError(
-          'Attempt $attempts failed: ${lastException.toString()}',
-          context: operationName ?? 'RetryOperation',
-        );
-
-        // 如果還有重試機會，等待後重試
-        if (attempts < maxRetries) {
-          await Future.delayed(retryDelay * attempts); // 指數退避
-        }
-      }
-    }
-
-    // 所有重試都失敗了
-    throw Exception(
-      'Operation failed after $maxRetries attempts. Last error: ${lastException?.toString()}',
-    );
-  }
-
-  /// 檢查網絡錯誤
-  static bool isNetworkError(Exception error) {
+  /// 將 API 錯誤轉換為使用者友善的訊息
+  static String getUserFriendlyMessage(dynamic error) {
     final errorString = error.toString().toLowerCase();
-    return errorString.contains('network') ||
-        errorString.contains('timeout') ||
+
+    // 網路相關錯誤
+    if (errorString.contains('network') ||
         errorString.contains('connection') ||
-        errorString.contains('socket');
+        errorString.contains('timeout') ||
+        errorString.contains('socket')) {
+      return '網路連線異常，請檢查您的網路設定';
+    }
+
+    // HTTP 狀態碼錯誤
+    if (errorString.contains('404')) {
+      return '請求的資源不存在，請稍後再試';
+    }
+
+    if (errorString.contains('401') || errorString.contains('unauthorized')) {
+      return '登入已過期，請重新登入';
+    }
+
+    if (errorString.contains('403') || errorString.contains('forbidden')) {
+      return '您沒有權限執行此操作';
+    }
+
+    if (errorString.contains('500') ||
+        errorString.contains('internal server')) {
+      return '伺服器暫時無法處理請求，請稍後再試';
+    }
+
+    if (errorString.contains('502') || errorString.contains('bad gateway')) {
+      return '伺服器連線異常，請稍後再試';
+    }
+
+    if (errorString.contains('503') ||
+        errorString.contains('service unavailable')) {
+      return '服務暫時無法使用，請稍後再試';
+    }
+
+    // 任務相關錯誤
+    if (errorString.contains('task not found')) {
+      return '找不到指定的任務';
+    }
+
+    if (errorString.contains('already rated') ||
+        errorString.contains('already been rated')) {
+      return '您已經對此任務進行過評分';
+    }
+
+    if (errorString.contains('already been assigned') ||
+        errorString.contains('already assigned')) {
+      return '此任務已經指派給其他人';
+    }
+
+    if (errorString.contains('already has an assigned tasker')) {
+      return '此任務已經有執行者，無法再接受其他申請';
+    }
+
+    if (errorString.contains('must be in open status')) {
+      return '只有開放中的任務才能接受申請';
+    }
+
+    if (errorString.contains('only task creator can accept')) {
+      return '只有任務發布者才能接受申請';
+    }
+
+    // 驗證錯誤
+    if (errorString.contains('validation') || errorString.contains('invalid')) {
+      return '輸入的資料格式不正確，請檢查後重試';
+    }
+
+    // JSON 解析錯誤
+    if (errorString.contains('json') || errorString.contains('format')) {
+      return '資料格式錯誤，請稍後再試';
+    }
+
+    // 權限錯誤
+    if (errorString.contains('permission')) {
+      return '您沒有執行此操作的權限';
+    }
+
+    // 檔案上傳錯誤
+    if (errorString.contains('upload') || errorString.contains('file')) {
+      return '檔案上傳失敗，請檢查檔案格式和大小';
+    }
+
+    // 資料庫錯誤
+    if (errorString.contains('database') || errorString.contains('sql')) {
+      return '資料處理異常，請稍後再試';
+    }
+
+    // 預設錯誤訊息
+    return '操作失敗，請稍後再試';
   }
 
-  /// 檢查服務器錯誤
-  static bool isServerError(Exception error) {
-    final errorString = error.toString().toLowerCase();
-    return errorString.contains('500') ||
-        errorString.contains('502') ||
-        errorString.contains('503') ||
-        errorString.contains('504');
+  /// 記錄錯誤到控制台（僅在 debug 模式）
+  static void logError(String context, dynamic error,
+      [StackTrace? stackTrace]) {
+    if (kDebugMode) {
+      debugPrint('❌ [$context] Error: $error');
+      if (stackTrace != null) {
+        debugPrint('Stack trace: $stackTrace');
+      }
+    }
   }
 
-  /// 檢查認證錯誤
-  static bool isAuthError(Exception error) {
+  /// 獲取特定操作的錯誤訊息
+  static String getOperationErrorMessage(String operation, dynamic error) {
+    final baseMessage = getUserFriendlyMessage(error);
+
+    switch (operation.toLowerCase()) {
+      case 'login':
+        return 'Login failed: $baseMessage';
+      case 'register':
+        return 'Registration failed: $baseMessage';
+      case 'load_tasks':
+        return 'Failed to load tasks: $baseMessage';
+      case 'create_task':
+        return 'Failed to create task: $baseMessage';
+      case 'update_task':
+        return 'Failed to update task: $baseMessage';
+      case 'delete_task':
+        return 'Failed to delete task: $baseMessage';
+      case 'accept_application':
+        // Specific error handling for accepting application
+        if (error.toString().contains('already been assigned')) {
+          return 'This user has already been assigned as the tasker for this task';
+        } else if (error
+            .toString()
+            .contains('already has an assigned tasker')) {
+          return 'This task already has a tasker and cannot accept more applications';
+        } else if (error.toString().contains('must be in open status')) {
+          return 'Only tasks that are open can accept applications';
+        } else if (error.toString().contains('Only task creator can accept')) {
+          return 'Only the task creator can accept applications';
+        }
+        return 'Failed to accept application: $baseMessage';
+      case 'submit_rating':
+        return 'Failed to submit rating: $baseMessage';
+      case 'upload_file':
+        return 'File upload failed: $baseMessage';
+      case 'send_message':
+        return 'Failed to send message: $baseMessage';
+      case 'block_user':
+        return 'Failed to block user: $baseMessage';
+      default:
+        return baseMessage;
+    }
+  }
+
+  /// 檢查是否為需要重新登入的錯誤
+  static bool isAuthError(dynamic error) {
     final errorString = error.toString().toLowerCase();
     return errorString.contains('401') ||
-        errorString.contains('403') ||
         errorString.contains('unauthorized') ||
-        errorString.contains('forbidden');
+        errorString.contains('token') ||
+        errorString.contains('expired');
   }
 
-  /// 獲取用戶友好的錯誤信息
-  static String getUserFriendlyMessage(Exception error) {
-    if (isNetworkError(error)) {
-      return '網絡連接失敗，請檢查網絡設置後重試';
-    } else if (isServerError(error)) {
-      return '服務器暫時無法響應，請稍後重試';
-    } else if (isAuthError(error)) {
-      return '登錄已過期，請重新登錄';
-    } else {
-      return '操作失敗，請重試';
-    }
+  /// 檢查是否為網路錯誤
+  static bool isNetworkError(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+    return errorString.contains('network') ||
+        errorString.contains('connection') ||
+        errorString.contains('timeout') ||
+        errorString.contains('socket');
   }
 }

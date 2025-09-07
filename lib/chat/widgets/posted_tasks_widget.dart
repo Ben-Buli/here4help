@@ -9,16 +9,17 @@ import 'package:here4help/chat/providers/chat_list_provider.dart';
 import 'package:here4help/chat/widgets/task_card_components.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
+import 'package:here4help/services/permission_service.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/services/notification_service.dart';
-import 'package:here4help/chat/utils/avatar_error_cache.dart';
 import 'package:flutter/foundation.dart';
 import 'package:infinite_scroll_pagination/infinite_scroll_pagination.dart';
 import 'package:here4help/chat/services/chat_navigation_service.dart';
 import 'package:here4help/chat/services/socket_service.dart';
 import 'package:here4help/chat/services/chat_preload_service.dart';
-import 'package:here4help/config/environment_config.dart';
 import 'package:here4help/chat/widgets/highlighted_text.dart';
+import 'package:here4help/chat/widgets/cached_avatar_widget.dart';
+import 'package:here4help/chat/utils/avatar_cache_manager.dart';
 
 const bool verboseSearchLog = false; // 控制搜尋相關的詳細日誌
 
@@ -295,7 +296,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
   /// 設置未讀數據監聽器
   void _setupUnreadListener() {
     try {
-      // 監聽未讀數據變化
+      // 移除重複監聽：NotificationCenter 已自動同步到 Provider
+      // 只監聽未讀數據變化來更新 Tab 標記
       _unreadSub = NotificationCenter().byRoomStream.listen((unreadData) {
         if (!mounted) return;
 
@@ -303,25 +305,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           debugPrint('📡 [Posted Tasks] 收到未讀數據更新: ${unreadData.length} 個房間');
         }
 
-        // 更新 Provider：以快照覆蓋，避免舊房間殘留
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          try {
-            ChatListProvider? provider;
-            try {
-              provider = _getChatProvider();
-            } catch (e) {
-              debugPrint(
-                  '⚠️ [Posted Tasks][_setupUnreadListener()] 無法獲取 ChatListProvider，跳過未讀數據更新');
-              return;
-            }
-            provider?.replaceUnreadByRoom(unreadData);
-          } catch (e) {
-            debugPrint('❌ [Posted Tasks] 更新未讀數據失敗: $e');
-          }
-        });
-
-        // 延遲更新未讀標記，避免頻繁觸發
+        // 只更新 Tab 未讀標記，不重複呼叫 replaceUnreadByRoom
         Future.delayed(const Duration(milliseconds: 100), () {
           if (!mounted) return;
           _updatePostedTabUnreadFlag();
@@ -352,6 +336,32 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       }
     } catch (e) {
       debugPrint('❌ [Posted Tasks] 預載入聊天室數據失敗: $e');
+    }
+  }
+
+  /// 預載入頭像數據
+  void _preloadAvatars() {
+    try {
+      final avatarPaths = <String>[];
+
+      // 收集所有應徵者的頭像路徑
+      for (final appliers in _applicationsByTask.values) {
+        for (final applier in appliers) {
+          final avatarPath = applier['applier_avatar']?.toString();
+          if (avatarPath != null &&
+              avatarPath.isNotEmpty &&
+              !avatarPaths.contains(avatarPath)) {
+            avatarPaths.add(avatarPath);
+          }
+        }
+      }
+
+      if (avatarPaths.isNotEmpty) {
+        debugPrint('🚀 [Posted Tasks] 開始預載入 ${avatarPaths.length} 個頭像');
+        AvatarCacheManager.preloadAvatars(avatarPaths);
+      }
+    } catch (e) {
+      debugPrint('❌ [Posted Tasks] 預載入頭像失敗: $e');
     }
   }
 
@@ -444,26 +454,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       // 等待 NotificationCenter 初始化完成
       await NotificationCenter().waitForUnreadData();
 
-      // 獲取當前快照，不強制刷新
-      final unreadData =
-          await NotificationCenter().service.observeUnreadByRoom().first;
-
-      if (mounted) {
-        // 安全地獲取 Provider
-        ChatListProvider? provider;
-        try {
-          provider = _getChatProvider();
-        } catch (e) {
-          debugPrint(
-              '⚠️ [Posted Tasks][_ensureUnreadDataLoaded()] 無法獲取 ChatListProvider，跳過未讀數據更新');
-          return;
-        }
-
-        provider?.replaceUnreadByRoom(unreadData);
-
-        if (kDebugMode && verboseSearchLog) {
-          // debugPrint('✅ [Posted Tasks] 未讀數據載入完成: ${unreadData.length} 個房間');
-        }
+      // NotificationCenter 會自動同步到 Provider，無需手動呼叫 replaceUnreadByRoom
+      if (kDebugMode && verboseSearchLog) {
+        debugPrint('✅ [Posted Tasks] 未讀數據載入完成');
       }
     } catch (e) {
       debugPrint('❌ [Posted Tasks] 未讀數據載入失敗: $e');
@@ -718,6 +711,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
         // 預載入聊天室數據
         _preloadChatData();
+
+        // 預載入頭像
+        _preloadAvatars();
 
         debugPrint('🔍 [Posted Tasks] [_fetchAllTasks()] 任務獲取完成');
         debugPrint(
@@ -1412,7 +1408,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               child: CompactCountdownTimerWidget(
                 task: task,
                 onCountdownComplete: () {
-                  // TODO: 實現倒數計時完成邏輯
+                  // 倒數計時完成，執行自動完成任務流程
+                  _executeAutoCompleteTask(task);
                 },
               ),
             ),
@@ -1521,6 +1518,22 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
   Widget _buildActionBar(Map<String, dynamic> task, ColorScheme colorScheme) {
     final displayStatus = TaskCardUtils.displayStatus(task);
+    final userService = Provider.of<UserService>(context, listen: false);
+    final currentPermission = userService.getCurrentPermissionLevel();
+    final isAdmin = PermissionService.canAccessAdmin(currentPermission);
+    final isPendingConfirmation = task['status_id'] == 3;
+
+    // 調試日誌
+    debugPrint('🔍 [Posted Tasks] Timeup 按鈕調試:');
+    debugPrint('  - 任務 ID: ${task['id']}');
+    debugPrint('  - 任務標題: ${task['title']}');
+    debugPrint('  - 當前用戶權限: $currentPermission');
+    debugPrint('  - isAdmin: $isAdmin');
+    debugPrint('  - 任務狀態結構: $task');
+    debugPrint('  - 任務狀態 code: ${task['status_id']}');
+    debugPrint('  - isPendingConfirmation: $isPendingConfirmation');
+    debugPrint('  - displayStatus: $displayStatus');
+    debugPrint('  - 應該顯示 Timeup 按鈕: ${isAdmin && isPendingConfirmation}');
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1634,6 +1647,26 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                   ),
                 ),
                 const SizedBox(width: 16),
+                // Timeup 按鈕（僅限管理員且 pending_confirmation 狀態）
+                if (isAdmin && isPendingConfirmation) ...[
+                  SizedBox(
+                    width: 100,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _confirmTimeupTask(task),
+                      icon: Icon(Icons.timer_off,
+                          size: 16, color: Colors.purple[700]),
+                      label: Text('Timeup',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.purple[700])),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.purple[700]!),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                ],
                 // Info 按鈕
                 SizedBox(
                   width: 120,
@@ -1656,14 +1689,14 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     );
   }
 
-  /// 建構帶有錯誤回退的頭像
+  /// 建構帶有錯誤回退的頭像（使用快取）
   Widget _buildAvatarWithFallback(
     String? avatarPath,
     String? name, {
     double radius = 20,
     double fontSize = 14,
   }) {
-    return _AvatarWithFallback(
+    return CachedAvatarWidget(
       avatarPath: avatarPath,
       name: name ?? 'Unknown',
       radius: radius,
@@ -2284,6 +2317,190 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     debugPrint('  - _sortedTasks 剩餘數量: ${_sortedTasks.length}');
   }
 
+  /// 確認 Timeup 任務（管理員強制完成）
+  void _confirmTimeupTask(Map<String, dynamic> task) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.timer_off, color: Colors.purple[700]),
+            const SizedBox(width: 8),
+            const Text('Force Complete Task'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to force complete "${task['title']}"?',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.purple[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.purple[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.warning, color: Colors.purple[700], size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Admin Action',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.purple[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'This will immediately complete the task and transfer points to the tasker.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _executeTimeupTask(task);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.purple[700],
+            ),
+            child: const Text('Force Complete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 執行 Timeup 任務（強制完成）
+  void _executeTimeupTask(Map<String, dynamic> task) async {
+    final taskId = task['id'].toString();
+
+    try {
+      debugPrint('🔍 [Posted Tasks] 開始執行 Timeup 任務: $taskId');
+      debugPrint('  - 任務資料: $task');
+
+      // 顯示載入中
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 12),
+                Text('Force completing task...'),
+              ],
+            ),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+
+      // 使用現有的 confirmCompletion API 來強制完成任務
+      final taskService = TaskService();
+      debugPrint('🔍 [Posted Tasks] 調用 TaskService.confirmCompletion...');
+
+      final result = await taskService.confirmCompletion(
+        taskId: taskId,
+        preview: false, // 直接執行，不預覽
+      );
+
+      debugPrint('✅ [Posted Tasks] confirmCompletion 成功: $result');
+
+      if (mounted) {
+        // 更新本地任務狀態
+        _updateTaskById(taskId, {'status': 'completed'});
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Task "${task['title']}" has been force completed'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        debugPrint('✅ [Posted Tasks] Timeup 任務執行成功: $taskId');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ [Posted Tasks] Timeup 任務執行失敗: $taskId');
+      debugPrint('❌ 錯誤詳情: $e');
+      debugPrint('❌ 堆疊追蹤: $stackTrace');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to force complete task: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 執行自動完成任務（倒數計時結束時觸發）
+  void _executeAutoCompleteTask(Map<String, dynamic> task) async {
+    final taskId = task['id'].toString();
+
+    try {
+      debugPrint('⏰ [Posted Tasks] 倒數計時結束，開始自動完成任務: $taskId');
+
+      // 使用現有的 confirmCompletion API 來自動完成任務
+      final taskService = TaskService();
+      await taskService.confirmCompletion(
+        taskId: taskId,
+        preview: false, // 直接執行，不預覽
+      );
+
+      if (mounted) {
+        // 更新本地任務狀態
+        _updateTaskById(taskId, {'status': 'completed'});
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Task "${task['title']}" has been automatically completed'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        debugPrint('✅ [Posted Tasks] 任務自動完成成功: $taskId');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to auto complete task: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+
+        debugPrint('❌ [Posted Tasks] 任務自動完成失敗: $taskId, 錯誤: $e');
+      }
+    }
+  }
+
   /// 通過 ID 更新任務狀態（本地狀態更新）
   void _updateTaskById(String taskId, Map<String, dynamic> updatedTask) {
     if (!mounted) return;
@@ -2559,110 +2776,4 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
   }
 }
 
-/// 帶有錯誤回退的頭像 Widget
-class _AvatarWithFallback extends StatefulWidget {
-  final String? avatarPath;
-  final String name;
-  final double radius;
-  final double fontSize;
-
-  const _AvatarWithFallback({
-    required this.avatarPath,
-    required this.name,
-    required this.radius,
-    required this.fontSize,
-  });
-
-  @override
-  State<_AvatarWithFallback> createState() => _AvatarWithFallbackState();
-}
-
-class _AvatarWithFallbackState extends State<_AvatarWithFallback> {
-  bool _hasError = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final avatarPath = widget.avatarPath;
-    // 正規化頭像路徑：相對路徑轉為完整 URL，assets/ 保持不變
-    final String resolvedPath = (avatarPath == null || avatarPath.isEmpty)
-        ? ''
-        : EnvironmentConfig.getFullImageUrl(avatarPath);
-
-    // 如果沒有頭像路徑、已發生錯誤，或 URL 在失敗快取中，直接顯示首字母
-    if (resolvedPath.isEmpty ||
-        _hasError ||
-        AvatarErrorCache.isFailedUrl(resolvedPath)) {
-      return _buildInitialsAvatar();
-    }
-
-    // 如果是相對路徑 (assets)
-    if (resolvedPath.startsWith('assets/')) {
-      return CircleAvatar(
-        radius: widget.radius,
-        backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
-        backgroundImage: AssetImage(resolvedPath),
-        onBackgroundImageError: (exception, stackTrace) {
-          AvatarErrorCache.addFailedUrl(resolvedPath);
-          if (mounted) {
-            // 使用 addPostFrameCallback 避免在繪製過程中調用 setState
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                setState(() {
-                  _hasError = true;
-                });
-              }
-            });
-          }
-        },
-        child: _hasError ? _buildInitialsText() : null,
-      );
-    }
-
-    // 如果是網路 URL
-    if (resolvedPath.startsWith('http://') ||
-        resolvedPath.startsWith('https://')) {
-      return CircleAvatar(
-        radius: widget.radius,
-        backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
-        backgroundImage: NetworkImage(resolvedPath),
-        onBackgroundImageError: (exception, stackTrace) {
-          AvatarErrorCache.addFailedUrl(resolvedPath);
-          debugPrint('🔴 Avatar load error (cached): $resolvedPath');
-          if (mounted) {
-            // 使用 addPostFrameCallback 避免在繪製過程中調用 setState
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                setState(() {
-                  _hasError = true;
-                });
-              }
-            });
-          }
-        },
-        child: _hasError ? _buildInitialsText() : null,
-      );
-    }
-
-    // 其他格式不支援，顯示首字母
-    return _buildInitialsAvatar();
-  }
-
-  Widget _buildInitialsAvatar() {
-    return CircleAvatar(
-      radius: widget.radius,
-      backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
-      child: _buildInitialsText(),
-    );
-  }
-
-  Widget _buildInitialsText() {
-    return Text(
-      TaskCardUtils.getInitials(widget.name),
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: widget.fontSize,
-        fontWeight: FontWeight.bold,
-      ),
-    );
-  }
-}
+// 舊的 _AvatarWithFallback 已移除，統一使用 CachedAvatarWidget

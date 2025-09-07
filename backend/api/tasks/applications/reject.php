@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../utils/Response.php';
+require_once __DIR__ . '/../../../utils/socket_notifier.php';
 
 Response::setCorsHeaders();
 
@@ -73,6 +74,21 @@ try {
         $logStmt->execute([$userId, $posterId, $posterId, $userId, $taskId, $metadata, $ip]);
 
         $conn->commit();
+
+        // 發送 Socket 通知
+        try {
+            $socketNotifier = SocketNotifier::getInstance();
+            $userIds = $socketNotifier->getTaskUserIds($taskId);
+            $room = $db->fetch(
+                "SELECT id FROM chat_rooms WHERE task_id = ? ORDER BY id DESC LIMIT 1",
+                [$taskId]
+            );
+            $roomId = $room ? $room['id'] : null;
+            
+            $socketNotifier->notifyApplicationStatusUpdate($taskId, $roomId, 'rejected', $userIds);
+        } catch (Exception $e) {
+            error_log("Socket notification failed: " . $e->getMessage());
+        }
 
         // 回傳更新後的應徵紀錄
         $updatedApplication = $db->fetch("

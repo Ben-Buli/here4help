@@ -564,4 +564,40 @@ class ChatService {
       return null;
     }
   }
+
+  /// 撤銷應徵申請
+  Future<Map<String, dynamic>> withdrawApplication({
+    required String taskId,
+  }) async {
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('未登入');
+      }
+
+      final uri = Uri.parse(AppConfig.api('/tasks/applications/withdraw.php'));
+      final response = await http.post(
+        uri,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'task_id': taskId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return Map<String, dynamic>.from(data['data'] ?? {});
+        }
+        throw Exception(data['message'] ?? '撤銷應徵申請失敗');
+      } else {
+        throw Exception('HTTP ${response.statusCode}: 撤銷應徵申請失敗');
+      }
+    } catch (e) {
+      throw Exception('撤銷應徵申請失敗: $e');
+    }
+  }
 }

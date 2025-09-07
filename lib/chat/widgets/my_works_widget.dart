@@ -8,11 +8,12 @@ import 'package:here4help/chat/widgets/task_card_components.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/services/notification_service.dart';
-import 'package:here4help/chat/utils/avatar_error_cache.dart';
 import 'package:here4help/chat/services/smart_refresh_strategy.dart';
 import 'package:here4help/chat/services/chat_navigation_service.dart';
 import 'package:here4help/chat/utils/application_status_utils.dart';
 import 'package:here4help/chat/widgets/highlighted_text.dart';
+import 'package:here4help/chat/widgets/cached_avatar_widget.dart';
+import 'package:here4help/chat/utils/avatar_cache_manager.dart';
 
 /// My Works 分頁組件
 /// 從原 ChatListPage 中抽取的 My Works 相關功能
@@ -249,32 +250,13 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       }
     });
 
+    // 移除重複監聽：NotificationCenter 已自動同步到 Provider
+    // 只監聽未讀數據變化來更新 Tab 標記
     _unreadSub = NotificationCenter().byRoomStream.listen((map) {
       if (!mounted) return;
       debugPrint('🔍 [My Works] 收到未讀數據更新: ${map.length} 個房間');
 
-      // 更新 Provider 中的未讀數據
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        try {
-          // 再次檢查 mounted 狀態
-          if (!mounted) return;
-
-          // 安全地獲取 Provider
-          final safeProvider = _getChatProvider();
-          if (safeProvider == null) {
-            debugPrint('⚠️ [My Works] PostFrame 中無法獲取 ChatListProvider');
-            return;
-          }
-
-          // 使用快照覆蓋，避免舊房間殘留造成未讀膨脹
-          safeProvider.replaceUnreadByRoom(map);
-          debugPrint('✅ [My Works] 未讀數據已同步完成');
-        } catch (e) {
-          debugPrint('❌ [My Works] 更新未讀數據失敗: $e');
-        }
-      });
-
+      // 只更新 Tab 未讀標記，不重複呼叫 replaceUnreadByRoom
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _updateMyWorksTabUnreadFlag();
@@ -290,8 +272,7 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       // 等待 NotificationCenter 初始化完成
       await NotificationCenter().waitForUnreadData();
 
-      // 強制刷新快照
-      await NotificationCenter().service.refreshSnapshot();
+      // NotificationCenter 會自動同步到 Provider，無需手動呼叫 replaceUnreadByRoom
       debugPrint('✅ [My Works] 未讀數據初始化完成');
     } catch (e) {
       debugPrint('❌ [My Works] 未讀數據初始化失敗: $e');
@@ -527,9 +508,36 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       chatProvider.myWorksApplications.clear();
       chatProvider.myWorksApplications.addAll(processedData);
 
+      // 預載入頭像
+      _preloadAvatars(processedData);
+
       debugPrint('✅ [My Works] 數據刷新完成: ${processedData.length} 個任務');
     } catch (e) {
       debugPrint('❌ [My Works] 刷新數據失敗: $e');
+    }
+  }
+
+  /// 預載入頭像數據
+  void _preloadAvatars(List<Map<String, dynamic>> tasks) {
+    try {
+      final avatarPaths = <String>[];
+
+      // 收集所有創建者的頭像路徑
+      for (final task in tasks) {
+        final creatorAvatar = task['creator_avatar']?.toString();
+        if (creatorAvatar != null &&
+            creatorAvatar.isNotEmpty &&
+            !avatarPaths.contains(creatorAvatar)) {
+          avatarPaths.add(creatorAvatar);
+        }
+      }
+
+      if (avatarPaths.isNotEmpty) {
+        debugPrint('🚀 [My Works] 開始預載入 ${avatarPaths.length} 個頭像');
+        AvatarCacheManager.preloadAvatars(avatarPaths);
+      }
+    } catch (e) {
+      debugPrint('❌ [My Works] 預載入頭像失敗: $e');
     }
   }
 
@@ -813,7 +821,8 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
               child: CompactCountdownTimerWidget(
                 task: task,
                 onCountdownComplete: () {
-                  // TODO: 實現倒數計時完成邏輯
+                  // 倒數計時完成，執行自動完成任務流程
+                  _executeAutoCompleteTask(task);
                 },
               ),
             ),
@@ -1017,14 +1026,14 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     );
   }
 
-  /// 建構帶有錯誤回退的頭像
+  /// 建構帶有錯誤回退的頭像（使用快取）
   Widget _buildAvatarWithFallback(
     String? avatarPath,
     String? name, {
     double radius = 16,
     double fontSize = 12,
   }) {
-    return _MyWorksAvatarWithFallback(
+    return CachedAvatarWidget(
       avatarPath: avatarPath,
       name: name ?? 'Unknown',
       radius: radius,
@@ -1109,100 +1118,50 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       ),
     );
   }
-}
 
-/// 帶有錯誤回退的頭像 Widget (MyWorks 版本)
-class _MyWorksAvatarWithFallback extends StatefulWidget {
-  final String? avatarPath;
-  final String name;
-  final double radius;
-  final double fontSize;
+  /// 執行自動完成任務（倒數計時結束時觸發）
+  void _executeAutoCompleteTask(Map<String, dynamic> task) async {
+    final taskId = task['id'].toString();
 
-  const _MyWorksAvatarWithFallback({
-    required this.avatarPath,
-    required this.name,
-    required this.radius,
-    required this.fontSize,
-  });
+    try {
+      debugPrint('⏰ [My Works] 倒數計時結束，開始自動完成任務: $taskId');
 
-  @override
-  State<_MyWorksAvatarWithFallback> createState() =>
-      _MyWorksAvatarWithFallbackState();
-}
-
-class _MyWorksAvatarWithFallbackState
-    extends State<_MyWorksAvatarWithFallback> {
-  bool _hasError = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final avatarPath = widget.avatarPath;
-
-    // 如果沒有頭像路徑、已發生錯誤，或 URL 在失敗快取中，直接顯示首字母
-    if (avatarPath == null ||
-        avatarPath.isEmpty ||
-        _hasError ||
-        AvatarErrorCache.isFailedUrl(avatarPath)) {
-      return _buildInitialsAvatar();
-    }
-
-    // 如果是相對路徑 (assets)
-    if (avatarPath.startsWith('assets/')) {
-      return CircleAvatar(
-        radius: widget.radius,
-        backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
-        backgroundImage: AssetImage(avatarPath),
-        onBackgroundImageError: (exception, stackTrace) {
-          AvatarErrorCache.addFailedUrl(avatarPath);
-          if (mounted) {
-            setState(() {
-              _hasError = true;
-            });
-          }
-        },
-        child: _hasError ? _buildInitialsText() : null,
+      // 使用現有的 confirmCompletion API 來自動完成任務
+      final taskService = TaskService();
+      await taskService.confirmCompletion(
+        taskId: taskId,
+        preview: false, // 直接執行，不預覽
       );
+
+      if (mounted) {
+        // 刷新任務列表
+        setState(() {
+          // 觸發重新載入
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Task "${task['title']}" has been automatically completed'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        debugPrint('✅ [My Works] 任務自動完成成功: $taskId');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to auto complete task: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+
+        debugPrint('❌ [My Works] 任務自動完成失敗: $taskId, 錯誤: $e');
+      }
     }
-
-    // 如果是網路 URL
-    if (avatarPath.startsWith('http://') || avatarPath.startsWith('https://')) {
-      return CircleAvatar(
-        radius: widget.radius,
-        backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
-        backgroundImage: NetworkImage(avatarPath),
-        onBackgroundImageError: (exception, stackTrace) {
-          AvatarErrorCache.addFailedUrl(avatarPath);
-          debugPrint('🔴 MyWorks Avatar load error (cached): $avatarPath');
-          if (mounted) {
-            setState(() {
-              _hasError = true;
-            });
-          }
-        },
-        child: _hasError ? _buildInitialsText() : null,
-      );
-    }
-
-    // 其他格式不支援，顯示首字母
-    return _buildInitialsAvatar();
-  }
-
-  Widget _buildInitialsAvatar() {
-    return CircleAvatar(
-      radius: widget.radius,
-      backgroundColor: TaskCardUtils.getAvatarColor(widget.name),
-      child: _buildInitialsText(),
-    );
-  }
-
-  Widget _buildInitialsText() {
-    return Text(
-      TaskCardUtils.getInitials(widget.name),
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: widget.fontSize,
-        fontWeight: FontWeight.bold,
-      ),
-    );
   }
 }
+
+// 舊的 _MyWorksAvatarWithFallback 已移除，統一使用 CachedAvatarWidget

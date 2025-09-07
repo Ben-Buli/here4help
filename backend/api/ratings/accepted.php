@@ -35,7 +35,7 @@ try {
     $countQuery = "
         SELECT COUNT(*) as total 
         FROM tasks t
-        JOIN task_applications ta ON t.id = ta.task_id AND ta.status = 'accepted'
+        JOIN task_applications ta ON t.id = ta.task_id AND ta.status in ('applied', 'accepted', 'in_progress', 'pending', 'dispute', 'completed')
         WHERE ta.user_id = ?
     ";
     $totalResult = $db->fetch($countQuery, [$userId]);
@@ -71,7 +71,7 @@ try {
             u.name AS creator_name,
             u.avatar_url AS creator_avatar
         FROM tasks t
-        JOIN task_applications ta ON t.id = ta.task_id AND ta.status = 'accepted'
+        JOIN task_applications ta ON t.id = ta.task_id AND ta.status in ('applied', 'accepted', 'in_progress', 'pending', 'dispute', 'completed')
         JOIN task_statuses ts ON ts.id = t.status_id
         JOIN users u ON u.id = t.creator_id
         LEFT JOIN task_ratings tr ON tr.task_id = t.id AND tr.tasker_id = t.creator_id

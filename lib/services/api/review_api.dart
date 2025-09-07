@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:here4help/services/http_client_service.dart';
 import 'package:here4help/config/app_config.dart';
+import 'package:here4help/services/error_handler_service.dart';
 
 class ReviewApi {
   /// 提交任務評價
@@ -19,7 +20,7 @@ class ReviewApi {
       };
 
       final response = await HttpClientService.post(
-        '${AppConfig.apiBaseUrl}/backend/api/tasks/reviews_submit.php',
+        AppConfig.api('/tasks/reviews_submit.php'),
         body: jsonEncode(body),
       );
 
@@ -30,7 +31,9 @@ class ReviewApi {
         throw Exception(error['message'] ?? 'Failed to submit review');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      ErrorHandlerService.logError('ReviewApi.submitReview', e);
+      throw Exception(
+          ErrorHandlerService.getOperationErrorMessage('submit_rating', e));
     }
   }
 
@@ -38,7 +41,7 @@ class ReviewApi {
   static Future<Map<String, dynamic>> getReview(String taskId) async {
     try {
       final response = await HttpClientService.get(
-        '${AppConfig.apiBaseUrl}/backend/api/tasks/reviews_get.php?task_id=$taskId',
+        '${AppConfig.api('/tasks/reviews_get.php')}?task_id=$taskId',
       );
 
       if (response.statusCode == 200) {
@@ -48,7 +51,9 @@ class ReviewApi {
         throw Exception(error['message'] ?? 'Failed to get review');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      ErrorHandlerService.logError('ReviewApi.getReview', e);
+      throw Exception(
+          ErrorHandlerService.getOperationErrorMessage('load_tasks', e));
     }
   }
 }
@@ -62,7 +67,7 @@ class TaskHistoryApi {
   }) async {
     try {
       final response = await HttpClientService.get(
-        '${AppConfig.apiBaseUrl}/backend/api/tasks/history.php?role=$role&page=$page&per_page=$perPage',
+        '${AppConfig.api('/tasks/history.php')}?role=$role&page=$page&per_page=$perPage',
       );
 
       if (response.statusCode == 200) {
@@ -72,7 +77,9 @@ class TaskHistoryApi {
         throw Exception(error['message'] ?? 'Failed to get task history');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      ErrorHandlerService.logError('TaskHistoryApi.getTaskHistory', e);
+      throw Exception(
+          ErrorHandlerService.getOperationErrorMessage('load_tasks', e));
     }
   }
 }

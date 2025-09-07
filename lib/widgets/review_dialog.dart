@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:here4help/services/api/review_api.dart';
 import 'package:here4help/constants/app_colors.dart';
 
@@ -8,6 +9,8 @@ class ReviewDialog extends StatefulWidget {
   final String taskerName;
   final String taskTitle;
   final VoidCallback? onReviewSubmitted;
+  final bool readOnlyMode; // 新增：唯讀模式
+  final Map<String, dynamic>? existingReview; // 新增：現有評分資料
 
   const ReviewDialog({
     super.key,
@@ -16,6 +19,8 @@ class ReviewDialog extends StatefulWidget {
     required this.taskerName,
     required this.taskTitle,
     this.onReviewSubmitted,
+    this.readOnlyMode = false,
+    this.existingReview,
   });
 
   @override
@@ -23,10 +28,21 @@ class ReviewDialog extends StatefulWidget {
 }
 
 class _ReviewDialogState extends State<ReviewDialog> {
-  int _rating = 0;
+  double _rating = 1.0; // 預設 1 分
   final TextEditingController _commentController = TextEditingController();
   bool _isSubmitting = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // 如果是唯讀模式且有現有評分，載入現有資料
+    if (widget.readOnlyMode && widget.existingReview != null) {
+      _rating = (widget.existingReview!['rating'] ?? 1).toDouble();
+      _commentController.text = widget.existingReview!['comment'] ?? '';
+    }
+  }
 
   @override
   void dispose() {
@@ -37,7 +53,7 @@ class _ReviewDialogState extends State<ReviewDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Submit Review'),
+      title: Text(widget.readOnlyMode ? 'Review Details' : 'Submit Review'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -73,7 +89,7 @@ class _ReviewDialogState extends State<ReviewDialog> {
             ),
             const SizedBox(height: 16),
 
-            // 評分星級
+            // 評分星級 - 簡化為單一排
             const Text(
               'Rating *',
               style: TextStyle(
@@ -82,40 +98,45 @@ class _ReviewDialogState extends State<ReviewDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (index) {
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _rating = index + 1;
-                      _errorMessage = null;
-                    });
-                  },
-                  child: Icon(
-                    Icons.star,
-                    size: 40,
-                    color: index < _rating ? Colors.amber : Colors.grey[300],
-                  ),
-                );
-              }),
+            Center(
+              child: RatingBar.builder(
+                initialRating: _rating,
+                minRating: 1,
+                direction: Axis.horizontal,
+                allowHalfRating: false,
+                itemCount: 5,
+                itemSize: 40,
+                itemPadding: const EdgeInsets.symmetric(horizontal: 4.0),
+                itemBuilder: (context, _) => const Icon(
+                  Icons.star,
+                  color: Colors.amber,
+                ),
+                onRatingUpdate: widget.readOnlyMode
+                    ? (rating) {}
+                    : (rating) {
+                        setState(() {
+                          _rating = rating;
+                          _errorMessage = null;
+                        });
+                      },
+              ),
             ),
-            if (_rating > 0)
-              Center(
-                child: Text(
-                  _getRatingText(_rating),
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                  ),
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                _getRatingText(_rating.toInt()),
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
                 ),
               ),
+            ),
             const SizedBox(height: 16),
 
-            // 評論（可選）
+            // 評論 - 必填
             const Text(
-              'Comment (Optional)',
+              'Comment *',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
@@ -124,10 +145,11 @@ class _ReviewDialogState extends State<ReviewDialog> {
             const SizedBox(height: 8),
             TextField(
               controller: _commentController,
-              maxLines: 3,
-              maxLength: 200,
+              maxLines: 4,
+              maxLength: 500, // 調整為 500 字
+              enabled: !widget.readOnlyMode,
               decoration: const InputDecoration(
-                hintText: 'Share your experience...',
+                hintText: 'Please share your experience...',
                 border: OutlineInputBorder(),
                 contentPadding: EdgeInsets.all(12),
               ),
@@ -145,7 +167,10 @@ class _ReviewDialogState extends State<ReviewDialog> {
                 ),
                 child: Text(
                   _errorMessage!,
-                  style: const TextStyle(color: Colors.red),
+                  style: TextStyle(
+                    color: Colors.red[700],
+                    fontSize: 12,
+                  ),
                 ),
               ),
           ],
@@ -153,25 +178,27 @@ class _ReviewDialogState extends State<ReviewDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(widget.readOnlyMode ? 'Close' : 'Cancel'),
         ),
-        ElevatedButton(
-          onPressed: _isSubmitting ? null : _submitReview,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
+        if (!widget.readOnlyMode)
+          ElevatedButton(
+            onPressed: _isSubmitting ? null : _submitReview,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: _isSubmitting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Text('Submit Review'),
           ),
-          child: _isSubmitting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-              : const Text('Submit Review'),
-        ),
       ],
     );
   }
@@ -189,14 +216,31 @@ class _ReviewDialogState extends State<ReviewDialog> {
       case 5:
         return 'Excellent';
       default:
-        return '';
+        return 'Please rate';
     }
   }
 
   Future<void> _submitReview() async {
-    if (_rating == 0) {
+    // 驗證評分
+    if (_rating < 1) {
       setState(() {
         _errorMessage = 'Please select a rating';
+      });
+      return;
+    }
+
+    // 驗證評論必填
+    if (_commentController.text.trim().isEmpty) {
+      setState(() {
+        _errorMessage = 'Comment is required';
+      });
+      return;
+    }
+
+    // 驗證評論長度
+    if (_commentController.text.trim().length < 10) {
+      setState(() {
+        _errorMessage = 'Comment must be at least 10 characters';
       });
       return;
     }
@@ -210,10 +254,8 @@ class _ReviewDialogState extends State<ReviewDialog> {
       await ReviewApi.submitReview(
         taskId: widget.taskId,
         taskerId: widget.taskerId,
-        rating: _rating,
-        comment: _commentController.text.trim().isEmpty
-            ? null
-            : _commentController.text.trim(),
+        rating: _rating.toInt(),
+        comment: _commentController.text.trim(),
       );
 
       if (mounted) {
@@ -228,9 +270,7 @@ class _ReviewDialogState extends State<ReviewDialog> {
         );
 
         // 通知父組件刷新
-        if (widget.onReviewSubmitted != null) {
-          widget.onReviewSubmitted!();
-        }
+        widget.onReviewSubmitted?.call();
       }
     } catch (e) {
       setState(() {
@@ -248,7 +288,8 @@ class QuickReviewButton extends StatelessWidget {
   final String taskerName;
   final String taskTitle;
   final VoidCallback? onReviewSubmitted;
-  final bool isEnabled;
+  final bool hasExistingReview;
+  final Map<String, dynamic>? existingReview;
 
   const QuickReviewButton({
     super.key,
@@ -257,22 +298,20 @@ class QuickReviewButton extends StatelessWidget {
     required this.taskerName,
     required this.taskTitle,
     this.onReviewSubmitted,
-    this.isEnabled = true,
+    this.hasExistingReview = false,
+    this.existingReview,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ElevatedButton(
-      onPressed: isEnabled ? () => _showReviewDialog(context) : null,
+    return ElevatedButton.icon(
+      onPressed: () => _showReviewDialog(context),
+      icon: Icon(hasExistingReview ? Icons.visibility : Icons.star),
+      label: Text(hasExistingReview ? 'Reviewed' : 'Reviews'),
       style: ElevatedButton.styleFrom(
-        backgroundColor: isEnabled ? AppColors.primary : Colors.grey[300],
-        foregroundColor: isEnabled ? Colors.white : Colors.grey[600],
-        minimumSize: const Size(80, 32),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      ),
-      child: const Text(
-        'Review',
-        style: TextStyle(fontSize: 12),
+        backgroundColor:
+            hasExistingReview ? Colors.grey[600] : AppColors.primary,
+        foregroundColor: Colors.white,
       ),
     );
   }
@@ -280,15 +319,15 @@ class QuickReviewButton extends StatelessWidget {
   void _showReviewDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return ReviewDialog(
-          taskId: taskId,
-          taskerId: taskerId,
-          taskerName: taskerName,
-          taskTitle: taskTitle,
-          onReviewSubmitted: onReviewSubmitted,
-        );
-      },
+      builder: (context) => ReviewDialog(
+        taskId: taskId,
+        taskerId: taskerId,
+        taskerName: taskerName,
+        taskTitle: taskTitle,
+        onReviewSubmitted: onReviewSubmitted,
+        readOnlyMode: hasExistingReview,
+        existingReview: existingReview,
+      ),
     );
   }
 }

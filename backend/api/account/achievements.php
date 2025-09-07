@@ -56,15 +56,12 @@ try {
         Response::error('User not found', 404);
     }
     
-    // 2. 獲取完成任務數 - 統計已接受且任務狀態為完成的任務
+    // 2. 獲取完成任務數 - 從任務應徵表統計該使用者完成的任務
     $completedTasksQuery = "
         SELECT COUNT(*) as completed_tasks
         FROM task_applications ta
-        JOIN tasks t ON t.id = ta.task_id
-        JOIN task_statuses ts ON ts.id = t.status_id
         WHERE ta.user_id = ? 
-        AND ta.status = 'accepted'
-        AND ts.code = 'completed'
+        AND ta.status = 'completed'
     ";
     
     $completedTasksResult = $db->fetch($completedTasksQuery, [$targetUserId]);

@@ -117,20 +117,34 @@ try {
     Response::error('Room not found or access denied', 404);
   }
 
-  // 檢查是否被對方封鎖（雙向檢查）
+  // 檢查封鎖狀態（詳細資訊）
   $creatorId = (int)$row['creator_id'];
   $participantId = (int)$row['participant_id'];
   $isBlocked = false;
+  $isBlockedByMe = false;
+  $isBlockedByTarget = false;
   
-  // 檢查聊天室雙方是否互相封鎖
-  $blockCheck = $db->fetch(
+  // 檢查我是否封鎖了對方
+  $myBlockCheck = $db->fetch(
     "SELECT COUNT(*) as block_count FROM user_blocks 
-     WHERE (user_id = ? AND target_user_id = ?) 
-        OR (user_id = ? AND target_user_id = ?)",
-    [$creatorId, $participantId, $participantId, $creatorId]
+     WHERE user_id = ? AND target_user_id = ?",
+    [$user_id, $user_id == $creatorId ? $participantId : $creatorId]
   );
   
-  if ($blockCheck && $blockCheck['block_count'] > 0) {
+  if ($myBlockCheck && $myBlockCheck['block_count'] > 0) {
+    $isBlockedByMe = true;
+    $isBlocked = true;
+  }
+  
+  // 檢查對方是否封鎖了我
+  $targetBlockCheck = $db->fetch(
+    "SELECT COUNT(*) as block_count FROM user_blocks 
+     WHERE user_id = ? AND target_user_id = ?",
+    [$user_id == $creatorId ? $participantId : $creatorId, $user_id]
+  );
+  
+  if ($targetBlockCheck && $targetBlockCheck['block_count'] > 0) {
+    $isBlockedByTarget = true;
     $isBlocked = true;
   }
 
@@ -193,6 +207,10 @@ try {
     'user_role' => $user_role,
     'chat_partner_info' => $partner,
     'is_blocked' => $isBlocked,
+    'block_info' => [
+      'blocked_by_me' => $isBlockedByMe,
+      'blocked_by_target' => $isBlockedByTarget,
+    ],
   ], 'Chat detail loaded');
 
 } catch (Throwable $e) {

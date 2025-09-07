@@ -27,6 +27,8 @@ class SocketService {
   // 新增：任務狀態變化監聽器
   Function(Map<String, dynamic>)? onTaskStatusUpdate;
   Function(Map<String, dynamic>)? onApplicationStatusUpdate;
+  // 新增：封鎖狀態變化監聽器
+  Function(Map<String, dynamic>)? onBlockStatusUpdate;
 
   /// 初始化並連接 Socket.IO
   Future<void> connect() async {
@@ -193,6 +195,19 @@ class SocketService {
         }
       }
     });
+
+    // 封鎖狀態更新
+    _socket!.on('block_status_update', (data) {
+      debugPrint('🚫 Block status update: $data');
+      if (onBlockStatusUpdate != null) {
+        try {
+          final blockData = Map<String, dynamic>.from(data as Map);
+          onBlockStatusUpdate!(blockData);
+        } catch (e) {
+          debugPrint('❌ Error parsing block status data: $e');
+        }
+      }
+    });
   }
 
   /// 加入聊天室
@@ -299,6 +314,7 @@ class SocketService {
     onTypingUpdate = null;
     onTaskStatusUpdate = null;
     onApplicationStatusUpdate = null;
+    onBlockStatusUpdate = null;
 
     debugPrint('🔌 Socket disconnected and state cleared');
   }

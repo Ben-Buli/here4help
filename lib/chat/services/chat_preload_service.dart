@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:here4help/chat/services/chat_service.dart';
-import 'package:here4help/chat/services/chat_storage_service.dart';
 
 /// 聊天數據預載入服務
 /// 在用戶點擊聊天項目前就開始載入數據，提升用戶體驗

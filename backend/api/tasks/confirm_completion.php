@@ -40,6 +40,29 @@ try {
   );
   if (!$task) { Response::error('Task not found', 404); }
 
+  // 權限檢查：只有任務創建者或管理員可以確認完成
+  $creatorId = (int)$task['creator_id'];
+  $isCreator = ($actor_id === $creatorId);
+  
+  // 檢查是否為管理員（permission = 99）
+  $actorUser = $db->fetch("SELECT permission FROM users WHERE id = ?", [$actor_id]);
+  $isAdmin = ($actorUser && (int)$actorUser['permission'] === 99);
+  
+  if (!$isCreator && !$isAdmin) {
+    Response::error('Permission denied: Only task creator or admin can confirm completion', 403);
+  }
+
+  // 狀態檢查：只有 pending_confirmation 狀態的任務可以被確認完成
+  if ($task['status_code'] !== 'pending_confirmation') {
+    Response::error("Task status must be 'pending_confirmation' to confirm completion. Current status: " . ($task['status_code'] ?? 'unknown'), 400);
+  }
+
+  // 檢查任務是否有參與者
+  $participantId = (int)($task['participant_id'] ?? 0);
+  if ($participantId <= 0) {
+    Response::error('Task has no participant assigned', 400);
+  }
+
   // 讀取手續費設定（isActive=1）
   // 若缺表，fallback 為 0% 手續費
   $feeRate = 0.0;
@@ -73,9 +96,23 @@ try {
   $statusRow = $db->fetch("SELECT id FROM task_statuses WHERE code = 'completed' LIMIT 1");
   if ($statusRow && isset($statusRow['id'])) {
     $db->query("UPDATE tasks SET status_id = ?, updated_at = NOW() WHERE id = ?", [(int)$statusRow['id'], $task_id]);
+    
+    // 同步更新 task_applications.status 為 'completed'
+    $db->query(
+      "UPDATE task_applications SET status = 'completed', updated_at = NOW() 
+       WHERE task_id = ? AND status IN ('pending', 'accepted')",
+      [$task_id]
+    );
   } else {
     try { $db->query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS status VARCHAR(64) NULL"); } catch (Exception $e) {}
     $db->query("UPDATE tasks SET status = 'Completed', updated_at = NOW() WHERE id = ?", [$task_id]);
+    
+    // 同步更新 task_applications.status
+    $db->query(
+      "UPDATE task_applications SET status = 'completed', updated_at = NOW() 
+       WHERE task_id = ? AND status IN ('pending', 'accepted')",
+      [$task_id]
+    );
   }
 
   // 實作點數轉移與交易紀錄
@@ -83,8 +120,7 @@ try {
     require_once __DIR__ . '/../../utils/PointTransactionLogger.php';
     require_once __DIR__ . '/../../utils/UserActiveLogEvent.php';
     
-    $creatorId = (int)$task['creator_id'];
-    $participantId = (int)$task['participant_id'];
+    // $creatorId 和 $participantId 已在上面定義
     $taskTitle = $task['title'] ?? 'Unknown Task';
     
     // 開始資料庫交易

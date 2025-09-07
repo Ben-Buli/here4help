@@ -9,6 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/socket_notifier.php';
 
 try {
   if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -63,12 +64,26 @@ try {
   $statusRow = $db->fetch("SELECT id FROM task_statuses WHERE code = 'in_progress' LIMIT 1");
   if ($statusRow && isset($statusRow['id'])) {
     $db->query("UPDATE tasks SET status_id = ?, updated_at = NOW() WHERE id = ?", [(int)$statusRow['id'], $task_id]);
+    
+    // 同步更新 task_applications.status 從 'pending' 回到 'accepted'
+    $db->query(
+      "UPDATE task_applications SET status = 'accepted', updated_at = NOW() 
+       WHERE task_id = ? AND status = 'pending'",
+      [$task_id]
+    );
   } else {
     // 回退：若 task_statuses 不存在對應代碼，嘗試以文本欄位處理（不建議）
     try {
       $db->query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS status VARCHAR(64) NULL");
     } catch (Exception $e) {}
     $db->query("UPDATE tasks SET status = 'In Progress', updated_at = NOW() WHERE id = ?", [$task_id]);
+    
+    // 同步更新 task_applications.status
+    $db->query(
+      "UPDATE task_applications SET status = 'accepted', updated_at = NOW() 
+       WHERE task_id = ? AND status = 'pending'",
+      [$task_id]
+    );
   }
 
   // 記錄使用者操作日誌（寫入 user_active_log）
@@ -105,6 +120,27 @@ try {
     }
   } catch (Exception $e) {
     // 不阻斷
+  }
+
+  // 發送 Socket 通知
+  try {
+    $socketNotifier = SocketNotifier::getInstance();
+    $userIds = $socketNotifier->getTaskUserIds($task_id);
+    $room = $db->fetch(
+      "SELECT id FROM chat_rooms WHERE task_id = ? ORDER BY id DESC LIMIT 1",
+      [$task_id]
+    );
+    $roomId = $room ? $room['id'] : null;
+    
+    $statusData = [
+      'code' => 'in_progress',
+      'display_name' => 'In Progress',
+      'progress_ratio' => 0.5
+    ];
+    
+    $socketNotifier->notifyTaskStatusUpdate($task_id, $roomId, $statusData, $userIds);
+  } catch (Exception $e) {
+    error_log("Socket notification failed: " . $e->getMessage());
   }
 
   // 回傳最新任務

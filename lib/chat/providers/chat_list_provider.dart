@@ -830,14 +830,62 @@ class ChatListProvider extends ChangeNotifier {
 
   /// 使用快照覆蓋未讀數（全量替換，不保留舊房間）
   void replaceUnreadByRoom(Map<String, int> snapshot) {
-    debugPrint('🧹 [ChatListProvider] 以快照覆蓋未讀數: ${snapshot.length} 個房間');
-    // 全量替換，確保不在快照中的房間被移除
-    _unreadByRoom
-      ..clear()
-      ..addAll(snapshot.map((k, v) => MapEntry(k, v < 0 ? 0 : v)));
+    debugPrint('🧹 [ChatListProvider] 準備以快照覆蓋未讀數: ${snapshot.length} 個房間');
 
-    // 廣播更新
-    _emit('room_unread_replace');
+    // 標準化新數據
+    final normalizedSnapshot =
+        snapshot.map((k, v) => MapEntry(k, v < 0 ? 0 : v));
+
+    // 檢查是否有實際變化
+    bool hasChanges = false;
+
+    // 檢查房間數量是否變化
+    if (_unreadByRoom.length != normalizedSnapshot.length) {
+      hasChanges = true;
+      debugPrint(
+          '🔍 [ChatListProvider] 房間數量變化: ${_unreadByRoom.length} -> ${normalizedSnapshot.length}');
+    }
+
+    // 檢查每個房間的未讀數是否變化
+    if (!hasChanges) {
+      for (final entry in normalizedSnapshot.entries) {
+        final roomId = entry.key;
+        final newCount = entry.value;
+        final oldCount = _unreadByRoom[roomId] ?? 0;
+
+        if (oldCount != newCount) {
+          hasChanges = true;
+          debugPrint(
+              '🔍 [ChatListProvider] 房間 $roomId 未讀數變化: $oldCount -> $newCount');
+          break;
+        }
+      }
+    }
+
+    // 檢查是否有房間被移除
+    if (!hasChanges) {
+      for (final roomId in _unreadByRoom.keys) {
+        if (!normalizedSnapshot.containsKey(roomId)) {
+          hasChanges = true;
+          debugPrint('🔍 [ChatListProvider] 房間 $roomId 被移除');
+          break;
+        }
+      }
+    }
+
+    // 只有在有變化時才更新
+    if (hasChanges) {
+      debugPrint('✅ [ChatListProvider] 檢測到變化，執行快照覆蓋');
+      // 全量替換，確保不在快照中的房間被移除
+      _unreadByRoom
+        ..clear()
+        ..addAll(normalizedSnapshot);
+
+      // 廣播更新
+      _emit('room_unread_replace');
+    } else {
+      debugPrint('⏭️ [ChatListProvider] 未檢測到變化，跳過快照覆蓋');
+    }
   }
 
   /// Socket 事件處理方法

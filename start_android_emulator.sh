@@ -23,7 +23,7 @@ fi
 
 # 啟動 Flutter Android 模擬器
 echo "🚀 啟動 Flutter Android 模擬器..."
-flutter run -d android \
+flutter run -d 'emulator-5554' \
   --dart-define=ENVIRONMENT=development \
   --dart-define=API_BASE_URL=http://127.0.0.1:8888/here4help \
   --dart-define=SOCKET_URL=http://127.0.0.1:3001 \

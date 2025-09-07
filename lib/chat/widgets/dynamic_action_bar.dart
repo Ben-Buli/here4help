@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:here4help/chat/utils/action_bar_config.dart';
 import 'package:here4help/chat/widgets/task_card_components.dart';
 import 'package:here4help/chat/utils/application_status_utils.dart';
@@ -10,6 +11,11 @@ class DynamicActionBar extends StatelessWidget {
   final TaskStatus taskStatus;
   final UserRole userRole;
   final Map<String, VoidCallback> actionCallbacks;
+  final String? applicationStatus;
+  final bool isBlocked;
+  final bool isBlockedByMe;
+  final bool isBlockedByTarget;
+  final bool hasExistingReview;
   final bool showStatusBar;
   final String? statusDisplayName;
   final double? progressRatio;
@@ -21,6 +27,11 @@ class DynamicActionBar extends StatelessWidget {
     required this.taskStatus,
     required this.userRole,
     required this.actionCallbacks,
+    this.applicationStatus,
+    this.isBlocked = false,
+    this.isBlockedByMe = false,
+    this.isBlockedByTarget = false,
+    this.hasExistingReview = false,
     this.showStatusBar = true,
     this.statusDisplayName,
     this.progressRatio,
@@ -30,24 +41,26 @@ class DynamicActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('🔍 [DynamicActionBar] build() 開始');
-    debugPrint('  - taskStatus: $taskStatus');
-    debugPrint('  - userRole: $userRole');
-    debugPrint('  - showStatusBar: $showStatusBar');
-    debugPrint('  - statusDisplayName: $statusDisplayName');
-    debugPrint('  - progressRatio: $progressRatio');
-    debugPrint('  - actionCallbacks keys: ${actionCallbacks.keys.toList()}');
+    // 減少 debug 輸出頻率，避免刷屏
+    if (kDebugMode) {
+      debugPrint(
+          '🔍 [DynamicActionBar] build() - Status: $taskStatus, Role: $userRole');
+    }
 
     final actions = ActionBarConfigManager.getActionsForStatus(
       status: taskStatus,
       userRole: userRole,
       actionCallbacks: actionCallbacks,
+      applicationStatus: applicationStatus,
+      isBlocked: isBlocked,
+      isBlockedByMe: isBlockedByMe,
+      isBlockedByTarget: isBlockedByTarget,
+      hasExistingReview: hasExistingReview,
     );
 
-    debugPrint('  - 獲取到的 actions 數量: ${actions.length}');
-    for (int i = 0; i < actions.length; i++) {
-      final action = actions[i];
-      debugPrint('    - Action $i: ${action.label} (${action.icon})');
+    if (kDebugMode && actions.isEmpty) {
+      debugPrint(
+          '⚠️ [DynamicActionBar] No actions available for $taskStatus/$userRole');
     }
 
     return Column(
@@ -64,15 +77,8 @@ class DynamicActionBar extends StatelessWidget {
 
   /// 構建狀態顯示條
   Widget _buildStatusBar(BuildContext context) {
-    debugPrint('🔍 [DynamicActionBar] _buildStatusBar() 開始');
-
     final statusColor = ActionBarConfigManager.getStatusColor(taskStatus);
     final statusIcon = ActionBarConfigManager.getStatusIcon(taskStatus);
-
-    debugPrint('  - statusColor: $statusColor');
-    debugPrint('  - statusIcon: $statusIcon');
-    debugPrint('  - statusDisplayName: $statusDisplayName');
-    debugPrint('  - progressRatio: $progressRatio');
 
     return Container(
       width: double.infinity,
@@ -132,10 +138,6 @@ class DynamicActionBar extends StatelessWidget {
 
   /// 構建 Action Bar
   Widget _buildActionBar(BuildContext context, List<ActionBarAction> actions) {
-    debugPrint('🔍 [DynamicActionBar] _buildActionBar() 開始');
-    debugPrint('  - actions 數量: ${actions.length}');
-    debugPrint('  - colorScheme: $colorScheme');
-
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
@@ -257,8 +259,6 @@ class DynamicActionBar extends StatelessWidget {
   /// 根據配色方案和任務狀態返回適當的背景色
   Color _getContextualBackgroundColor(BuildContext context) {
     // 如果指定了配色方案，使用對應的配色邏輯
-    debugPrint(
-        '🔍 [_getContextualBackgroundColor()] colorScheme: $colorScheme');
     if (colorScheme != null) {
       switch (colorScheme) {
         case 'posted_tasks':
@@ -477,7 +477,7 @@ class ActionBarBuilder {
                           child: DynamicActionBar(
                             taskStatus: TaskStatus.open, // 佔位符
                             userRole: UserRole.participant, // 佔位符
-                            actionCallbacks: {},
+                            actionCallbacks: const {},
                             showStatusBar: false,
                             colorScheme: colorScheme, // 傳遞配色方案
                           )._buildActionButton(context, action),

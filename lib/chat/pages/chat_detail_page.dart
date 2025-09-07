@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/chat/services/global_chat_room.dart';
@@ -7,6 +8,8 @@ import 'package:here4help/constants/task_status.dart' as TaskStatusConstants;
 import 'package:here4help/chat/widgets/dynamic_action_bar.dart';
 import 'package:here4help/chat/utils/action_bar_config.dart';
 import 'package:here4help/chat/utils/application_status_utils.dart';
+import 'package:here4help/services/error_handler_service.dart';
+import 'package:here4help/widgets/error_display_widget.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,6 +43,8 @@ import 'package:here4help/utils/error_message_mapper.dart';
 import 'package:here4help/services/api/support_event_api.dart';
 import 'package:here4help/widgets/support_timeline_dialog.dart';
 import 'package:here4help/widgets/support_solved_dialog.dart';
+import 'package:here4help/widgets/review_dialog.dart';
+import 'package:here4help/widgets/block_user_dialog.dart';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, this.data});
@@ -66,6 +71,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   // 封鎖狀態
   bool _isBlocked = false;
+  bool _isBlockedByMe = false; // 我是否封鎖了對方
+  bool _isBlockedByTarget = false; // 對方是否封鎖了我
+  bool _hasExistingReview = false; // 是否已有評分
 
   // 聊天訊息列表（從資料庫載入）
   List<Map<String, dynamic>> _chatMessages = [];
@@ -246,43 +254,24 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   /// 根據用戶角色獲取狀態顯示名稱
   String? _getStatusDisplayNameForUserRole() {
-    debugPrint('🔍 [_getStatusDisplayNameForUserRole] 用戶角色: $_userRole');
-
     switch (_userRole.toLowerCase()) {
       case 'creator':
         // 發布者：顯示任務狀態（來自 tasks.status）
-        final taskStatusDisplay = _task?['status']?['display_name'];
-        debugPrint(
-            '🔍 [_getStatusDisplayNameForUserRole] Creator - 任務狀態: $taskStatusDisplay');
-        return taskStatusDisplay;
+        return _task?['status']?['display_name'];
       case 'participant':
         // 應徵者：顯示應徵狀態（來自 task_applications.status）
         // 後端 API 將 application_status 放在 task 物件中
         final applicationStatus = _task?['application_status']?.toString();
-        debugPrint(
-            '🔍 [_getStatusDisplayNameForUserRole] Participant - 應徵狀態: $applicationStatus');
-        debugPrint(
-            '🔍 [_getStatusDisplayNameForUserRole] Participant - _task: $_task');
 
         if (applicationStatus != null && applicationStatus.isNotEmpty) {
           // 使用 ApplicationStatusUtils 獲取顯示名稱
-          final displayName =
-              ApplicationStatusUtils.getDisplayName(applicationStatus);
-          debugPrint(
-              '🔍 [_getStatusDisplayNameForUserRole] Participant - 轉換後顯示名稱: $displayName');
-          return displayName;
+          return ApplicationStatusUtils.getDisplayName(applicationStatus);
         }
         // 備用方案：如果沒有應徵狀態，使用任務狀態
-        final fallbackStatus = _task?['status']?['display_name'];
-        debugPrint(
-            '🔍 [_getStatusDisplayNameForUserRole] Participant - 備用任務狀態: $fallbackStatus');
-        return fallbackStatus;
+        return _task?['status']?['display_name'];
       default:
         // 預設使用任務狀態
-        final defaultStatus = _task?['status']?['display_name'];
-        debugPrint(
-            '🔍 [_getStatusDisplayNameForUserRole] Default - 任務狀態: $defaultStatus');
-        return defaultStatus;
+        return _task?['status']?['display_name'];
     }
   }
 
@@ -346,6 +335,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       debugPrint('  - 錯誤堆疊: ${e.toString()}');
       return null;
     }
+  }
+
+  /// 取得對方用戶名稱
+  String? _getOpponentUserName() {
+    return _getOpponentDisplayName();
   }
 
   /// 取得對方顯示名稱（依對方 userId 判斷應取哪一側欄位）
@@ -654,6 +648,26 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     super.initState();
     debugPrint('🔍 ChatDetailPage.initState() 開始');
     debugPrint('🔍 widget.data: ${widget.data}');
+
+    // 初始化 actionCallbacks
+    _actionCallbacks = {
+      'accept': () => _handleAcceptApplication(),
+      'withdraw': () => _handleWithdrawApplication(),
+      'block': () => _handleBlockUser(),
+      'unblock': () => _handleUnblockUser(),
+      'report': () => _openReportSheet(),
+      'pay': () => _openPayAndReview(),
+      'complete': () => _handleCompleteTask(),
+      'confirm': () => _handleConfirmCompletion(),
+      'disagree': () => _handleDisagreeCompletion(),
+      'paid_info': () => _showPaidInfo(),
+      'review': () => _openReviewDialog(),
+      'view_review': () => _viewExistingReview(),
+      'dispute': () => _handleDispute(),
+      // Support 相關動作
+      'issue': () => _handleShowSupportTimeline(),
+      'solved': () => _handleSupportSolved(),
+    };
 
     // 如果有 widget.data，先設置初始狀態
     if (widget.data != null) {
@@ -1042,6 +1056,19 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           _userRole = chatData['user_role'] ?? 'participant';
           _currentRoomId = roomId;
           _isBlocked = chatData['is_blocked'] ?? false;
+
+          // 解析詳細的封鎖狀態
+          final blockInfo = chatData['block_info'];
+          if (blockInfo != null) {
+            _isBlockedByMe = blockInfo['blocked_by_me'] ?? false;
+            _isBlockedByTarget = blockInfo['blocked_by_target'] ?? false;
+          } else {
+            _isBlockedByMe = false;
+            _isBlockedByTarget = false;
+          }
+
+          // 檢查是否已有評分
+          _hasExistingReview = chatData['has_existing_review'] ?? false;
         });
 
         // 初始化圖片上傳管理器
@@ -1088,27 +1115,34 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                 remainingTime = const Duration();
               }
             } else if (task['status']?['code'] == 'pending_confirmation') {
-              // 檢查是否真的需要倒計時
-              final taskCreatedAt = task['created_at'];
-              if (taskCreatedAt != null) {
+              // 使用 updated_at 作為進入 pending_confirmation 狀態的時間戳記
+              final taskUpdatedAt = task['updated_at'];
+              if (taskUpdatedAt != null) {
                 try {
-                  final createdAt = DateTime.parse(taskCreatedAt);
+                  final updatedAt = DateTime.parse(taskUpdatedAt);
                   final now = DateTime.now();
-                  final timeSinceCreation = now.difference(createdAt);
+                  final timeSinceUpdate = now.difference(updatedAt);
 
-                  // 只有在創建時間合理範圍內才啟動倒計時
-                  if (timeSinceCreation.inDays < 30) {
-                    // 30天內的任務才考慮倒計時
-                    taskPendingStart = DateTime.now();
-                    taskPendingEnd =
-                        taskPendingStart.add(const Duration(days: 7));
-                    remainingTime = taskPendingEnd.difference(DateTime.now());
+                  // 計算剩餘時間：updated_at + 7天 - 當下時間
+                  const totalPendingTime = Duration(days: 7);
+                  final remainingTimeFromUpdate =
+                      totalPendingTime - timeSinceUpdate;
+
+                  if (remainingTimeFromUpdate > Duration.zero) {
+                    // 還有剩餘時間，啟動倒數計時
+                    taskPendingStart = updatedAt;
+                    taskPendingEnd = updatedAt.add(totalPendingTime);
+                    remainingTime = remainingTimeFromUpdate;
                     countdownTicker = Ticker(_onTick)..start();
+                    debugPrint(
+                        '⏰ 啟動 pending_confirmation 倒數計時: ${remainingTime.inDays}天 ${remainingTime.inHours.remainder(24)}小時 ${remainingTime.inMinutes.remainder(60)}分鐘');
                   } else {
-                    remainingTime = const Duration();
+                    // 時間已到，應該自動完成
+                    remainingTime = Duration.zero;
+                    debugPrint('⏰ pending_confirmation 時間已到，應該自動完成任務');
                   }
                 } catch (e) {
-                  debugPrint('❌ 解析任務創建時間失敗: $e');
+                  debugPrint('❌ 解析任務更新時間失敗: $e');
                   remainingTime = const Duration();
                 }
               } else {
@@ -1156,6 +1190,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       _socketService.onUnreadUpdate = _onUnreadUpdate;
       _socketService.onTaskStatusUpdate = _onTaskStatusUpdate;
       _socketService.onApplicationStatusUpdate = _onApplicationStatusUpdate;
+      _socketService.onBlockStatusUpdate = _onBlockStatusUpdate;
 
       // 加入當前聊天室（保險：立即與延時重試）
       if (_currentRoomId != null) {
@@ -1284,7 +1319,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     // 這裡可以更新 UI 中的未讀徽章
   }
 
-  /// 處理任務狀態更新
+  /// 處理任務狀態更新 - 純局部更新版本
   void _onTaskStatusUpdate(Map<String, dynamic> data) {
     debugPrint('📋 Task status update received: $data');
 
@@ -1293,13 +1328,86 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final taskId = data['task_id']?.toString();
 
     if (roomId == _currentRoomId || taskId == _task?['id']?.toString()) {
-      debugPrint('🔄 Refreshing chat data due to task status update');
-      // 重新載入聊天室數據
-      _initializeChat();
+      debugPrint('🔄 Updating task status locally (no full refresh)');
+
+      // 1. 立即更新本地任務狀態（即時性）
+      _updateTaskStatusLocally(data);
+
+      // 2. 顯示狀態變更通知
+      final statusData = data['status'] as Map<String, dynamic>?;
+      if (statusData != null) {
+        _showTaskStatusChangeNotification(statusData);
+      }
+
+      // 3. 通知 Provider 刷新聊天列表（保持列表同步）
+      _notifyProviderRefresh();
+
+      // 移除全量刷新：不再呼叫 _initializeChat()
     }
   }
 
-  /// 處理應徵狀態更新
+  /// 立即更新本地任務狀態 - 增強版本
+  void _updateTaskStatusLocally(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    final statusData = data['status'] as Map<String, dynamic>?;
+    if (statusData == null) return;
+
+    setState(() {
+      if (_task != null) {
+        // 更新任務狀態
+        _task!['status'] = statusData;
+
+        // 同步更新相關的計算屬性
+        _updateDerivedStates();
+      }
+    });
+
+    debugPrint(
+        '✅ [ChatDetailPage] Task status updated locally: ${statusData['code']}');
+  }
+
+  /// 更新衍生狀態（如倒數計時等）
+  void _updateDerivedStates() {
+    if (_task == null) return;
+
+    final statusCode = _task!['status']?['code'];
+
+    // 更新倒數計時相關狀態
+    if (statusCode == 'pending_confirmation') {
+      _startCountdownIfNeeded();
+    } else {
+      _stopCountdown();
+    }
+
+    debugPrint(
+        '✅ [ChatDetailPage] Derived states updated for status: $statusCode');
+  }
+
+  /// 開始倒數計時（如果需要）
+  void _startCountdownIfNeeded() {
+    if (_task == null) return;
+
+    final statusCode = _task!['status']?['code'];
+    if (statusCode != 'pending_confirmation') return;
+
+    // 如果已經在倒數計時，不重複開始
+    if (countdownTicker.isActive) return;
+
+    debugPrint(
+        '🕐 [ChatDetailPage] Starting countdown for pending_confirmation');
+    countdownTicker.start();
+  }
+
+  /// 停止倒數計時
+  void _stopCountdown() {
+    if (countdownTicker.isActive) {
+      debugPrint('🛑 [ChatDetailPage] Stopping countdown');
+      countdownTicker.stop();
+    }
+  }
+
+  /// 處理應徵狀態更新 - 純局部更新版本
   void _onApplicationStatusUpdate(Map<String, dynamic> data) {
     debugPrint('📝 Application status update received: $data');
 
@@ -1308,9 +1416,213 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final taskId = data['task_id']?.toString();
 
     if (roomId == _currentRoomId || taskId == _task?['id']?.toString()) {
-      debugPrint('🔄 Refreshing chat data due to application status update');
-      // 重新載入聊天室數據
-      _initializeChat();
+      debugPrint('🔄 Updating application status locally (no full refresh)');
+
+      // 1. 立即更新本地應徵狀態（即時性）
+      _updateApplicationStatusLocally(data);
+
+      // 2. 顯示應徵狀態變更通知
+      final applicationStatus = data['application_status']?.toString();
+      if (applicationStatus != null) {
+        _showApplicationStatusChangeNotification(applicationStatus);
+      }
+
+      // 3. 通知 Provider 刷新聊天列表（保持列表同步）
+      _notifyProviderRefresh();
+
+      // 移除全量刷新：不再呼叫 _initializeChat()
+    }
+  }
+
+  /// 立即更新本地應徵狀態
+  void _updateApplicationStatusLocally(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    final applicationStatus = data['application_status']?.toString();
+    if (applicationStatus == null) return;
+
+    setState(() {
+      if (_task != null) {
+        _task!['application'] = {
+          'status': applicationStatus,
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+      }
+    });
+
+    debugPrint(
+        '✅ [ChatDetailPage] Application status updated locally: $applicationStatus');
+  }
+
+  /// 處理封鎖狀態更新 - 優化版本（方案一：混合策略）
+  void _onBlockStatusUpdate(Map<String, dynamic> data) {
+    debugPrint('🚫 [ChatDetailPage] Block status update received: $data');
+
+    if (!mounted) return;
+
+    try {
+      final currentUserId = _currentUserId;
+      if (currentUserId == null) return;
+
+      final blockedByUserId = data['blocked_by_user_id']?.toString();
+      final unblockedByUserId = data['unblocked_by_user_id']?.toString();
+      final targetUserId = data['target_user_id']?.toString();
+      final isBlocked = data['is_blocked'] as bool? ?? false;
+
+      // 檢查這個封鎖事件是否與當前聊天室相關
+      final opponentId = _getOpponentUserId()?.toString();
+      if (opponentId == null) return;
+
+      debugPrint('🔍 [ChatDetailPage] Block status data: $data');
+      debugPrint(
+          '🔍 [ChatDetailPage] Current user: $currentUserId, Opponent: $opponentId');
+      debugPrint(
+          '🔍 [ChatDetailPage] Blocked by: $blockedByUserId, Unblocked by: $unblockedByUserId, Target: $targetUserId, Is blocked: $isBlocked');
+
+      bool shouldUpdate = false;
+
+      if (isBlocked) {
+        // 封鎖事件：檢查是否涉及當前聊天室的雙方
+        if ((blockedByUserId == currentUserId.toString() &&
+                targetUserId == opponentId) ||
+            (blockedByUserId == opponentId &&
+                targetUserId == currentUserId.toString())) {
+          shouldUpdate = true;
+        }
+      } else {
+        // 解除封鎖事件：檢查是否涉及當前聊天室的雙方
+        if ((unblockedByUserId == currentUserId.toString() &&
+                targetUserId == opponentId) ||
+            (unblockedByUserId == opponentId &&
+                targetUserId == currentUserId.toString())) {
+          shouldUpdate = true;
+        }
+      }
+
+      if (shouldUpdate) {
+        // 1. 立即更新本地狀態（即時性）
+        _updateBlockStatusLocally(data);
+
+        // 2. 顯示狀態變更通知
+        _showBlockStatusChangeNotification(data);
+
+        // 3. 通知 Provider 刷新聊天列表（保持列表同步）
+        _notifyProviderRefresh();
+
+        // 移除全量刷新：不再呼叫 _initializeChat()
+      }
+    } catch (e) {
+      debugPrint('❌ [ChatDetailPage] Error handling block status update: $e');
+    }
+  }
+
+  /// 立即更新本地封鎖狀態
+  void _updateBlockStatusLocally(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    final isBlocked = data['is_blocked'] as bool? ?? false;
+    final blockedByUserId = data['blocked_by_user_id']?.toString();
+    final currentUserId = _currentUserId?.toString();
+
+    setState(() {
+      _isBlocked = isBlocked;
+
+      if (isBlocked) {
+        // 封鎖狀態
+        if (blockedByUserId == currentUserId) {
+          _isBlockedByMe = true;
+          _isBlockedByTarget = false;
+        } else {
+          _isBlockedByMe = false;
+          _isBlockedByTarget = true;
+        }
+      } else {
+        // 解除封鎖狀態
+        _isBlockedByMe = false;
+        _isBlockedByTarget = false;
+      }
+    });
+
+    debugPrint(
+        '✅ [ChatDetailPage] Block status updated locally: $_isBlocked, byMe: $_isBlockedByMe, byTarget: $_isBlockedByTarget');
+  }
+
+  /// 顯示封鎖狀態變更通知
+  void _showBlockStatusChangeNotification(Map<String, dynamic> data) {
+    if (!mounted) return;
+
+    final isBlocked = data['is_blocked'] as bool? ?? false;
+    final blockedByUserId = data['blocked_by_user_id']?.toString();
+    final unblockedByUserId = data['unblocked_by_user_id']?.toString();
+    final currentUserId = _currentUserId?.toString();
+
+    String message;
+    Color backgroundColor;
+    IconData icon;
+
+    if (isBlocked) {
+      if (blockedByUserId == currentUserId) {
+        message = '您已封鎖此用戶，雙方無法發送訊息';
+        backgroundColor = Colors.orange;
+        icon = Icons.block;
+      } else {
+        message = '您已被此用戶封鎖，雙方無法發送訊息';
+        backgroundColor = Colors.red;
+        icon = Icons.block;
+      }
+    } else {
+      if (unblockedByUserId == currentUserId) {
+        message = '您已解除封鎖此用戶';
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+      } else {
+        message = '此用戶已解除對您的封鎖';
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+      }
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  /// 通知 Provider 刷新聊天列表
+  void _notifyProviderRefresh() {
+    if (!mounted || !context.mounted) return;
+
+    try {
+      final provider = context.read<ChatListProvider>();
+      // 根據用戶角色刷新對應的標籤頁
+      if (_userRole == 'creator') {
+        provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+        debugPrint('✅ [BlockStatus] 已通知 Provider 刷新 POSTED_TASKS');
+      } else {
+        provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
+        debugPrint('✅ [BlockStatus] 已通知 Provider 刷新 MY_WORKS');
+      }
+      // 強制刷新快取
+      provider.forceRefreshCache();
+      debugPrint('✅ [BlockStatus] 已強制刷新快取');
+    } catch (e) {
+      debugPrint('❌ [BlockStatus] 通知 Provider 刷新失敗: $e');
     }
   }
 
@@ -1523,34 +1835,84 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     if (remain <= Duration.zero && !countdownCompleted) {
       countdownCompleted = true;
       countdownTicker.stop();
-      setState(() {
-        remainingTime = Duration.zero;
-        if (_task != null) {
-          _task!['status'] =
-              TaskStatusConstants.TaskStatus.statusString['completed_tasker'];
-        }
-      });
-      if (_task != null) {
-        TaskService().updateTaskStatus(
-          _task!['id'].toString(),
-          TaskStatusConstants.TaskStatus.statusString['completed_tasker']!,
-          statusCode: 'completed',
-        );
+
+      debugPrint('⏰ 倒數計時結束，開始執行自動完成流程');
+
+      // 執行自動完成流程
+      _executeAutoComplete();
+    } else if (!countdownCompleted) {
+      // 只有當剩餘時間真正改變時才更新狀態
+      final newRemainingTime = remain > Duration.zero ? remain : Duration.zero;
+      if (newRemainingTime.inSeconds != remainingTime.inSeconds) {
+        setState(() {
+          remainingTime = newRemainingTime;
+        });
       }
+    }
+  }
+
+  /// 執行自動完成任務流程
+  Future<void> _executeAutoComplete() async {
+    if (_task == null) return;
+
+    try {
+      debugPrint('🔄 開始執行自動完成任務流程');
+
+      // 1. 更新任務狀態為 completed
+      final success = await TaskService().updateTaskStatus(
+        _task!['id'].toString(),
+        TaskStatusConstants.TaskStatus.statusString['completed_tasker']!,
+        statusCode: 'completed',
+      );
+
+      if (success) {
+        // 2. 更新本地狀態
+        setState(() {
+          remainingTime = Duration.zero;
+          if (_task != null) {
+            _task!['status'] =
+                TaskStatusConstants.TaskStatus.statusString['completed_tasker'];
+          }
+        });
+
+        // 3. 顯示成功訊息
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '⏰ 倒數計時結束！任務已自動完成，獎勵點數已轉移給任務執行者。',
+              ),
+              duration: Duration(seconds: 5),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+
+        debugPrint('✅ 自動完成任務流程執行成功');
+
+        // 4. 刷新聊天室資料
+        await _initializeChat();
+      } else {
+        debugPrint('❌ 自動完成任務失敗');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('自動完成任務失敗，請稍後重試'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ 執行自動完成任務時發生錯誤: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'The countdown has ended. The task is now automatically completed and the payment has been successfully transferred. Thank you!',
-            ),
-            duration: Duration(seconds: 3),
+          SnackBar(
+            content: Text('自動完成任務時發生錯誤: $e'),
+            backgroundColor: Colors.red,
           ),
         );
       }
-    } else if (!countdownCompleted) {
-      setState(() {
-        remainingTime = remain > Duration.zero ? remain : Duration.zero;
-      });
     }
   }
 
@@ -2137,12 +2499,12 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         _pendingImageMessages.length + // 加入暫存圖片訊息
         (hasUnreadSeparator ? 1 : 0); // 加入未讀分隔線
 
-    debugPrint(
-        '🔍 Total messages: $totalItemCount (hasViewResume: ${hasViewResumeMessage ? 1 : 0}, chatMessages: ${_chatMessages.length}, pendingMessages: ${_pendingMessages.length}, pendingImageMessages: ${_pendingImageMessages.length}, unreadSeparator: ${hasUnreadSeparator ? 1 : 0})');
-    debugPrint(
-        '🔍 未讀分隔線調試: _myLastReadMessageId=$_myLastReadMessageId, _currentUserId=$_currentUserId');
-    debugPrint(
-        '🔍 未讀分隔線調試: unreadSeparatorIndex=$unreadSeparatorIndex, hasUnreadSeparator=$hasUnreadSeparator');
+    // 減少 debug 輸出頻率
+    if (kDebugMode && totalItemCount != _lastDebugMessageCount) {
+      debugPrint(
+          '🔍 Messages: $totalItemCount (unread: ${hasUnreadSeparator ? 1 : 0})');
+      _lastDebugMessageCount = totalItemCount;
+    }
 
     // 已移除 buildQuestionReplyBubble - 使用 _buildViewResumeBubble 替代
 
@@ -2150,29 +2512,52 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
     // 已移除 buildMyMessageBubble - 使用 _buildTextMessage 替代
 
-    final isInputDisabled = _isBlocked ||
+    final isInputDisabled = _isBlocked || // 任何封鎖狀態都禁用輸入
         _task?['status']?['code'] == 'completed' ||
         _task?['status']?['code'] == 'rejected_tasker' ||
-        _task?['status']?['code'] == 'completed_tasker';
+        _task?['status']?['code'] == 'completed_tasker' ||
+        _task?['application']?['status'] == 'withdrawn';
     // --- ALERT BAR SWITCH-CASE 重構 ---
     // 預設 alert bar 不會顯示，只有在特定狀態下才顯示
     Widget? alertContent;
 
     // 優先檢查封鎖狀態
     if (_isBlocked) {
+      // 統一處理任何封鎖狀態
+      String message;
+      Color? backgroundColor;
+      Color? textColor;
+
+      if (_isBlockedByMe) {
+        message =
+            'You have blocked this user, both parties cannot send messages.';
+        backgroundColor = Theme.of(context).colorScheme.tertiaryContainer;
+        textColor = Theme.of(context).colorScheme.tertiary;
+      } else if (_isBlockedByTarget) {
+        message =
+            'You have been blocked by this user, both parties cannot send messages.';
+        backgroundColor = Theme.of(context).colorScheme.errorContainer;
+        textColor = Theme.of(context).colorScheme.error;
+      } else {
+        message =
+            'This chat room has been restricted, both parties cannot send messages or images.';
+        backgroundColor = Theme.of(context).colorScheme.errorContainer;
+        textColor = Theme.of(context).colorScheme.error;
+      }
+
       alertContent = Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        color: Colors.red[50],
+        color: backgroundColor,
         child: Row(
           children: [
-            Icon(Icons.block, color: Colors.red[700], size: 20),
+            Icon(Icons.block, color: textColor, size: 20),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                '此聊天室已被限制，您只能查看歷史訊息，無法發送新訊息或圖片。',
+                message,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.red[700],
+                  color: textColor,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -2206,6 +2591,28 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                   color: Colors.black87,
                   fontWeight: FontWeight.w500),
               textAlign: TextAlign.center,
+            ),
+          );
+          break;
+        case 'withdrawn':
+          alertContent = Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: Colors.grey[100],
+            child: Row(
+              children: [
+                Icon(Icons.cancel_outlined, color: Colors.grey[600], size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '您已撤銷此任務的應徵申請。',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
           );
           break;
@@ -2413,6 +2820,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                       _task!['status']?['code']),
                   userRole: ActionBarConfigManager.parseUserRole(_userRole),
                   actionCallbacks: _buildActionCallbacks(),
+                  applicationStatus: _task?['application']?['status'],
+                  isBlocked: _isBlocked,
+                  isBlockedByMe: _isBlockedByMe,
+                  isBlockedByTarget: _isBlockedByTarget,
+                  hasExistingReview: _hasExistingReview,
                   showStatusBar: true,
                   statusDisplayName:
                       _getStatusDisplayNameForUserRole(), // 根據用戶角色獲取狀態顯示名稱
@@ -2654,23 +3066,15 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   // Store applierChatItems in state for Accept button logic
   List<Map<String, dynamic>> applierChatItems = [];
 
-  /// 構建動作回調映射
+  // 緩存 actionCallbacks 避免無限重建
+  late final Map<String, VoidCallback> _actionCallbacks;
+
+  // 用於減少 debug 輸出頻率
+  int _lastDebugMessageCount = -1;
+
+  /// 構建動作回調映射（已緩存）
   Map<String, VoidCallback> _buildActionCallbacks() {
-    return {
-      'accept': () => _handleAcceptApplication(),
-      'block': () => _handleBlockUser(),
-      'report': () => _openReportSheet(),
-      'pay': () => _openPayAndReview(),
-      'complete': () => _handleCompleteTask(),
-      'confirm': () => _handleConfirmCompletion(),
-      'disagree': () => _handleDisagreeCompletion(),
-      'paid_info': () => _showPaidInfo(),
-      'review': () => _openReviewDialog(readOnlyIfExists: true),
-      'dispute': () => _handleDispute(),
-      // Support 相關動作
-      'issue': () => _handleShowSupportTimeline(),
-      'solved': () => _handleSupportSolved(),
-    };
+    return _actionCallbacks;
   }
 
   /// 構建支援聊天室的 Action Bar
@@ -2945,58 +3349,82 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       if (mounted && context.mounted) {
         try {
           final provider = context.read<ChatListProvider>();
-          if (provider != null) {
-            // 根據用戶角色刷新對應的標籤頁
-            if (_userRole == 'creator') {
-              provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
-              debugPrint('✅ [Accept] 已通知 Provider 刷新 POSTED_TASKS');
-            } else {
-              provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
-              debugPrint('✅ [Accept] 已通知 Provider 刷新 MY_WORKS');
-            }
-            // 強制刷新快取
-            provider.forceRefreshCache();
-            debugPrint('✅ [Accept] 已強制刷新快取');
-
-            // 新增：通知兩個分頁的分頁控制器刷新（若上層有監聽）
-            try {
-              // 透過 Provider 的事件機制定義：這裡只呼叫既有方法，
-              // 具體分頁元件會在 build 中使用 RefreshIndicator 與 PagingController.refresh()
-              // 因此這裡不直接持有 controller，避免相依。
-              provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
-              provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
-            } catch (_) {}
+          // 根據用戶角色刷新對應的標籤頁
+          if (_userRole == 'creator') {
+            provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+            debugPrint('✅ [Accept] 已通知 Provider 刷新 POSTED_TASKS');
+          } else {
+            provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
+            debugPrint('✅ [Accept] 已通知 Provider 刷新 MY_WORKS');
           }
+          // 強制刷新快取
+          provider.forceRefreshCache();
+          debugPrint('✅ [Accept] 已強制刷新快取');
+
+          // 新增：通知兩個分頁的分頁控制器刷新（若上層有監聽）
+          try {
+            // 透過 Provider 的事件機制定義：這裡只呼叫既有方法，
+            // 具體分頁元件會在 build 中使用 RefreshIndicator 與 PagingController.refresh()
+            // 因此這裡不直接持有 controller，避免相依。
+            provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+            provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
+          } catch (_) {}
         } catch (e) {
           debugPrint('❌ 通知 Provider 刷新失敗: $e');
         }
+
+        // 重新載入聊天室狀態以更新 Action Bar
+        await _initializeChat();
       }
     } catch (e) {
-      debugPrint('❌ Accept application failed: $e');
+      ErrorHandlerService.logError(
+          'ChatDetailPage._handleAcceptApplication', e);
       if (mounted) {
-        // 顯示具體的錯誤訊息
-        String errorMessage = 'Failed to accept application';
-        if (e.toString().contains('already been assigned')) {
-          errorMessage =
-              'This user has already been assigned as the tasker for this task.';
-        } else if (e.toString().contains('already has an assigned tasker')) {
-          errorMessage =
-              'This task already has an assigned tasker. Cannot accept another application.';
-        } else if (e.toString().contains('must be in open status')) {
-          errorMessage = 'Task must be in open status to accept applications.';
-        } else if (e.toString().contains('Only task creator can accept')) {
-          errorMessage = 'Only task creator can accept applications.';
-        } else {
-          errorMessage = e.toString().replaceFirst('Exception: ', '');
-        }
+        ErrorSnackBar.show(context, e, operation: 'accept_application');
+      }
+    }
+  }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
+  /// 處理撤銷應徵申請
+  Future<void> _handleWithdrawApplication() async {
+    final taskId = _task?['id']?.toString();
+    if (taskId == null) return;
+
+    try {
+      // 顯示確認對話框
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('撤銷應徵申請'),
+          content: const Text('確定要撤銷此任務的應徵申請嗎？撤銷後將無法再次應徵此任務。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('確認撤銷'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        await ChatService().withdrawApplication(taskId: taskId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('已撤銷應徵申請')),
+          );
+          // 重新載入聊天室狀態
+          await _initializeChat();
+        }
+      }
+    } catch (e) {
+      ErrorHandlerService.logError(
+          'ChatDetailPage._handleWithdrawApplication', e);
+      if (mounted) {
+        ErrorSnackBar.show(context, e, operation: 'withdraw_application');
       }
     }
   }
@@ -3004,20 +3432,94 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   /// 處理封鎖用戶
   Future<void> _handleBlockUser() async {
     final opponentId = _getOpponentUserId();
+    final opponentName = _getOpponentUserName();
     if (opponentId == null) return;
 
     try {
-      await ChatService().blockUser(targetUserId: opponentId, block: true);
-      if (mounted) {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => BlockUserDialog(
+          targetUserId: opponentId.toString(),
+          targetUserName: opponentName ?? '用戶',
+          isCurrentlyBlocked: false,
+          onBlockStatusChanged: () {
+            // 重新載入聊天室狀態
+            _initializeChat();
+          },
+        ),
+      );
+
+      if (result == true && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User blocked.')),
+          const SnackBar(content: Text('User blocked successfully')),
         );
       }
     } catch (e) {
+      ErrorHandlerService.logError('ChatDetailPage._handleBlockUser', e);
       if (mounted) {
+        // 檢查是否為重複封鎖錯誤
+        final errorMessage = e.toString();
+        if (errorMessage.contains('Block relationship already exists') ||
+            errorMessage.contains('409')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('Block relationship already exists between these users'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          // 重新載入狀態以同步最新的封鎖狀態
+          _initializeChat();
+        } else {
+          ErrorSnackBar.show(context, e, operation: 'block_user');
+        }
+      }
+    }
+  }
+
+  /// 處理解除封鎖用戶
+  Future<void> _handleUnblockUser() async {
+    final opponentId = _getOpponentUserId();
+    final opponentName = _getOpponentUserName();
+    if (opponentId == null) return;
+
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        builder: (context) => BlockUserDialog(
+          targetUserId: opponentId.toString(),
+          targetUserName: opponentName ?? '用戶',
+          isCurrentlyBlocked: true,
+          onBlockStatusChanged: () {
+            // 重新載入聊天室狀態
+            _initializeChat();
+          },
+        ),
+      );
+
+      if (result == true && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Block failed: $e')),
+          const SnackBar(content: Text('Block removed successfully')),
         );
+      }
+    } catch (e) {
+      ErrorHandlerService.logError('ChatDetailPage._handleUnblockUser', e);
+      if (mounted) {
+        // 檢查是否為找不到封鎖記錄的錯誤
+        final errorMessage = e.toString();
+        if (errorMessage.contains('No block relationship found') ||
+            errorMessage.contains('404')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No block relationship found to remove'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          // 重新載入狀態以同步最新的封鎖狀態
+          _initializeChat();
+        } else {
+          ErrorSnackBar.show(context, e, operation: 'unblock_user');
+        }
       }
     }
   }
@@ -3331,7 +3833,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             _showPaidInfo();
           }));
           actions.add(actionDefs('Reviews', Icons.reviews, () {
-            _openReviewDialog(readOnlyIfExists: true);
+            _openReviewDialog();
           }));
           actions.add(actionDefs('Block', Icons.block, () async {
             await confirmDialog(
@@ -3586,86 +4088,64 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     );
   }
 
-  void _openReviewDialog({bool readOnlyIfExists = false}) {
-    // 簡易評論視窗骨架（之後串接後端/查已有評論改為唯讀）
-    int service = 0, attitude = 0, experience = 0;
-    final commentCtrl = TextEditingController();
+  /// 開啟評分對話框
+  void _openReviewDialog() {
+    final taskId = _task?['id']?.toString();
+    final taskerId = _getOpponentUserId()?.toString();
+    final taskerName = _getOpponentDisplayName();
+    final taskTitle = _task?['title']?.toString() ?? '';
+
+    if (taskId == null || taskerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('無法獲取任務或用戶資訊')),
+      );
+      return;
+    }
+
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          Widget buildStars(int value, ValueChanged<int> onChanged) {
-            return Row(
-              children: List.generate(
-                5,
-                (i) => IconButton(
-                  icon: Icon(i < value ? Icons.star : Icons.star_border,
-                      color: Colors.amber),
-                  onPressed: readOnlyIfExists ? null : () => onChanged(i + 1),
-                ),
-              ),
-            );
-          }
-
-          return AlertDialog(
-            title: const Text('Reviews'),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Service'),
-                  buildStars(service, (v) => setState(() => service = v)),
-                  const Text('Attitude'),
-                  buildStars(attitude, (v) => setState(() => attitude = v)),
-                  const Text('Experience'),
-                  buildStars(experience, (v) => setState(() => experience = v)),
-                  const SizedBox(height: 8),
-                  const Text('Comment (<= 100 chars)'),
-                  TextField(
-                      controller: commentCtrl,
-                      maxLength: 100,
-                      maxLines: 3,
-                      enabled: !readOnlyIfExists),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close')),
-              if (!readOnlyIfExists)
-                ElevatedButton(
-                  onPressed: () async {
-                    try {
-                      if (_task != null) {
-                        await TaskService().submitReview(
-                          taskId: _task!['id'].toString(),
-                          ratingService: service,
-                          ratingAttitude: attitude,
-                          ratingExperience: experience,
-                          comment: commentCtrl.text.trim().isEmpty
-                              ? null
-                              : commentCtrl.text.trim(),
-                        );
-                        if (mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content: Text('Review submitted.')));
-                        }
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text('Submit review failed: $e')));
-                      }
-                    }
-                  },
-                  child: const Text('Submit'),
-                ),
-            ],
-          );
+      builder: (context) => ReviewDialog(
+        taskId: taskId,
+        taskerId: taskerId,
+        taskerName: taskerName,
+        taskTitle: taskTitle,
+        onReviewSubmitted: () {
+          // 重新載入聊天室狀態以更新 Action Bar
+          _initializeChat();
         },
+      ),
+    );
+  }
+
+  /// 查看現有評分
+  void _viewExistingReview() {
+    final taskId = _task?['id']?.toString();
+    final taskerId = _getOpponentUserId()?.toString();
+    final taskerName = _getOpponentDisplayName();
+    final taskTitle = _task?['title']?.toString() ?? '';
+
+    if (taskId == null || taskerId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('無法獲取任務或用戶資訊')),
+      );
+      return;
+    }
+
+    // TODO: 從後端獲取現有評分資料
+    final existingReview = {
+      'rating': 4.0,
+      'comment': '服務很好，準時完成任務。',
+    };
+
+    showDialog(
+      context: context,
+      builder: (context) => ReviewDialog(
+        taskId: taskId,
+        taskerId: taskerId,
+        taskerName: taskerName,
+        taskTitle: taskTitle,
+        readOnlyMode: true,
+        existingReview: existingReview,
       ),
     );
   }
@@ -4605,6 +5085,128 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       );
     }
   }
+
+  /// 顯示任務狀態變更通知
+  void _showTaskStatusChangeNotification(Map<String, dynamic> statusData) {
+    final statusCode = statusData['code']?.toString();
+    final displayName = statusData['display_name']?.toString();
+
+    String message;
+    Color backgroundColor;
+    IconData icon;
+
+    switch (statusCode) {
+      case 'in_progress':
+        message = '任務已開始進行';
+        backgroundColor = Colors.blue;
+        icon = Icons.play_arrow;
+        break;
+      case 'pending_confirmation':
+        message = '任務已標記完成，等待確認';
+        backgroundColor = Colors.orange;
+        icon = Icons.hourglass_empty;
+        break;
+      case 'completed':
+        message = '任務已確認完成！';
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        break;
+      case 'dispute':
+        message = '任務進入爭議處理';
+        backgroundColor = Colors.red;
+        icon = Icons.warning;
+        break;
+      case 'cancelled':
+        message = '任務已取消';
+        backgroundColor = Colors.grey;
+        icon = Icons.cancel;
+        break;
+      default:
+        message = displayName != null ? '任務狀態已更新為：$displayName' : '任務狀態已更新';
+        backgroundColor = Theme.of(context).colorScheme.primary;
+        icon = Icons.info;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: Text(message,
+                      style: const TextStyle(color: Colors.white))),
+            ],
+          ),
+          backgroundColor: backgroundColor,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
+  }
+
+  /// 顯示應徵狀態變更通知
+  void _showApplicationStatusChangeNotification(String applicationStatus) {
+    String message;
+    Color backgroundColor;
+    IconData icon;
+
+    switch (applicationStatus) {
+      case 'accepted':
+        message = '應徵已被接受！';
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        break;
+      case 'rejected':
+        message = '應徵已被拒絕';
+        backgroundColor = Colors.red;
+        icon = Icons.cancel;
+        break;
+      case 'withdrawn':
+        message = '應徵已撤銷';
+        backgroundColor = Colors.orange;
+        icon = Icons.undo;
+        break;
+      case 'cancelled':
+        message = '應徵已取消';
+        backgroundColor = Colors.grey;
+        icon = Icons.cancel;
+        break;
+      case 'pending':
+        message = '應徵狀態已更新';
+        backgroundColor = Colors.blue;
+        icon = Icons.hourglass_empty;
+        break;
+      default:
+        message = '應徵狀態已更新';
+        backgroundColor = Theme.of(context).colorScheme.primary;
+        icon = Icons.info;
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: Text(message,
+                      style: const TextStyle(color: Colors.white))),
+            ],
+          ),
+          backgroundColor: backgroundColor,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
+  }
+
 // #endregion
 }
 

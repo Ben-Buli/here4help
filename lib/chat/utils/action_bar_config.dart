@@ -89,7 +89,22 @@ class ActionBarConfigManager {
     required UserRole userRole,
     required Map<String, VoidCallback> actionCallbacks,
     String? applicationStatus, // 新增：應徵狀態參數
+    bool isBlocked = false, // 新增：封鎖狀態參數
+    bool isBlockedByMe = false, // 新增：我是否封鎖了對方
+    bool isBlockedByTarget = false, // 新增：對方是否封鎖了我
+    bool hasExistingReview = false, // 新增：是否已有評分
   }) {
+    // 添加詳細的調試信息
+    debugPrint('🔍 [ActionBarConfigManager] getActionsForStatus called:');
+    debugPrint('  - status: $status');
+    debugPrint('  - userRole: $userRole');
+    debugPrint('  - applicationStatus: $applicationStatus');
+    debugPrint('  - isBlocked: $isBlocked');
+    debugPrint('  - isBlockedByMe: $isBlockedByMe');
+    debugPrint('  - isBlockedByTarget: $isBlockedByTarget');
+    debugPrint('  - hasExistingReview: $hasExistingReview');
+    debugPrint('  - actionCallbacks keys: ${actionCallbacks.keys.toList()}');
+
     final actions = <ActionBarAction>[];
 
     switch (status) {
@@ -128,20 +143,40 @@ class ActionBarConfigManager {
                       'Are you sure you want to reject this applicant for this task?',
                 ),
           );
-          actions.add(
-            ActionBarAction(
-              id: 'block',
-              label: 'Block',
-              icon: Icons.block,
-              onTap: actionCallbacks['block'] ?? () {},
-              backgroundColor: const Color.fromARGB(255, 109, 105, 105),
-              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
-            ).asDestructive().withConfirmation(
-                  title: 'Block User',
-                  content:
-                      'Block this user from applying your tasks in the future?',
-                ),
-          );
+          // Block 按鈕邏輯：只要有任何一方封鎖，另一方就失去 Block 功能
+          if (!isBlocked) {
+            // 沒有任何封鎖關係，顯示 "Block" 按鈕
+            actions.add(
+              ActionBarAction(
+                id: 'block',
+                label: 'Block',
+                icon: Icons.block,
+                onTap: actionCallbacks['block'] ?? () {},
+                backgroundColor: const Color.fromARGB(255, 109, 105, 105),
+                foregroundColor: const Color.fromARGB(255, 255, 255, 255),
+              ).asDestructive().withConfirmation(
+                    title: 'Block User',
+                    content:
+                        'Block this user? This will disable all communication in this chat room.',
+                  ),
+            );
+          } else if (isBlockedByMe) {
+            // 我封鎖了對方，顯示 "Blocked" 按鈕，可解除封鎖
+            actions.add(
+              ActionBarAction(
+                id: 'unblock',
+                label: 'Blocked',
+                icon: Icons.block,
+                onTap: actionCallbacks['unblock'] ?? () {},
+                backgroundColor: const Color.fromARGB(255, 255, 152, 0), // 橙色
+                foregroundColor: const Color.fromARGB(255, 255, 255, 255),
+              ).withConfirmation(
+                title: 'Unblock User',
+                content: 'Are you sure you want to unblock this user?',
+              ),
+            );
+          }
+          // 如果被對方封鎖（isBlockedByTarget），不顯示任何 Block 相關按鈕
         } else {
           // participant 角色
           actions.add(
@@ -265,48 +300,101 @@ class ActionBarConfigManager {
 
       case TaskStatus.completed:
         if (userRole == UserRole.creator) {
-          actions.addAll([
-            // ActionBarAction(
-            //   id: 'paid_info',
-            //   label: 'Paid',
-            //   icon: Icons.attach_money,
-            //   onTap: actionCallbacks['paid_info'] ?? () {},
-            // ),
-            ActionBarAction(
-              id: 'review',
-              label: 'Reviews',
-              icon: Icons.reviews,
-              onTap: actionCallbacks['review'] ?? () {},
-              backgroundColor: const Color.fromARGB(255, 72, 107, 119),
-              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
-            ),
-            ActionBarAction(
-              id: 'block',
-              label: 'Block',
-              icon: Icons.block,
-              onTap: actionCallbacks['block'] ?? () {},
-              backgroundColor: const Color.fromARGB(255, 109, 105, 105),
-              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
-            ).asDestructive().withConfirmation(
-                  title: 'Block User',
-                  content: 'Block this user?',
-                ),
-          ]);
+          // Reviews 按鈕邏輯：根據是否有現有評分顯示不同按鈕
+          if (hasExistingReview) {
+            actions.add(
+              ActionBarAction(
+                id: 'view_review',
+                label: 'Reviewed',
+                icon: Icons.visibility,
+                onTap: actionCallbacks['view_review'] ?? () {},
+                backgroundColor: const Color.fromARGB(255, 72, 107, 119),
+                foregroundColor: const Color.fromARGB(255, 255, 255, 255),
+              ),
+            );
+          } else {
+            actions.add(
+              ActionBarAction(
+                id: 'review',
+                label: 'Reviews',
+                icon: Icons.reviews,
+                onTap: actionCallbacks['review'] ?? () {},
+                backgroundColor: const Color.fromARGB(255, 72, 107, 119),
+                foregroundColor: const Color.fromARGB(255, 255, 255, 255),
+              ),
+            );
+          }
+
+          // Block 按鈕邏輯：只要有任何一方封鎖，另一方就失去 Block 功能
+          if (!isBlocked) {
+            // 沒有任何封鎖關係，顯示 "Block" 按鈕
+            actions.add(
+              ActionBarAction(
+                id: 'block',
+                label: 'Block',
+                icon: Icons.block,
+                onTap: actionCallbacks['block'] ?? () {},
+                backgroundColor: const Color.fromARGB(255, 109, 105, 105),
+                foregroundColor: const Color.fromARGB(255, 255, 255, 255),
+              ).asDestructive().withConfirmation(
+                    title: 'Block User',
+                    content:
+                        'Block this user? This will disable all communication in this chat room.',
+                  ),
+            );
+          } else if (isBlockedByMe) {
+            // 我封鎖了對方，顯示 "Blocked" 按鈕，可解除封鎖
+            actions.add(
+              ActionBarAction(
+                id: 'unblock',
+                label: 'Blocked',
+                icon: Icons.block,
+                onTap: actionCallbacks['unblock'] ?? () {},
+                backgroundColor: const Color.fromARGB(255, 255, 152, 0), // 橙色
+                foregroundColor: const Color.fromARGB(255, 255, 255, 255),
+              ).withConfirmation(
+                title: 'Unblock User',
+                content: 'Are you sure you want to unblock this user?',
+              ),
+            );
+          }
+          // 如果被對方封鎖（isBlockedByTarget），不顯示任何 Block 相關按鈕
         } else {
           // participant 角色
-          actions.addAll([
-            ActionBarAction(
-              id: 'block',
-              label: 'Block',
-              icon: Icons.block,
-              onTap: actionCallbacks['block'] ?? () {},
-              backgroundColor: const Color.fromARGB(255, 109, 105, 105),
-              foregroundColor: const Color.fromARGB(255, 255, 255, 255),
-            ).asDestructive().withConfirmation(
-                  title: 'Block User',
-                  content: 'Block this user?',
-                ),
-          ]);
+          // Block 按鈕邏輯：只要有任何一方封鎖，另一方就失去 Block 功能
+          if (!isBlocked) {
+            // 沒有任何封鎖關係，顯示 "Block" 按鈕
+            actions.add(
+              ActionBarAction(
+                id: 'block',
+                label: 'Block',
+                icon: Icons.block,
+                onTap: actionCallbacks['block'] ?? () {},
+                backgroundColor: const Color.fromARGB(255, 109, 105, 105),
+                foregroundColor: const Color.fromARGB(255, 255, 255, 255),
+              ).asDestructive().withConfirmation(
+                    title: 'Block User',
+                    content:
+                        'Block this user? This will disable all communication in this chat room.',
+                  ),
+            );
+          } else if (isBlockedByMe) {
+            // 我封鎖了對方，顯示 "Blocked" 按鈕，可解除封鎖
+            actions.add(
+              ActionBarAction(
+                id: 'unblock',
+                label: 'Blocked',
+                icon: Icons.block,
+                onTap: actionCallbacks['unblock'] ?? () {},
+                backgroundColor: const Color.fromARGB(255, 255, 152, 0), // 橙色
+                foregroundColor: const Color.fromARGB(255, 255, 255, 255),
+              ).withConfirmation(
+                title: 'Unblock User',
+                content: 'Are you sure you want to unblock this user?',
+              ),
+            );
+          }
+          // 如果被對方封鎖（isBlockedByTarget），不顯示任何 Block 相關按鈕
         }
         break;
 
@@ -325,7 +413,6 @@ class ActionBarConfigManager {
 
       case TaskStatus.cancelled:
       case TaskStatus.rejected:
-      default:
         actions.addAll([
           ActionBarAction(
             id: 'report',
@@ -348,6 +435,11 @@ class ActionBarConfigManager {
               ),
         ]);
     }
+
+    // 添加結果調試信息
+    debugPrint('🔍 [ActionBarConfigManager] getActionsForStatus result:');
+    debugPrint('  - actions count: ${actions.length}');
+    debugPrint('  - action IDs: ${actions.map((a) => a.id).toList()}');
 
     return actions;
   }

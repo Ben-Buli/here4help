@@ -243,7 +243,7 @@ class _HighlightedTextDemoState extends State<HighlightedTextDemo> {
   /// 建構功能說明
   Widget _buildFeatureDescription() {
     return Card(
-      color: Theme.of(context).colorScheme.surfaceVariant,
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
