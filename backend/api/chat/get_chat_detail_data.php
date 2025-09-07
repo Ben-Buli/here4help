@@ -92,7 +92,11 @@ try {
 
       -- 創建者評分統計
       creator_stats.avg_rating AS creator_avg_rating,
-      creator_stats.total_reviews AS creator_total_reviews
+      creator_stats.total_reviews AS creator_total_reviews,
+      
+      -- 參與者評分統計
+      participant_stats.avg_rating AS participant_avg_rating,
+      participant_stats.total_reviews AS participant_total_reviews
     FROM chat_rooms cr
     LEFT JOIN tasks t ON t.id = cr.task_id
     LEFT JOIN task_statuses ts ON ts.id = t.status_id
@@ -108,6 +112,14 @@ try {
       FROM task_ratings
       GROUP BY tasker_id
     ) creator_stats ON creator_stats.tasker_id = creator.id
+    LEFT JOIN (
+      SELECT 
+        tasker_id,
+        ROUND(AVG(rating), 1) AS avg_rating,
+        COUNT(*) AS total_reviews
+      FROM task_ratings
+      GROUP BY tasker_id
+    ) participant_stats ON participant_stats.tasker_id = participant.id
     WHERE cr.id = ? AND (cr.creator_id = ? OR cr.participant_id = ?)
     LIMIT 1
   ";
@@ -153,14 +165,16 @@ try {
 
   // 生成對方資訊
   if ($user_role === 'creator') {
+    // 創建者視角：對方是參與者
     $partner = [
       'id' => (int)$row['participant_id'],
       'name' => $row['participant_name'],
       'avatar' => $row['participant_avatar'],
-      'rating' => null, // 參與者評分統計可以後續添加
-      'reviewsCount' => null,
+      'rating' => $row['participant_avg_rating'] ? (float)$row['participant_avg_rating'] : null,
+      'reviewsCount' => $row['participant_total_reviews'] ? (int)$row['participant_total_reviews'] : null,
     ];
   } else {
+    // 參與者視角：對方是創建者
     $partner = [
       'id' => (int)$row['creator_id'],
       'name' => $row['creator_name'],

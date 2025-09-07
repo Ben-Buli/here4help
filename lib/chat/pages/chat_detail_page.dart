@@ -18,8 +18,12 @@ import 'package:here4help/task/models/resume_data.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/chat/services/chat_service.dart';
 import 'package:here4help/services/rating_service.dart';
+import 'package:here4help/services/user_info_service.dart';
 import 'package:here4help/chat/services/socket_service.dart';
 import 'package:here4help/services/wallet_service.dart';
+import 'package:here4help/chat/services/chat_storage_service.dart';
+import 'package:here4help/chat/services/chat_preload_service.dart';
+import 'package:here4help/chat/services/chat_session_manager.dart';
 import 'package:provider/provider.dart';
 
 import 'package:photo_view/photo_view.dart';
@@ -27,7 +31,6 @@ import 'package:here4help/utils/path_mapper.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'dart:ui';
 import 'package:here4help/services/notification_service.dart';
-import 'package:here4help/chat/services/chat_storage_service.dart';
 import 'package:here4help/chat/providers/chat_list_provider.dart';
 import 'package:here4help/widgets/dispute_dialog.dart';
 import 'package:here4help/chat/widgets/disagree_completion_dialog.dart';
@@ -405,8 +408,17 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     // 優先從 chat_partner_info 獲取評分數據
     final chatPartnerInfo = _chatPartnerInfo;
     if (chatPartnerInfo != null) {
+      // 🔍 調試：輸出完整的 chat_partner_info
+      debugPrint(
+          '🔍 [_getOpponentRating] chat_partner_info 完整內容: $chatPartnerInfo');
+
       final rating = chatPartnerInfo['rating'];
       final reviewsCount = chatPartnerInfo['reviewsCount'];
+
+      debugPrint(
+          '🔍 [_getOpponentRating] rating: $rating (類型: ${rating.runtimeType})');
+      debugPrint(
+          '🔍 [_getOpponentRating] reviewsCount: $reviewsCount (類型: ${reviewsCount.runtimeType})');
 
       if (rating != null && reviewsCount != null) {
         final avgRating = rating is double
@@ -417,12 +429,174 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             : (reviewsCount is num ? reviewsCount.toInt() : 0);
         debugPrint('✅ 從 chat_partner_info 獲取評分: $avgRating ($count 評論)');
         return (avgRating, count);
+      } else {
+        debugPrint('⚠️ [_getOpponentRating] rating 或 reviewsCount 為 null');
       }
+    } else {
+      debugPrint('⚠️ [_getOpponentRating] chat_partner_info 為 null');
     }
 
     // 備用方案：使用緩存的評分數據
     debugPrint('⚠️ 使用緩存的評分數據: $_opponentAvgRating ($_opponentReviewsCount 評論)');
     return (_opponentAvgRating, _opponentReviewsCount);
+  }
+
+  /// 🔧 新增：異步取得應徵者（participant）完整資料的方法
+  /// 返回 (姓名, 頭像URL, 平均評分, 評論數量)
+  Future<(String, String?, double, int)> _getParticipantInfoAsync() async {
+    try {
+      final room = _room;
+      if (room == null) {
+        debugPrint('❌ [_getParticipantInfoAsync] _room 為 null');
+        return ('Applicant', null, 0.0, 0);
+      }
+
+      // 取得 participant_id
+      final participantId = room['participant_id'];
+      final int? participantIdInt = (participantId is int)
+          ? participantId
+          : int.tryParse('$participantId');
+
+      debugPrint(
+          '🔍 [_getParticipantInfoAsync] participant_id: $participantIdInt');
+
+      if (participantIdInt == null) {
+        debugPrint('❌ [_getParticipantInfoAsync] 無法解析 participant_id');
+        return ('Applicant', null, 0.0, 0);
+      }
+
+      // 判斷當前用戶角色來決定資料來源
+      if (_userRole == 'creator') {
+        // 如果我是創建者，participant 就是對方，優先使用 chat_partner_info
+        final chatPartnerInfo = _chatPartnerInfo;
+        if (chatPartnerInfo != null) {
+          final name =
+              chatPartnerInfo['name']?.toString().trim() ?? 'Applicant';
+          final avatar =
+              chatPartnerInfo['avatar_url'] ?? chatPartnerInfo['avatar'];
+          final rating = chatPartnerInfo['rating'];
+          final reviewsCount = chatPartnerInfo['reviewsCount'];
+
+          // 🔍 調試：輸出 chat_partner_info 的完整內容
+          debugPrint(
+              '🔍 [_getParticipantInfoAsync] chat_partner_info 完整內容: $chatPartnerInfo');
+          debugPrint(
+              '🔍 [_getParticipantInfoAsync] rating 原始值: $rating (類型: ${rating.runtimeType})');
+          debugPrint(
+              '🔍 [_getParticipantInfoAsync] reviewsCount 原始值: $reviewsCount (類型: ${reviewsCount.runtimeType})');
+
+          final avgRating = rating is double
+              ? rating
+              : (rating is num ? rating.toDouble() : 0.0);
+          final count = reviewsCount is int
+              ? reviewsCount
+              : (reviewsCount is num ? reviewsCount.toInt() : 0);
+
+          debugPrint(
+              '✅ [_getParticipantInfoAsync] 創建者視角 - 從 chat_partner_info 獲取應徵者資料');
+          debugPrint('  - 姓名: $name, 評分: $avgRating ($count 評論)');
+
+          return (name, avatar?.toString(), avgRating, count);
+        }
+      }
+
+      // 🔧 新增：通過 UserInfoService API 獲取 participant 的完整資料
+      debugPrint('🔍 [_getParticipantInfoAsync] 通過 API 獲取 participant 完整資料');
+
+      try {
+        final completeInfo =
+            await UserInfoService.getUserCompleteInfo(participantIdInt);
+
+        debugPrint('✅ [_getParticipantInfoAsync] API 獲取成功');
+        debugPrint('  - 姓名: ${completeInfo.$1}');
+        debugPrint('  - 評分: ${completeInfo.$3} (${completeInfo.$4} 評論)');
+
+        return completeInfo;
+      } catch (e) {
+        debugPrint('❌ [_getParticipantInfoAsync] API 獲取失敗: $e');
+
+        // 備用方案：從 room 資料中取得基本資訊
+        final participantName =
+            room['participant_name']?.toString().trim() ?? 'Applicant';
+        final participantAvatar = room['participant_avatar']?.toString();
+
+        debugPrint('⚠️ [_getParticipantInfoAsync] 使用備用方案從 room 資料獲取');
+        return (participantName, participantAvatar, 0.0, 0);
+      }
+    } catch (e) {
+      debugPrint('❌ [_getParticipantInfoAsync] 錯誤: $e');
+      return ('Applicant', null, 0.0, 0);
+    }
+  }
+
+  /// 🔧 保留：同步版本的方法（向後兼容）
+  /// 返回 (姓名, 頭像URL, 平均評分, 評論數量)
+  (String, String?, double, int) _getParticipantInfo() {
+    try {
+      final room = _room;
+      if (room == null) {
+        debugPrint('❌ [_getParticipantInfo] _room 為 null');
+        return ('Applicant', null, 0.0, 0);
+      }
+
+      // 取得 participant_id
+      final participantId = room['participant_id'];
+      final int? participantIdInt = (participantId is int)
+          ? participantId
+          : int.tryParse('$participantId');
+
+      debugPrint('🔍 [_getParticipantInfo] participant_id: $participantIdInt');
+
+      // 判斷當前用戶角色來決定資料來源
+      if (_userRole == 'creator') {
+        // 如果我是創建者，participant 就是對方，使用 chat_partner_info
+        final chatPartnerInfo = _chatPartnerInfo;
+        if (chatPartnerInfo != null) {
+          final name =
+              chatPartnerInfo['name']?.toString().trim() ?? 'Applicant';
+          final avatar =
+              chatPartnerInfo['avatar_url'] ?? chatPartnerInfo['avatar'];
+          final rating = chatPartnerInfo['rating'];
+          final reviewsCount = chatPartnerInfo['reviewsCount'];
+
+          final avgRating = rating is double
+              ? rating
+              : (rating is num ? rating.toDouble() : 0.0);
+          final count = reviewsCount is int
+              ? reviewsCount
+              : (reviewsCount is num ? reviewsCount.toInt() : 0);
+
+          debugPrint(
+              '✅ [_getParticipantInfo] 創建者視角 - 從 chat_partner_info 獲取應徵者資料');
+          debugPrint('  - 姓名: $name, 評分: $avgRating ($count 評論)');
+
+          return (name, avatar?.toString(), avgRating, count);
+        }
+      } else {
+        // 如果我是應徵者，participant 就是我自己，需要從其他地方獲取我的資料
+        // 這種情況下應該不會顯示 Resume Dialog，但為了完整性還是處理
+        debugPrint('⚠️ [_getParticipantInfo] 應徵者視角 - 不應該顯示自己的 Resume');
+
+        // 從 room 資料中取得 participant 資訊
+        final participantName = room['participant_name']?.toString().trim() ??
+            '${room['participant_name']?.toString().trim()}(You)';
+        final participantAvatar = room['participant_avatar']?.toString();
+
+        // 從 RatingService 獲取評分（如果需要的話）
+        return (participantName, participantAvatar, 0.0, 0);
+      }
+
+      // 備用方案：從 room 資料中取得
+      final participantName =
+          room['participant_name']?.toString().trim() ?? 'Applicant';
+      final participantAvatar = room['participant_avatar']?.toString();
+
+      debugPrint('⚠️ [_getParticipantInfo] 使用備用方案從 room 資料獲取');
+      return (participantName, participantAvatar, 0.0, 0);
+    } catch (e) {
+      debugPrint('❌ [_getParticipantInfo] 錯誤: $e');
+      return ('Applicant', null, 0.0, 0);
+    }
   }
 
   // 移除未使用的 _getRoomCreatorId 以消除警告
@@ -1012,6 +1186,26 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   // 已移除 _pickAndSendPhoto - 使用新的圖片上傳邏輯
 
+  /// 🔧 清除聊天室相關快取
+  Future<void> _clearChatCache(String roomId) async {
+    try {
+      debugPrint('🧹 清除聊天室快取: roomId=$roomId');
+
+      // 清除 SharedPreferences 快取
+      await ChatStorageService.clearChatRoomData(roomId);
+
+      // 清除預載入快取
+      ChatPreloadService.clearPreloadedData(roomId);
+
+      // 清除會話快取
+      await ChatSessionManager.clearCurrentChatSession();
+
+      debugPrint('✅ 聊天室快取清除完成');
+    } catch (e) {
+      debugPrint('⚠️ 清除快取時發生錯誤: $e');
+    }
+  }
+
   /// 初始化聊天室
   Future<void> _initializeChat() async {
     try {
@@ -1033,6 +1227,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       }
 
       debugPrint('🔍 初始化聊天室，room_id: $roomId');
+
+      // 🔧 清除快取以確保獲取最新資料（用於測試評分修復）
+      await _clearChatCache(roomId);
 
       // 使用聚合 API 獲取聊天室數據
       final chatData = await ChatService().getChatDetailData(roomId: roomId);
@@ -2110,8 +2307,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   // 已移除 _getApplicationData - 使用聚合 API 數據
 
   /// 顯示新的結構化 Resume 對話框
-  void _showResumeDialog(ResumeData resumeData) {
-    final (avgRating, reviewsCount) = _getOpponentRating();
+  void _showResumeDialog(ResumeData resumeData) async {
+    // 🔧 修復：始終取得應徵者（participant）的資料，而非對方資料
+    final (participantName, participantAvatar, avgRating, reviewsCount) =
+        await _getParticipantInfoAsync();
 
     showDialog(
       context: context,
@@ -2147,13 +2346,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                 children: [
                   CircleAvatar(
                     radius: 25,
-                    backgroundImage: _opponentAvatarUrlCached != null
-                        ? ImageHelper.getAvatarImage(_opponentAvatarUrlCached!)
+                    backgroundImage: participantAvatar != null
+                        ? ImageHelper.getAvatarImage(participantAvatar)
                         : null,
-                    backgroundColor: _getAvatarColor(_opponentNameCached),
-                    child: _opponentAvatarUrlCached == null
+                    backgroundColor: _getAvatarColor(participantName),
+                    child: participantAvatar == null
                         ? Text(
-                            _getInitials(_opponentNameCached),
+                            _getInitials(participantName),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -2168,7 +2367,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _opponentNameCached,
+                          participantName,
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
