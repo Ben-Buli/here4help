@@ -1112,6 +1112,11 @@ class TaskService extends ChangeNotifier {
     required int userId,
     required int posterId,
   }) async {
+    debugPrint('🔍 [rejectApplication] 開始執行');
+    debugPrint('  - taskId: $taskId');
+    debugPrint('  - userId: $userId');
+    debugPrint('  - posterId: $posterId');
+
     // 獲取用戶 token
     final token = await AuthService.getToken();
     if (token == null) {
@@ -1124,6 +1129,9 @@ class TaskService extends ChangeNotifier {
       'poster_id': posterId,
     };
 
+    debugPrint('  - request body: $body');
+    debugPrint('  - API URL: ${AppConfig.applicationRejectUrl}');
+
     final resp = await http
         .post(
           Uri.parse(AppConfig.applicationRejectUrl),
@@ -1135,13 +1143,20 @@ class TaskService extends ChangeNotifier {
         )
         .timeout(const Duration(seconds: 30));
 
+    debugPrint('  - response status: ${resp.statusCode}');
+    debugPrint('  - response body: ${resp.body}');
+
     if (resp.statusCode == 200) {
       final data = jsonDecode(resp.body);
       if (data['success'] == true) {
+        debugPrint('✅ [rejectApplication] 成功完成');
         return Map<String, dynamic>.from(data['data'] ?? {});
       }
+      debugPrint('❌ [rejectApplication] API 返回失敗: ${data['message']}');
       throw Exception(data['message'] ?? 'Reject failed');
     } else {
+      debugPrint('❌ [rejectApplication] HTTP 錯誤: ${resp.statusCode}');
+      debugPrint('  - response body: ${resp.body}');
       throw Exception('HTTP ${resp.statusCode}: Reject failed');
     }
   }
@@ -1354,8 +1369,13 @@ class TaskService extends ChangeNotifier {
     required int applicantUserId,
   }) async {
     try {
+      debugPrint('🔍 [rejectApplicationFromChat] 開始執行');
+      debugPrint('  - taskId: $taskId');
+      debugPrint('  - applicantUserId: $applicantUserId');
+
       // 獲取用戶 token
       final token = await AuthService.getToken();
+      debugPrint('  - token: ${token != null ? 'found' : 'null'}');
       if (token == null) {
         throw Exception('User not authenticated');
       }
@@ -1363,20 +1383,31 @@ class TaskService extends ChangeNotifier {
       // 獲取當前用戶 ID 作為 poster_id
       // 使用 AuthService.getUserData() 方法來獲取用戶信息
       final userData = await AuthService.getUserData();
+      debugPrint('  - userData: $userData');
       if (userData == null) {
         throw Exception('Current user not found');
       }
 
+      if (userData['id'] == null) {
+        debugPrint('❌ [rejectApplicationFromChat] userData[\'id\'] is null');
+        throw Exception('User ID not found in user data');
+      }
+
       final posterId = userData['id'] as int;
+      debugPrint('  - posterId: $posterId');
 
       // 調用現有的 rejectApplication 方法
-      return await rejectApplication(
+      debugPrint('🔍 [rejectApplicationFromChat] 呼叫 rejectApplication');
+      final result = await rejectApplication(
         taskId: taskId,
         userId: applicantUserId,
         posterId: posterId,
       );
+
+      debugPrint('✅ [rejectApplicationFromChat] 成功完成');
+      return result;
     } catch (e) {
-      debugPrint('TaskService rejectApplicationFromChat error: $e');
+      debugPrint('❌ [rejectApplicationFromChat] 錯誤: $e');
       throw Exception('Failed to reject application: $e');
     }
   }

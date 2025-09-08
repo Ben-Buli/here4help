@@ -76,6 +76,11 @@ class _DisputeDialogState extends State<DisputeDialog> {
       setState(() {
         _isLoading = false;
       });
+
+      // 顯示用戶友好的錯誤訊息
+      if (mounted) {
+        _showErrorMessage(_getErrorMessage(e));
+      }
     }
   }
 
@@ -88,6 +93,60 @@ class _DisputeDialogState extends State<DisputeDialog> {
     } catch (e) {
       return dateTimeStr;
     }
+  }
+
+  /// 獲取用戶友好的錯誤訊息
+  String _getErrorMessage(dynamic error) {
+    final errorString = error.toString().toLowerCase();
+
+    // 檢查常見的錯誤類型
+    if (errorString.contains('404') || errorString.contains('not found')) {
+      return '服務暫時無法使用，請稍後再試';
+    }
+
+    if (errorString.contains('network') || errorString.contains('connection')) {
+      return '網路連線異常，請檢查網路設定';
+    }
+
+    if (errorString.contains('timeout')) {
+      return '請求逾時，請稍後再試';
+    }
+
+    if (errorString.contains('unauthorized') || errorString.contains('401')) {
+      return '登入已過期，請重新登入';
+    }
+
+    if (errorString.contains('forbidden') || errorString.contains('403')) {
+      return '您沒有權限執行此操作';
+    }
+
+    if (errorString.contains('already exists') ||
+        errorString.contains('duplicate')) {
+      return '此任務已存在爭議記錄';
+    }
+
+    // 預設錯誤訊息
+    return '操作失敗，請稍後再試';
+  }
+
+  /// 顯示錯誤訊息
+  void _showErrorMessage(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(
+          label: '確定',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _submitDispute() async {
@@ -126,12 +185,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
         debugPrint('DisputeDialog: Dispute Submission Failed: $e');
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Dispute Submission Failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorMessage(_getErrorMessage(e));
       }
     } finally {
       if (mounted) {
@@ -162,7 +216,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
           children: [
             Icon(Icons.info_outline, color: Colors.orange),
             SizedBox(width: 8),
-            Text('Dispute Already Exists'),
+            Text('Dispute Status'),
           ],
         ),
         content: Column(
@@ -170,7 +224,7 @@ class _DisputeDialogState extends State<DisputeDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-                'This task has already been submitted for dispute, and cannot be submitted again.'),
+                'This task has already been submitted for dispute, please wait for the administrator to review.'),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
@@ -181,22 +235,52 @@ class _DisputeDialogState extends State<DisputeDialog> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Dispute ID: ${_existingDispute!['id']}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  Row(
+                    children: [
+                      const Text(
+                        'Dispute Status: ',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        '${_existingDispute!['status']}',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    'Status: ${_existingDispute!['status']}',
-                    style: const TextStyle(fontSize: 14),
+                  Row(
+                    children: [
+                      const Text(
+                        'Submitted Time: ',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        _formatDateTime(_existingDispute!['created_at']),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    'Submitted Time: ${_formatDateTime(_existingDispute!['created_at'])}',
-                    style: const TextStyle(fontSize: 14),
+                  Row(
+                    children: [
+                      const Text(
+                        'Last Updated Time: ',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        _formatDateTime(_existingDispute!['updated_at']),
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ],
                   ),
                 ],
               ),

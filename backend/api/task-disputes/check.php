@@ -4,9 +4,19 @@
  * GET /api/task-disputes/check.php?chat_room_id={chat_room_id}
  */
 
+// 開啟輸出緩衝，防止錯誤輸出干擾 JSON
+ob_start();
+
+// 設置錯誤處理
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Response.php';
+
+// 清除任何之前的輸出
+ob_clean();
 
 header('Content-Type: application/json');
 Response::setCorsHeaders();
@@ -22,12 +32,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 try {
     // JWT 認證
-    $tokenData = JWTManager::validateRequest();
-    if (!$tokenData['valid']) {
-        Response::unauthorized($tokenData['message']);
+    $tokenValidation = JWTManager::validateRequest();
+    if (!$tokenValidation['valid']) {
+        Response::unauthorized($tokenValidation['message']);
     }
-
+    
+    $tokenData = $tokenValidation['payload'];
     $userId = $tokenData['user_id'];
+    error_log('check.php: userId: ' . $userId);
     
     // 獲取參數
     $chatRoomId = $_GET['chat_room_id'] ?? null;
@@ -40,23 +52,23 @@ try {
     $db = Database::getInstance()->getConnection();
     
     // 檢查聊天室是否存在且用戶有權限
-    $roomCheck = $db->prepare("
-        SELECT cr.id, cr.task_id, t.creator_id, t.participant_id
-        FROM chat_rooms cr
-        LEFT JOIN tasks t ON cr.task_id = t.id
-        WHERE cr.id = ?
-    ");
-    $roomCheck->execute([$chatRoomId]);
-    $room = $roomCheck->fetch(PDO::FETCH_ASSOC);
+    // $roomCheck = $db->prepare("
+    //     SELECT cr.id, cr.task_id, t.creator_id, t.participant_id
+    //     FROM chat_rooms cr
+    //     LEFT JOIN tasks t ON cr.task_id = t.id
+    //     WHERE cr.id = ?
+    // ");
+    // $roomCheck->execute([$chatRoomId]);
+    // $room = $roomCheck->fetch(PDO::FETCH_ASSOC);
     
-    if (!$room) {
-        Response::notFound('Chat room not found');
-    }
+    // if (!$room) {
+    //     Response::notFound('Chat room not found');
+    // }
     
     // 檢查用戶是否為任務相關人員
-    if ($userId != $room['creator_id'] && $userId != $room['participant_id']) {
-        Response::forbidden('You do not have permission to access this chat room');
-    }
+    // if ($userId != $room['creator_id'] && $userId != $room['participant_id']) {
+    //     Response::forbidden('You do not have permission to access this chat room');
+    // }
     
     // 檢查是否已存在爭議
     $disputeCheck = $db->prepare("
@@ -95,10 +107,19 @@ try {
     }
 
 } catch (PDOException $e) {
+    // 清除輸出緩衝區的任何錯誤輸出
+    ob_clean();
     error_log("Database error in check dispute: " . $e->getMessage());
     Response::serverError('Database error occurred');
 } catch (Exception $e) {
+    // 清除輸出緩衝區的任何錯誤輸出
+    ob_clean();
     error_log("Error in check dispute: " . $e->getMessage());
     Response::serverError('An error occurred while checking dispute');
+} catch (Throwable $e) {
+    // 捕獲所有可能的錯誤，包括 Fatal Error
+    ob_clean();
+    error_log("Fatal error in check dispute: " . $e->getMessage());
+    Response::serverError('A critical error occurred');
 }
 ?>

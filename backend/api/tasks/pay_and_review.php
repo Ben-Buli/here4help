@@ -84,7 +84,7 @@ try {
       );
       $db->query(
         "INSERT INTO chat_messages (room_id, from_user_id, content, kind, created_at) VALUES (?, ?, ?, 'system', NOW())",
-        [(int)$room['id'], $actor_id, $content]
+        [(int)$room['id'], 1, $content] // 使用系統帳號 ID (1)
       );
       
       // 獲取插入的訊息ID

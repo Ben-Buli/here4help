@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 
 /// Action Bar 動作定義
 class ActionBarAction {
@@ -107,16 +108,12 @@ class ActionBarConfigManager {
     bool isBlockedByTarget = false, // 對方是否封鎖了我
     bool hasExistingReview = false, // 是否已有評分
   }) {
-    // 添加詳細的調試信息
-    debugPrint('🔍 [ActionBarConfigManager] getActionsForStatus called:');
-    debugPrint('  - userRole: $userRole');
-    debugPrint('  - taskStatus: $taskStatus');
-    debugPrint('  - applicationStatus: $applicationStatus');
-    debugPrint('  - isBlocked: $isBlocked');
-    debugPrint('  - isBlockedByMe: $isBlockedByMe');
-    debugPrint('  - isBlockedByTarget: $isBlockedByTarget');
-    debugPrint('  - hasExistingReview: $hasExistingReview');
-    debugPrint('  - actionCallbacks keys: ${actionCallbacks.keys.toList()}');
+    // 減少調試信息輸出頻率，避免刷屏
+    // 只在狀態變化時輸出調試信息（靜態變數用於狀態比較）
+    if (kDebugMode) {
+      // 簡化調試輸出，只顯示關鍵信息
+      debugPrint('🔍 [ActionBar] $userRole/$taskStatus/$applicationStatus');
+    }
 
     final actions = <ActionBarAction>[];
 
@@ -337,10 +334,11 @@ class ActionBarConfigManager {
         ]);
     }
 
-    // 添加結果調試信息
-    debugPrint('🔍 [ActionBarConfigManager] _getCreatorActions result:');
-    debugPrint('  - actions count: ${actions.length}');
-    debugPrint('  - action IDs: ${actions.map((a) => a.id).toList()}');
+    // 簡化結果調試信息
+    if (kDebugMode && actions.isNotEmpty) {
+      debugPrint(
+          '✅ [Creator] ${actions.length} actions: ${actions.map((a) => a.id).join(', ')}');
+    }
 
     return actions;
   }
@@ -468,10 +466,11 @@ class ActionBarConfigManager {
         break;
     }
 
-    // 添加結果調試信息
-    debugPrint('🔍 [ActionBarConfigManager] _getParticipantActions result:');
-    debugPrint('  - actions count: ${actions.length}');
-    debugPrint('  - action IDs: ${actions.map((a) => a.id).toList()}');
+    // 簡化結果調試信息
+    if (kDebugMode && actions.isNotEmpty) {
+      debugPrint(
+          '✅ [Participant] ${actions.length} actions: ${actions.map((a) => a.id).join(', ')}');
+    }
 
     return actions;
   }
@@ -587,7 +586,7 @@ class ActionBarConfigManager {
       case TaskStatus.inProgress:
         return Colors.orange;
       case TaskStatus.pendingConfirmation:
-        return Colors.amber;
+        return const Color.fromARGB(255, 133, 85, 196);
       case TaskStatus.completed:
         return Colors.green;
       case TaskStatus.dispute:
@@ -625,7 +624,7 @@ class ActionBarConfigManager {
       case TaskApplicationStatus.accepted:
         return Colors.orange;
       case TaskApplicationStatus.pending:
-        return Colors.amber;
+        return const Color.fromARGB(255, 133, 85, 196);
       case TaskApplicationStatus.completed:
         return Colors.green;
       case TaskApplicationStatus.dispute:

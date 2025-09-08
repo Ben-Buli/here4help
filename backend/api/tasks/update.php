@@ -112,7 +112,8 @@ try {
                 );
                 if ($room && isset($room['id'])) {
                     $content = 'Task marked as completed and is now pending confirmation.';
-                    $systemUserId = $actorId ?: 1; // 使用操作者ID，如果沒有則使用系統ID 1
+                    // 修正：系統訊息應該使用系統帳號 ID (1)，而不是操作者 ID
+                    $systemUserId = 1; // 固定使用系統帳號
                     $db->query(
                         "INSERT INTO chat_messages (room_id, from_user_id, content, kind, created_at) VALUES (?, ?, ?, 'system', NOW())",
                         [(int)$room['id'], $systemUserId, $content]
@@ -145,7 +146,7 @@ try {
                 
                 // 發送新訊息通知（如果有插入系統訊息）
                 if (isset($messageId) && $messageId && $roomId) {
-                    $systemUserId = $actorId ?: 1; // 使用操作者ID，如果沒有則使用系統ID 1
+                    $systemUserId = 1; // 固定使用系統帳號 ID
                     $socketNotifier->notifyNewMessage($roomId, $messageId, $content, $systemUserId, 'system', $userIds);
                 }
             } catch (Exception $e) {

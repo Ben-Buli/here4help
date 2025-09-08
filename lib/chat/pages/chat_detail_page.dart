@@ -6,6 +6,7 @@ import 'package:here4help/chat/services/global_chat_room.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:here4help/constants/task_status.dart' as TaskStatusConstants;
 import 'package:here4help/chat/widgets/dynamic_action_bar.dart';
+import 'package:here4help/chat/widgets/countdown_timer_widget.dart';
 import 'package:here4help/chat/utils/action_bar_config.dart';
 import 'package:here4help/chat/utils/application_status_utils.dart';
 import 'package:here4help/services/error_handler_service.dart';
@@ -34,7 +35,6 @@ import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/chat/providers/chat_list_provider.dart';
 import 'package:here4help/widgets/dispute_dialog.dart';
 import 'package:here4help/chat/widgets/disagree_completion_dialog.dart';
-import 'package:here4help/chat/widgets/confirm_completion_dialog.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:here4help/chat/models/image_tray_item.dart';
 import 'package:here4help/chat/models/pending_image_message.dart';
@@ -48,6 +48,7 @@ import 'package:here4help/widgets/support_timeline_dialog.dart';
 import 'package:here4help/widgets/support_solved_dialog.dart';
 import 'package:here4help/widgets/review_dialog.dart';
 import 'package:here4help/widgets/block_user_dialog.dart';
+import 'package:go_router/go_router.dart';
 
 class ChatDetailPage extends StatefulWidget {
   const ChatDetailPage({super.key, this.data});
@@ -817,12 +818,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   late String joinTime;
 
-  // 新增狀態變數
-  late Duration remainingTime;
-  late DateTime taskPendingStart;
-  late DateTime taskPendingEnd;
-  late Ticker countdownTicker;
-  bool countdownCompleted = false;
+  // 倒數計時相關變數（使用 CountdownTimerWidget）
+  DateTime? _countdownEndTime;
+  bool _isCountdownActive = false;
 
   @override
   void initState() {
@@ -991,9 +989,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       }
 
       // 重新獲取聊天室數據以更新任務狀態
-      final chatData = await ChatService().getChatDetailData(roomId: roomId);
+      final rawChatData = await ChatService().getChatDetailData(roomId: roomId);
 
-      if (chatData.isNotEmpty && mounted) {
+      if (rawChatData.isNotEmpty && mounted) {
+        // 🔧 修復：應用應徵狀態映射修正
+        final chatData = _fixApplicationStatusMapping(rawChatData);
         final newTask = chatData['task'];
         final currentTask = _task;
 
@@ -1003,7 +1003,21 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         final currentAppStatus = currentTask?['application']?['status'];
         final newAppStatus = newTask?['application']?['status'];
 
-        if (currentStatus != newStatus || currentAppStatus != newAppStatus) {
+        // 🔍 詳細調試信息
+        debugPrint('🔍 [_refreshTaskStatusOnExpand] 狀態比較:');
+        debugPrint(
+            '  - 任務狀態: $currentStatus → $newStatus (變化: ${currentStatus != newStatus})');
+        debugPrint(
+            '  - 應徵狀態: $currentAppStatus → $newAppStatus (變化: ${currentAppStatus != newAppStatus})');
+        debugPrint(
+            '  - 整體變化: ${currentStatus != newStatus || currentAppStatus != newAppStatus}');
+
+        // 檢查是否有實質性變化（排除 null 值的干擾）
+        final hasTaskStatusChange = currentStatus != newStatus;
+        final hasAppStatusChange = currentAppStatus != newAppStatus;
+        final hasRealChange = hasTaskStatusChange || hasAppStatusChange;
+
+        if (hasRealChange) {
           debugPrint('📊 [ChatDetailPage] 檢測到任務狀態變化:');
           debugPrint('  - 任務狀態: $currentStatus → $newStatus');
           debugPrint('  - 應徵狀態: $currentAppStatus → $newAppStatus');
@@ -1298,6 +1312,47 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
+  @override
+  void dispose() {
+    // 最後一次保險：離開時嘗試標記到目前列表最後一則
+    try {
+      if (_currentRoomId != null && _chatMessages.isNotEmpty) {
+        final lastIdRaw = _chatMessages.last['id'];
+        final lastId =
+            (lastIdRaw is int) ? lastIdRaw : int.tryParse('$lastIdRaw') ?? 0;
+        if (lastId > 0) {
+          NotificationCenter()
+              .service
+              .markRoomRead(roomId: _currentRoomId!, upToMessageId: '$lastId');
+          // 立即同步 Provider
+          try {
+            final provider = context.read<ChatListProvider>();
+            provider.markRoomRead(_currentRoomId!);
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+
+    // 離開 Socket.IO 房間
+    if (_currentRoomId != null) {
+      _socketService.leaveRoom(_currentRoomId!);
+    }
+
+    // 清理倒數計時相關資源（CountdownTimerWidget 會自動清理自己的 ticker）
+    _countdownEndTime = null;
+    _isCountdownActive = false;
+
+    // 清理其他資源
+    _controller.dispose();
+    _focusNode.dispose();
+    _listController.dispose();
+
+    // 清理圖片上傳管理器
+    _imageUploadManager?.dispose();
+
+    super.dispose();
+  }
+
   /// 初始化聊天室
   Future<void> _initializeChat() async {
     try {
@@ -1382,73 +1437,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         // 更新任務狀態相關數據
         final task = chatData['task'];
         if (task != null) {
-          setState(() {
-            // 只在真正需要倒計時時才啟動，避免不必要的通知
-            if (task['status']?['code'] == 'pending_confirmation_tasker') {
-              // 檢查是否真的需要倒計時（避免測試數據觸發）
-              final taskCreatedAt = task['created_at'];
-              if (taskCreatedAt != null) {
-                try {
-                  final createdAt = DateTime.parse(taskCreatedAt);
-                  final now = DateTime.now();
-                  final timeSinceCreation = now.difference(createdAt);
-
-                  // 只有在創建時間合理範圍內才啟動倒計時
-                  if (timeSinceCreation.inDays < 30) {
-                    // 30天內的任務才考慮倒計時
-                    taskPendingStart = DateTime.now();
-                    taskPendingEnd =
-                        taskPendingStart.add(const Duration(seconds: 5));
-                    remainingTime = taskPendingEnd.difference(DateTime.now());
-                    countdownTicker = Ticker(_onTick)..start();
-                  } else {
-                    remainingTime = const Duration();
-                  }
-                } catch (e) {
-                  debugPrint('❌ 解析任務創建時間失敗: $e');
-                  remainingTime = const Duration();
-                }
-              } else {
-                remainingTime = const Duration();
-              }
-            } else if (task['status']?['code'] == 'pending_confirmation') {
-              // 使用 updated_at 作為進入 pending_confirmation 狀態的時間戳記
-              final taskUpdatedAt = task['updated_at'];
-              if (taskUpdatedAt != null) {
-                try {
-                  final updatedAt = DateTime.parse(taskUpdatedAt);
-                  final now = DateTime.now();
-                  final timeSinceUpdate = now.difference(updatedAt);
-
-                  // 計算剩餘時間：updated_at + 7天 - 當下時間
-                  const totalPendingTime = Duration(days: 7);
-                  final remainingTimeFromUpdate =
-                      totalPendingTime - timeSinceUpdate;
-
-                  if (remainingTimeFromUpdate > Duration.zero) {
-                    // 還有剩餘時間，啟動倒數計時
-                    taskPendingStart = updatedAt;
-                    taskPendingEnd = updatedAt.add(totalPendingTime);
-                    remainingTime = remainingTimeFromUpdate;
-                    countdownTicker = Ticker(_onTick)..start();
-                    debugPrint(
-                        '⏰ 啟動 pending_confirmation 倒數計時: ${remainingTime.inDays}天 ${remainingTime.inHours.remainder(24)}小時 ${remainingTime.inMinutes.remainder(60)}分鐘');
-                  } else {
-                    // 時間已到，應該自動完成
-                    remainingTime = Duration.zero;
-                    debugPrint('⏰ pending_confirmation 時間已到，應該自動完成任務');
-                  }
-                } catch (e) {
-                  debugPrint('❌ 解析任務更新時間失敗: $e');
-                  remainingTime = const Duration();
-                }
-              } else {
-                remainingTime = const Duration();
-              }
-            } else {
-              remainingTime = const Duration();
-            }
-          });
+          // 計算倒數計時結束時間（不觸發 setState）
+          _calculateCountdownEndTime(task);
         }
 
         // 載入聊天訊息
@@ -1671,8 +1661,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final statusCode = _task!['status']?['code'];
 
     // 更新倒數計時相關狀態
-    if (statusCode == 'pending_confirmation') {
-      _startCountdownIfNeeded();
+    if (statusCode == 'pending_confirmation' ||
+        statusCode == 'pending_confirmation_tasker') {
+      _calculateCountdownEndTime(_task!);
     } else {
       _stopCountdown();
     }
@@ -1681,68 +1672,74 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         '✅ [ChatDetailPage] Derived states updated for status: $statusCode');
   }
 
-  /// 開始倒數計時（如果需要）
-  void _startCountdownIfNeeded() {
-    if (_task == null) return;
+  /// 計算倒數計時結束時間
+  void _calculateCountdownEndTime(Map<String, dynamic> task) {
+    final statusCode = task['status']?['code'];
 
-    final statusCode = _task!['status']?['code'];
-    if (statusCode != 'pending_confirmation') return;
+    if (statusCode == 'pending_confirmation_tasker') {
+      // pending_confirmation_tasker 狀態的倒數計時
+      final taskCreatedAt = task['created_at'];
+      if (taskCreatedAt != null) {
+        try {
+          final createdAt = DateTime.parse(taskCreatedAt);
+          final now = DateTime.now();
+          final timeSinceCreation = now.difference(createdAt);
 
-    // 停止現有的倒數計時
-    if (countdownTicker.isActive) {
-      countdownTicker.stop();
-    }
-
-    // 重新計算倒數計時參數
-    final taskUpdatedAt = _task!['updated_at'];
-    if (taskUpdatedAt != null) {
-      try {
-        final updatedAt = DateTime.parse(taskUpdatedAt);
-        final now = DateTime.now();
-        final timeSinceUpdate = now.difference(updatedAt);
-
-        // 計算剩餘時間：updated_at + 7天 - 當下時間
-        const totalPendingTime = Duration(days: 7);
-        final remainingTimeFromUpdate = totalPendingTime - timeSinceUpdate;
-
-        if (remainingTimeFromUpdate > Duration.zero) {
-          // 還有剩餘時間，啟動倒數計時
-          setState(() {
-            taskPendingStart = updatedAt;
-            taskPendingEnd = updatedAt.add(totalPendingTime);
-            remainingTime = remainingTimeFromUpdate;
-            countdownCompleted = false; // 重置完成標記
-          });
-
-          countdownTicker = Ticker(_onTick)..start();
-          debugPrint(
-              '⏰ 重新啟動 pending_confirmation 倒數計時: ${remainingTime.inDays}天 ${remainingTime.inHours.remainder(24)}小時 ${remainingTime.inMinutes.remainder(60)}分鐘');
-        } else {
-          // 時間已到，應該自動完成
-          setState(() {
-            remainingTime = Duration.zero;
-          });
-          debugPrint('⏰ pending_confirmation 時間已到，應該自動完成任務');
+          // 只有在創建時間合理範圍內才啟動倒計時
+          if (timeSinceCreation.inDays < 30) {
+            _countdownEndTime = DateTime.now().add(const Duration(seconds: 5));
+            _isCountdownActive = true;
+            debugPrint(
+                '⏰ 設置 pending_confirmation_tasker 倒數計時，結束時間: $_countdownEndTime');
+            debugPrint('⏰ 剩餘時間: 5秒（測試用）');
+          } else {
+            _countdownEndTime = null;
+            _isCountdownActive = false;
+          }
+        } catch (e) {
+          debugPrint('❌ 解析任務創建時間失敗: $e');
+          _countdownEndTime = null;
+          _isCountdownActive = false;
         }
-      } catch (e) {
-        debugPrint('❌ 解析任務更新時間失敗: $e');
-        setState(() {
-          remainingTime = const Duration();
-        });
+      }
+    } else if (statusCode == 'pending_confirmation') {
+      // pending_confirmation 狀態的倒數計時
+      final taskUpdatedAt = task['updated_at'];
+      if (taskUpdatedAt != null) {
+        try {
+          final updatedAt = DateTime.parse(taskUpdatedAt);
+          const totalPendingTime = Duration(days: 7);
+          final endTime = updatedAt.add(totalPendingTime);
+
+          if (endTime.isAfter(DateTime.now())) {
+            _countdownEndTime = endTime;
+            _isCountdownActive = true;
+            final remaining = endTime.difference(DateTime.now());
+            debugPrint('⏰ 設置 pending_confirmation 倒數計時，結束時間: $endTime');
+            debugPrint(
+                '⏰ 剩餘時間: ${remaining.inDays}天 ${remaining.inHours.remainder(24)}小時 ${remaining.inMinutes.remainder(60)}分鐘');
+          } else {
+            _countdownEndTime = null;
+            _isCountdownActive = false;
+            debugPrint('⏰ pending_confirmation 時間已到，應該自動完成任務');
+          }
+        } catch (e) {
+          debugPrint('❌ 解析任務更新時間失敗: $e');
+          _countdownEndTime = null;
+          _isCountdownActive = false;
+        }
       }
     } else {
-      setState(() {
-        remainingTime = const Duration();
-      });
+      _countdownEndTime = null;
+      _isCountdownActive = false;
     }
   }
 
   /// 停止倒數計時
   void _stopCountdown() {
-    if (countdownTicker.isActive) {
-      debugPrint('🛑 [ChatDetailPage] Stopping countdown');
-      countdownTicker.stop();
-    }
+    _countdownEndTime = null;
+    _isCountdownActive = false;
+    debugPrint('🛑 [ChatDetailPage] Stopping countdown');
   }
 
   /// 處理應徵狀態更新 - 純局部更新版本
@@ -2167,26 +2164,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   // 已移除 _getCurrentUserInfo - 使用 UserService 替代
 
-  void _onTick(Duration elapsed) {
-    final now = DateTime.now();
-    final remain = taskPendingEnd.difference(now);
-    if (remain <= Duration.zero && !countdownCompleted) {
-      countdownCompleted = true;
-      countdownTicker.stop();
-
-      debugPrint('⏰ 倒數計時結束，開始執行自動完成流程');
-
-      // 執行自動完成流程
-      _executeAutoComplete();
-    } else if (!countdownCompleted) {
-      // 只有當剩餘時間真正改變時才更新狀態
-      final newRemainingTime = remain > Duration.zero ? remain : Duration.zero;
-      if (newRemainingTime.inSeconds != remainingTime.inSeconds) {
-        setState(() {
-          remainingTime = newRemainingTime;
-        });
-      }
-    }
+  /// 倒數計時完成回調
+  void _onCountdownComplete() {
+    debugPrint('⏰ 倒數計時結束，開始執行自動完成流程');
+    _executeAutoComplete();
   }
 
   /// 執行自動完成任務流程
@@ -2206,7 +2187,9 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       if (success) {
         // 2. 更新本地狀態
         setState(() {
-          remainingTime = Duration.zero;
+          // 停止倒數計時
+          _countdownEndTime = null;
+          _isCountdownActive = false;
           if (_task != null) {
             _task!['status'] =
                 TaskStatusConstants.TaskStatus.statusString['completed_tasker'];
@@ -2356,47 +2339,6 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         );
       }
     }
-  }
-
-  @override
-  void dispose() {
-    // 最後一次保險：離開時嘗試標記到目前列表最後一則
-    try {
-      if (_currentRoomId != null && _chatMessages.isNotEmpty) {
-        final lastIdRaw = _chatMessages.last['id'];
-        final lastId =
-            (lastIdRaw is int) ? lastIdRaw : int.tryParse('$lastIdRaw') ?? 0;
-        if (lastId > 0) {
-          NotificationCenter()
-              .service
-              .markRoomRead(roomId: _currentRoomId!, upToMessageId: '$lastId');
-          // 立即同步 Provider
-          try {
-            final provider = context.read<ChatListProvider>();
-            provider.markRoomRead(_currentRoomId!);
-          } catch (_) {}
-        }
-      }
-    } catch (_) {}
-    // 離開 Socket.IO 房間
-    if (_currentRoomId != null) {
-      _socketService.leaveRoom(_currentRoomId!);
-    }
-
-    // 清理計時器
-    if (_task?['status']?['code'] == 'pending_confirmation_tasker' ||
-        _task?['status']?['code'] == 'pending_confirmation') {
-      countdownTicker.dispose();
-    }
-
-    _controller.dispose();
-    _focusNode.dispose();
-
-    // 清理圖片上傳管理器
-    _imageUploadManager?.dispose();
-
-    // 移除狀態 Bar 相關清理
-    super.dispose();
   }
 
   // 已移除 _getApplicationData - 使用聚合 API 數據
@@ -2981,13 +2923,16 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         case 'pending_confirmation_tasker':
           alertContent = Column(
             children: [
-              Text(
-                '⏰ ${remainingTime.inDays}d ${remainingTime.inHours.remainder(24).toString().padLeft(2, '0')}:${remainingTime.inMinutes.remainder(60).toString().padLeft(2, '0')}:${remainingTime.inSeconds.remainder(60).toString().padLeft(2, '0')} until auto complete',
-                style: const TextStyle(
+              if (_isCountdownActive && _countdownEndTime != null)
+                CountdownTimerWidget(
+                  endTime: _countdownEndTime!,
+                  onComplete: _onCountdownComplete,
+                  textStyle: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
-                    color: Colors.red),
-              ),
+                    color: Colors.red,
+                  ),
+                ),
               const SizedBox(height: 4),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
@@ -3006,13 +2951,16 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         case 'pending_confirmation':
           alertContent = Column(
             children: [
-              Text(
-                '⏰ ${remainingTime.inDays}d ${remainingTime.inHours.remainder(24).toString().padLeft(2, '0')}:${remainingTime.inMinutes.remainder(60).toString().padLeft(2, '0')}:${remainingTime.inSeconds.remainder(60).toString().padLeft(2, '0')} until auto complete',
-                style: const TextStyle(
+              if (_isCountdownActive && _countdownEndTime != null)
+                CountdownTimerWidget(
+                  endTime: _countdownEndTime!,
+                  onComplete: _onCountdownComplete,
+                  textStyle: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
-                    color: Colors.red),
-              ),
+                    color: Colors.red,
+                  ),
+                ),
               const SizedBox(height: 4),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
@@ -3568,7 +3516,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       // 刷新聊天室數據
       await _initializeChat();
 
-      // 自動收起 Action Bar
+      // Support 操作完成後自動收起 Action Bar
       if (mounted) {
         setState(() {
           _showActionBar = false;
@@ -3603,7 +3551,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       // 申訴提交成功，刷新頁面資料
       await _initializeChat();
 
-      // 自動收起 Action Bar
+      // 申訴操作完成後自動收起 Action Bar
       if (mounted) {
         setState(() {
           _showActionBar = false;
@@ -3710,12 +3658,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       // 刷新頁面資料
       await _initializeChat();
 
-      // 自動收起 Action Bar
-      if (mounted) {
-        setState(() {
-          _showActionBar = false;
-        });
-      }
+      // 這是 Accept 操作的一部分，已在前面修改過
 
       // 調試：檢查任務狀態是否已更新
       debugPrint('🔍 [Accept] 刷新後任務狀態檢查:');
@@ -3773,8 +3716,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         // 重新載入聊天室狀態以更新 Action Bar
         await _initializeChat();
 
-        // 自動收起 Action Bar
-        if (mounted) {
+        // 只對 creator 自動收起 Action Bar，participant 保持展開狀態
+        if (mounted && _userRole == 'creator') {
           setState(() {
             _showActionBar = false;
           });
@@ -3836,16 +3779,16 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       if (confirmed == true) {
         await ChatService().withdrawApplication(taskId: taskId);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('The application has been withdrawn')),
-          );
+          // ScaffoldMessenger.of(context).showSnackBar(
+          //   const SnackBar(content: Text('The application has been withdrawn')),
+          // );
           // 重新載入聊天室狀態
           await _initializeChat();
 
           // 自動收起 Action Bar
-          setState(() {
-            _showActionBar = false;
-          });
+          // setState(() {
+          //   _showActionBar = false;
+          // });
         }
       }
     } catch (e) {
@@ -3952,10 +3895,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         }
       }
 
-      // 重要：reject 成功後自動返回上一頁
-      if (mounted && Navigator.canPop(context)) {
-        debugPrint('🔙 [Reject] 自動返回上一頁');
-        Navigator.pop(context);
+      // 重要：reject 成功後導航回到聊天列表頁面
+      if (mounted) {
+        debugPrint('🔙 [Reject] 導航回到聊天列表');
+        context.go('/chat');
       }
     } catch (e) {
       ErrorHandlerService.logError(
@@ -4087,8 +4030,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       // 刷新頁面資料以更新任務狀態
       await _initializeChat();
 
-      // 自動收起 Action Bar
-      if (mounted) {
+      // Complete 操作後，只對 participant 自動收起 Action Bar
+      if (mounted && _userRole == 'participant') {
         setState(() {
           _showActionBar = false;
         });
@@ -4102,25 +4045,19 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => ConfirmCompletionDialog(
-        taskId: _task!['id'].toString(),
-        taskTitle: _task!['title']?.toString() ?? 'Unknown Task',
-        onPreview: () => TaskService().confirmCompletion(
-          taskId: _task!['id'].toString(),
-          preview: true,
-        ),
-        onConfirm: () async {
-          await TaskService().confirmCompletion(
-            taskId: _task!['id'].toString(),
-            preview: false,
-          );
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Task confirmed and paid.')),
-            );
-          }
-        },
-      ),
+      barrierDismissible: false,
+      builder: (context) {
+        return _ConfirmPayDialog(
+          task: _task,
+          room: _room,
+          title: 'Confirm Completion',
+          buttonText: 'Confirm & Pay',
+          onPaymentSuccess: () {
+            // 確認完成成功後的回調
+            Navigator.of(context).pop(true);
+          },
+        );
+      },
     );
 
     if (result == true && mounted) {
@@ -4153,8 +4090,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       // 重新載入聊天室狀態以更新 Action Bar
       await _initializeChat();
 
-      // 自動收起 Action Bar
-      if (mounted) {
+      // Confirm 操作後，只對 creator 自動收起 Action Bar
+      if (mounted && _userRole == 'creator') {
         setState(() {
           _showActionBar = false;
         });
@@ -4215,8 +4152,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       // 重新載入聊天室狀態以更新 Action Bar
       await _initializeChat();
 
-      // 自動收起 Action Bar
-      if (mounted) {
+      // Disagree 操作後，只對 creator 自動收起 Action Bar
+      if (mounted && _userRole == 'creator') {
         setState(() {
           _showActionBar = false;
         });
@@ -4713,6 +4650,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         return _ConfirmPayDialog(
           task: _task,
           room: _room,
+          title: 'Confirm & Pay',
+          buttonText: 'Confirm & Pay',
           onPaymentSuccess: () {
             // 付款成功後的回調
             Navigator.of(context).pop(true);
@@ -4752,8 +4691,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       // 重新載入聊天室狀態以更新 Action Bar
       await _initializeChat();
 
-      // 自動收起 Action Bar
-      if (mounted) {
+      // Pay 操作後，只對 creator 自動收起 Action Bar
+      if (mounted && _userRole == 'creator') {
         setState(() {
           _showActionBar = false;
         });
@@ -5126,8 +5065,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       debugPrint('  - application_status: $applicationStatus');
       debugPrint('  - 現有 application: ${task['application']}');
 
-      // 如果有應徵狀態但沒有 application 巢狀結構，創建它
-      if (applicationStatus != null && applicationStatus.isNotEmpty) {
+      // 🔧 改進：處理應徵狀態映射邏輯
+      if (applicationStatus != null &&
+          applicationStatus.isNotEmpty &&
+          applicationStatus != 'null') {
         // 保持現有的 application 數據（如果存在）
         final existingApplication =
             task['application'] as Map<String, dynamic>? ?? {};
@@ -5141,6 +5082,17 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         };
 
         debugPrint('  - 已創建/更新 application 巢狀結構: ${task['application']}');
+      } else {
+        // 🔧 新增：如果 application_status 為 null 或空，但存在現有的 application，保持現有狀態
+        final existingApplication =
+            task['application'] as Map<String, dynamic>?;
+        if (existingApplication != null &&
+            existingApplication['status'] != null) {
+          debugPrint(
+              '  - 保持現有 application 狀態: ${existingApplication['status']}');
+        } else {
+          debugPrint('  - 無有效的應徵狀態數據');
+        }
       }
 
       result['task'] = task;
@@ -6060,11 +6012,15 @@ class _ConfirmPayDialog extends StatefulWidget {
   final Map<String, dynamic>? task;
   final Map<String, dynamic>? room;
   final VoidCallback? onPaymentSuccess;
+  final String? title; // 新增：自定義標題
+  final String? buttonText; // 新增：自定義按鈕文字
 
   const _ConfirmPayDialog({
     required this.task,
     required this.room,
     this.onPaymentSuccess,
+    this.title,
+    this.buttonText,
   });
 
   @override
@@ -6301,11 +6257,11 @@ class _ConfirmPayDialogState extends State<_ConfirmPayDialog> {
               ),
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Confirm & Pay',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      widget.title ?? 'Confirm & Pay',
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ),
                   IconButton(
@@ -6363,7 +6319,7 @@ class _ConfirmPayDialogState extends State<_ConfirmPayDialog> {
                               height: 16,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('Confirm Payment'),
+                          : Text(widget.buttonText ?? 'Confirm & Pay'),
                     ),
                   ),
                 ],
@@ -6464,8 +6420,6 @@ class _ConfirmPayDialogState extends State<_ConfirmPayDialog> {
         const SizedBox(height: 8),
         Row(
           children: [
-            const Text('Rating：'),
-            const SizedBox(width: 8),
             // 使用簡單的星星評分（可以後續改為 flutter_rating_bar）
             ...List.generate(5, (index) {
               return IconButton(

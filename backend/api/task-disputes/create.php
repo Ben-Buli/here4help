@@ -4,10 +4,20 @@
  * POST /api/task-disputes/create.php
  */
 
+// 開啟輸出緩衝，防止錯誤輸出干擾 JSON
+ob_start();
+
+// 設置錯誤處理
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Response.php';
 require_once __DIR__ . '/../../utils/UserActiveLogger.php';
+
+// 清除任何之前的輸出
+ob_clean();
 
 header('Content-Type: application/json');
 Response::setCorsHeaders();
@@ -23,11 +33,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 try {
     // JWT 認證
-    $tokenData = JWTManager::validateRequest();
-    if (!$tokenData['valid']) {
-        Response::unauthorized($tokenData['message']);
+    $tokenValidation = JWTManager::validateRequest();
+    if (!$tokenValidation['valid']) {
+        Response::unauthorized($tokenValidation['message']);
     }
-
+    
+    $tokenData = $tokenValidation['payload'];
     $userId = $tokenData['user_id'];
     
     // 獲取 POST 資料
@@ -102,7 +113,7 @@ try {
             Response::badRequest('Chat room not found or not associated with this task');
         }
         
-        // 檢查是否已存在爭議
+        // 檢查是否已存在爭議 TODO: select 帶入creator_id 除了判斷task_dispute_chat_room_id 還要判斷creator_id是否是當前使用者重複申請
         $existingCheck = $db->prepare("
             SELECT id 
             FROM task_dispute_events 
@@ -205,7 +216,7 @@ try {
         
         $systemMessage->execute([
             $chatRoomId,
-            $userId,
+            1, // 使用系統帳號 ID (1) 而不是操作者 ID
             $messageContent
         ]);
         
@@ -223,10 +234,19 @@ try {
     }
 
 } catch (PDOException $e) {
+    // 清除輸出緩衝區的任何錯誤輸出
+    ob_clean();
     error_log("Database error in create dispute: " . $e->getMessage());
     Response::serverError('Database error occurred');
 } catch (Exception $e) {
+    // 清除輸出緩衝區的任何錯誤輸出
+    ob_clean();
     error_log("Error in create dispute: " . $e->getMessage());
-    Response::serverError('An error occurred while creating dispute: ' . $e->getMessage());
+    Response::serverError('An error occurred while creating dispute');
+} catch (Throwable $e) {
+    // 捕獲所有可能的錯誤，包括 Fatal Error
+    ob_clean();
+    error_log("Fatal error in create dispute: " . $e->getMessage());
+    Response::serverError('A critical error occurred');
 }
 ?>

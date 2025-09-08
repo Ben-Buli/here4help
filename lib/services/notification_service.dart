@@ -75,10 +75,41 @@ class NotificationServicePlaceholder implements NotificationService {
     } catch (_) {}
   }
 
+  // 缓存上次发送的数据，避免重复推送
+  Map<String, int>? _lastEmittedByRoom;
+  Map<String, int>? _lastEmittedByTask;
+  int? _lastEmittedTotal;
+
   void _emitAll() {
-    _safeAdd<int>(_totalUnreadController, _totalUnread);
-    _safeAdd<Map<String, int>>(_byTaskController, _unreadByTask);
-    _safeAdd<Map<String, int>>(_byRoomController, _unreadByRoom);
+    // 检查总未读数是否有变化
+    if (_lastEmittedTotal != _totalUnread) {
+      _safeAdd<int>(_totalUnreadController, _totalUnread);
+      _lastEmittedTotal = _totalUnread;
+    }
+
+    // 检查任务未读数是否有变化
+    if (!_mapsEqual(_lastEmittedByTask, _unreadByTask)) {
+      _safeAdd<Map<String, int>>(_byTaskController, _unreadByTask);
+      _lastEmittedByTask = Map<String, int>.from(_unreadByTask);
+    }
+
+    // 检查房间未读数是否有变化
+    if (!_mapsEqual(_lastEmittedByRoom, _unreadByRoom)) {
+      _safeAdd<Map<String, int>>(_byRoomController, _unreadByRoom);
+      _lastEmittedByRoom = Map<String, int>.from(_unreadByRoom);
+    }
+  }
+
+  // 辅助方法：比较两个 Map 是否相等
+  bool _mapsEqual(Map<String, int>? a, Map<String, int>? b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
   }
 
   @override
@@ -191,10 +222,41 @@ class SocketNotificationService implements NotificationService {
     } catch (_) {}
   }
 
+  // 缓存上次发送的数据，避免重复推送
+  Map<String, int>? _lastEmittedByRoom2;
+  Map<String, int>? _lastEmittedByTask2;
+  int? _lastEmittedTotal2;
+
   void _emitAll() {
-    _safeAdd2<int>(_totalUnreadController, _totalUnread);
-    _safeAdd2<Map<String, int>>(_byTaskController, _unreadByTask);
-    _safeAdd2<Map<String, int>>(_byRoomController, _unreadByRoom);
+    // 检查总未读数是否有变化
+    if (_lastEmittedTotal2 != _totalUnread) {
+      _safeAdd2<int>(_totalUnreadController, _totalUnread);
+      _lastEmittedTotal2 = _totalUnread;
+    }
+
+    // 检查任务未读数是否有变化
+    if (!_mapsEqual2(_lastEmittedByTask2, _unreadByTask)) {
+      _safeAdd2<Map<String, int>>(_byTaskController, _unreadByTask);
+      _lastEmittedByTask2 = Map<String, int>.from(_unreadByTask);
+    }
+
+    // 检查房间未读数是否有变化
+    if (!_mapsEqual2(_lastEmittedByRoom2, _unreadByRoom)) {
+      _safeAdd2<Map<String, int>>(_byRoomController, _unreadByRoom);
+      _lastEmittedByRoom2 = Map<String, int>.from(_unreadByRoom);
+    }
+  }
+
+  // 辅助方法：比较两个 Map 是否相等
+  bool _mapsEqual2(Map<String, int>? a, Map<String, int>? b) {
+    if (a == null && b == null) return true;
+    if (a == null || b == null) return false;
+    if (a.length != b.length) return false;
+
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
   }
 
   @override

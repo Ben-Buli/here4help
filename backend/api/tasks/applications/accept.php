@@ -16,42 +16,79 @@ const ACCEPT_MESSAGE = "Congratulations! You’ve been selected as the tasker fo
 const REJECT_MESSAGE = "Unfortunately, you were not selected as the tasker for this task. Please try again!";
 
 try {
+  error_log("[accept.php] 🔍 Request started");
+  
   if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     Response::methodNotAllowed('Method not allowed');
   }
 
   // Auth（取得操作者）
   $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+  error_log("[accept.php] 🔍 Auth header: " . (empty($auth_header) ? 'empty' : 'found'));
+  
   if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
+    error_log("[accept.php] ❌ Authorization header missing or invalid");
     throw new Exception('Authorization header required');
   }
   $actor_id = TokenValidator::validateAuthHeader($auth_header);
-  if (!$actor_id) { throw new Exception('Invalid or expired token'); }
+  error_log("[accept.php] 🔍 Token validation result: " . ($actor_id ? 'success' : 'failed'));
+  
+  if (!$actor_id) { 
+    error_log("[accept.php] ❌ Invalid or expired token");
+    throw new Exception('Invalid or expired token'); 
+  }
   $actor_id = (int)$actor_id;
+  error_log("[accept.php] 🔍 Actor ID: $actor_id");
 
-  $input = json_decode(file_get_contents('php://input'), true) ?? [];
+  $raw = file_get_contents('php://input');
+  error_log("[accept.php] 🔍 Raw input: " . $raw);
+  
+  $input = json_decode($raw, true) ?? [];
+  error_log("[accept.php] 🔍 JSON decoded input: " . json_encode($input));
+  
   $task_id = (string)($input['task_id'] ?? '');
   $application_id = (string)($input['application_id'] ?? '');
   $user_id = (string)($input['user_id'] ?? '');
   $poster_id = (string)($input['poster_id'] ?? '');
   
-  if ($task_id === '') Response::validationError(['task_id' => 'required']);
-  if ($application_id === '' && $user_id === '') Response::validationError(['application_id or user_id' => 'required']);
-  if ($poster_id === '') Response::validationError(['poster_id' => 'required']);
+  error_log("[accept.php] 🔍 Parsed parameters:");
+  error_log("[accept.php]   - task_id: '$task_id'");
+  error_log("[accept.php]   - application_id: '$application_id'");
+  error_log("[accept.php]   - user_id: '$user_id'");
+  error_log("[accept.php]   - poster_id: '$poster_id'");
+  
+  if ($task_id === '') {
+    error_log("[accept.php] ❌ Validation failed - task_id required");
+    Response::validationError(['task_id' => 'required']);
+  }
+  if ($application_id === '' && $user_id === '') {
+    error_log("[accept.php] ❌ Validation failed - application_id or user_id required");
+    Response::validationError(['application_id or user_id' => 'required']);
+  }
+  if ($poster_id === '') {
+    error_log("[accept.php] ❌ Validation failed - poster_id required");
+    Response::validationError(['poster_id' => 'required']);
+  }
 
   $db = Database::getInstance();
 
   // 讀取任務資訊
+  error_log("[accept.php] 🔍 Fetching task information for task_id: $task_id");
   $task = $db->fetch(
     "SELECT t.*, s.code AS status_code FROM tasks t LEFT JOIN task_statuses s ON t.status_id = s.id WHERE t.id = ?",
     [$task_id]
   );
+  error_log("[accept.php] 🔍 Task query result: " . json_encode($task));
+  
   if (!$task) {
+    error_log("[accept.php] ❌ Task not found: $task_id");
     Response::notFound('Task not found');
   }
 
   // 驗證操作者是否為任務創建者
+  error_log("[accept.php] 🔍 Checking permissions: actor_id=$actor_id, poster_id=$poster_id, task creator_id=" . $task['creator_id']);
   if ((int)$task['creator_id'] !== (int)$poster_id) {
+    error_log("[accept.php] ❌ Permission denied: task creator=" . $task['creator_id'] . ", poster_id=$poster_id");
     Response::forbidden('Only task creator can accept applications');
   }
 
@@ -59,16 +96,22 @@ try {
   $target_user_id = null;
   if ($user_id !== '') {
     $target_user_id = $user_id;
+    error_log("[accept.php] 🔍 Using provided user_id: $user_id");
   } else {
     // 從 application_id 取得 user_id
+    error_log("[accept.php] 🔍 Fetching user_id from application_id: $application_id");
     $application = $db->fetch(
       "SELECT user_id FROM task_applications WHERE id = ? AND task_id = ?",
       [$application_id, $task_id]
     );
+    error_log("[accept.php] 🔍 Application query result: " . json_encode($application));
+    
     if (!$application) {
+      error_log("[accept.php] ❌ Application not found: application_id=$application_id, task_id=$task_id");
       Response::notFound('Application not found');
     }
     $target_user_id = $application['user_id'];
+    error_log("[accept.php] 🔍 Resolved target_user_id: $target_user_id");
   }
 
   // 驗證任務狀態必須為 open
@@ -95,15 +138,19 @@ try {
   }
 
   // 開始資料庫交易
+  error_log("[accept.php] 🔍 Starting transaction");
   $db->beginTransaction();
 
   try {
       // 1. 更新任務狀態為 in_progress 並設定 participant_id
     // task_statuses.id = 2 = in_progress
+      error_log("[accept.php] 🔍 Updating task status to in_progress");
       try { 
-        $db->query("UPDATE tasks SET status_id = ?, participant_id = ?, updated_at = NOW() WHERE id = ?", 
+        $result = $db->query("UPDATE tasks SET status_id = ?, participant_id = ?, updated_at = NOW() WHERE id = ?", 
           [2, $target_user_id, $task_id]);
+        error_log("[accept.php] 🔍 Task update result: " . ($result ? 'success' : 'failed'));
       } catch (Exception $e) {
+        error_log("[accept.php] ❌ Task update error: " . $e->getMessage());
         Response::serverError('Failed to update task status to in_progress(id: 2): ' . $e->getMessage());
       }
    
@@ -137,34 +184,39 @@ try {
 
     // 接受指定的應徵
     if ($application_id !== '' && $isApplied) {
-      $db->query("UPDATE task_applications SET status = 'accepted', updated_at = NOW() WHERE id = ?", [$application_id]);
+      error_log("[accept.php] 🔍 Updating existing application to accepted: $application_id");
+      $result = $db->query("UPDATE task_applications SET status = 'accepted', updated_at = NOW() WHERE id = ?", [$application_id]);
+      error_log("[accept.php] 🔍 Application update result: " . ($result ? 'success' : 'failed'));
     } else {
-      // 檢查是否已經存在 accepted 記錄
-      $existingAccepted = $db->fetch(
-        "SELECT id FROM task_applications WHERE task_id = ? AND status = 'accepted'",
-        [$task_id]
+      // 檢查該用戶是否已經有任何應徵記錄（不限於 accepted）
+      error_log("[accept.php] 🔍 Checking for existing application record for user: $target_user_id");
+      $existingApplication = $db->fetch(
+        "SELECT id, status FROM task_applications WHERE task_id = ? AND user_id = ?",
+        [$task_id, $target_user_id]
       );
+      error_log("[accept.php] 🔍 Existing application query result: " . json_encode($existingApplication));
       
-      if ($existingAccepted) {
-        // 如果已經有 accepted 記錄，檢查是否是同一個用戶
-        $existingUser = $db->fetch(
-          "SELECT user_id FROM task_applications WHERE task_id = ? AND status = 'accepted'",
-          [$task_id]
-        );
-        
-        if ($existingUser && (int)$existingUser['user_id'] === (int)$target_user_id) {
-          // 同一個用戶，不需要重複操作
-          error_log("User $target_user_id is already accepted for task $task_id");
-        } else {
-          // 不同用戶，這是一個錯誤狀態
-          throw new Exception("Task already has an accepted applicant. Cannot accept another application.");
-        }
-      } else {
-        // 沒有 accepted 記錄，可以安全插入
-        $db->query("
-          INSERT INTO task_applications (task_id, user_id, status, created_at, updated_at) 
-          VALUES (?, ?, 'accepted', NOW(), NOW())
+      if ($existingApplication) {
+        // 用戶已經有應徵記錄，更新狀態為 accepted
+        error_log("[accept.php] 🔍 Updating existing application status from '" . $existingApplication['status'] . "' to 'accepted'");
+        $result = $db->query("
+          UPDATE task_applications SET status = 'accepted', updated_at = NOW() 
+          WHERE task_id = ? AND user_id = ?
         ", [$task_id, $target_user_id]);
+        error_log("[accept.php] 🔍 Application status update result: " . ($result ? 'success' : 'failed'));
+      } else {
+        // 沒有應徵記錄，插入新記錄
+        error_log("[accept.php] 🔍 Inserting new accepted application record");
+        try {
+          $result = $db->query("
+            INSERT INTO task_applications (task_id, user_id, status, created_at, updated_at) 
+            VALUES (?, ?, 'accepted', NOW(), NOW())
+          ", [$task_id, $target_user_id]);
+          error_log("[accept.php] 🔍 New application insert result: " . ($result ? 'success' : 'failed'));
+        } catch (Exception $e) {
+          error_log("[accept.php] ❌ Failed to insert new application: " . $e->getMessage());
+          throw $e;
+        }
       }
     }
     
@@ -185,7 +237,8 @@ try {
     }
 
     // 3. 寫入 user_active_log
-    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    error_log("[accept.php] 🔍 Preparing user_active_log entry");
+    $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
     $metadata = json_encode([
       'task_id' => $task_id,
       'application_id' => $application_id,
@@ -193,13 +246,25 @@ try {
       'rejected_application_ids' => $rejectedApplicationIds
     ]);
     
-    $db->query("
-      INSERT INTO user_active_log (
-        user_id, actor_type, actor_id, action, field, old_value, new_value, 
-        reason, metadata, ip, created_at
-      ) VALUES (?, 'user', ?, 'Assign to only one participant, and reject other applications.', 'participant_id', NULL, ?, 
-        NULL, ?, ?, NOW())
-    ", [$actor_id, $actor_id, $target_user_id, $metadata, $ip]);
+    // 使用較短的 action 字符串
+    $shortAction = "app_accepted:u{$target_user_id}";
+    error_log("[accept.php] 🔍 Action string: '$shortAction' (length: " . strlen($shortAction) . ")");
+    error_log("[accept.php] 🔍 Metadata: " . $metadata);
+    error_log("[accept.php] 🔍 IP: $ip");
+    
+    try {
+      $result = $db->query("
+        INSERT INTO user_active_log (
+          user_id, actor_type, actor_id, action, field, old_value, new_value, 
+          reason, metadata, ip, created_at
+        ) VALUES (?, 'user', ?, ?, 'participant_id', NULL, ?, 
+          NULL, ?, ?, NOW())
+      ", [$actor_id, $actor_id, $shortAction, $target_user_id, $metadata, $ip]);
+      error_log("[accept.php] 🔍 User active log insert result: " . ($result ? 'success' : 'failed'));
+    } catch (Exception $e) {
+      error_log("[accept.php] ❌ User active log insert error: " . $e->getMessage());
+      throw $e;
+    }
 
     // 4. 發送系統訊息到聊天室
     // #region 發送訊息給accepted的用戶
@@ -214,7 +279,7 @@ try {
         $content = ACCEPT_MESSAGE;
         $db->query(
           "INSERT INTO chat_messages (room_id, from_user_id, content, kind, created_at) VALUES (?, ?, ?, 'system', NOW())",
-          [(int)$room['id'], $actor_id, $content]
+          [(int)$room['id'], 1, $content] // 使用系統帳號 ID (1)
         );
       }
     } catch (Exception $e) {
@@ -223,34 +288,13 @@ try {
     }
     // #endregion
 
-    // #region 發送訊息給rejected的用戶
-    try {
-      $rejected_users = $db->fetchAll(
-        "SELECT user_id FROM task_applications WHERE task_id = ? AND user_id <> ? AND status = 'rejected'",
-        [$task_id, $target_user_id]
-      );
-      foreach ($rejected_users as $rejected_user) {
-        $room = $db->fetch(
-          "SELECT id FROM chat_rooms WHERE task_id = ? AND (creator_id = ? OR participant_id = ?) ORDER BY id DESC LIMIT 1",
-          [$task_id, $actor_id, $rejected_user['user_id']]
-        );
-       
-      }
-    } catch (Exception $e) {
-      // 不阻斷主流程
-      error_log("Failed to send system rejected message: " . $e->getMessage());
-    }
-    // #endregion
-
-    // 提交交易
-    $db->commit();
 
     // 發送 Socket 通知
     try {
       $socketNotifier = SocketNotifier::getInstance();
       $userIds = $socketNotifier->getTaskUserIds($task_id);
       
-      // 🔧 獲取被接受者的聊天室
+      // 🔧 獲取被接受者的聊天室acceptedRoom
       $acceptedRoom = $db->fetch(
         "SELECT id FROM chat_rooms WHERE task_id = ? AND (creator_id = ? OR participant_id = ?) ORDER BY id DESC LIMIT 1",
         [$task_id, $actor_id, $target_user_id]
@@ -268,46 +312,53 @@ try {
       // 通知被指派任務者的應徵狀態更新
       $socketNotifier->notifyApplicationStatusUpdate($task_id, $acceptedRoomId, 'accepted', [$target_user_id]);
       
-      // 🔧 個別通知被拒絕的應徵者
-      $rejected_users = $db->fetchAll(
-        "SELECT user_id FROM task_applications WHERE task_id = ? AND user_id <> ? AND status = 'rejected'",
+      // 🔧 通知所有被拒絕的用戶（不包含被指派任務者target_user_id）
+      $rejectedRooms = $db->fetchAll(
+        "SELECT id, participant_id 
+         FROM chat_rooms 
+         WHERE task_id = ? AND participant_id != ?",
         [$task_id, $target_user_id]
       );
-
-      $rejectedRoomIds = $db->fetchAll("SELECT id FROM chat_rooms WHERE task_id = ? AND (creator_id = ? OR participant_id = ?) ORDER BY id DESC LIMIT 1", [$task_id, $actor_id, $target_user_id]);
-      foreach ($rejectedRoomIds as $rejectedRoomId) {
-        $rejectedUserId = $rejectedRoomId['id'];
+      
+      error_log("[accept.php] 🔍 Found " . count($rejectedRooms) . " rejected rooms to notify");
+      
+      foreach ($rejectedRooms as $room) {
+        $rejectedUserId = $room['participant_id'];
+        $rejectedRoomId = $room['id'];
+        error_log("[accept.php] 🔍 Processing rejected user: $rejectedUserId in room $rejectedRoomId");
         
-       
-        if ($rejectedRoomId) {
-          // 向每個被拒絕者發送個別的狀態更新通知
-          $socketNotifier->notifyApplicationStatusUpdate($task_id, $rejectedRoomId, 'rejected', [$rejectedUserId]);
-          error_log("✅ Socket notification sent to rejected user $rejectedUserId in room $rejectedRoomId");
-        } else {
-          error_log("⚠️ No chat room found for rejected user $rejectedUserId in task $task_id");
-        }
-      }
-
-        // 發送系統訊息到被拒絕者的聊天室
-        foreach ($rejectedRoomIds as $rejectedRoomId) {
-          $rejectedContent = REJECT_MESSAGE;
+        $socketNotifier->notifyApplicationStatusUpdate($task_id, $rejectedRoomId, 'rejected', [$rejectedUserId]);
+        error_log("[accept.php] ✅ Socket notification sent to rejected user $rejectedUserId in room $rejectedRoomId");
+        
+        try {
           $db->query(
             "INSERT INTO chat_messages (room_id, from_user_id, content, kind, created_at) VALUES (?, ?, ?, 'system', NOW())",
-            [(int)$room['id'], $actor_id, $rejectedContent]
+            [$rejectedRoomId, 1, REJECT_MESSAGE] // 使用系統帳號 ID (1)
           );
+          error_log("[accept.php] ✅ System message sent to rejected user $rejectedUserId in room $rejectedRoomId");
+        } catch (Exception $e) {
+          error_log("[accept.php] ❌ Failed to send system message to rejected user $rejectedUserId: " . $e->getMessage());
         }
+      }
       
     } catch (Exception $e) {
       error_log("Socket notification failed: " . $e->getMessage());
     }
 
+    // 提交事務
+    error_log("[accept.php] 🔍 Committing transaction");
+    $db->commit();
+    error_log("[accept.php] ✅ Transaction committed successfully");
+
     // 回傳更新後的任務資訊
+    error_log("[accept.php] 🔍 Fetching updated task information");
     $updated = $db->fetch(
       "SELECT t.*, s.code AS status_code, s.display_name AS status_display
          FROM tasks t LEFT JOIN task_statuses s ON t.status_id = s.id WHERE t.id = ?",
       [$task_id]
     );
 
+    error_log("[accept.php] ✅ Accept operation completed successfully");
     Response::success([
       'task' => $updated,
       'assigned_user' => [
@@ -319,11 +370,14 @@ try {
     ], 'Application accepted');
 
   } catch (Exception $e) {
+    error_log("[accept.php] ❌ Transaction error: " . $e->getMessage());
     $db->rollback();
     throw $e;
   }
 
 } catch (Exception $e) {
+  error_log("[accept.php] ❌ Server error: " . $e->getMessage());
+  error_log("[accept.php] ❌ Stack trace: " . $e->getTraceAsString());
   Response::serverError('Server error: ' . $e->getMessage());
 }
 ?>

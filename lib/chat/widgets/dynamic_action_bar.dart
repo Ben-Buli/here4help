@@ -41,11 +41,8 @@ class DynamicActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 減少 debug 輸出頻率，避免刷屏
-    if (kDebugMode) {
-      debugPrint(
-          '🔍 [DynamicActionBar] build() - Status: $taskStatus, Role: $userRole');
-    }
+    // 大幅減少 debug 輸出，只在必要時顯示
+    // 移除重複的 build 日誌，避免刷屏
 
     final actions = ActionBarConfigManager.getActionsForStatus(
       taskStatus: taskStatus,

@@ -1,11 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/services/http_client_service.dart';
 
 /// 任務爭議 API 服務
 class DisputeApi {
-  static String get _baseUrl => '${AppConfig.apiBaseUrl}/task-disputes';
+  static String get _baseUrl => AppConfig.api('/task-disputes');
 
   /// 檢查是否已存在爭議
   ///
@@ -20,27 +19,17 @@ class DisputeApi {
         debugPrint('DisputeApi: 檢查現有爭議: chatRoomId=$chatRoomId');
       }
 
-      final response = await HttpClientService.get(
+      final data = await HttpClientService.getJson(
         '$_baseUrl/check.php?chat_room_id=$chatRoomId',
+        useQueryParamToken: true, // MAMP 兼容性
       );
 
-      if (kDebugMode) debugPrint('DisputeApi: 檢查回應: ${response.statusCode}');
+      if (kDebugMode) debugPrint('DisputeApi: 檢查成功: ${data['data']}');
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          if (kDebugMode) debugPrint('DisputeApi: 檢查成功: ${data['data']}');
-          return {
-            'exists': data['data']['exists'] ?? false,
-            'dispute': data['data']['dispute'], // 包含 id, status, created_at 等資訊
-          };
-        } else {
-          throw Exception(data['message'] ?? '檢查爭議失敗');
-        }
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? '檢查爭議失敗');
-      }
+      return {
+        'exists': data['data']['exists'] ?? false,
+        'dispute': data['data']['dispute'], // 包含 id, status, created_at 等資訊
+      };
     } catch (e) {
       if (kDebugMode) debugPrint('DisputeApi: 檢查爭議錯誤: $e');
       rethrow;
@@ -66,7 +55,7 @@ class DisputeApi {
         debugPrint('DisputeApi: 提交爭議: taskId=$taskId, title=$title');
       }
 
-      final response = await HttpClientService.post(
+      final data = await HttpClientService.postJson(
         '$_baseUrl/create.php',
         body: {
           'task_id': taskId,
@@ -74,22 +63,11 @@ class DisputeApi {
           'title': title,
           'description': description,
         },
+        useQueryParamToken: true, // MAMP 兼容性
       );
 
-      if (kDebugMode) debugPrint('DisputeApi: 爭議提交回應: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          if (kDebugMode) debugPrint('DisputeApi: 爭議提交成功: ${data['data']}');
-          return data['data'];
-        } else {
-          throw Exception(data['message'] ?? '爭議提交失敗');
-        }
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? '爭議提交失敗');
-      }
+      if (kDebugMode) debugPrint('DisputeApi: 爭議提交成功: ${data['data']}');
+      return data['data'];
     } catch (e) {
       if (kDebugMode) debugPrint('DisputeApi: 爭議提交錯誤: $e');
       rethrow;
@@ -103,24 +81,15 @@ class DisputeApi {
     try {
       if (kDebugMode) debugPrint('DisputeApi: 獲取爭議列表');
 
-      final response = await HttpClientService.get('$_baseUrl/list.php');
+      final data = await HttpClientService.getJson(
+        '$_baseUrl/list.php',
+        useQueryParamToken: true, // MAMP 兼容性
+      );
 
-      if (kDebugMode) debugPrint('DisputeApi: 爭議列表回應: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          if (kDebugMode) {
-            debugPrint('DisputeApi: 爭議列表獲取成功: ${data['data'].length} 筆');
-          }
-          return List<Map<String, dynamic>>.from(data['data']);
-        } else {
-          throw Exception(data['message'] ?? '獲取爭議列表失敗');
-        }
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? '獲取爭議列表失敗');
+      if (kDebugMode) {
+        debugPrint('DisputeApi: 爭議列表獲取成功: ${data['data'].length} 筆');
       }
+      return List<Map<String, dynamic>>.from(data['data']);
     } catch (e) {
       if (kDebugMode) debugPrint('DisputeApi: 獲取爭議列表錯誤: $e');
       rethrow;
@@ -136,23 +105,13 @@ class DisputeApi {
     try {
       if (kDebugMode) debugPrint('DisputeApi: 獲取申訴詳情: disputeId=$disputeId');
 
-      final response = await HttpClientService.get(
-          '$_baseUrl/disputes.php?dispute_id=$disputeId');
+      final data = await HttpClientService.getJson(
+        '$_baseUrl/disputes.php?dispute_id=$disputeId',
+        useQueryParamToken: true, // MAMP 兼容性
+      );
 
-      if (kDebugMode) debugPrint('DisputeApi: 申訴詳情回應: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          if (kDebugMode) debugPrint('DisputeApi: 申訴詳情獲取成功');
-          return data['data'];
-        } else {
-          throw Exception(data['message'] ?? '獲取申訴詳情失敗');
-        }
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? '獲取申訴詳情失敗');
-      }
+      if (kDebugMode) debugPrint('DisputeApi: 申訴詳情獲取成功');
+      return data['data'];
     } catch (e) {
       if (kDebugMode) debugPrint('DisputeApi: 獲取申訴詳情錯誤: $e');
       rethrow;

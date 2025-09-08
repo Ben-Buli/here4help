@@ -112,10 +112,10 @@ try {
       [$task_id, $actor_id, $actor_id]
     );
     if ($room && isset($room['id'])) {
-      $content = 'Completion request was rejected.' . ($reason !== '' ? ('\nReason: ' . $reason) : '');
+      $content = 'Completion request was rejected.' . ($reason !== '' ? ('Reason: ' . $reason) : '');
       $db->query(
         "INSERT INTO chat_messages (room_id, from_user_id, content, kind) VALUES (?, ?, ?, 'system')",
-        [(int)$room['id'], $actor_id, $content]
+        [(int)$room['id'], 1, $content] // 使用系統帳號 ID (1)
       );
     }
   } catch (Exception $e) {
