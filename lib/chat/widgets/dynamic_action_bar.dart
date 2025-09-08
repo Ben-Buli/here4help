@@ -48,10 +48,12 @@ class DynamicActionBar extends StatelessWidget {
     }
 
     final actions = ActionBarConfigManager.getActionsForStatus(
-      status: taskStatus,
+      taskStatus: taskStatus,
       userRole: userRole,
       actionCallbacks: actionCallbacks,
-      applicationStatus: applicationStatus,
+      applicationStatus: applicationStatus != null
+          ? ActionBarConfigManager.parseApplicationStatus(applicationStatus)
+          : null,
       isBlocked: isBlocked,
       isBlockedByMe: isBlockedByMe,
       isBlockedByTarget: isBlockedByTarget,

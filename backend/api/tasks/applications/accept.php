@@ -139,13 +139,33 @@ try {
     if ($application_id !== '' && $isApplied) {
       $db->query("UPDATE task_applications SET status = 'accepted', updated_at = NOW() WHERE id = ?", [$application_id]);
     } else {
-      // 如果沒有指定 application_id，直接創建新的 accepted 應徵記錄
-      // 依賴 (task_id, user_id) 唯一鍵避免重複記錄
-      $db->query("
-        INSERT INTO task_applications (task_id, user_id, status, created_at, updated_at) 
-        VALUES (?, ?, 'accepted', NOW(), NOW())
-        ON DUPLICATE KEY UPDATE status = 'accepted', updated_at = NOW()
-      ", [$task_id, $target_user_id]);
+      // 檢查是否已經存在 accepted 記錄
+      $existingAccepted = $db->fetch(
+        "SELECT id FROM task_applications WHERE task_id = ? AND status = 'accepted'",
+        [$task_id]
+      );
+      
+      if ($existingAccepted) {
+        // 如果已經有 accepted 記錄，檢查是否是同一個用戶
+        $existingUser = $db->fetch(
+          "SELECT user_id FROM task_applications WHERE task_id = ? AND status = 'accepted'",
+          [$task_id]
+        );
+        
+        if ($existingUser && (int)$existingUser['user_id'] === (int)$target_user_id) {
+          // 同一個用戶，不需要重複操作
+          error_log("User $target_user_id is already accepted for task $task_id");
+        } else {
+          // 不同用戶，這是一個錯誤狀態
+          throw new Exception("Task already has an accepted applicant. Cannot accept another application.");
+        }
+      } else {
+        // 沒有 accepted 記錄，可以安全插入
+        $db->query("
+          INSERT INTO task_applications (task_id, user_id, status, created_at, updated_at) 
+          VALUES (?, ?, 'accepted', NOW(), NOW())
+        ", [$task_id, $target_user_id]);
+      }
     }
     
     // 手動拒絕其他已投遞（Applied）應徵（已移除觸發器）

@@ -95,6 +95,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   // 角色與動作列控制
   String _userRole = 'participant';
   bool _showActionBar = true;
+
+  // 操作狀態控制（防重複點擊）
+  bool _isAccepting = false;
+  bool _isRejecting = false;
+  bool _isWithdrawing = false;
+  bool _isRefreshingTaskStatus = false;
+
   // 移除狀態 Bar 動畫控制相關變數
 
   // Socket.IO 服務
@@ -826,6 +833,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     // 初始化 actionCallbacks
     _actionCallbacks = {
       'accept': () => _handleAcceptApplication(),
+      'reject': () => _handleRejectApplication(),
       'withdraw': () => _handleWithdrawApplication(),
       'block': () => _handleBlockUser(),
       'unblock': () => _handleUnblockUser(),
@@ -893,16 +901,17 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
     try {
       // 優先從 UserService 獲取當前用戶
-      debugPrint('🔍 [ChatDetailPage] 嘗試從 UserService 獲取用戶');
+      // debugPrint('🔍 [ChatDetailPage] 嘗試從 UserService 獲取用戶');
       final userService = Provider.of<UserService>(context, listen: false);
       await userService.ensureUserLoaded();
-      debugPrint('  - UserService 載入完成');
+      // debugPrint('  - UserService 載入完成');
 
       if (userService.currentUser != null) {
-        debugPrint('✅ [ChatDetailPage] UserService 有當前用戶');
-        debugPrint('  - 用戶ID: ${userService.currentUser!.id}');
-        debugPrint('  - 用戶名稱: ${userService.currentUser!.name}');
-        debugPrint('  - 用戶頭像: ${userService.currentUser!.avatar_url}');
+        // debugPrint(
+        // '✅ [ChatDetailPage] UserService 有當前用戶：${userService.currentUser!.id}');
+        // debugPrint('  - 用戶ID: ${userService.currentUser!.id}');
+        // debugPrint('  - 用戶名稱: ${userService.currentUser!.name}');
+        // debugPrint('  - 用戶頭像: ${userService.currentUser!.avatar_url}');
 
         if (mounted) {
           setState(() {
@@ -952,6 +961,89 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     setState(() {
       _showActionBar = !_showActionBar;
     });
+
+    // 當展開 Action Bar 時，重新讀取最新的任務狀態
+    if (_showActionBar) {
+      _refreshTaskStatusOnExpand();
+    }
+  }
+
+  /// 展開 Action Bar 時刷新任務狀態
+  Future<void> _refreshTaskStatusOnExpand() async {
+    // 防重複刷新
+    if (_isRefreshingTaskStatus) {
+      debugPrint('⚠️ [ChatDetailPage] 任務狀態刷新進行中，跳過');
+      return;
+    }
+
+    debugPrint('🔄 [ChatDetailPage] Action Bar 展開，刷新任務狀態');
+
+    setState(() {
+      _isRefreshingTaskStatus = true;
+    });
+
+    try {
+      // 獲取當前 room_id
+      final roomId = _currentRoomId;
+      if (roomId == null || roomId.isEmpty) {
+        debugPrint('⚠️ [ChatDetailPage] 無 room_id，跳過狀態刷新');
+        return;
+      }
+
+      // 重新獲取聊天室數據以更新任務狀態
+      final chatData = await ChatService().getChatDetailData(roomId: roomId);
+
+      if (chatData.isNotEmpty && mounted) {
+        final newTask = chatData['task'];
+        final currentTask = _task;
+
+        // 比較任務狀態是否有變化
+        final currentStatus = currentTask?['status']?['code'];
+        final newStatus = newTask?['status']?['code'];
+        final currentAppStatus = currentTask?['application']?['status'];
+        final newAppStatus = newTask?['application']?['status'];
+
+        if (currentStatus != newStatus || currentAppStatus != newAppStatus) {
+          debugPrint('📊 [ChatDetailPage] 檢測到任務狀態變化:');
+          debugPrint('  - 任務狀態: $currentStatus → $newStatus');
+          debugPrint('  - 應徵狀態: $currentAppStatus → $newAppStatus');
+
+          // 更新任務數據
+          setState(() {
+            _chatData = {..._chatData!, ...chatData};
+          });
+
+          // 顯示狀態變化提示
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Row(
+                  children: [
+                    Icon(Icons.refresh, color: Colors.white, size: 16),
+                    SizedBox(width: 8),
+                    Text('Task status updated'),
+                  ],
+                ),
+                backgroundColor: Colors.blue[600],
+                duration: const Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        } else {
+          debugPrint('✅ [ChatDetailPage] 任務狀態無變化，保持現有狀態');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ [ChatDetailPage] 刷新任務狀態失敗: $e');
+      // 靜默失敗，不影響用戶體驗
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshingTaskStatus = false;
+        });
+      }
+    }
   }
 
   /// 初始化圖片上傳管理器
@@ -1248,8 +1340,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
       if (mounted) {
         setState(() {
+          // 修正應徵狀態數據映射問題
+          final fixedChatData = _fixApplicationStatusMapping(chatData);
+
           // 更新聊天室數據
-          _chatData = chatData;
+          _chatData = fixedChatData;
           _userRole = chatData['user_role'] ?? 'participant';
           _currentRoomId = roomId;
           _isBlocked = chatData['is_blocked'] ?? false;
@@ -3472,6 +3567,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
       // 刷新聊天室數據
       await _initializeChat();
+
+      // 自動收起 Action Bar
+      if (mounted) {
+        setState(() {
+          _showActionBar = false;
+        });
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -3500,12 +3602,26 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     if (result == true) {
       // 申訴提交成功，刷新頁面資料
       await _initializeChat();
+
+      // 自動收起 Action Bar
+      if (mounted) {
+        setState(() {
+          _showActionBar = false;
+        });
+      }
     }
   }
 
   /// 處理接受應徵
   Future<void> _handleAcceptApplication() async {
     debugPrint('🔍 [ChatDetailPage] _handleAcceptApplication() 開始');
+
+    // 防重複點擊檢查
+    if (_isAccepting) {
+      debugPrint('⚠️ [ChatDetailPage] Accept 操作進行中，忽略重複點擊');
+      return;
+    }
+
     debugPrint('  - _task: ${_task != null ? 'not null' : 'null'}');
     debugPrint('  - _chatData: ${_chatData != null ? 'not null' : 'null'}');
     debugPrint('  - _room: ${_room != null ? 'not null' : 'null'}');
@@ -3514,6 +3630,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       debugPrint('❌ [ChatDetailPage] _task 為 null，無法處理接受應徵');
       return;
     }
+
+    // 設置操作狀態
+    setState(() {
+      _isAccepting = true;
+    });
 
     try {
       debugPrint('🔍 [ChatDetailPage] 開始載入當前用戶ID');
@@ -3589,6 +3710,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       // 刷新頁面資料
       await _initializeChat();
 
+      // 自動收起 Action Bar
+      if (mounted) {
+        setState(() {
+          _showActionBar = false;
+        });
+      }
+
       // 調試：檢查任務狀態是否已更新
       debugPrint('🔍 [Accept] 刷新後任務狀態檢查:');
       debugPrint('  - _chatData: ${_chatData != null ? 'not null' : 'null'}');
@@ -3644,6 +3772,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
         // 重新載入聊天室狀態以更新 Action Bar
         await _initializeChat();
+
+        // 自動收起 Action Bar
+        if (mounted) {
+          setState(() {
+            _showActionBar = false;
+          });
+        }
       }
     } catch (e) {
       ErrorHandlerService.logError(
@@ -3651,13 +3786,31 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       if (mounted) {
         ErrorSnackBar.show(context, e, operation: 'accept_application');
       }
+    } finally {
+      // 重置操作狀態
+      if (mounted) {
+        setState(() {
+          _isAccepting = false;
+        });
+      }
     }
   }
 
   /// 處理撤銷應徵申請
   Future<void> _handleWithdrawApplication() async {
+    // 防重複點擊檢查
+    if (_isWithdrawing) {
+      debugPrint('⚠️ [ChatDetailPage] Withdraw 操作進行中，忽略重複點擊');
+      return;
+    }
+
     final taskId = _task?['id']?.toString();
     if (taskId == null) return;
+
+    // 設置操作狀態
+    setState(() {
+      _isWithdrawing = true;
+    });
 
     try {
       // 顯示確認對話框
@@ -3688,6 +3841,11 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           );
           // 重新載入聊天室狀態
           await _initializeChat();
+
+          // 自動收起 Action Bar
+          setState(() {
+            _showActionBar = false;
+          });
         }
       }
     } catch (e) {
@@ -3695,6 +3853,122 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           'ChatDetailPage._handleWithdrawApplication', e);
       if (mounted) {
         ErrorSnackBar.show(context, e, operation: 'withdraw_application');
+      }
+    } finally {
+      // 重置操作狀態
+      if (mounted) {
+        setState(() {
+          _isWithdrawing = false;
+        });
+      }
+    }
+  }
+
+  /// 處理拒絕應徵
+  Future<void> _handleRejectApplication() async {
+    debugPrint('🔍 [ChatDetailPage] _handleRejectApplication() 開始');
+
+    // 防重複點擊檢查
+    if (_isRejecting) {
+      debugPrint('⚠️ [ChatDetailPage] Reject 操作進行中，忽略重複點擊');
+      return;
+    }
+
+    if (_task == null) {
+      debugPrint('❌ [ChatDetailPage] _task 為 null，無法處理拒絕應徵');
+      return;
+    }
+
+    // 設置操作狀態
+    setState(() {
+      _isRejecting = true;
+    });
+
+    try {
+      // 確保當前用戶ID已載入
+      if (_currentUserId == null) {
+        debugPrint('  - _currentUserId 為 null，開始載入');
+        await _loadCurrentUserId();
+        debugPrint('  - 載入後 _currentUserId: $_currentUserId');
+      }
+
+      if (_currentUserId == null) {
+        debugPrint('❌ [ChatDetailPage] 載入後仍無法獲取當前用戶ID');
+        throw Exception('Unable to get current user ID');
+      }
+
+      // 檢查聊天室數據是否已載入
+      if (_chatData == null || _chatData!.isEmpty) {
+        debugPrint('❌ [ChatDetailPage] _chatData 為空，無法獲取對手用戶ID');
+        throw Exception('Chat data not loaded. Please refresh the page.');
+      }
+
+      // 獲取對手用戶ID（應徵者）
+      final opponentId = _getOpponentUserId();
+      debugPrint('  - 獲取到的 opponentId: $opponentId');
+
+      if (opponentId == null) {
+        debugPrint('❌ [ChatDetailPage] 無法獲取對手用戶ID');
+        throw Exception(
+            'Unable to get opponent user ID. Please check chat room data.');
+      }
+
+      debugPrint(
+          '✅ 準備拒絕應徵 - Task: ${_task!['id']}, User: $opponentId, Poster: $_currentUserId');
+
+      // 呼叫 TaskService 的 rejectApplicationFromChat 方法
+      final result = await TaskService().rejectApplicationFromChat(
+        taskId: _task!['id'].toString(),
+        applicantUserId: opponentId,
+      );
+
+      debugPrint('✅ [Reject] API 調用成功，結果: $result');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text(result['message'] ?? 'Application rejected successfully!'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // 通知 Provider 刷新聊天列表數據
+      if (mounted && context.mounted) {
+        try {
+          final provider = context.read<ChatListProvider>();
+          // 根據用戶角色刷新對應的標籤頁
+          if (_userRole == 'creator') {
+            provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+            debugPrint('✅ [Reject] 已通知 Provider 刷新 POSTED_TASKS');
+          }
+          // 強制刷新快取
+          provider.forceRefreshCache();
+          debugPrint('✅ [Reject] 已強制刷新快取');
+        } catch (e) {
+          debugPrint('❌ 通知 Provider 刷新失敗: $e');
+        }
+      }
+
+      // 重要：reject 成功後自動返回上一頁
+      if (mounted && Navigator.canPop(context)) {
+        debugPrint('🔙 [Reject] 自動返回上一頁');
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      ErrorHandlerService.logError(
+          'ChatDetailPage._handleRejectApplication', e);
+      if (mounted) {
+        ErrorSnackBar.show(context, e, operation: 'reject_application');
+      }
+    } finally {
+      // 重置操作狀態
+      if (mounted) {
+        setState(() {
+          _isRejecting = false;
+        });
       }
     }
   }
@@ -3812,6 +4086,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
       // 刷新頁面資料以更新任務狀態
       await _initializeChat();
+
+      // 自動收起 Action Bar
+      if (mounted) {
+        setState(() {
+          _showActionBar = false;
+        });
+      }
     }
   }
 
@@ -3842,9 +4123,42 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       ),
     );
 
-    if (result == true) {
-      // 確認完成成功，刷新頁面資料
+    if (result == true && mounted) {
+      debugPrint('✅ [Confirm] 確認完成成功，刷新聊天室狀態');
+
+      // 通知 Provider 刷新聊天列表數據
+      try {
+        final provider = context.read<ChatListProvider>();
+        // 根據用戶角色刷新對應的標籤頁
+        if (_userRole == 'creator') {
+          provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+          debugPrint('✅ [Confirm] 已通知 Provider 刷新 POSTED_TASKS');
+        } else {
+          provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
+          debugPrint('✅ [Confirm] 已通知 Provider 刷新 MY_WORKS');
+        }
+        // 強制刷新快取
+        provider.forceRefreshCache();
+        debugPrint('✅ [Confirm] 已強制刷新快取');
+
+        // 通知兩個分頁的分頁控制器刷新
+        try {
+          provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+          provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
+        } catch (_) {}
+      } catch (e) {
+        debugPrint('❌ 通知 Provider 刷新失敗: $e');
+      }
+
+      // 重新載入聊天室狀態以更新 Action Bar
       await _initializeChat();
+
+      // 自動收起 Action Bar
+      if (mounted) {
+        setState(() {
+          _showActionBar = false;
+        });
+      }
     }
   }
 
@@ -3871,9 +4185,42 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       ),
     );
 
-    if (result == true) {
-      // 駁回完成成功，刷新頁面資料
+    if (result == true && mounted) {
+      debugPrint('✅ [Disagree] 駁回完成成功，刷新聊天室狀態');
+
+      // 通知 Provider 刷新聊天列表數據
+      try {
+        final provider = context.read<ChatListProvider>();
+        // 根據用戶角色刷新對應的標籤頁
+        if (_userRole == 'creator') {
+          provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+          debugPrint('✅ [Disagree] 已通知 Provider 刷新 POSTED_TASKS');
+        } else {
+          provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
+          debugPrint('✅ [Disagree] 已通知 Provider 刷新 MY_WORKS');
+        }
+        // 強制刷新快取
+        provider.forceRefreshCache();
+        debugPrint('✅ [Disagree] 已強制刷新快取');
+
+        // 通知兩個分頁的分頁控制器刷新
+        try {
+          provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+          provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
+        } catch (_) {}
+      } catch (e) {
+        debugPrint('❌ 通知 Provider 刷新失敗: $e');
+      }
+
+      // 重新載入聊天室狀態以更新 Action Bar
       await _initializeChat();
+
+      // 自動收起 Action Bar
+      if (mounted) {
+        setState(() {
+          _showActionBar = false;
+        });
+      }
     }
   }
 
@@ -4242,6 +4589,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         builder: (context) {
           final descriptionCtrl = TextEditingController();
           String? selectedReason;
+          String? errorText;
           return Padding(
             padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -4279,44 +4627,68 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     }),
                     const SizedBox(height: 8),
                     const Text('Description (min 10 chars)'),
-                    TextField(maxLines: 4, controller: descriptionCtrl),
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final roomId = _currentRoomId;
-                          if (roomId == null ||
-                              selectedReason == null ||
-                              (descriptionCtrl.text.trim().length < 10)) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text(
-                                        'Please select a reason and enter at least 10 characters description.')));
-                            return;
-                          }
-                          try {
-                            await ChatService().reportChat(
-                              roomId: roomId,
-                              reason: selectedReason!,
-                              description: descriptionCtrl.text.trim(),
-                            );
-                            if (mounted) {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text('Report submitted.')));
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Report failed: $e')));
-                            }
-                          }
-                        },
-                        child: const Text('Submit'),
-                      ),
-                    )
+                    StatefulBuilder(builder: (context, setState) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            maxLines: 4,
+                            controller: descriptionCtrl,
+                            onChanged: (_) {
+                              if (errorText != null) {
+                                setState(() => errorText = null);
+                              }
+                            },
+                          ),
+                          if (errorText != null) const SizedBox(height: 6),
+                          if (errorText != null)
+                            Text(
+                              errorText!,
+                              style: const TextStyle(
+                                color: Colors.red,
+                                fontSize: 12,
+                              ),
+                            ),
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                final roomId = _currentRoomId;
+                                if (roomId == null ||
+                                    selectedReason == null ||
+                                    (descriptionCtrl.text.trim().length < 10)) {
+                                  setState(() => errorText =
+                                      'Please select a reason and enter at least 10 characters description.');
+                                  return;
+                                }
+                                try {
+                                  await ChatService().reportChat(
+                                    roomId: roomId,
+                                    reason: selectedReason!,
+                                    description: descriptionCtrl.text.trim(),
+                                  );
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Report submitted.'),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    setState(
+                                        () => errorText = 'Report failed: $e');
+                                  }
+                                }
+                              },
+                              child: const Text('Submit'),
+                            ),
+                          ),
+                        ],
+                      );
+                    })
                   ],
                 ),
               ),
@@ -4327,20 +4699,66 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('檢查檢舉狀態失敗: $e')),
+          SnackBar(content: Text('Error checking report status: $e')),
         );
       }
     }
   }
 
-  void _openPayAndReview() {
-    showDialog(
+  void _openPayAndReview() async {
+    final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return _ConfirmPayDialog(task: _task, room: _room);
+        return _ConfirmPayDialog(
+          task: _task,
+          room: _room,
+          onPaymentSuccess: () {
+            // 付款成功後的回調
+            Navigator.of(context).pop(true);
+          },
+        );
       },
     );
+
+    // 如果付款成功，刷新聊天室狀態
+    if (result == true && mounted) {
+      debugPrint('💰 [Pay] 付款成功，刷新聊天室狀態');
+
+      // 通知 Provider 刷新聊天列表數據
+      try {
+        final provider = context.read<ChatListProvider>();
+        // 根據用戶角色刷新對應的標籤頁
+        if (_userRole == 'creator') {
+          provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+          debugPrint('✅ [Pay] 已通知 Provider 刷新 POSTED_TASKS');
+        } else {
+          provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
+          debugPrint('✅ [Pay] 已通知 Provider 刷新 MY_WORKS');
+        }
+        // 強制刷新快取
+        provider.forceRefreshCache();
+        debugPrint('✅ [Pay] 已強制刷新快取');
+
+        // 通知兩個分頁的分頁控制器刷新
+        try {
+          provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+          provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
+        } catch (_) {}
+      } catch (e) {
+        debugPrint('❌ 通知 Provider 刷新失敗: $e');
+      }
+
+      // 重新載入聊天室狀態以更新 Action Bar
+      await _initializeChat();
+
+      // 自動收起 Action Bar
+      if (mounted) {
+        setState(() {
+          _showActionBar = false;
+        });
+      }
+    }
   }
 
   void _showPaidInfo() {
@@ -4389,6 +4807,34 @@ class _ChatDetailPageState extends State<ChatDetailPage>
             taskerName: taskerName,
             taskTitle: taskTitle,
             onReviewSubmitted: () {
+              debugPrint('✅ [Review] 評分提交成功，刷新聊天室狀態');
+
+              // 通知 Provider 刷新聊天列表數據
+              try {
+                final provider = context.read<ChatListProvider>();
+                // 根據用戶角色刷新對應的標籤頁
+                if (_userRole == 'creator') {
+                  provider
+                      .checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+                  debugPrint('✅ [Review] 已通知 Provider 刷新 POSTED_TASKS');
+                } else {
+                  provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
+                  debugPrint('✅ [Review] 已通知 Provider 刷新 MY_WORKS');
+                }
+                // 強制刷新快取
+                provider.forceRefreshCache();
+                debugPrint('✅ [Review] 已強制刷新快取');
+
+                // 通知兩個分頁的分頁控制器刷新
+                try {
+                  provider
+                      .checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+                  provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
+                } catch (_) {}
+              } catch (e) {
+                debugPrint('❌ 通知 Provider 刷新失敗: $e');
+              }
+
               // 重新載入聊天室狀態以更新 Action Bar
               _initializeChat();
             },
@@ -4406,6 +4852,34 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           taskerName: taskerName,
           taskTitle: taskTitle,
           onReviewSubmitted: () {
+            debugPrint('✅ [Review] 評分提交成功，刷新聊天室狀態');
+
+            // 通知 Provider 刷新聊天列表數據
+            try {
+              final provider = context.read<ChatListProvider>();
+              // 根據用戶角色刷新對應的標籤頁
+              if (_userRole == 'creator') {
+                provider
+                    .checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+                debugPrint('✅ [Review] 已通知 Provider 刷新 POSTED_TASKS');
+              } else {
+                provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
+                debugPrint('✅ [Review] 已通知 Provider 刷新 MY_WORKS');
+              }
+              // 強制刷新快取
+              provider.forceRefreshCache();
+              debugPrint('✅ [Review] 已強制刷新快取');
+
+              // 通知兩個分頁的分頁控制器刷新
+              try {
+                provider
+                    .checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
+                provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
+              } catch (_) {}
+            } catch (e) {
+              debugPrint('❌ 通知 Provider 刷新失敗: $e');
+            }
+
             _initializeChat();
           },
         ),
@@ -4635,6 +5109,44 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         );
       }
     }
+  }
+
+  /// 修正應徵狀態數據映射問題
+  /// 將 task['application_status'] 映射到 task['application']['status']
+  /// 以便 Action Bar 能夠正確讀取應徵狀態
+  Map<String, dynamic> _fixApplicationStatusMapping(
+      Map<String, dynamic> chatData) {
+    final result = Map<String, dynamic>.from(chatData);
+    final task = result['task'] as Map<String, dynamic>?;
+
+    if (task != null) {
+      final applicationStatus = task['application_status']?.toString();
+
+      debugPrint('🔧 [_fixApplicationStatusMapping] 修正應徵狀態映射:');
+      debugPrint('  - application_status: $applicationStatus');
+      debugPrint('  - 現有 application: ${task['application']}');
+
+      // 如果有應徵狀態但沒有 application 巢狀結構，創建它
+      if (applicationStatus != null && applicationStatus.isNotEmpty) {
+        // 保持現有的 application 數據（如果存在）
+        final existingApplication =
+            task['application'] as Map<String, dynamic>? ?? {};
+
+        // 創建或更新 application 巢狀結構
+        task['application'] = {
+          ...existingApplication,
+          'status': applicationStatus,
+          'created_at': task['application_created_at'],
+          'updated_at': task['application_updated_at'],
+        };
+
+        debugPrint('  - 已創建/更新 application 巢狀結構: ${task['application']}');
+      }
+
+      result['task'] = task;
+    }
+
+    return result;
   }
 
   // 輔助方法：安全地獲取數據
@@ -5547,8 +6059,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 class _ConfirmPayDialog extends StatefulWidget {
   final Map<String, dynamic>? task;
   final Map<String, dynamic>? room;
+  final VoidCallback? onPaymentSuccess;
 
-  const _ConfirmPayDialog({required this.task, required this.room});
+  const _ConfirmPayDialog({
+    required this.task,
+    required this.room,
+    this.onPaymentSuccess,
+  });
 
   @override
   State<_ConfirmPayDialog> createState() => _ConfirmPayDialogState();
@@ -5729,10 +6246,16 @@ class _ConfirmPayDialogState extends State<_ConfirmPayDialog> {
         debugPrint('✅ [Payment Flow] Step 3: Review submitted successfully');
 
         if (mounted) {
-          Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Payment completed, task finished')),
           );
+
+          // 調用成功回調
+          if (widget.onPaymentSuccess != null) {
+            widget.onPaymentSuccess!();
+          } else {
+            Navigator.of(context).pop();
+          }
         }
       }
     } catch (e) {

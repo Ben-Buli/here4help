@@ -11,8 +11,6 @@ class ChatService {
   factory ChatService() => _instance;
   ChatService._internal();
 
-  final String _baseUrl = AppConfig.apiBaseUrl;
-
   /// 獲取用戶的聊天房間列表
   Future<Map<String, dynamic>> getChatRooms({
     String? taskId,
@@ -347,7 +345,7 @@ class ChatService {
         'room_id': roomId,
       };
 
-      final uri = Uri.parse('$_baseUrl/backend/api/chat/check_report.php')
+      final uri = Uri.parse(AppConfig.api('/chat/check_report.php'))
           .replace(queryParameters: queryParams);
 
       final response = await http.get(
@@ -575,26 +573,116 @@ class ChatService {
         throw Exception('未登入');
       }
 
-      final uri = Uri.parse(AppConfig.api('/tasks/applications/withdraw.php'));
-      final response = await http.post(
-        uri,
+      // 獲取當前用戶信息
+      final userData = await AuthService.getUserData();
+      if (userData == null) {
+        throw Exception('Current user not found');
+      }
+
+      final userId = userData['id'] as int;
+
+      // 首先查找當前用戶在該任務的應徵記錄
+      final applicationsResponse = await http.get(
+        Uri.parse('${AppConfig.myWorkApplicationsUrl}?user_id=$userId'),
         headers: {
-          'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
         },
-        body: json.encode({
-          'task_id': taskId,
-        }),
-      );
+      ).timeout(const Duration(seconds: 30));
+
+      if (applicationsResponse.statusCode != 200) {
+        throw Exception('Failed to fetch user applications');
+      }
+
+      final applicationsData = json.decode(applicationsResponse.body);
+      if (applicationsData['success'] != true) {
+        throw Exception(
+            applicationsData['message'] ?? 'Failed to fetch applications');
+      }
+
+      // 查找該任務的應徵記錄
+      debugPrint('🔍 [withdrawApplication] API 回應結構:');
+      debugPrint('  - applicationsData: ${applicationsData.toString()}');
+
+      // 根據 API 回應結構，applications 在 data.applications 中
+      final applications = applicationsData['data']?['applications'] ?? [];
+
+      debugPrint('🔍 [withdrawApplication] 查找應徵記錄:');
+      debugPrint('  - taskId: $taskId');
+      debugPrint('  - applications count: ${applications.length}');
+
+      Map<String, dynamic>? targetApplication;
+      for (final app in applications) {
+        debugPrint(
+            '  - checking app: task_id=${app['task_id']}, status=${app['status'] ?? app['application_status']}');
+        final appStatus = app['status'] ?? app['application_status'];
+        if (app['task_id'].toString() == taskId && appStatus == 'applied') {
+          targetApplication = app;
+          debugPrint(
+              '  ✅ 找到目標應徵記錄: application_id=${app['id'] ?? app['application_id']}');
+          break;
+        }
+      }
+
+      if (targetApplication == null) {
+        // 檢查是否已經撤回
+        for (final app in applications) {
+          final appStatus = app['status'] ?? app['application_status'];
+          if (app['task_id'].toString() == taskId && appStatus == 'withdrawn') {
+            throw Exception('This application has already been withdrawn');
+          }
+        }
+        throw Exception('No active application found for this task');
+      }
+
+      final applicationId = targetApplication['id']?.toString() ??
+          targetApplication['application_id']?.toString();
+
+      if (applicationId == null) {
+        throw Exception('Application ID not found');
+      }
+
+      // 使用 update-status API 將狀態更新為 withdrawn
+      final uri =
+          Uri.parse(AppConfig.api('/tasks/applications/update-status.php'));
+
+      debugPrint('🚀 [withdrawApplication] 呼叫 update-status API:');
+      debugPrint('  - URI: $uri');
+      debugPrint('  - application_id: $applicationId');
+
+      final requestBody = json.encode({
+        'application_id': applicationId,
+        'status': 'withdrawn',
+      });
+
+      debugPrint('📤 [withdrawApplication] 請求內容:');
+      debugPrint('  - body: $requestBody');
+      debugPrint('  - token: ${token.substring(0, 20)}...');
+
+      final response = await http
+          .put(
+            uri,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+            body: requestBody,
+          )
+          .timeout(const Duration(seconds: 30));
+
+      debugPrint('📥 [withdrawApplication] API 回應:');
+      debugPrint('  - statusCode: ${response.statusCode}');
+      debugPrint('  - body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
+          debugPrint('✅ [withdrawApplication] 撤回成功');
           return Map<String, dynamic>.from(data['data'] ?? {});
         }
         throw Exception(data['message'] ?? '撤銷應徵申請失敗');
       } else {
-        throw Exception('HTTP ${response.statusCode}: 撤銷應徵申請失敗');
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       throw Exception('撤銷應徵申請失敗: $e');

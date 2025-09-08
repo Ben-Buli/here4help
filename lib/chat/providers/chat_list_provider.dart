@@ -830,7 +830,7 @@ class ChatListProvider extends ChangeNotifier {
 
   /// 使用快照覆蓋未讀數（全量替換，不保留舊房間）
   void replaceUnreadByRoom(Map<String, int> snapshot) {
-    debugPrint('🧹 [ChatListProvider] 準備以快照覆蓋未讀數: ${snapshot.length} 個房間');
+    // debugPrint('🧹 [ChatListProvider] 準備以快照覆蓋未讀數: ${snapshot.length} 個房間');
 
     // 標準化新數據
     final normalizedSnapshot =

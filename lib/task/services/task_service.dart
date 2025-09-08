@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../../config/app_config.dart';
 import '../../auth/services/auth_service.dart';
-import '../../auth/services/user_service.dart';
 import '../../services/http_client_service.dart';
 
 class TaskService extends ChangeNotifier {
@@ -31,29 +30,58 @@ class TaskService extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      final response = await http.get(
-        Uri.parse(AppConfig.taskListUrl),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 30));
+      // 獲取認證標頭
+      final token = await AuthService.getToken();
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
+      final response = await http
+          .get(
+            Uri.parse(AppConfig.taskListUrl),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 30));
+
+      debugPrint('🔍 [TaskService] loadTasks API 調用:');
+      debugPrint('  - URL: ${AppConfig.taskListUrl}');
+      debugPrint('  - Headers: $headers');
+      debugPrint('  - Status Code: ${response.statusCode}');
+      debugPrint(
+          '  - Response Body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}...');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data['success']) {
           _tasks.clear();
           final dataList = data['data'];
+          debugPrint('🔍 [TaskService] 解析任務數據:');
+          debugPrint('  - dataList type: ${dataList.runtimeType}');
+
           if (dataList is List) {
             _tasks.addAll(List<Map<String, dynamic>>.from(dataList));
+            debugPrint('  - 直接從 List 載入 ${_tasks.length} 個任務');
           } else if (dataList is Map) {
             // 檢查是否有 tasks 子陣列
             if (dataList['tasks'] is List) {
               _tasks.addAll(List<Map<String, dynamic>>.from(dataList['tasks']));
+              debugPrint('  - 從 Map.tasks 載入 ${_tasks.length} 個任務');
             } else {
               // 如果 data 是單個任務對象，轉換為列表
               _tasks.add(Map<String, dynamic>.from(dataList));
+              debugPrint('  - 從單個 Map 載入 1 個任務');
             }
           }
+
+          debugPrint('✅ [TaskService] 最終載入 ${_tasks.length} 個任務');
+          if (_tasks.isNotEmpty) {
+            debugPrint(
+                '  - 第一個任務: ${_tasks.first['title']} (ID: ${_tasks.first['id']})');
+          }
+
           _sortTasks();
         } else {
           _error = data['message'] ?? 'Failed to load tasks';
@@ -84,11 +112,21 @@ class TaskService extends ChangeNotifier {
       if (filters != null) {
         query.addAll(filters);
       }
+
+      // 獲取認證標頭
+      final token = await AuthService.getToken();
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
       final uri =
           Uri.parse(AppConfig.taskListUrl).replace(queryParameters: query);
-      final resp = await http.get(uri, headers: {
-        'Content-Type': 'application/json'
-      }).timeout(const Duration(seconds: 30));
+      final resp = await http
+          .get(uri, headers: headers)
+          .timeout(const Duration(seconds: 30));
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body);
         if (data['success'] == true) {
@@ -1034,6 +1072,12 @@ class TaskService extends ChangeNotifier {
     required int userId,
     required int posterId,
   }) async {
+    // 獲取用戶 token
+    final token = await AuthService.getToken();
+    if (token == null) {
+      throw Exception('User not authenticated');
+    }
+
     final body = {
       'task_id': taskId,
       'user_id': userId,
@@ -1043,7 +1087,10 @@ class TaskService extends ChangeNotifier {
     final resp = await http
         .post(
           Uri.parse(AppConfig.applicationApproveUrlV2),
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 30));
@@ -1065,6 +1112,12 @@ class TaskService extends ChangeNotifier {
     required int userId,
     required int posterId,
   }) async {
+    // 獲取用戶 token
+    final token = await AuthService.getToken();
+    if (token == null) {
+      throw Exception('User not authenticated');
+    }
+
     final body = {
       'task_id': taskId,
       'user_id': userId,
@@ -1074,7 +1127,10 @@ class TaskService extends ChangeNotifier {
     final resp = await http
         .post(
           Uri.parse(AppConfig.applicationRejectUrl),
-          headers: {'Content-Type': 'application/json'},
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 30));
@@ -1208,13 +1264,13 @@ class TaskService extends ChangeNotifier {
       }
 
       // 獲取當前用戶 ID
-      final userService = UserService();
-      final currentUser = userService.currentUser;
-      if (currentUser == null) {
+      // 使用 AuthService.getUserData() 方法來獲取用戶信息
+      final userData = await AuthService.getUserData();
+      if (userData == null) {
         throw Exception('Current user not found');
       }
 
-      final userId = currentUser.id;
+      final userId = userData['id'] as int;
 
       // 首先查找當前用戶在該任務的應徵記錄
       final applicationsResponse = await http.get(
@@ -1305,13 +1361,13 @@ class TaskService extends ChangeNotifier {
       }
 
       // 獲取當前用戶 ID 作為 poster_id
-      final userService = UserService();
-      final currentUser = userService.currentUser;
-      if (currentUser == null) {
+      // 使用 AuthService.getUserData() 方法來獲取用戶信息
+      final userData = await AuthService.getUserData();
+      if (userData == null) {
         throw Exception('Current user not found');
       }
 
-      final posterId = currentUser.id;
+      final posterId = userData['id'] as int;
 
       // 調用現有的 rejectApplication 方法
       return await rejectApplication(

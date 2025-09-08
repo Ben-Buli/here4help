@@ -477,6 +477,109 @@ class _TaskListPageState extends State<TaskListPage> {
     );
   }
 
+  /// 建構空任務列表視圖
+  Widget _buildEmptyTasksView() {
+    return Consumer<ThemeConfigManager>(
+      builder: (context, themeManager, child) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 空狀態圖示
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color:
+                        Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.work_outline,
+                    size: 60,
+                    color:
+                        Theme.of(context).colorScheme.primary.withOpacity(0.6),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // 主要文字
+                Text(
+                  'No tasks are currently being posted',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+
+                // 副文字
+                Text(
+                  _getEmptyStateSubtitle(),
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.7),
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 32),
+
+                // 操作按鈕
+                _buildEmptyStateActions(),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 獲取空狀態副標題
+  String _getEmptyStateSubtitle() {
+    if (searchQuery.isNotEmpty) {
+      return 'No tasks found matching "$searchQuery"\nPlease try a different keyword or clear the search';
+    } else if (_hasActiveFilters) {
+      return 'No tasks match the current filter settings\nPlease adjust the filter settings or reset the filters';
+    } else if (_taskTypeFilter == 'favorites') {
+      return 'You have not favorited any tasks\nClick the bookmark icon on a task card to favorite a task';
+    } else if (_taskTypeFilter == 'my_tasks') {
+      return 'You have not posted any tasks\nGo to the post page to create your first task';
+    } else {
+      return 'No tasks are currently applying\nPlease check back later or refresh the page';
+    }
+  }
+
+  /// 建構空狀態操作按鈕
+  Widget _buildEmptyStateActions() {
+    // 沒有搜尋或篩選條件時，顯示重新整理按鈕
+    return ElevatedButton.icon(
+      onPressed: () async {
+        await _loadGlobalTasks();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Task list has been updated'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+      icon: const Icon(Icons.refresh),
+      label: const Text('Refresh'),
+      style: ElevatedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      ),
+    );
+  }
+
   /// 顯示狀態
   String _displayStatus(Map<String, dynamic> task) {
     final dynamic display = task['status_display'];
@@ -1681,378 +1784,412 @@ class _TaskListPageState extends State<TaskListPage> {
 
               // 任務列表
               Expanded(
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.only(
-                    left: 12,
-                    right: 12,
-                    top: 12,
-                    bottom: 80, // 保留底部距離，避免被 scroll to top button 遮擋
-                  ),
-                  itemCount: sortedTasks.length,
-                  itemBuilder: (context, index) {
-                    final task = sortedTasks[index];
-                    final taskId = task['id']?.toString() ?? '';
-                    final isFavorite = _favoriteTaskIds.contains(taskId);
+                child: sortedTasks.isEmpty
+                    ? _buildEmptyTasksView()
+                    : ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.only(
+                          left: 12,
+                          right: 12,
+                          top: 12,
+                          bottom: 80, // 保留底部距離，避免被 scroll to top button 遮擋
+                        ),
+                        itemCount: sortedTasks.length,
+                        itemBuilder: (context, index) {
+                          final task = sortedTasks[index];
+                          final taskId = task['id']?.toString() ?? '';
+                          final isFavorite = _favoriteTaskIds.contains(taskId);
 
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 1,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () {
-                          _showTaskDetailDialog(task);
-                        },
-                        child: Stack(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 1,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () {
+                                _showTaskDetailDialog(task);
+                              },
+                              child: Stack(
                                 children: [
-                                  // 任務標題和操作按鈕
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          task['title'] ?? 'Untitled Task',
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      // trailing menu, no extra SizedBox/Align so it uses the same 16px card padding
-                                      Consumer<UserService>(
-                                        builder: (context, userService, child) {
-                                          final userPermission = userService
-                                                  .currentUser?.permission ??
-                                              0;
-                                          final currentUserId =
-                                              userService.currentUser?.id;
-                                          final taskCreatorId =
-                                              task['creator_id']?.toString();
-                                          final isOwnTask =
-                                              currentUserId?.toString() ==
-                                                  taskCreatorId;
-
-                                          // 不顯示檢舉按鈕的條件：權限不足或是自己的任務
-                                          if (userPermission <= 0 ||
-                                              isOwnTask) {
-                                            return const SizedBox.shrink();
-                                          }
-
-                                          return PopupMenuButton<String>(
-                                            padding: EdgeInsets.zero,
-                                            icon: const Icon(Icons.more_vert,
-                                                size: 20),
-                                            onSelected: (value) {
-                                              if (value == 'report') {
-                                                _showReportDialog(task);
-                                              }
-                                            },
-                                            itemBuilder: (context) => const [
-                                              PopupMenuItem(
-                                                value: 'report',
-                                                child: Row(
-                                                  children: [
-                                                    Icon(Icons.flag_outlined),
-                                                    SizedBox(width: 8),
-                                                    Text('Report'),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-
-                                  // 任務資訊 - 按照截圖右邊的佈局
-                                  Row(
-                                    children: [
-                                      // 左側：Applicant、Location、Language
-                                      Expanded(
-                                        child: Column(
+                                  Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // 任務標題和操作按鈕
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            // Applicant
-                                            Row(
-                                              children: [
-                                                Icon(Icons.person_outline,
-                                                    size: 14,
-                                                    color: Colors.grey[600]),
-                                                const SizedBox(width: 4),
-                                                Expanded(
-                                                  child: Consumer<UserService>(
-                                                    builder: (context,
-                                                        userService, child) {
-                                                      final currentUserId =
-                                                          userService
-                                                              .currentUser?.id;
-                                                      final taskCreatorId =
-                                                          task['creator_id']
-                                                              ?.toString();
-                                                      final isOwnTask =
-                                                          currentUserId
-                                                                  ?.toString() ==
-                                                              taskCreatorId;
-                                                      final creatorName = task[
-                                                              'creator_name'] ??
-                                                          'Unknown User';
+                                            Expanded(
+                                              child: Text(
+                                                task['title'] ??
+                                                    'Untitled Task',
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            // trailing menu, no extra SizedBox/Align so it uses the same 16px card padding
+                                            Consumer<UserService>(
+                                              builder: (context, userService,
+                                                  child) {
+                                                final userPermission =
+                                                    userService.currentUser
+                                                            ?.permission ??
+                                                        0;
+                                                final currentUserId =
+                                                    userService.currentUser?.id;
+                                                final taskCreatorId =
+                                                    task['creator_id']
+                                                        ?.toString();
+                                                final isOwnTask =
+                                                    currentUserId?.toString() ==
+                                                        taskCreatorId;
 
-                                                      return Text(
-                                                        isOwnTask
-                                                            ? '$creatorName (YOU)'
-                                                            : creatorName,
+                                                // 不顯示檢舉按鈕的條件：權限不足或是自己的任務
+                                                if (userPermission <= 0 ||
+                                                    isOwnTask) {
+                                                  return const SizedBox
+                                                      .shrink();
+                                                }
+
+                                                return PopupMenuButton<String>(
+                                                  padding: EdgeInsets.zero,
+                                                  icon: const Icon(
+                                                      Icons.more_vert,
+                                                      size: 20),
+                                                  onSelected: (value) {
+                                                    if (value == 'report') {
+                                                      _showReportDialog(task);
+                                                    }
+                                                  },
+                                                  itemBuilder: (context) =>
+                                                      const [
+                                                    PopupMenuItem(
+                                                      value: 'report',
+                                                      child: Row(
+                                                        children: [
+                                                          Icon(Icons
+                                                              .flag_outlined),
+                                                          SizedBox(width: 8),
+                                                          Text('Report'),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ],
+                                                );
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+
+                                        // 任務資訊 - 按照截圖右邊的佈局
+                                        Row(
+                                          children: [
+                                            // 左側：Applicant、Location、Language
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  // Applicant
+                                                  Row(
+                                                    children: [
+                                                      Icon(Icons.person_outline,
+                                                          size: 14,
+                                                          color:
+                                                              Colors.grey[600]),
+                                                      const SizedBox(width: 4),
+                                                      Expanded(
+                                                        child: Consumer<
+                                                            UserService>(
+                                                          builder: (context,
+                                                              userService,
+                                                              child) {
+                                                            final currentUserId =
+                                                                userService
+                                                                    .currentUser
+                                                                    ?.id;
+                                                            final taskCreatorId =
+                                                                task['creator_id']
+                                                                    ?.toString();
+                                                            final isOwnTask =
+                                                                currentUserId
+                                                                        ?.toString() ==
+                                                                    taskCreatorId;
+                                                            final creatorName =
+                                                                task['creator_name'] ??
+                                                                    'Unknown User';
+
+                                                            return Text(
+                                                              isOwnTask
+                                                                  ? '$creatorName (YOU)'
+                                                                  : creatorName,
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                color: Theme.of(
+                                                                        context)
+                                                                    .colorScheme
+                                                                    .primary,
+                                                                fontWeight: isOwnTask
+                                                                    ? FontWeight
+                                                                        .w600
+                                                                    : FontWeight
+                                                                        .normal,
+                                                              ),
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  // Location
+                                                  Row(
+                                                    children: [
+                                                      Icon(Icons.location_on,
+                                                          size: 14,
+                                                          color:
+                                                              Colors.grey[600]),
+                                                      const SizedBox(width: 4),
+                                                      Expanded(
+                                                        child: Text(
+                                                          task['location'] ??
+                                                              'No assigned',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: Theme.of(
+                                                                    context)
+                                                                .colorScheme
+                                                                .primary,
+                                                          ),
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  // Language
+                                                  Row(
+                                                    children: [
+                                                      Icon(Icons.chat_outlined,
+                                                          size: 14,
+                                                          color:
+                                                              Colors.grey[600]),
+                                                      const SizedBox(width: 4),
+                                                      Expanded(
+                                                        child: Text(
+                                                          (task['language_requirement'] !=
+                                                                      null &&
+                                                                  task['language_requirement']
+                                                                      .toString()
+                                                                      .isNotEmpty)
+                                                              ? task[
+                                                                  'language_requirement']
+                                                              : '-',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: Theme.of(
+                                                                    context)
+                                                                .colorScheme
+                                                                .primary,
+                                                          ),
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            // 右側：Date、Reward
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  // Date
+                                                  Row(
+                                                    children: [
+                                                      Icon(Icons.access_time,
+                                                          size: 14,
+                                                          color:
+                                                              Colors.grey[600]),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        DateFormat('MM/dd')
+                                                            .format(
+                                                          DateTime.parse(task[
+                                                                  'task_date'] ??
+                                                              'No assigned'),
+                                                        ),
                                                         style: TextStyle(
                                                           fontSize: 12,
                                                           color:
                                                               Theme.of(context)
                                                                   .colorScheme
                                                                   .primary,
-                                                          fontWeight: isOwnTask
-                                                              ? FontWeight.w600
-                                                              : FontWeight
-                                                                  .normal,
                                                         ),
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                      );
-                                                    },
+                                                      ),
+                                                    ],
                                                   ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 4),
-                                            // Location
-                                            Row(
-                                              children: [
-                                                Icon(Icons.location_on,
-                                                    size: 14,
-                                                    color: Colors.grey[600]),
-                                                const SizedBox(width: 4),
-                                                Expanded(
-                                                  child: Text(
-                                                    task['location'] ??
-                                                        'No assigned',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .primary,
-                                                    ),
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
+                                                  const SizedBox(height: 4),
+                                                  // Reward
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                          Icons
+                                                              .monetization_on_outlined,
+                                                          size: 14,
+                                                          color:
+                                                              Colors.grey[600]),
+                                                      const SizedBox(width: 4),
+                                                      Expanded(
+                                                        child: Text(
+                                                          NumberFormat('#,###').format(
+                                                              int.tryParse((task[
+                                                                              'reward_point'] ??
+                                                                          task[
+                                                                              'salary'] ??
+                                                                          '0')
+                                                                      .toString()) ??
+                                                                  0),
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                            color: Theme.of(
+                                                                    context)
+                                                                .colorScheme
+                                                                .primary,
+                                                          ),
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 4),
-                                            // Language
-                                            Row(
-                                              children: [
-                                                Icon(Icons.chat_outlined,
-                                                    size: 14,
-                                                    color: Colors.grey[600]),
-                                                const SizedBox(width: 4),
-                                                Expanded(
-                                                  child: Text(
-                                                    (task['language_requirement'] !=
-                                                                null &&
-                                                            task['language_requirement']
-                                                                .toString()
-                                                                .isNotEmpty)
-                                                        ? task[
-                                                            'language_requirement']
-                                                        : '-',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Theme.of(context)
-                                                          .colorScheme
-                                                          .primary,
-                                                    ),
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
+                                                ],
+                                              ),
                                             ),
                                           ],
                                         ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      // 右側：Date、Reward
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                        const SizedBox(height: 8),
+
+                                        // New/Popular 狀態 + 時間距離戳記（合併顯示）
+                                        Row(
                                           children: [
-                                            // Date
-                                            Row(
-                                              children: [
-                                                Icon(Icons.access_time,
-                                                    size: 14,
-                                                    color: Colors.grey[600]),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  DateFormat('MM/dd').format(
-                                                    DateTime.parse(
-                                                        task['task_date'] ??
-                                                            'No assigned'),
-                                                  ),
+                                            if (_isNewTask(task)) ...[
+                                              Icon(Icons.eco,
+                                                  size: 16,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary),
+                                              const SizedBox(width: 6),
+                                              Text('New',
                                                   style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .primary,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 4),
-                                            // Reward
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                    Icons
-                                                        .monetization_on_outlined,
-                                                    size: 14,
-                                                    color: Colors.grey[600]),
-                                                const SizedBox(width: 4),
-                                                Expanded(
-                                                  child: Text(
-                                                    NumberFormat('#,###').format(
-                                                        int.tryParse((task[
-                                                                        'reward_point'] ??
-                                                                    task[
-                                                                        'salary'] ??
-                                                                    '0')
-                                                                .toString()) ??
-                                                            0),
-                                                    style: TextStyle(
-                                                      fontSize: 12,
+                                                      fontSize: 14,
                                                       fontWeight:
                                                           FontWeight.w500,
                                                       color: Theme.of(context)
                                                           .colorScheme
-                                                          .primary,
-                                                    ),
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
+                                                          .primary)),
+                                              const SizedBox(width: 16),
+                                            ] else if (_isPopularTask(
+                                                task)) ...[
+                                              Icon(Icons.local_fire_department,
+                                                  size: 16,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary),
+                                              const SizedBox(width: 6),
+                                              Text('Popular',
+                                                  style: TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .primary)),
+                                              const SizedBox(width: 16),
+                                            ],
+                                            const Icon(Icons.schedule,
+                                                size: 16, color: Colors.grey),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              _getTimeAgo(task),
+                                              style: const TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey),
                                             ),
                                           ],
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-
-                                  // New/Popular 狀態 + 時間距離戳記（合併顯示）
-                                  Row(
-                                    children: [
-                                      if (_isNewTask(task)) ...[
-                                        Icon(Icons.eco,
-                                            size: 16,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .primary),
-                                        const SizedBox(width: 6),
-                                        Text('New',
-                                            style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .primary)),
-                                        const SizedBox(width: 16),
-                                      ] else if (_isPopularTask(task)) ...[
-                                        Icon(Icons.local_fire_department,
-                                            size: 16,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .primary),
-                                        const SizedBox(width: 6),
-                                        Text('Popular',
-                                            style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .primary)),
-                                        const SizedBox(width: 16),
                                       ],
-                                      const Icon(Icons.schedule,
-                                          size: 16, color: Colors.grey),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        _getTimeAgo(task),
-                                        style: const TextStyle(
-                                            fontSize: 14, color: Colors.grey),
-                                      ),
-                                    ],
+                                    ),
+                                  ),
+                                  // 書籤按鈕 - 固定在右下角
+                                  Positioned(
+                                    right: 16,
+                                    bottom: 8,
+                                    child: Consumer<UserService>(
+                                      builder: (context, userService, child) {
+                                        final userPermission = userService
+                                                .currentUser?.permission ??
+                                            0;
+                                        final currentUserId =
+                                            userService.currentUser?.id;
+                                        final taskCreatorId =
+                                            task['creator_id']?.toString();
+                                        final isOwnTask =
+                                            currentUserId?.toString() ==
+                                                taskCreatorId;
+
+                                        // 不顯示收藏按鈕的條件：權限不足或是自己的任務
+                                        if (userPermission <= 0 || isOwnTask) {
+                                          return const SizedBox.shrink();
+                                        }
+
+                                        return IconButton(
+                                          icon: Icon(
+                                            isFavorite
+                                                ? Icons.bookmark
+                                                : Icons.bookmark_border,
+                                            size: 22,
+                                            color: isFavorite
+                                                ? Colors.amber
+                                                : null,
+                                          ),
+                                          onPressed: () async =>
+                                              await _toggleFavorite(taskId),
+                                          tooltip: isFavorite
+                                              ? 'Remove from favorites'
+                                              : 'Add to favorites',
+                                        );
+                                      },
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                            // 書籤按鈕 - 固定在右下角
-                            Positioned(
-                              right: 16,
-                              bottom: 8,
-                              child: Consumer<UserService>(
-                                builder: (context, userService, child) {
-                                  final userPermission =
-                                      userService.currentUser?.permission ?? 0;
-                                  final currentUserId =
-                                      userService.currentUser?.id;
-                                  final taskCreatorId =
-                                      task['creator_id']?.toString();
-                                  final isOwnTask = currentUserId?.toString() ==
-                                      taskCreatorId;
-
-                                  // 不顯示收藏按鈕的條件：權限不足或是自己的任務
-                                  if (userPermission <= 0 || isOwnTask) {
-                                    return const SizedBox.shrink();
-                                  }
-
-                                  return IconButton(
-                                    icon: Icon(
-                                      isFavorite
-                                          ? Icons.bookmark
-                                          : Icons.bookmark_border,
-                                      size: 22,
-                                      color: isFavorite ? Colors.amber : null,
-                                    ),
-                                    onPressed: () async =>
-                                        await _toggleFavorite(taskId),
-                                    tooltip: isFavorite
-                                        ? 'Remove from favorites'
-                                        : 'Add to favorites',
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
               ),
             ],
           ),

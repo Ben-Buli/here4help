@@ -34,7 +34,7 @@ class UserActiveLogger {
             INSERT INTO user_active_log
                 (user_id, actor_type, actor_id, action, field, old_value, new_value, reason, ip, user_agent, request_id, trace_id, metadata, created_at)
             VALUES
-                (:user_id, :actor_type, :actor_id, :action, :field, :old_value, :new_value, :reason, :request_id, :trace_id, :metadata, NOW())
+                (:user_id, :actor_type, :actor_id, :action, :field, :old_value, :new_value, :reason, :ip, :user_agent, :request_id, :trace_id, :metadata, NOW())
         ");
 
         $ip = $_SERVER['REMOTE_ADDR'] ?? null;

@@ -65,8 +65,27 @@ class ErrorHandlerService {
       return 'Only open tasks can accept applications';
     }
 
-    if (errorString.contains('only task creator can accept')) {
-      return 'Only the task creator can accept applications';
+    if (errorString.contains('only task creator can accept') ||
+        errorString.contains('only task creator can reject')) {
+      return 'Only the task creator can perform this action';
+    }
+
+    if (errorString.contains('application not found')) {
+      return 'The application could not be found';
+    }
+
+    if (errorString.contains('application is not in applied status')) {
+      return 'This application cannot be processed in its current status';
+    }
+
+    // 數據庫約束錯誤
+    if (errorString.contains('duplicate entry') &&
+        errorString.contains('uk_task_one_accept')) {
+      return 'This task already has an accepted applicant';
+    }
+
+    if (errorString.contains('integrity constraint violation')) {
+      return 'This operation cannot be completed due to data conflicts';
     }
 
     // 驗證錯誤
@@ -138,8 +157,31 @@ class ErrorHandlerService {
           return 'This task is no longer available for applications. It may have been assigned to another tasker.';
         } else if (error.toString().contains('Only task creator can accept')) {
           return 'Only the task creator can accept applications';
+        } else if (error.toString().contains('duplicate entry') &&
+            error.toString().contains('uk_task_one_accept')) {
+          return 'This applicant has already been accepted for this task';
+        } else if (error
+            .toString()
+            .contains('integrity constraint violation')) {
+          return 'Cannot accept this application due to existing task assignments';
         }
         return 'Failed to accept application: $baseMessage';
+      case 'reject_application':
+        if (error.toString().contains('Only task creator can reject')) {
+          return 'Only the task creator can reject applications';
+        } else if (error.toString().contains('application not found')) {
+          return 'The application could not be found';
+        } else if (error.toString().contains('not in applied status')) {
+          return 'This application cannot be rejected in its current status';
+        }
+        return 'Failed to reject application: $baseMessage';
+      case 'withdraw_application':
+        if (error.toString().contains('application not found')) {
+          return 'The application could not be found';
+        } else if (error.toString().contains('cannot withdraw')) {
+          return 'This application cannot be withdrawn at this time';
+        }
+        return 'Failed to withdraw application: $baseMessage';
       case 'submit_rating':
         return 'Failed to submit rating: $baseMessage';
       case 'upload_file':

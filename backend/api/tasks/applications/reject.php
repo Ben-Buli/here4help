@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../utils/Response.php';
+require_once __DIR__ . '/../../../utils/TokenValidator.php';
 require_once __DIR__ . '/../../../utils/socket_notifier.php';
 
 Response::setCorsHeaders();
@@ -10,6 +11,18 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
+    // 驗證 Authorization token
+    $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+    if (empty($auth_header)) {
+        Response::error('Authorization header required', 401);
+    }
+    
+    $actor_id = TokenValidator::validateAuthHeader($auth_header);
+    if (!$actor_id) {
+        Response::error('Invalid or expired token', 401);
+    }
+    $actor_id = (int)$actor_id;
+
     $db = Database::getInstance();
     $conn = $db->getConnection();
 
@@ -27,6 +40,11 @@ try {
             'user_id' => 'user_id is required (applier to reject)',
             'poster_id' => 'poster_id is required (must be task creator)'
         ]);
+    }
+    
+    // 驗證操作者權限：必須是任務創建者
+    if ($actor_id !== $posterId) {
+        Response::error('Only task creator can reject applications', 403);
     }
 
     // 開始交易

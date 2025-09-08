@@ -158,7 +158,10 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
                               const Text('Request Language:',
                                   style:
                                       TextStyle(fontWeight: FontWeight.bold)),
-                              Text(task['language_requirement'] ?? '-'),
+                              Text(task['language_requirement'] != '' &&
+                                      task['language_requirement']
+                                  ? task['language_requirement']
+                                  : 'No language requirement'),
                               const SizedBox(height: 8),
                               const Text('Location:',
                                   style:

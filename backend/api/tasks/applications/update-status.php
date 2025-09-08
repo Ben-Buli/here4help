@@ -1,11 +1,19 @@
 <?php
 require_once __DIR__ . '/../../../config/env_loader.php';
 require_once __DIR__ . '/../../../utils/Response.php';
-require_once __DIR__ . '/../../../utils/JWTManager.php';
+require_once __DIR__ . '/../../../utils/TokenValidator.php';
+require_once __DIR__ . '/../../../utils/UserActiveLogger.php';
 require_once __DIR__ . '/../../../utils/socket_notifier.php';
 require_once __DIR__ . '/../../../config/database.php';
 
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: PUT, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'PUT') {
@@ -13,20 +21,16 @@ try {
     }
 
     // 驗證 JWT token
-    $jwtManager = new JWTManager();
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-    $token = str_replace('Bearer ', '', $authHeader);
-    
-    if (!$token) {
-        throw new Exception('Token is required');
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+    if (empty($authHeader) || !preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+        throw new Exception('Authorization header required');
     }
     
-    $payload = $jwtManager->validateToken($token);
-    if (!$payload) {
+    $userId = TokenValidator::validateAuthHeader($authHeader);
+    if (!$userId) {
         throw new Exception('Invalid or expired token');
     }
-    
-    $userId = $payload['user_id'];
+    $userId = (int)$userId;
     
     // 解析請求資料
     $input = json_decode(file_get_contents('php://input'), true);
@@ -61,7 +65,7 @@ try {
         SELECT ta.*, t.creator_id, t.title 
         FROM task_applications ta
         JOIN tasks t ON ta.task_id = t.id
-        WHERE ta.id = ? AND ta.deleted_at IS NULL
+        WHERE ta.id = ? 
     ");
     $stmt->execute([$applicationId]);
     $application = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -110,25 +114,26 @@ try {
         $updateStmt->execute([$newStatus, $applicationId]);
         
         // 記錄操作日誌
-        $logSql = "
-            INSERT INTO user_activity_logs (user_id, action, details, ip_address, created_at)
-            VALUES (?, 'application_status_updated', ?, ?, NOW())
-        ";
-        
-        $logStmt = $pdo->prepare($logSql);
-        $logStmt->execute([
-            $userId, 
-            json_encode([
+        UserActiveLogger::logAction(
+            $pdo,
+            $application['user_id'], // 被影響的用戶（應徵者）
+            'application_status_updated',
+            'status',
+            $currentStatus,
+            $newStatus,
+            "Application status changed from {$currentStatus} to {$newStatus}",
+            'user',
+            $userId, // 操作者（可能是創建者或應徵者自己）
+            $_SERVER['HTTP_X_REQUEST_ID'] ?? null,
+            $_SERVER['HTTP_X_TRACE_ID'] ?? null,
+            [
                 'application_id' => $applicationId,
                 'task_id' => $application['task_id'],
                 'task_title' => $application['title'],
-                'applicant_id' => $application['user_id'],
-                'old_status' => $currentStatus,
-                'new_status' => $newStatus,
+                'operator_role' => $isCreator ? 'creator' : 'applicant',
                 'updated_at' => date('Y-m-d H:i:s')
-            ]),
-            $_SERVER['REMOTE_ADDR'] ?? 'unknown'
-        ]);
+            ]
+        );
         
         // 如果是接受應徵，需要拒絕同一任務的其他應徵
         if ($newStatus === 'accepted') {
@@ -140,17 +145,25 @@ try {
             $rejectOthersStmt->execute([$application['task_id'], $applicationId]);
             
             // 記錄自動拒絕其他應徵的日誌
-            $autoRejectLogStmt = $pdo->prepare($logSql);
-            $autoRejectLogStmt->execute([
-                $userId, 
-                json_encode([
-                    'action' => 'auto_reject_other_applications',
+            UserActiveLogger::logAction(
+                $pdo,
+                $userId, // 操作者（任務創建者）
+                'auto_reject_applications',
+                'multiple_applications',
+                'applied',
+                'rejected',
+                "Auto-rejected other applications when accepting application {$applicationId}",
+                'user',
+                $userId,
+                $_SERVER['HTTP_X_REQUEST_ID'] ?? null,
+                $_SERVER['HTTP_X_TRACE_ID'] ?? null,
+                [
                     'accepted_application_id' => $applicationId,
                     'task_id' => $application['task_id'],
-                    'task_title' => $application['title']
-                ]),
-                $_SERVER['REMOTE_ADDR'] ?? 'unknown'
-            ]);
+                    'task_title' => $application['title'],
+                    'rejected_count' => $rejectOthersStmt->rowCount()
+                ]
+            );
         }
         
         // 提交交易

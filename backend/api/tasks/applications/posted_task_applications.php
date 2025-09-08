@@ -205,7 +205,7 @@ try {
                 AND cr.participant_id = ta.user_id 
                 AND cr.creator_id = ?
             )
-            WHERE ta.task_id = ? AND ta.status != 'withdrawn' -- 排除已撤回的應徵
+            WHERE ta.task_id = ? AND ta.status NOT IN ('withdrawn', 'rejected', 'cancelled') -- 排除已撤回/被拒絕/已取消的應徵
             ORDER BY ta.created_at DESC
         ";
         
