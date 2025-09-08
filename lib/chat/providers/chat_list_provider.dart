@@ -712,9 +712,9 @@ class ChatListProvider extends ChangeNotifier {
 
     if (timeDiff < 500) {
       // 500ms 內的重複更新被忽略
-      // debugPrint(
-      //     '⏱️ [ChatListProvider] 時間防抖: tab=$tabIndex, 間隔=${timeDiff}ms < 500ms');
-      // return;
+      debugPrint(
+          '⏱️ [ChatListProvider] 時間防抖: tab=$tabIndex, 間隔=${timeDiff}ms < 500ms，跳過更新');
+      return;
     }
 
     // 記錄待更新值
@@ -1332,6 +1332,167 @@ class ChatListProvider extends ChangeNotifier {
   /// 刷新當前分頁的數據
   Future<void> refreshCurrentTab() async {
     refreshTab(_currentTabIndex);
+  }
+
+  /// 精確更新特定任務的狀態（避免全量刷新）
+  void updateTaskStatus(String taskId, Map<String, dynamic> updatedTask) {
+    debugPrint('🔄 [ChatListProvider] 精確更新任務狀態: $taskId');
+
+    bool hasUpdates = false;
+
+    // 更新 Posted Tasks 快取中的任務
+    for (int i = 0; i < _cacheManager.postedTasksCache.length; i++) {
+      if (_cacheManager.postedTasksCache[i]['id'].toString() == taskId) {
+        _cacheManager.postedTasksCache[i] = {
+          ..._cacheManager.postedTasksCache[i],
+          ...updatedTask,
+        };
+        hasUpdates = true;
+        debugPrint('✅ [ChatListProvider] 已更新 Posted Tasks 快取中的任務 $taskId');
+        break;
+      }
+    }
+
+    // 更新 My Works 快取中的任務
+    for (int i = 0; i < _myWorksApplications.length; i++) {
+      if (_myWorksApplications[i]['task_id'].toString() == taskId) {
+        _myWorksApplications[i] = {
+          ..._myWorksApplications[i],
+          ...updatedTask,
+        };
+        hasUpdates = true;
+        debugPrint('✅ [ChatListProvider] 已更新 My Works 快取中的任務 $taskId');
+        break;
+      }
+    }
+
+    if (hasUpdates) {
+      _emit('task_status_updated');
+      debugPrint('✅ [ChatListProvider] 任務狀態更新完成，已通知監聽者');
+    } else {
+      debugPrint('⚠️ [ChatListProvider] 未找到任務 $taskId，無法更新');
+    }
+  }
+
+  /// 精確更新特定應徵者的狀態
+  void updateApplicantStatus(String taskId, String applicantUserId,
+      Map<String, dynamic> updatedApplicant) {
+    debugPrint(
+        '🔄 [ChatListProvider] 精確更新應徵者狀態: 任務=$taskId, 應徵者=$applicantUserId');
+
+    bool hasUpdates = false;
+
+    // 更新 Posted Tasks 的應徵者數據
+    if (_applicationsByTask.containsKey(taskId)) {
+      final applicants = _applicationsByTask[taskId]!;
+      for (int i = 0; i < applicants.length; i++) {
+        if (applicants[i]['user_id'].toString() == applicantUserId) {
+          applicants[i] = {
+            ...applicants[i],
+            ...updatedApplicant,
+          };
+          hasUpdates = true;
+          debugPrint('✅ [ChatListProvider] 已更新應徵者 $applicantUserId 的狀態');
+          break;
+        }
+      }
+    }
+
+    // 同時更新 Posted Tasks 快取中的應徵者數據
+    for (final task in _cacheManager.postedTasksCache) {
+      if (task['id'].toString() == taskId && task['applicants'] != null) {
+        final applicants = task['applicants'] as List;
+        for (int i = 0; i < applicants.length; i++) {
+          if (applicants[i]['user_id'].toString() == applicantUserId) {
+            applicants[i] = {
+              ...applicants[i],
+              ...updatedApplicant,
+            };
+            hasUpdates = true;
+            debugPrint('✅ [ChatListProvider] 已更新快取中應徵者 $applicantUserId 的狀態');
+            break;
+          }
+        }
+        break;
+      }
+    }
+
+    if (hasUpdates) {
+      _emit('applicant_status_updated');
+      debugPrint('✅ [ChatListProvider] 應徵者狀態更新完成，已通知監聽者');
+    } else {
+      debugPrint('⚠️ [ChatListProvider] 未找到應徵者 $applicantUserId，無法更新');
+    }
+  }
+
+  /// 精確更新聊天室相關數據（如未讀數、最新訊息等）
+  void updateChatRoomData(String roomId, Map<String, dynamic> updatedData) {
+    debugPrint('🔄 [ChatListProvider] 精確更新聊天室數據: $roomId');
+
+    bool hasUpdates = false;
+
+    // 更新未讀數
+    if (updatedData.containsKey('unread_count')) {
+      final unreadCount = updatedData['unread_count'] as int;
+      setUnreadForRoom(roomId, unreadCount);
+      hasUpdates = true;
+    }
+
+    // 更新 My Works 中的聊天室數據
+    for (int i = 0; i < _myWorksApplications.length; i++) {
+      if (_myWorksApplications[i]['chat_room_id'].toString() == roomId) {
+        _myWorksApplications[i] = {
+          ..._myWorksApplications[i],
+          ...updatedData,
+        };
+        hasUpdates = true;
+        debugPrint('✅ [ChatListProvider] 已更新 My Works 中聊天室 $roomId 的數據');
+        break;
+      }
+    }
+
+    // 更新 Posted Tasks 中的應徵者聊天室數據
+    for (final applicants in _applicationsByTask.values) {
+      for (int i = 0; i < applicants.length; i++) {
+        if (applicants[i]['chat_room_id'].toString() == roomId) {
+          applicants[i] = {
+            ...applicants[i],
+            ...updatedData,
+          };
+          hasUpdates = true;
+          debugPrint('✅ [ChatListProvider] 已更新 Posted Tasks 中聊天室 $roomId 的數據');
+          break;
+        }
+      }
+    }
+
+    if (hasUpdates) {
+      _emit('chat_room_updated');
+      debugPrint('✅ [ChatListProvider] 聊天室數據更新完成，已通知監聽者');
+    }
+  }
+
+  /// 批量更新多個項目（用於複雜操作）
+  void batchUpdate(List<Map<String, dynamic>> updates) {
+    debugPrint('🔄 [ChatListProvider] 開始批量更新: ${updates.length} 個項目');
+
+    for (final update in updates) {
+      final type = update['type'] as String;
+      switch (type) {
+        case 'task':
+          updateTaskStatus(update['id'], update['data']);
+          break;
+        case 'applicant':
+          updateApplicantStatus(
+              update['task_id'], update['user_id'], update['data']);
+          break;
+        case 'chat_room':
+          updateChatRoomData(update['room_id'], update['data']);
+          break;
+      }
+    }
+
+    debugPrint('✅ [ChatListProvider] 批量更新完成');
   }
 
   @override

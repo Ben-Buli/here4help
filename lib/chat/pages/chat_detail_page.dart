@@ -2374,28 +2374,39 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            RatingBarIndicator(
-                              rating: avgRating,
-                              itemBuilder: (context, index) => const Icon(
-                                Icons.star,
-                                color: Colors.amber,
-                              ),
-                              itemCount: 5,
-                              itemSize: 16.0,
-                              direction: Axis.horizontal,
+                        // 條件判斷：如果評分和評論都沒有，顯示 "No reviews yet."
+                        if (avgRating <= 0 && reviewsCount <= 0)
+                          Text(
+                            '(No reviews yet.)',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${avgRating > 0 ? avgRating.toStringAsFixed(1) : '0.0'} ($reviewsCount reviews)',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 14,
+                          )
+                        else
+                          Row(
+                            children: [
+                              RatingBarIndicator(
+                                rating: avgRating,
+                                itemBuilder: (context, index) => const Icon(
+                                  Icons.star,
+                                  color: Colors.amber,
+                                ),
+                                itemCount: 5,
+                                itemSize: 16.0,
+                                direction: Axis.horizontal,
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${avgRating > 0 ? avgRating.toStringAsFixed(1) : '0.0'} ($reviewsCount reviews)',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),
@@ -2567,28 +2578,39 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            RatingBarIndicator(
-                              rating: averageRating.toDouble(),
-                              itemBuilder: (context, index) => const Icon(
-                                Icons.star,
-                                color: Colors.amber,
-                              ),
-                              itemCount: 5,
-                              itemSize: 16.0,
-                              direction: Axis.horizontal,
+                        // 條件判斷：如果評分和評論都沒有，顯示 "No reviews yet."
+                        if (averageRating <= 0 && totalRatings <= 0)
+                          Text(
+                            '(No reviews yet.)',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${averageRating.toStringAsFixed(1)} ($totalRatings reviews)',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 14,
+                          )
+                        else
+                          Row(
+                            children: [
+                              RatingBarIndicator(
+                                rating: averageRating.toDouble(),
+                                itemBuilder: (context, index) => const Icon(
+                                  Icons.star,
+                                  color: Colors.amber,
+                                ),
+                                itemCount: 5,
+                                itemSize: 16.0,
+                                direction: Axis.horizontal,
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${averageRating.toStringAsFixed(1)} ($totalRatings reviews)',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ),

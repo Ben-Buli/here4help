@@ -1,0 +1,94 @@
+# Posted Tasks 應徵者篩選修復補丁
+# 在現有的 posted_tasks_widget.dart 中應用此修復
+
+# 1. 在文件頂部添加 import
++ import 'package:here4help/chat/widgets/posted_tasks_widget_enhanced.dart';
+
+# 2. 在 _PostedTasksWidgetState 類聲明中添加 mixin
+- class _PostedTasksWidgetState extends State<PostedTasksWidget>
+-     with AutomaticKeepAliveClientMixin {
++ class _PostedTasksWidgetState extends State<PostedTasksWidget>
++     with AutomaticKeepAliveClientMixin, PostedTasksApplicantFilterMixin {
+
+# 3. 在 _buildTaskCard 方法中替換應徵者篩選邏輯
+# 找到這行代碼 (約第1175行):
+- final applierChatItems = applicants
+
+# 替換為:
++ // 🆕 根據任務狀態篩選應徵者
++ final filteredApplicants = filterApplicantsForTask(task, _applicationsByTask);
++ 
++ // 檢查是否應該顯示應徵者區塊
++ if (!shouldShowApplicantsForTask(task)) {
++   debugPrint('⚠️ [Posted Tasks] 任務 ${task['id']} 不應顯示應徵者區塊');
++ }
++ 
++ final applierChatItems = filteredApplicants
+
+# 4. 在 _buildPostedTasksCardWithAccordion 方法中更新應徵者區塊標題
+# 找到這行代碼 (約第1388行):
+-                           if (visibleAppliers.isNotEmpty)
+-                             ...visibleAppliers.map((applier) =>
+-                                 _buildApplierCard(applier, taskId, colorScheme))
+-                           else
+-                             const Padding(
+-                               padding: EdgeInsets.all(16),
+-                               child: Text(
+-                                 'No applicants',
+-                                 style:
+-                                     TextStyle(color: Colors.grey, fontSize: 14),
+-                                 textAlign: TextAlign.center,
+-                               ),
+-                             ),
+
+# 替換為:
++                           if (shouldShowApplicantsForTask(task)) ...[
++                             // 🆕 動態標題
++                             Padding(
++                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
++                               child: Text(
++                                 getApplicantsSectionTitle(task, visibleAppliers.length),
++                                 style: const TextStyle(
++                                   fontSize: 13,
++                                   fontWeight: FontWeight.w600,
++                                   color: Colors.grey,
++                                 ),
++                               ),
++                             ),
++                             if (visibleAppliers.isNotEmpty)
++                               ...visibleAppliers.map((applier) =>
++                                   _buildApplierCard(applier, taskId, colorScheme))
++                             else
++                               const Padding(
++                                 padding: EdgeInsets.all(16),
++                                 child: Text(
++                                   'No accepted applicant found',
++                                   style: TextStyle(
++                                     color: Colors.orange,
++                                     fontSize: 12,
++                                     fontStyle: FontStyle.italic,
++                                   ),
++                                   textAlign: TextAlign.center,
++                                 ),
++                               ),
++                           ] else ...[
++                             const Padding(
++                               padding: EdgeInsets.all(16),
++                               child: Text(
++                                 'Applicants section hidden for this task status',
++                                 style: TextStyle(color: Colors.grey, fontSize: 12),
++                                 textAlign: TextAlign.center,
++                               ),
++                             ),
++                           ],
+
+# 5. 在 _loadApplicantsData 方法中添加調試信息
+# 找到這行代碼 (約第404行):
+-         // debugPrint(
+-         //     '🔍 [Posted Tasks] 任務 $taskId 處理後應徵者數量: ${applicants.length}');
+
+# 替換為:
++         debugPrint('🔍 [Posted Tasks] 任務 $taskId 處理後應徵者數量: ${applicants.length}');
++         
++         // 🆕 調試任務和應徵者信息
++         PostedTasksApplicantFilter.debugTaskApplicants(task, applicants);

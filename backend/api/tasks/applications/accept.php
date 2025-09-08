@@ -214,13 +214,7 @@ try {
           "SELECT id FROM chat_rooms WHERE task_id = ? AND (creator_id = ? OR participant_id = ?) ORDER BY id DESC LIMIT 1",
           [$task_id, $actor_id, $rejected_user['user_id']]
         );
-        if ($room && isset($room['id'])) {
-          $content = REJECT_MESSAGE;
-          $db->query(
-            "INSERT INTO chat_messages (room_id, from_user_id, content, kind, created_at) VALUES (?, ?, ?, 'system', NOW())",
-            [(int)$room['id'], $actor_id, $content]
-          );
-        }
+       
       }
     } catch (Exception $e) {
       // 不阻斷主流程
@@ -235,11 +229,13 @@ try {
     try {
       $socketNotifier = SocketNotifier::getInstance();
       $userIds = $socketNotifier->getTaskUserIds($task_id);
-      $room = $db->fetch(
+      
+      // 🔧 獲取被接受者的聊天室
+      $acceptedRoom = $db->fetch(
         "SELECT id FROM chat_rooms WHERE task_id = ? AND (creator_id = ? OR participant_id = ?) ORDER BY id DESC LIMIT 1",
         [$task_id, $actor_id, $target_user_id]
       );
-      $roomId = $room ? $room['id'] : null;
+      $acceptedRoomId = $acceptedRoom ? $acceptedRoom['id'] : null;
       
       // 通知任務狀態更新
       $statusData = [
@@ -247,10 +243,40 @@ try {
         'display_name' => 'In Progress',
         'progress_ratio' => 0.3
       ];
-      $socketNotifier->notifyTaskStatusUpdate($task_id, $roomId, $statusData, $userIds);
+      $socketNotifier->notifyTaskStatusUpdate($task_id, $acceptedRoomId, $statusData, $userIds);
       
-      // 通知應徵狀態更新
-      $socketNotifier->notifyApplicationStatusUpdate($task_id, $roomId, 'accepted', $userIds);
+      // 通知被指派任務者的應徵狀態更新
+      $socketNotifier->notifyApplicationStatusUpdate($task_id, $acceptedRoomId, 'accepted', [$target_user_id]);
+      
+      // 🔧 個別通知被拒絕的應徵者
+      $rejected_users = $db->fetchAll(
+        "SELECT user_id FROM task_applications WHERE task_id = ? AND user_id <> ? AND status = 'rejected'",
+        [$task_id, $target_user_id]
+      );
+
+      $rejectedRoomIds = $db->fetchAll("SELECT id FROM chat_rooms WHERE task_id = ? AND (creator_id = ? OR participant_id = ?) ORDER BY id DESC LIMIT 1", [$task_id, $actor_id, $target_user_id]);
+      foreach ($rejectedRoomIds as $rejectedRoomId) {
+        $rejectedUserId = $rejectedRoomId['id'];
+        
+       
+        if ($rejectedRoomId) {
+          // 向每個被拒絕者發送個別的狀態更新通知
+          $socketNotifier->notifyApplicationStatusUpdate($task_id, $rejectedRoomId, 'rejected', [$rejectedUserId]);
+          error_log("✅ Socket notification sent to rejected user $rejectedUserId in room $rejectedRoomId");
+        } else {
+          error_log("⚠️ No chat room found for rejected user $rejectedUserId in task $task_id");
+        }
+      }
+
+        // 發送系統訊息到被拒絕者的聊天室
+        foreach ($rejectedRoomIds as $rejectedRoomId) {
+          $rejectedContent = REJECT_MESSAGE;
+          $db->query(
+            "INSERT INTO chat_messages (room_id, from_user_id, content, kind, created_at) VALUES (?, ?, ?, 'system', NOW())",
+            [(int)$room['id'], $actor_id, $rejectedContent]
+          );
+        }
+      
     } catch (Exception $e) {
       error_log("Socket notification failed: " . $e->getMessage());
     }

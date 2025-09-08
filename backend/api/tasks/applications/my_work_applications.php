@@ -79,19 +79,21 @@
           u.name               AS creator_name,
           u.avatar_url         AS creator_avatar,
 
-          -- 簡化 chat_rooms 查詢，只檢查是否存在聊天室
+          -- 正確的 chat_rooms 查詢：確保 creator_id 和 participant_id 都匹配
           (SELECT cr.id FROM chat_rooms cr 
           WHERE cr.task_id = t.id 
-          AND (cr.creator_id = t.creator_id OR cr.participant_id = ta.user_id)
+          AND cr.creator_id = t.creator_id 
+          AND cr.participant_id = ta.user_id
           LIMIT 1) AS chat_room_id,
           
-          -- 獲取最新聊天訊息片段
+          -- 獲取最新聊天訊息片段：確保使用正確的聊天室
           COALESCE(
               (SELECT SUBSTRING(cm.content, 1, 100)
               FROM chat_messages cm 
               JOIN chat_rooms cr2 ON cm.room_id = cr2.id
               WHERE cr2.task_id = t.id 
-              AND (cr2.creator_id = t.creator_id OR cr2.participant_id = ta.user_id)
+              AND cr2.creator_id = t.creator_id 
+              AND cr2.participant_id = ta.user_id
               ORDER BY cm.created_at DESC 
               LIMIT 1),
               'No conversation yet'

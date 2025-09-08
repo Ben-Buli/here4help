@@ -476,6 +476,11 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
       // 只有當前是 Posted Tasks 分頁時才刷新
       if (chatProvider.isPostedTasksTab == true) {
+        // 檢查是否為 unread_update 事件，如果是則跳過篩選刷新
+        if (chatProvider.lastEvent == 'unread_update') {
+          debugPrint('🔄 [Posted Tasks] 跳過 unread_update 事件觸發的篩選刷新');
+          return;
+        }
         final currentSearchQuery = chatProvider.searchQuery;
         final currentLocations =
             Set<String>.from(chatProvider.selectedLocations);
@@ -1713,13 +1718,16 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Slidable(
-        key: ValueKey('posted-applicant-$roomId'), // 應徵者卡片綁定 room id
+        key: ValueKey(
+            'posted-applicant-$roomId-${applier['user_id']}'), // 🔧 更唯一的 key
         endActionPane: ActionPane(
           motion: const ScrollMotion(),
           children: _buildSwipeActions(
               applier, taskId, applicationStatus, colorScheme),
         ),
         child: Card(
+          key: ValueKey(
+              'applier-card-$roomId-${applier['user_id']}'), // 🔧 添加卡片 key
           elevation: 0,
           color: Colors.white,
           shape: RoundedRectangleBorder(
@@ -1782,12 +1790,23 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                 Selector<ChatListProvider, int>(
               selector: (context, provider) {
                 final roomId = applier['chat_room_id']?.toString();
-                return roomId == null ? 0 : provider.unreadForRoom(roomId);
+                final unreadCount =
+                    roomId == null ? 0 : provider.unreadForRoom(roomId);
+
+                // 🔧 調試：記錄每個應徵者的未讀數字
+                if (kDebugMode) {
+                  debugPrint(
+                      '🔍 [Posted Tasks] 應徵者 ${applier['name']} (房間 $roomId) 未讀數: $unreadCount');
+                }
+
+                return unreadCount;
               },
               builder: (context, unread, child) {
                 if (unread <= 0) return const SizedBox.shrink();
 
                 return Container(
+                  key: ValueKey(
+                      'unread-badge-${applier['chat_room_id']}'), // 🔧 添加唯一 key
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -2754,14 +2773,23 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       builder: (context, snapshot) {
         String messageText = initialText;
 
+        // 🔧 修復：檢查訊息是否屬於當前房間
         if (snapshot.hasData && snapshot.data != null) {
           final messageData = snapshot.data!;
-          final text = messageData['text']?.toString() ??
-              messageData['content']?.toString() ??
-              messageData['message']?.toString() ??
-              '';
-          if (text.isNotEmpty) {
-            messageText = text;
+          final messageRoomId = messageData['roomId']?.toString() ??
+              messageData['room_id']?.toString();
+
+          // 只有當訊息確實屬於當前房間時才更新顯示
+          if (messageRoomId == roomId) {
+            final text = messageData['text']?.toString() ??
+                messageData['content']?.toString() ??
+                messageData['message']?.toString() ??
+                '';
+            if (text.isNotEmpty) {
+              messageText = text;
+              debugPrint(
+                  '🔄 [Posted Tasks] 更新房間 $roomId 的最新訊息: ${text.substring(0, text.length > 20 ? 20 : text.length)}...');
+            }
           }
         }
 

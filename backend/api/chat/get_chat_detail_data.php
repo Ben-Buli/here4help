@@ -23,7 +23,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 try {
   $db = Database::getInstance();
 
-  // 解析授權
+  // 解析授權 - 支援 Authorization header 和查詢參數
+  $user_id = false;
+  
+  // 1. 嘗試從 Authorization header 獲取
   $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? 
                 $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? 
                 '';
@@ -34,11 +37,18 @@ try {
     $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
   }
   
-  if (empty($authHeader)) {
-    Response::error('Authorization header required', 401);
+  if (!empty($authHeader)) {
+    $user_id = TokenValidator::validateAuthHeader($authHeader);
   }
   
-  $user_id = TokenValidator::validateAuthHeader($authHeader);
+  // 2. 如果 header 失敗，嘗試從查詢參數獲取（MAMP 兼容性）
+  if ($user_id === false && isset($_GET['token'])) {
+    $token = trim((string)$_GET['token']);
+    if (!empty($token)) {
+      $user_id = TokenValidator::validateToken($token);
+    }
+  }
+  
   if ($user_id === false) {
     Response::error('Invalid token', 401);
   }

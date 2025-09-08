@@ -133,6 +133,18 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       return staticInstance;
     }
 
+    // 檢查 widget 是否仍然在 widget tree 中
+    if (!mounted) return null;
+
+    // 額外檢查：確保 context 仍然有效
+    try {
+      if (!context.mounted) return null;
+    } catch (e) {
+      // context 可能已經無效
+      debugPrint('⚠️ [My Works] Context 已無效: $e');
+      return null;
+    }
+
     // 回退：僅在需要時才透過 context 取得，降低在 deactivated 階段觸發錯誤的機率
     try {
       return Provider.of<ChatListProvider>(context, listen: false);
@@ -142,11 +154,27 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     }
   }
 
+  // 防抖機制：避免重複調用
+  DateTime? _lastUpdateTime;
+  static const Duration _updateDebounceDelay = Duration(milliseconds: 500);
+
   void _updateMyWorksTabUnreadFlag() {
     if (!mounted) {
       debugPrint('⚠️ [My Works] Widget 未掛載，跳過未讀狀態更新');
       return;
     }
+
+    // 🔧 防抖檢查：避免頻繁調用
+    final now = DateTime.now();
+    if (_lastUpdateTime != null) {
+      final timeDiff = now.difference(_lastUpdateTime!);
+      if (timeDiff < _updateDebounceDelay) {
+        debugPrint(
+            '⏱️ [My Works] 防抖跳過更新，間隔: ${timeDiff.inMilliseconds}ms < ${_updateDebounceDelay.inMilliseconds}ms');
+        return;
+      }
+    }
+    _lastUpdateTime = now;
 
     try {
       debugPrint('🔄 [My Works] 開始更新 Tab 未讀狀態...');
@@ -256,9 +284,24 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
       if (!mounted) return;
       debugPrint('🔍 [My Works] 收到未讀數據更新: ${map.length} 個房間');
 
-      // 只更新 Tab 未讀標記，不重複呼叫 replaceUnreadByRoom
+      // 🔧 安全的延遲更新：多重檢查 mounted 狀態
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
+        if (!mounted) {
+          debugPrint('⚠️ [My Works] PostFrame 回調中 Widget 已卸載，跳過更新');
+          return;
+        }
+
+        // 🔧 額外檢查 context 有效性
+        try {
+          if (!context.mounted) {
+            debugPrint('⚠️ [My Works] PostFrame 回調中 Context 已無效，跳過更新');
+            return;
+          }
+        } catch (e) {
+          debugPrint('⚠️ [My Works] PostFrame 回調中 Context 檢查失敗: $e');
+          return;
+        }
+
         _updateMyWorksTabUnreadFlag();
       });
     });
@@ -322,23 +365,42 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
   @override
   void dispose() {
+    debugPrint('🔄 [My Works] 開始 dispose...');
+
+    // 🔧 清理防抖狀態
+    _lastUpdateTime = null;
+
     // 移除 provider listener
     try {
       // 使用靜態實例而不是 context，避免在 dispose 中訪問 context
       final chatProvider = ChatListProvider.instance;
       if (chatProvider != null) {
         chatProvider.removeListener(_handleProviderChanges);
+        debugPrint('✅ [My Works] 已移除 ChatListProvider listener');
       }
     } catch (e) {
       // Provider may not be available during dispose
       debugPrint('⚠️ [My Works] dispose 時移除 listener 失敗: $e');
     }
 
-    // 取消未讀數據訂閱
-    _unreadSub?.cancel();
-    _unreadSub = null;
+    // 🔧 安全地取消未讀數據訂閱
+    try {
+      _unreadSub?.cancel();
+      _unreadSub = null;
+      debugPrint('✅ [My Works] 已取消未讀數據訂閱');
+    } catch (e) {
+      debugPrint('⚠️ [My Works] 取消未讀數據訂閱失敗: $e');
+    }
 
-    _pagingController.dispose();
+    // 🔧 安全地清理分頁控制器
+    try {
+      _pagingController.dispose();
+      debugPrint('✅ [My Works] 已清理分頁控制器');
+    } catch (e) {
+      debugPrint('⚠️ [My Works] 清理分頁控制器失敗: $e');
+    }
+
+    debugPrint('✅ [My Works] dispose 完成');
     super.dispose();
   }
 

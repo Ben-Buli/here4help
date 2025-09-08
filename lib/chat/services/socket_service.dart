@@ -14,6 +14,7 @@ class SocketService {
   bool _isConnected = false;
   String? _currentUserId;
   final Set<String> _pendingJoinRooms = <String>{};
+  final Set<String> _joinedRooms = <String>{}; // 追蹤已加入的房間
   String? _lastRoomIdToJoin;
 
   // 廣播新訊息的 Stream（支援多處監聽）
@@ -75,15 +76,23 @@ class SocketService {
         // Auto-join any rooms that were queued before connection
         if (_pendingJoinRooms.isNotEmpty) {
           for (final roomId in _pendingJoinRooms) {
-            _socket!.emit('join_room', {'roomId': roomId});
-            debugPrint('🏠 Auto-joined queued room: $roomId');
+            if (!_joinedRooms.contains(roomId)) {
+              _socket!.emit('join_room', {'roomId': roomId});
+              _joinedRooms.add(roomId);
+              debugPrint('🏠 Auto-joined queued room: $roomId');
+            } else {
+              debugPrint('🔄 Room $roomId already joined, skipping');
+            }
           }
           _pendingJoinRooms.clear();
         }
 
         // 保險：若有最後一次想加入的房間，再強制補送一次 join
-        if (_lastRoomIdToJoin != null && _lastRoomIdToJoin!.isNotEmpty) {
+        if (_lastRoomIdToJoin != null &&
+            _lastRoomIdToJoin!.isNotEmpty &&
+            !_joinedRooms.contains(_lastRoomIdToJoin!)) {
           _socket!.emit('join_room', {'roomId': _lastRoomIdToJoin});
+          _joinedRooms.add(_lastRoomIdToJoin!);
           debugPrint(
               '🏠 Force-joined last requested room: ${_lastRoomIdToJoin!}');
         }
@@ -91,6 +100,7 @@ class SocketService {
 
       _socket!.onDisconnect((_) {
         _isConnected = false;
+        _joinedRooms.clear(); // 斷線時清除已加入房間記錄
         debugPrint('❌ Socket disconnected');
       });
 
@@ -220,7 +230,14 @@ class SocketService {
       return;
     }
 
+    // 檢查是否已經加入該房間
+    if (_joinedRooms.contains(roomId)) {
+      debugPrint('🔄 Room $roomId already joined, skipping duplicate join');
+      return;
+    }
+
     _socket!.emit('join_room', <String, String>{'roomId': roomId});
+    _joinedRooms.add(roomId);
     _lastRoomIdToJoin = roomId;
     debugPrint('🏠 Joined room: $roomId');
   }
@@ -232,6 +249,7 @@ class SocketService {
     }
 
     _socket!.emit('leave_room', <String, String>{'roomId': roomId});
+    _joinedRooms.remove(roomId); // 從已加入房間記錄中移除
     debugPrint('🚪 Left room: $roomId');
   }
 
@@ -306,6 +324,7 @@ class SocketService {
 
     // 清除所有待處理的房間和狀態
     _pendingJoinRooms.clear();
+    _joinedRooms.clear();
     _lastRoomIdToJoin = null;
 
     // 清除監聽器

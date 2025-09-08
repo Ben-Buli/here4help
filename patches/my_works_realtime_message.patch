@@ -1,0 +1,199 @@
+# My Works 實時訊息更新修復補丁
+# 在現有的 my_works_widget.dart 中應用此修復
+
+# 1. 在文件頂部添加 import
++ import 'package:here4help/chat/widgets/my_works_widget_enhanced.dart';
+
+# 2. 在 _MyWorksWidgetState 類聲明中添加 mixin
+- class _MyWorksWidgetState extends State<MyWorksWidget> {
++ class _MyWorksWidgetState extends State<MyWorksWidget>
++     with MyWorksRealtimeMessageMixin {
+
+# 3. 在 initState 中添加實時連接預載入
+# 找到這行代碼 (約第252行):
+    // 主動載入數據到 ChatListProvider
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        debugPrint('🚀 [My Works] 初始化時載入數據到 ChatListProvider');
+        final chatProvider = _getChatProvider();
+        if (chatProvider != null) {
+          _refreshMyWorksData(chatProvider);
+        }
+      }
+    });
+
+# 在其後添加:
++     // 🆕 預載入實時訊息連接
++     WidgetsBinding.instance.addPostFrameCallback((_) {
++       if (mounted) {
++         final chatProvider = _getChatProvider();
++         if (chatProvider != null && chatProvider.myWorksApplications.isNotEmpty) {
++           preloadRealtimeConnections(chatProvider.myWorksApplications);
++           MyWorksMessageStats.printMessageStats(chatProvider.myWorksApplications);
++         }
++       }
++     });
+
+# 4. 在 _refreshMyWorksData 方法中添加統計信息
+# 找到這行代碼 (約第576行):
+      debugPrint('✅ [My Works] 數據刷新完成: ${processedData.length} 個任務');
+
+# 替換為:
++       debugPrint('✅ [My Works] 數據刷新完成: ${processedData.length} 個任務');
++       
++       // 🆕 打印訊息統計和驗證數據完整性
++       MyWorksMessageStats.printMessageStats(processedData);
++       MyWorksMessageStats.validateMessageData(processedData);
+
+# 5. 替換 _buildChatPartnerSection 方法的實現
+# 找到整個 _buildChatPartnerSection 方法 (約第1107-1160行):
+-   /// 構建聊天對象與最新訊息區塊
+-   Widget _buildChatPartnerSection(Map<String, dynamic> task) {
+-     final creatorName = task['creator_name'] ?? 'Unknown';
+-     final creatorAvatar = task['creator_avatar'];
+-     final latestMessage =
+-         task['latest_message_snippet'] ?? 'No conversation yet';
+- 
+-     return Container(
+-       padding: const EdgeInsets.all(8),
+-       decoration: BoxDecoration(
+-         color: Colors.grey[50],
+-         borderRadius: BorderRadius.circular(8),
+-       ),
+-       child: Row(
+-         children: [
+-           // 創建者頭像
+-           _buildAvatarWithFallback(
+-             creatorAvatar?.toString(),
+-             creatorName,
+-             radius: 16,
+-             fontSize: 12,
+-           ),
+-           const SizedBox(width: 8),
+- 
+-           // 對象名稱與最新訊息
+-           Expanded(
+-             child: Column(
+-               crossAxisAlignment: CrossAxisAlignment.start,
+-               children: [
+-                 Text(
+-                   creatorName,
+-                   style: const TextStyle(
+-                     fontSize: 12,
+-                     fontWeight: FontWeight.w500,
+-                   ),
+-                   maxLines: 1,
+-                   overflow: TextOverflow.ellipsis,
+-                 ),
+-                 const SizedBox(height: 2),
+-                 Text(
+-                   latestMessage,
+-                   style: TextStyle(
+-                     fontSize: 11,
+-                     color: Colors.grey[600],
+-                   ),
+-                   maxLines: 1,
+-                   overflow: TextOverflow.ellipsis,
+-                 ),
+-               ],
+-             ),
+-           ),
+-         ],
+-       ),
+-     );
+-   }
+
+# 替換為:
++   /// 構建聊天對象與最新訊息區塊 - 增強版（支持實時更新）
++   Widget _buildChatPartnerSection(Map<String, dynamic> task) {
++     // 🆕 檢查是否支持實時訊息
++     if (supportsRealtimeMessages(task)) {
++       debugPrint('🔄 [My Works] 任務 ${task['id']} 使用實時訊息更新');
++       return buildEnhancedChatPartnerSection(task);
++     } else {
++       debugPrint('⚠️ [My Works] 任務 ${task['id']} 使用靜態訊息（無房間ID）');
++       return _buildStaticChatPartnerSection(task);
++     }
++   }
++ 
++   /// 構建靜態版本的聊天對象區塊（備用方案）
++   Widget _buildStaticChatPartnerSection(Map<String, dynamic> task) {
++     final creatorName = task['creator_name'] ?? 'Unknown';
++     final creatorAvatar = task['creator_avatar'];
++     final latestMessage = task['latest_message_snippet'] ?? 'No conversation yet';
++ 
++     return Container(
++       padding: const EdgeInsets.all(8),
++       decoration: BoxDecoration(
++         color: Colors.grey[50],
++         borderRadius: BorderRadius.circular(8),
++         // 🆕 添加邊框指示這是靜態版本
++         border: Border.all(color: Colors.orange.withOpacity(0.3)),
++       ),
++       child: Row(
++         children: [
++           _buildAvatarWithFallback(
++             creatorAvatar?.toString(),
++             creatorName,
++             radius: 16,
++             fontSize: 12,
++           ),
++           const SizedBox(width: 8),
++           Expanded(
++             child: Column(
++               crossAxisAlignment: CrossAxisAlignment.start,
++               children: [
++                 Text(
++                   creatorName,
++                   style: const TextStyle(
++                     fontSize: 12,
++                     fontWeight: FontWeight.w500,
++                   ),
++                   maxLines: 1,
++                   overflow: TextOverflow.ellipsis,
++                 ),
++                 const SizedBox(height: 2),
++                 Text(
++                   latestMessage,
++                   style: TextStyle(
++                     fontSize: 11,
++                     color: Colors.grey[600],
++                   ),
++                   maxLines: 1,
++                   overflow: TextOverflow.ellipsis,
++                 ),
++               ],
++             ),
++           ),
++         ],
++       ),
++     );
++   }
+
+# 6. 實現 Mixin 要求的 _buildAvatarWithFallback 方法
+# 在 MyWorksRealtimeMessageMixin 的使用處添加方法實現：
++ 
++   /// 實現 Mixin 要求的頭像構建方法
++   @override
++   Widget buildAvatarWithFallback(
++     String? avatarPath,
++     String? name, {
++     double radius = 16,
++     double fontSize = 12,
++   }) {
++     return _buildAvatarWithFallback(avatarPath, name, radius: radius, fontSize: fontSize);
++   }
+
+# 7. 在 dispose 方法中添加連接清理
+# 找到 dispose 方法的最後部分 (約第403行):
+    debugPrint('✅ [My Works] dispose 完成');
+    super.dispose();
+
+# 在其前面添加:
++     // 🆕 清理實時訊息監控
++     try {
++       MyWorksSocketMonitor.clearAll();
++       debugPrint('✅ [My Works] 已清理 Socket 監控');
++     } catch (e) {
++       debugPrint('⚠️ [My Works] 清理 Socket 監控失敗: $e');
++     }
