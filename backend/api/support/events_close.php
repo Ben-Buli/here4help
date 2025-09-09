@@ -87,10 +87,10 @@ try {
     
     // 獲取事件詳情
     $eventStmt = $db->prepare("
-        SELECT se.*, cr.creator_id, cr.participant_id
+        SELECT se.*, scr.user_id, scr.admin_id
         FROM support_events se
-        JOIN support_chat_rooms cr ON se.support_chat_room_id = cr.id
-        WHERE se.id = ? AND cr.type = 'support'
+        JOIN support_chat_rooms scr ON se.support_chat_room_id = scr.id
+        WHERE se.id = ? AND scr.type = 'support'
     ");
     $eventStmt->execute([$eventId]);
     $event = $eventStmt->fetch(PDO::FETCH_ASSOC);

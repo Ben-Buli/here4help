@@ -1,0 +1,333 @@
+{
+  "projectName": "客服聊天室架構調整",
+  "version": "1.0",
+  "createdAt": "2025-01-09",
+  "openQuestions": [],
+  "rollbackConditions": {
+    "description": "當遇到以下情況時，需要考慮回滾到前一個穩定版本",
+    "triggers": [
+      "資料庫遷移失敗導致資料遺失",
+      "現有聊天室功能受到影響",
+      "管理員後台無法正常運作",
+      "用戶無法正常使用客服功能",
+      "Socket 通知系統異常"
+    ],
+    "rollbackSteps": [
+      "1. 停止所有相關服務",
+      "2. 恢復資料庫備份",
+      "3. 回滾程式碼到上一個穩定版本",
+      "4. 重啟服務並驗證功能",
+      "5. 通知相關人員並記錄問題"
+    ],
+    "backupRequirements": [
+      "執行前必須備份 support_chat_rooms, support_events, support_chat_messages 表",
+      "備份現有程式碼版本",
+      "記錄當前配置狀態"
+    ]
+  },
+  "executionSteps": [
+    {
+      "phase": "1. 資料庫結構調整",
+      "rollbackRisk": "high",
+      "backupRequired": true,
+      "steps": [
+        {
+          "id": "db_001",
+          "title": "修改 support_chat_rooms 表結構",
+          "description": "將 participant_id 改為 DEFAULT NULL，允許初始為空值",
+          "files": ["backend/database/migrations/"],
+          "priority": "high",
+          "rollbackCondition": "如果修改後現有資料無法正常讀取",
+          "rollbackAction": "ALTER TABLE support_chat_rooms MODIFY participant_id BIGINT UNSIGNED NOT NULL",
+          "estimatedTime": "30分鐘"
+        },
+        {
+          "id": "db_002", 
+          "title": "確認 support_events 表結構",
+          "description": "確保包含 rating(tinyint), review(text) 欄位",
+          "files": ["backend/database/migrations/"],
+          "priority": "high",
+          "rollbackCondition": "如果新欄位導致現有查詢失敗",
+          "rollbackAction": "DROP COLUMN rating, review",
+          "estimatedTime": "20分鐘"
+        },
+        {
+          "id": "db_003",
+          "title": "清空現有客服相關資料表",
+          "description": "清空 support_chat_rooms, support_events, support_chat_messages 資料",
+          "files": ["backend/database/"],
+          "priority": "medium",
+          "rollbackCondition": "如果需要恢復舊資料",
+          "rollbackAction": "從備份恢復資料",
+          "estimatedTime": "15分鐘"
+        }
+      ]
+    },
+    {
+      "phase": "2. 後端 API 開發",
+      "rollbackRisk": "medium",
+      "backupRequired": true,
+      "steps": [
+        {
+          "id": "api_001",
+          "title": "修改客服事件建立 API",
+          "description": "調整 create_issue.php 實現單一進行中事件限制",
+          "files": ["backend/api/support/create_issue.php"],
+          "priority": "high",
+          "rollbackCondition": "如果用戶無法建立客服事件",
+          "rollbackAction": "恢復原始 create_issue.php 檔案",
+          "estimatedTime": "2小時"
+        },
+        {
+          "id": "api_002",
+          "title": "開發管理員接手 API",
+          "description": "修改 claim.php 更新 participant_id 和狀態",
+          "files": ["backend/api/support/claim.php"],
+          "priority": "high",
+          "rollbackCondition": "如果管理員無法接手客服事件",
+          "rollbackAction": "恢復原始 claim.php 檔案",
+          "estimatedTime": "1.5小時"
+        },
+        {
+          "id": "api_003",
+          "title": "開發客戶評分結案 API",
+          "description": "建立 resolve.php 處理評分和狀態更新",
+          "files": ["backend/api/support/resolve.php"],
+          "priority": "high",
+          "rollbackCondition": "如果評分功能異常",
+          "rollbackAction": "刪除 resolve.php 檔案",
+          "estimatedTime": "2小時"
+        },
+        {
+          "id": "api_004",
+          "title": "開發客服聊天室列表 API",
+          "description": "建立 get_support_chat_list.php 供前端獲取聊天室資料",
+          "files": ["backend/api/support/get_support_chat_list.php"],
+          "priority": "medium",
+          "rollbackCondition": "如果列表無法正常載入",
+          "rollbackAction": "刪除 get_support_chat_list.php 檔案",
+          "estimatedTime": "1.5小時"
+        },
+        {
+          "id": "api_005",
+          "title": "修改聊天室詳情 API",
+          "description": "調整 get_chat_detail_data.php 支援 support_chat_rooms",
+          "files": ["backend/api/chat/get_chat_detail_data.php"],
+          "priority": "high",
+          "rollbackCondition": "如果現有聊天室功能受影響",
+          "rollbackAction": "恢復原始 get_chat_detail_data.php 檔案",
+          "estimatedTime": "2小時"
+        }
+      ]
+    },
+    {
+      "phase": "3. 管理員後台調整",
+      "rollbackRisk": "low",
+      "backupRequired": true,
+      "steps": [
+        {
+          "id": "admin_001",
+          "title": "修改客服事件列表頁面",
+          "description": "調整 Vue 頁面顯示客服事件和 claim 按鈕",
+          "files": ["admin/frontend/src/views/support/"],
+          "priority": "medium",
+          "rollbackCondition": "如果管理員後台無法正常顯示",
+          "rollbackAction": "恢復原始 Vue 檔案",
+          "estimatedTime": "3小時"
+        },
+        {
+          "id": "admin_002",
+          "title": "開發管理員聊天室列表",
+          "description": "建立管理員專用的聊天室列表頁面",
+          "files": ["admin/frontend/src/views/support/chat-list.vue"],
+          "priority": "medium",
+          "rollbackCondition": "如果聊天室列表無法載入",
+          "rollbackAction": "刪除 chat-list.vue 檔案",
+          "estimatedTime": "4小時"
+        },
+        {
+          "id": "admin_003",
+          "title": "調整 claim 按鈕邏輯",
+          "description": "claim 後變成 Chat 按鈕，導向聊天室列表",
+          "files": ["admin/frontend/src/components/"],
+          "priority": "low",
+          "rollbackCondition": "如果按鈕邏輯異常",
+          "rollbackAction": "恢復原始按鈕組件",
+          "estimatedTime": "1小時"
+        }
+      ]
+    },
+    {
+      "phase": "4. Flutter App 前端開發",
+      "rollbackRisk": "medium",
+      "backupRequired": true,
+      "steps": [
+        {
+          "id": "app_001",
+          "title": "重構 contact_us_page.dart",
+          "description": "改為檢查進行中事件，顯示聊天室或建立表單",
+          "files": ["lib/account/pages/contact_us_page.dart"],
+          "priority": "high",
+          "rollbackCondition": "如果用戶無法進入客服頁面",
+          "rollbackAction": "恢復原始 contact_us_page.dart 檔案",
+          "estimatedTime": "3小時"
+        },
+        {
+          "id": "app_002",
+          "title": "建立客服問題表單 Dialog",
+          "description": "建立 SupportIssueDialog 收集 title 和 description",
+          "files": ["lib/widgets/support_issue_dialog.dart"],
+          "priority": "high",
+          "rollbackCondition": "如果表單無法正常提交",
+          "rollbackAction": "刪除 support_issue_dialog.dart 檔案",
+          "estimatedTime": "2小時"
+        },
+        {
+          "id": "app_003",
+          "title": "修改 issue_status_page.dart",
+          "description": "實現 timeline 三點進度顯示和時間戳記",
+          "files": ["lib/account/pages/issue_status_page.dart"],
+          "priority": "high",
+          "rollbackCondition": "如果進度顯示異常",
+          "rollbackAction": "恢復原始 issue_status_page.dart 檔案",
+          "estimatedTime": "3小時"
+        },
+        {
+          "id": "app_004",
+          "title": "調整聊天室路由",
+          "description": "新增 /account/support/contact/chat?room_id=123 路由",
+          "files": ["lib/router/app_router.dart"],
+          "priority": "medium",
+          "rollbackCondition": "如果路由導航異常",
+          "rollbackAction": "移除新增的路由配置",
+          "estimatedTime": "1小時"
+        },
+        {
+          "id": "app_005",
+          "title": "修改 ChatDetailPage 支援客服",
+          "description": "判斷 type=support 時顯示 'Support Chat' 標題",
+          "files": ["lib/chat/pages/chat_detail_page.dart"],
+          "priority": "high",
+          "rollbackCondition": "如果現有聊天功能受影響",
+          "rollbackAction": "恢復原始 chat_detail_page.dart 檔案",
+          "estimatedTime": "2小時"
+        },
+        {
+          "id": "app_006",
+          "title": "調整 Action Bar 配置",
+          "description": "客服聊天室只顯示 'issue' 和 'resolved' 按鈕",
+          "files": ["lib/chat/utils/action_bar_config.dart"],
+          "priority": "high",
+          "rollbackCondition": "如果 Action Bar 顯示異常",
+          "rollbackAction": "恢復原始 action_bar_config.dart 檔案",
+          "estimatedTime": "2小時"
+        },
+        {
+          "id": "app_007",
+          "title": "建立客服評分 Dialog",
+          "description": "建立 SupportResolveDialog 收集評分和評論",
+          "files": ["lib/widgets/support_resolve_dialog.dart"],
+          "priority": "medium",
+          "rollbackCondition": "如果評分功能異常",
+          "rollbackAction": "刪除 support_resolve_dialog.dart 檔案",
+          "estimatedTime": "2小時"
+        },
+        {
+          "id": "app_008",
+          "title": "調整 support_page.dart",
+          "description": "新增未讀標記顯示到 contact-us 項目",
+          "files": ["lib/account/pages/support_page.dart"],
+          "priority": "low",
+          "rollbackCondition": "如果未讀標記顯示異常",
+          "rollbackAction": "恢復原始 support_page.dart 檔案",
+          "estimatedTime": "1小時"
+        }
+      ]
+    },
+    {
+      "phase": "5. Socket 通知調整",
+      "rollbackRisk": "high",
+      "backupRequired": true,
+      "steps": [
+        {
+          "id": "socket_001",
+          "title": "調整 Socket 通知邏輯",
+          "description": "確保客服聊天室訊息正確推送未讀數",
+          "files": ["backend/socket/", "lib/services/notification_service.dart"],
+          "priority": "medium",
+          "rollbackCondition": "如果通知系統異常",
+          "rollbackAction": "恢復原始 Socket 和通知服務檔案",
+          "estimatedTime": "3小時"
+        },
+        {
+          "id": "socket_002",
+          "title": "管理員進入通知",
+          "description": "管理員 claim 後發送系統訊息通知用戶",
+          "files": ["backend/api/support/claim.php"],
+          "priority": "low",
+          "rollbackCondition": "如果系統訊息發送失敗",
+          "rollbackAction": "移除系統訊息發送邏輯",
+          "estimatedTime": "1小時"
+        }
+      ]
+    },
+    {
+      "phase": "6. 測試與優化",
+      "rollbackRisk": "low",
+      "backupRequired": false,
+      "steps": [
+        {
+          "id": "test_001",
+          "title": "單一進行中事件限制測試",
+          "description": "測試用戶只能有一個進行中的客服事件",
+          "files": [],
+          "priority": "high",
+          "rollbackCondition": "如果限制邏輯有誤",
+          "rollbackAction": "調整限制邏輯",
+          "estimatedTime": "2小時"
+        },
+        {
+          "id": "test_002",
+          "title": "管理員接手流程測試",
+          "description": "測試 claim 按鈕和聊天室建立流程",
+          "files": [],
+          "priority": "high",
+          "rollbackCondition": "如果接手流程異常",
+          "rollbackAction": "修正接手邏輯",
+          "estimatedTime": "2小時"
+        },
+        {
+          "id": "test_003",
+          "title": "評分結案流程測試",
+          "description": "測試用戶評分後狀態變更為 resolved",
+          "files": [],
+          "priority": "medium",
+          "rollbackCondition": "如果評分流程異常",
+          "rollbackAction": "修正評分邏輯",
+          "estimatedTime": "1.5小時"
+        },
+        {
+          "id": "test_004",
+          "title": "路由和導航測試",
+          "description": "測試新路由 /account/support/contact/chat 正常運作",
+          "files": [],
+          "priority": "medium",
+          "rollbackCondition": "如果路由異常",
+          "rollbackAction": "修正路由配置",
+          "estimatedTime": "1小時"
+        }
+      ]
+    }
+  ],
+  "totalSteps": 23,
+  "estimatedDays": "5-7 工作天",
+  "totalEstimatedHours": "45-50 小時",
+  "notes": [
+    "保持 support_chat_rooms 獨立，不與 chat_rooms 合併",
+    "管理員身份使用 users.permission=99，participant_id 存放 users.id",
+    "客服聊天室使用專用路由 /account/support/contact/chat?room_id=123",
+    "resolved 狀態聊天室設為唯讀，不能發送訊息",
+    "每個階段執行前必須建立備份點",
+    "高風險操作需要在測試環境先驗證"
+  ]
+}

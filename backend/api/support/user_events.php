@@ -46,21 +46,26 @@ try {
     $userId = $payload['user_id'];
     $db = Database::getInstance()->getConnection();
     
-    // 檢查用戶身份（普通用戶或管理員）
-    $adminStmt = $db->prepare("
-        SELECT a.id, a.role_id, ar.name as role_name
-        FROM admins a
-        LEFT JOIN admin_roles ar ON a.role_id = ar.id
-        WHERE a.user_id = ?
-    ");
-    $adminStmt->execute([$userId]);
-    $admin = $adminStmt->fetch(PDO::FETCH_ASSOC);
+    // 檢查請求來源，決定查詢類型
+    $viewType = $_GET['view_type'] ?? 'customer'; // 默認為客戶視角
     
-    $isAdmin = ($admin && in_array($admin['role_name'], ['admin', 'super_admin']));
+    // 檢查用戶權限
+    $userStmt = $db->prepare("SELECT permission FROM users WHERE id = ?");
+    $userStmt->execute([$userId]);
+    $user = $userStmt->fetch(PDO::FETCH_ASSOC);
     
-    // 根據用戶身份獲取不同的客服事件
-    if ($isAdmin) {
-        // 管理員：獲取所有被分配的客服事件
+    if (!$user) {
+        Response::error('User not found', 404);
+    }
+    
+    // 根據視圖類型決定查詢邏輯
+    // 'admin' = Vue Admin Web 管理員後台視角
+    // 'customer' = Flutter App 用戶視角（包括 permission=99 的用戶）
+    $isAdminView = ($user['permission'] == 99 && $viewType === 'admin');
+    
+    // 根據視圖類型獲取不同的客服事件
+    if ($isAdminView) {
+        // Vue Admin Web 管理員後台視角：獲取接手的客服事件
         $eventsStmt = $db->prepare("
             SELECT 
                 se.id,
@@ -73,18 +78,18 @@ try {
                 se.updated_at,
                 se.support_chat_room_id,
                 u.name as customer_name,
-                COALESCE(a.full_name, a.username) as admin_name,
-                cr.type as chat_room_type
+                admin_u.name as admin_name,
+                scr.type as chat_room_type
             FROM support_events se
             LEFT JOIN users u ON se.user_id = u.id
-            LEFT JOIN admins a ON se.admin_id = a.id
-            LEFT JOIN chat_rooms cr ON se.support_chat_room_id = cr.id
-            WHERE se.admin_id = ?
+            LEFT JOIN users admin_u ON se.admin_id = admin_u.id
+            LEFT JOIN support_chat_rooms scr ON se.support_chat_room_id = scr.id
+            WHERE scr.admin_id = ?
             ORDER BY se.created_at DESC
         ");
-        $eventsStmt->execute([$admin['id']]);
+        $eventsStmt->execute([$userId]);
     } else {
-        // 普通用戶：獲取自己建立的客服事件
+        // Flutter App 用戶視角：獲取自己創建的客服事件
         $eventsStmt = $db->prepare("
             SELECT 
                 se.id,
@@ -97,12 +102,12 @@ try {
                 se.updated_at,
                 se.support_chat_room_id,
                 u.name as customer_name,
-                COALESCE(a.full_name, a.username) as admin_name,
-                cr.type as chat_room_type
+                admin_u.name as admin_name,
+                scr.type as chat_room_type
             FROM support_events se
             LEFT JOIN users u ON se.user_id = u.id
-            LEFT JOIN admins a ON se.admin_id = a.id
-            LEFT JOIN chat_rooms cr ON se.support_chat_room_id = cr.id
+            LEFT JOIN users admin_u ON se.admin_id = admin_u.id
+            LEFT JOIN support_chat_rooms scr ON se.support_chat_room_id = scr.id
             WHERE se.user_id = ?
             ORDER BY se.created_at DESC
         ");
@@ -128,20 +133,21 @@ try {
     }
     
     // 統計資訊
-    if ($isAdmin) {
-        // 管理員統計
+    if ($isAdminView) {
+        // Vue Admin Web 管理員後台統計：接手的客服事件
         $statsStmt = $db->prepare("
             SELECT 
                 COUNT(*) as total_events,
-                SUM(CASE WHEN status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
-                SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_count,
-                SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) as resolved_count
-            FROM support_events 
-            WHERE admin_id = ?
+                SUM(CASE WHEN se.status = 'submitted' THEN 1 ELSE 0 END) as submitted_count,
+                SUM(CASE WHEN se.status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_count,
+                SUM(CASE WHEN se.status = 'resolved' THEN 1 ELSE 0 END) as resolved_count
+            FROM support_events se
+            LEFT JOIN support_chat_rooms scr ON se.support_chat_room_id = scr.id
+            WHERE scr.admin_id = ?
         ");
-        $statsStmt->execute([$admin['id']]);
+        $statsStmt->execute([$userId]);
     } else {
-        // 普通用戶統計
+        // Flutter App 用戶統計：自己創建的客服事件
         $statsStmt = $db->prepare("
             SELECT 
                 COUNT(*) as total_events,

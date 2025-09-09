@@ -34,9 +34,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 try {
-    // JWT 認證
-    $headers = getallheaders();
-    $authHeader = $headers['Authorization'] ?? '';
+    // JWT 認證 - 支援多種授權方式
+    $authHeader = '';
+    
+    // 方法 1: 嘗試從 getallheaders() 獲取
+    if (function_exists('getallheaders')) {
+        $headers = getallheaders();
+        $authHeader = $headers['Authorization'] ?? '';
+    }
+    
+    // 方法 2: 從 $_SERVER 獲取
+    if (empty($authHeader)) {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+    }
+    
+    // 方法 3: 從查詢參數獲取 token（MAMP 兼容）
+    if (empty($authHeader) && isset($_GET['token'])) {
+        $authHeader = 'Bearer ' . $_GET['token'];
+    }
     
     if (!$authHeader || !preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
         Response::error('Missing or invalid authorization header', 401);
@@ -85,8 +100,8 @@ function handleGetEvents($db, $userId) {
     
     // 驗證用戶是否有權限訪問此聊天室
     $roomStmt = $db->prepare("
-        SELECT id, type, creator_id, participant_id 
-        FROM chat_rooms 
+        SELECT id, type, user_id, admin_id 
+        FROM support_chat_rooms 
         WHERE id = ? AND type = 'support'
     ");
     $roomStmt->execute([$chatRoomId]);
@@ -97,7 +112,7 @@ function handleGetEvents($db, $userId) {
     }
     
     // 檢查用戶是否為聊天室參與者
-    if ($room['creator_id'] != $userId && $room['participant_id'] != $userId) {
+    if ($room['user_id'] != $userId && $room['admin_id'] != $userId) {
         Response::error('Access denied to this chat room', 403);
     }
     
@@ -168,8 +183,8 @@ function handleCreateEvent($db, $userId) {
     
     // 驗證聊天室是否為客服類型
     $roomStmt = $db->prepare("
-        SELECT id, creator_id, participant_id 
-        FROM chat_rooms 
+        SELECT id, user_id, admin_id 
+        FROM support_chat_rooms 
         WHERE id = ? AND type = 'support'
     ");
     $roomStmt->execute([$chatRoomId]);
@@ -179,11 +194,17 @@ function handleCreateEvent($db, $userId) {
         Response::error('Support chat room not found', 404);
     }
     
-    // 檢查用戶是否為管理員（這裡簡化處理，實際應該檢查 admins 表）
-    // TODO: 實作完整的管理員權限檢查 
+    // 檢查管理員權限 (users.permission = 99)
+    $adminCheckStmt = $db->prepare("SELECT permission FROM users WHERE id = ?");
+    $adminCheckStmt->execute([$userId]);
+    $adminUser = $adminCheckStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$adminUser || $adminUser['permission'] != 99) {
+        Response::error('Access denied. Admin privileges required.', 403);
+    }
     
     // 確定客戶 ID（非管理員的那一方）
-    $customerId = ($room['creator_id'] == $userId) ? $room['participant_id'] : $room['creator_id'];
+    $customerId = ($room['user_id'] == $userId) ? $room['admin_id'] : $room['user_id'];
     
     try {
         $db->beginTransaction();
@@ -291,9 +312,9 @@ function handleUpdateEvent($db, $userId) {
     
     // 獲取現有事件
     $eventStmt = $db->prepare("
-        SELECT se.*, cr.creator_id, cr.participant_id
+        SELECT se.*, scr.user_id, scr.admin_id
         FROM support_events se
-        JOIN chat_rooms cr ON se.support_chat_room_id = cr.id
+        JOIN support_chat_rooms scr ON se.support_chat_room_id = scr.id
         WHERE se.id = ?
     ");
     $eventStmt->execute([$eventId]);
@@ -305,7 +326,7 @@ function handleUpdateEvent($db, $userId) {
     
     // 權限檢查：客戶只能將狀態改為 closed_by_customer
     $isCustomer = ($event['user_id'] == $userId);
-    $isParticipant = ($event['creator_id'] == $userId || $event['participant_id'] == $userId);
+    $isParticipant = ($event['user_id'] == $userId || $event['admin_id'] == $userId);
     
     if (!$isParticipant) {
         Response::error('Access denied to this event', 403);

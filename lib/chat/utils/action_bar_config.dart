@@ -107,6 +107,8 @@ class ActionBarConfigManager {
     bool isBlockedByMe = false, // 我是否封鎖了對方
     bool isBlockedByTarget = false, // 對方是否封鎖了我
     bool hasExistingReview = false, // 是否已有評分
+    String? chatRoomType, // 聊天室類型 ('support' 為客服聊天室)
+    String? supportStatus, // 客服事件狀態 ('submitted', 'in_progress', 'resolved')
   }) {
     // 減少調試信息輸出頻率，避免刷屏
     // 只在狀態變化時輸出調試信息（靜態變數用於狀態比較）
@@ -116,6 +118,15 @@ class ActionBarConfigManager {
     }
 
     final actions = <ActionBarAction>[];
+
+    // 如果是客服聊天室，使用專門的處理邏輯
+    if (chatRoomType == 'support') {
+      return _getSupportChatActions(
+        supportStatus: supportStatus,
+        actionCallbacks: actionCallbacks,
+        userRole: userRole,
+      );
+    }
 
     // Creator 和 Participant 分別處理不同的狀態
     if (userRole == UserRole.creator) {
@@ -146,6 +157,60 @@ class ActionBarConfigManager {
         isBlockedByTarget: isBlockedByTarget,
       );
     }
+  }
+
+  /// 客服聊天室的動作邏輯
+  static List<ActionBarAction> _getSupportChatActions({
+    String? supportStatus,
+    required Map<String, VoidCallback> actionCallbacks,
+    required UserRole userRole,
+  }) {
+    final actions = <ActionBarAction>[];
+
+    if (kDebugMode) {
+      debugPrint('🔍 [ActionBar] Support Chat: $userRole/$supportStatus');
+    }
+
+    // 只有客戶（creator）可以操作客服聊天室
+    if (userRole == UserRole.creator) {
+      // 根據客服事件狀態顯示不同的動作
+      switch (supportStatus) {
+        case 'submitted':
+          // 已提交，等待管理員回應
+          // 暫時不提供任何動作
+          break;
+        case 'in_progress':
+          // 進行中，可以結案並評分
+          if (actionCallbacks.containsKey('close')) {
+            actions.add(
+              ActionBarAction(
+                id: 'close',
+                label: 'Close',
+                icon: Icons.close,
+                onTap: actionCallbacks['close']!,
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+              ).withConfirmation(
+                title: 'Close Support Case',
+                content:
+                    'Are you sure you want to close this support case? You can rate the service after closing.',
+              ),
+            );
+          }
+          break;
+        case 'resolved':
+          // 已結案，只能查看
+          // 不提供任何動作
+          break;
+        default:
+          // 未知狀態，不提供動作
+          break;
+      }
+    }
+    // 管理員（participant）在客服聊天室中不需要特殊動作
+    // 他們只能發送訊息，不能操作客服事件狀態
+
+    return actions;
   }
 
   /// Creator 的動作邏輯（基於任務狀態）

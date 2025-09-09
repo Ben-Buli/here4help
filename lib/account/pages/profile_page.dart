@@ -673,7 +673,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   onCancel: () {
                     setState(() {
                       editingField = null;
-                      controllers['name']!.text = originalData['name'];
+                      controllers['name']!.text = originalData['name'] ?? '';
                       _checkForChanges();
                     });
                   },
@@ -710,7 +710,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   onCancel: () {
                     setState(() {
                       editingField = null;
-                      controllers['nickname']!.text = originalData['nickname'];
+                      controllers['nickname']!.text =
+                          originalData['nickname'] ?? '';
                       _checkForChanges();
                     });
                   },
@@ -774,7 +775,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   onCancel: () {
                     setState(() {
                       editingField = null;
-                      controllers['phone']!.text = originalData['phone'];
+                      controllers['phone']!.text = originalData['phone'] ?? '';
                       _checkForChanges();
                     });
                   },
@@ -813,7 +814,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     setState(() {
                       editingField = null;
                       controllers['dateOfBirth']!.text =
-                          originalData['dateOfBirth'];
+                          originalData['dateOfBirth'] ?? '';
                       _checkForChanges();
                     });
                   },
@@ -1131,7 +1132,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   onCancel: () {
                     setState(() {
                       editingField = null;
-                      controllers['country']!.text = originalData['country'];
+                      controllers['country']!.text =
+                          originalData['country'] ?? '';
                       _checkForChanges();
                     });
                   },
@@ -1190,8 +1192,10 @@ class _ProfilePageState extends State<ProfilePage> {
                   onCancel: () {
                     setState(() {
                       editingField = null;
-                      controllers['address']!.text = originalData['address'];
-                      isPermanentAddress = originalData['isPermanentAddress'];
+                      controllers['address']!.text =
+                          originalData['address'] ?? '';
+                      isPermanentAddress =
+                          originalData['isPermanentAddress'] ?? false;
                       _checkForChanges();
                     });
                   },
@@ -1232,7 +1236,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   onCancel: () {
                     setState(() {
                       editingField = null;
-                      controllers['aboutMe']!.text = originalData['aboutMe'];
+                      controllers['aboutMe']!.text =
+                          originalData['about_me'] ?? '';
                       _checkForChanges();
                     });
                   },

@@ -30,9 +30,17 @@ try {
   $room_id = isset($_POST['room_id']) ? (int)$_POST['room_id'] : 0;
   if ($room_id <= 0) Response::validationError(['room_id' => 'required']);
 
-  // 驗證房間權限
-  $room = $db->fetch("SELECT id, task_id, creator_id, participant_id FROM chat_rooms WHERE id = ?", [$room_id]);
-  if (!$room || ($room['creator_id'] != $user_id && $room['participant_id'] != $user_id)) {
+  // 驗證房間權限（支援一般聊天室和客服聊天室）
+  $room = $db->fetch("
+    SELECT 'regular' as source, id, task_id, creator_id, participant_id FROM chat_rooms 
+    WHERE id = ? AND (creator_id = ? OR participant_id = ?)
+    UNION ALL
+    SELECT 'support' as source, id, NULL as task_id, user_id as creator_id, admin_id as participant_id 
+    FROM support_chat_rooms 
+    WHERE id = ? AND (user_id = ? OR admin_id = ?)
+    LIMIT 1
+  ", [$room_id, $user_id, $user_id, $room_id, $user_id, $user_id]);
+  if (!$room) {
     Response::error('Room not found or access denied', 404);
   }
 
@@ -66,7 +74,8 @@ try {
   }
 
   // 產出可供前端引用的 URL（相對於 apiBaseUrl）
-  $publicPath = '/backend/uploads/chat/' . $safeName;
+  // 確保路徑格式與前端 PathMapper 期望的格式一致
+  $publicPath = 'uploads/chat/' . $safeName;
 
   Response::success([
     'filename' => $file['name'],

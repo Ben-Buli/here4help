@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'dart:io';
 import '../models/image_tray_item.dart';
 
 /// 圖片托盤 UI 組件
@@ -105,29 +107,83 @@ class ImageTray extends StatelessWidget {
 
   /// 構建圖片內容
   Widget _buildImageContent(ImageTrayItem item) {
-    if (item.thumbnailData != null) {
+    // 優先使用縮圖數據
+    if (item.thumbnailData != null && item.thumbnailData!.isNotEmpty) {
       return Image.memory(
         item.thumbnailData!,
         fit: BoxFit.cover,
         width: 72,
         height: 72,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('❌ 縮圖顯示失敗: $error');
+          return _buildErrorPlaceholder();
+        },
       );
-    } else if (item.compressedData != null) {
+    }
+    // 備用：使用壓縮數據
+    else if (item.compressedData != null && item.compressedData!.isNotEmpty) {
       return Image.memory(
         item.compressedData!,
         fit: BoxFit.cover,
         width: 72,
         height: 72,
-      );
-    } else {
-      return const Center(
-        child: Icon(
-          Icons.broken_image,
-          color: Colors.grey,
-          size: 32,
-        ),
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('❌ 壓縮圖片顯示失敗: $error');
+          return _buildErrorPlaceholder();
+        },
       );
     }
+    // 最後備用：嘗試從原始文件讀取（僅非 Web 環境）
+    else if (!kIsWeb && item.originalFile.path.isNotEmpty) {
+      return Image.file(
+        item.originalFile,
+        fit: BoxFit.cover,
+        width: 72,
+        height: 72,
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('❌ 原始文件顯示失敗: $error');
+          return _buildErrorPlaceholder();
+        },
+      );
+    }
+    // 無可用數據
+    else {
+      debugPrint(
+          '❌ 圖片托盤項目無可用數據: thumbnailData=${item.thumbnailData?.length}, compressedData=${item.compressedData?.length}');
+      return _buildErrorPlaceholder();
+    }
+  }
+
+  /// 構建錯誤佔位符
+  Widget _buildErrorPlaceholder() {
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.broken_image,
+              color: Colors.grey,
+              size: 24,
+            ),
+            SizedBox(height: 2),
+            Text(
+              '預覽失敗',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 8,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// 構建狀態指示器

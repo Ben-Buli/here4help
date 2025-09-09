@@ -40,39 +40,72 @@ try {
     $db->beginTransaction();
     
     try {
-        // 1. 驗證用戶是否為該聊天室的參與者
+        // 1. 驗證用戶是否為該聊天室的參與者（支援一般聊天室和客服聊天室）
         $roomCheckSQL = "
-            SELECT id, creator_id, participant_id, task_id 
+            SELECT 'regular' as source, id, creator_id, participant_id, task_id 
             FROM chat_rooms 
             WHERE id = ? AND (creator_id = ? OR participant_id = ?)
+            UNION ALL
+            SELECT 'support' as source, id, user_id as creator_id, admin_id as participant_id, NULL as task_id
+            FROM support_chat_rooms 
+            WHERE id = ? AND (user_id = ? OR admin_id = ?)
+            LIMIT 1
         ";
-        $roomInfo = $db->query($roomCheckSQL, [$room_id, $user_id, $user_id])->fetch();
+        $roomInfo = $db->query($roomCheckSQL, [$room_id, $user_id, $user_id, $room_id, $user_id, $user_id])->fetch();
         
         if (!$roomInfo) {
             throw new Exception('Room not found or access denied');
         }
         
-        // 2. 獲取該聊天室的最新訊息 ID
-        $lastMessageSQL = "SELECT MAX(id) as last_message_id FROM chat_messages WHERE room_id = ?";
+        // 2. 根據聊天室類型獲取該聊天室的最新訊息 ID
+        if ($roomInfo['source'] === 'support') {
+            $lastMessageSQL = "SELECT MAX(id) as last_message_id FROM support_chat_messages WHERE room_id = ?";
+        } else {
+            $lastMessageSQL = "SELECT MAX(id) as last_message_id FROM chat_messages WHERE room_id = ?";
+        }
         $lastMessageResult = $db->query($lastMessageSQL, [$room_id])->fetch();
         $lastMessageId = $lastMessageResult['last_message_id'] ?? 0;
         
-        // 3. Upsert 更新用戶的已讀記錄（確保只能前進，不會倒退）
-        $upsertSQL = "
-            INSERT INTO chat_reads (user_id, room_id, last_read_message_id, updated_at)
-            VALUES (?, ?, ?, NOW())
-            ON DUPLICATE KEY UPDATE 
-                last_read_message_id = GREATEST(last_read_message_id, VALUES(last_read_message_id)),
-                updated_at = NOW()
-        ";
+        // 3. 根據聊天室類型更新用戶的已讀記錄（確保只能前進，不會倒退）
+        if ($roomInfo['source'] === 'support') {
+            $upsertSQL = "
+                INSERT INTO support_chat_reads (user_id, room_id, last_read_message_id, updated_at)
+                VALUES (?, ?, ?, NOW())
+                ON DUPLICATE KEY UPDATE 
+                    last_read_message_id = GREATEST(last_read_message_id, VALUES(last_read_message_id)),
+                    updated_at = NOW()
+            ";
+        } else {
+            $upsertSQL = "
+                INSERT INTO chat_reads (user_id, room_id, last_read_message_id, updated_at)
+                VALUES (?, ?, ?, NOW())
+                ON DUPLICATE KEY UPDATE 
+                    last_read_message_id = GREATEST(last_read_message_id, VALUES(last_read_message_id)),
+                    updated_at = NOW()
+            ";
+        }
         $db->query($upsertSQL, [$user_id, $room_id, $lastMessageId]);
         
-        // 4. 獲取更新後的已讀記錄
-        $readStatusSQL = "SELECT last_read_message_id FROM chat_reads WHERE user_id = ? AND room_id = ?";
+        // 4. 根據聊天室類型獲取更新後的已讀記錄
+        if ($roomInfo['source'] === 'support') {
+            $readStatusSQL = "SELECT last_read_message_id FROM support_chat_reads WHERE user_id = ? AND room_id = ?";
+        } else {
+            $readStatusSQL = "SELECT last_read_message_id FROM chat_reads WHERE user_id = ? AND room_id = ?";
+        }
         $readStatus = $db->query($readStatusSQL, [$user_id, $room_id])->fetch();
         $actualLastRead = $readStatus['last_read_message_id'] ?? 0;
         
-                    // 5. 計算該聊天室當前未讀數（應該為 0）
+        // 5. 根據聊天室類型計算該聊天室當前未讀數（應該為 0）
+        if ($roomInfo['source'] === 'support') {
+            $unreadSQL = "
+                SELECT COUNT(*) as unread_count
+                FROM support_chat_messages scm
+                JOIN support_chat_rooms scr ON scr.id = scm.room_id
+                WHERE scm.room_id = ?
+                  AND scm.from_user_id != ?
+                  AND scm.id > ?
+            ";
+        } else {
             $unreadSQL = "
                 SELECT COUNT(*) as unread_count
                 FROM chat_messages cm
@@ -81,6 +114,7 @@ try {
                   AND cm.from_user_id != ?
                   AND cm.id > ?
             ";
+        }
         $unreadResult = $db->query($unreadSQL, [$room_id, $user_id, $actualLastRead])->fetch();
         $unreadCount = (int)$unreadResult['unread_count'];
         

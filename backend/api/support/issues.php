@@ -52,11 +52,17 @@ try {
         Response::error('Invalid or expired token', 401);
     }
     
-    // TODO: 檢查管理員權限
-    // $adminId = $payload['user_id'];
-    // 暫時跳過管理員權限檢查，實際部署時需要實作
-    
+    // 檢查管理員權限
+    $adminId = $payload['user_id'];
     $db = Database::getInstance()->getConnection();
+    
+    $adminCheckStmt = $db->prepare("SELECT permission FROM users WHERE id = ?");
+    $adminCheckStmt->execute([$adminId]);
+    $adminUser = $adminCheckStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$adminUser || $adminUser['permission'] != 99) {
+        Response::error('Access denied. Admin privileges required.', 403);
+    }
     
     // 解析查詢參數
     $type = $_GET['type'] ?? 'support'; // support, dispute, all
@@ -71,10 +77,10 @@ try {
     
     // 類型篩選
     if ($type !== 'all') {
-        $whereConditions[] = "cr.type = ?";
+        $whereConditions[] = "scr.type = ?";
         $params[] = $type;
     } else {
-        $whereConditions[] = "cr.type IN ('support', 'dispute')";
+        $whereConditions[] = "scr.type IN ('support', 'dispute')";
     }
     
     // 狀態篩選
@@ -96,8 +102,8 @@ try {
     
     // 計算總數
     $countSql = "
-        SELECT COUNT(DISTINCT cr.id) as total
-        FROM chat_rooms cr
+        SELECT COUNT(DISTINCT scr.id) as total
+        FROM support_chat_rooms scr
         LEFT JOIN (
             SELECT 
                 se1.support_chat_room_id,
@@ -114,7 +120,7 @@ try {
                 GROUP BY support_chat_room_id
             ) se2 ON se1.support_chat_room_id = se2.support_chat_room_id 
                   AND se1.created_at = se2.max_created_at
-        ) latest_event ON latest_event.support_chat_room_id = cr.id
+        ) latest_event ON latest_event.support_chat_room_id = scr.id
         LEFT JOIN users u ON latest_event.user_id = u.id
         WHERE {$whereClause}
     ";
@@ -130,8 +136,8 @@ try {
     // 主查詢：獲取事件列表
     $sql = "
         SELECT 
-            cr.id as room_id,
-            cr.type,
+            scr.id as room_id,
+            scr.type,
             latest_event.status,
             latest_event.title,
             latest_event.id as event_id,
@@ -140,7 +146,7 @@ try {
             u.email as user_email,
             latest_event.created_at as event_created_at,
             last_message.last_message_at
-        FROM chat_rooms cr
+        FROM support_chat_rooms scr
         LEFT JOIN (
             SELECT 
                 se1.support_chat_room_id,
@@ -157,15 +163,15 @@ try {
                 GROUP BY support_chat_room_id
             ) se2 ON se1.support_chat_room_id = se2.support_chat_room_id 
                   AND se1.created_at = se2.max_created_at
-        ) latest_event ON latest_event.support_chat_room_id = cr.id
+        ) latest_event ON latest_event.support_chat_room_id = scr.id
         LEFT JOIN users u ON latest_event.user_id = u.id
         LEFT JOIN (
             SELECT 
                 room_id,
                 MAX(created_at) as last_message_at
-            FROM chat_messages
+            FROM support_chat_messages
             GROUP BY room_id
-        ) last_message ON last_message.room_id = cr.id
+        ) last_message ON last_message.room_id = scr.id
         WHERE {$whereClause}
         ORDER BY 
             CASE 

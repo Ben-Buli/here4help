@@ -154,6 +154,19 @@ const router = createRouter({
       ],
     },
     {
+      path: '/support-chat-list',
+      component: () => import('../components/AppLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'support-chat-list',
+          component: () => import('../views/SupportChatListView.vue'),
+          meta: { title: 'Support Chat List' },
+        },
+      ],
+    },
+    {
       path: '/payments',
       component: () => import('../components/AppLayout.vue'),
       meta: { requiresAuth: true },

@@ -36,12 +36,10 @@ import 'package:here4help/chat/providers/chat_list_provider.dart';
 import 'package:here4help/widgets/dispute_dialog.dart';
 import 'package:here4help/chat/widgets/disagree_completion_dialog.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
-import 'package:here4help/chat/models/image_tray_item.dart';
-import 'package:here4help/chat/models/pending_image_message.dart';
-import 'package:here4help/chat/services/image_upload_manager.dart';
-import 'package:here4help/chat/services/image_processing_service.dart';
-import 'package:here4help/chat/widgets/image_tray.dart';
-import 'package:here4help/chat/widgets/pending_image_message.dart';
+import 'package:here4help/chat/models/image_upload_status.dart';
+import 'package:here4help/chat/widgets/uploading_image_message.dart';
+import 'package:here4help/services/media/cross_platform_image_service.dart';
+import 'package:here4help/services/image_cleanup_service.dart';
 import 'package:here4help/utils/error_message_mapper.dart';
 import 'package:here4help/services/api/support_event_api.dart';
 import 'package:here4help/widgets/support_timeline_dialog.dart';
@@ -109,14 +107,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   final SocketService _socketService = SocketService();
   String? _currentRoomId;
 
-  // 圖片托盤相關
-  ImageUploadManager? _imageUploadManager;
-  final ImageProcessingService _imageProcessingService =
-      ImageProcessingService();
-  List<ImageTrayItem> _imageTrayItems = [];
-
-  // 暫存圖片訊息相關
-  final List<PendingImageMessage> _pendingImageMessages = [];
+  // 圖片上傳狀態管理
+  final Map<String, ImageUploadStatus> _uploadingImages = {};
 
   // 對方頭像與名稱（相對於當前使用者的聊天室對象）快取
   String? _opponentAvatarUrlCached;
@@ -847,6 +839,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       // Support 相關動作
       'issue': () => _handleShowSupportTimeline(),
       'solved': () => _handleSupportSolved(),
+      'close': () => _handleSupportSolved(), // 使用相同的處理邏輯
     };
 
     // 如果有 widget.data，先設置初始狀態
@@ -1060,104 +1053,22 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
-  /// 初始化圖片上傳管理器
-  void _initImageUploadManager() {
-    if (_currentRoomId == null) return;
-
-    _imageUploadManager?.dispose();
-    _imageUploadManager = ImageUploadManager(_currentRoomId!);
-
-    // 設置回調
-    _imageUploadManager!.onItemsUpdated = (items) {
-      if (mounted) {
-        setState(() {
-          _imageTrayItems = items;
-        });
-      }
-    };
-
-    _imageUploadManager!.onItemError = (item, error) {
-      if (mounted) {
-        // 更新暫存訊息為失敗狀態
-        setState(() {
-          final index = _pendingImageMessages
-              .indexWhere((msg) => msg.localId == item.localId);
-          if (index != -1) {
-            _pendingImageMessages[index] =
-                _pendingImageMessages[index].copyWith(
-              status: PendingImageStatus.failed,
-              errorMessage: error,
-            );
-          }
-        });
-
-        // 根據錯誤類型顯示不同的提示
-        final String errorMessage = getImageUploadErrorMessage(error);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-            action: SnackBarAction(
-              label: '重試',
-              textColor: Colors.white,
-              onPressed: () => _retryImageUpload(item.localId),
-            ),
-          ),
-        );
-      }
-    };
-
-    _imageUploadManager!.onItemSuccess = (item) {
-      debugPrint('✅ 圖片上傳成功: ${item.localId}');
-      // 圖片上傳成功後，移除暫存訊息並重新載入聊天訊息
-      if (mounted) {
-        setState(() {
-          _pendingImageMessages
-              .removeWhere((msg) => msg.localId == item.localId);
-        });
-        Future.delayed(const Duration(milliseconds: 500), () {
-          _loadChatMessagesFromDatabase();
-        });
-      }
-    };
-
-    _imageUploadManager!.onProgressUpdate = (localId, progress) {
-      if (mounted) {
-        setState(() {
-          final index =
-              _pendingImageMessages.indexWhere((msg) => msg.localId == localId);
-          if (index != -1) {
-            _pendingImageMessages[index] =
-                _pendingImageMessages[index].copyWith(
-              uploadProgress: progress,
-            );
-          }
-        });
-      }
-    };
-  }
-
-  /// 選擇並添加圖片到托盤
-  Future<void> _pickAndAddImages() async {
+  /// 選擇並直接發送圖片
+  Future<void> _pickAndSendImage() async {
     try {
-      if (_imageUploadManager == null) {
-        throw Exception('圖片管理器未初始化');
-      }
-
-      final items = await _imageProcessingService.pickMultipleImages(
-        maxImages: 9 - _imageTrayItems.length,
+      // 使用 CrossPlatformImageService 來選擇圖片（Web 兼容）
+      final imageService = CrossPlatformImageService();
+      final image = await imageService.pickFromGallery(
+        config: ImageValidationConfig.chat,
       );
 
-      if (items.isNotEmpty) {
-        final files = items.map((item) => item.originalFile).toList();
-        await _imageUploadManager!.addImages(files);
+      if (image != null) {
+        await _sendImageMessage(image);
       }
     } catch (e) {
+      debugPrint('❌ 選擇圖片失敗: $e');
       if (mounted) {
         final errorMessage = getImageUploadErrorMessage(e.toString());
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -1169,125 +1080,250 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     }
   }
 
-  /// 從托盤移除圖片
-  void _removeImageFromTray(String localId) {
-    _imageUploadManager?.removeImage(localId);
-  }
+  /// 發送圖片訊息
+  Future<void> _sendImageMessage(ImageResult image,
+      {String? existingMessageId}) async {
+    if (_currentRoomId == null) {
+      debugPrint('❌ 無法取得 roomId');
+      return;
+    }
 
-  /// 重試圖片上傳
-  Future<void> _retryImageUpload(String localId) async {
+    // 使用現有的 messageId 或創建新的
+    final messageId =
+        existingMessageId ?? 'temp_${DateTime.now().millisecondsSinceEpoch}';
+    final localId = messageId.replaceFirst('temp_', '');
+
     try {
-      // 更新暫存訊息為上傳中狀態
-      setState(() {
-        final index =
-            _pendingImageMessages.indexWhere((msg) => msg.localId == localId);
-        if (index != -1) {
-          _pendingImageMessages[index] = _pendingImageMessages[index].copyWith(
-            status: PendingImageStatus.uploading,
-            uploadProgress: 0.0,
+      // 獲取或創建上傳狀態
+      final existingStatus = _uploadingImages[messageId];
+      final uploadStatus = existingStatus?.copyWith(
+            state: ImageUploadState.uploading,
+            progress: 0.0,
             errorMessage: null,
+            retryCount: existingStatus.retryCount + 1,
+          ) ??
+          ImageUploadStatus.uploading(
+            localId: localId,
+            messageId: messageId,
+            imageData: image.bytes,
+            fileName: image.name,
           );
-        }
+
+      setState(() {
+        _uploadingImages[messageId] = uploadStatus;
       });
 
-      final item = _imageTrayItems.firstWhere(
-        (item) => item.localId == localId,
-        orElse: () => throw Exception('找不到指定的圖片'),
+      // 滾動到底部（僅新上傳時）
+      if (existingMessageId == null) {
+        _scrollToBottom();
+      }
+
+      // 模擬進度更新
+      _simulateUploadProgress(messageId);
+
+      // 上傳圖片
+      final uploadResult = await ChatService().uploadAttachment(
+        roomId: _currentRoomId!,
+        image: image,
       );
 
-      await _imageUploadManager?.retryUpload(item);
-    } catch (e) {
-      debugPrint('❌ 重試上傳失敗: $e');
-      if (mounted) {
-        // 更新暫存訊息為失敗狀態
+      if (uploadResult['success'] == true) {
+        final uploadedUrl =
+            uploadResult['data']?['url'] ?? uploadResult['data']?['path'];
+        final tempFilePath =
+            ImageCleanupService.extractFilePathFromUploadResult(uploadResult);
+
+        // 更新進度到 90%
         setState(() {
-          final index =
-              _pendingImageMessages.indexWhere((msg) => msg.localId == localId);
-          if (index != -1) {
-            _pendingImageMessages[index] =
-                _pendingImageMessages[index].copyWith(
-              status: PendingImageStatus.failed,
-              errorMessage: e.toString(),
-            );
-          }
+          _uploadingImages[messageId] = uploadStatus.copyWith(
+            progress: 0.9,
+            tempFilePath: tempFilePath,
+            retryCount: uploadStatus.retryCount,
+          );
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(getImageUploadErrorMessage(e.toString())),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
-          ),
+        // 發送圖片訊息
+        await ChatService().sendMessage(
+          roomId: _currentRoomId!,
+          message: uploadedUrl ?? '',
+          kind: 'image',
         );
+
+        // 更新為成功狀態
+        setState(() {
+          _uploadingImages[messageId] = uploadStatus.copyWith(
+            state: ImageUploadState.success,
+            progress: 1.0,
+            uploadedUrl: uploadedUrl,
+            retryCount: uploadStatus.retryCount,
+          );
+        });
+
+        // 延遲移除上傳狀態並重新載入訊息
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (mounted) {
+            setState(() {
+              _uploadingImages.remove(messageId);
+            });
+            _loadChatMessagesFromDatabase();
+            // 圖片上傳成功後滾動到底部
+            _scrollToBottom();
+          }
+        });
+      } else {
+        // 上傳失敗，保存暫存檔案路徑以便清理
+        final tempFilePath =
+            ImageCleanupService.extractFilePathFromUploadResult(uploadResult);
+
+        setState(() {
+          _uploadingImages[messageId] = uploadStatus.copyWith(
+            state: ImageUploadState.failed,
+            errorMessage: uploadResult['message'] ?? '上傳失敗',
+            tempFilePath: tempFilePath,
+            retryCount: uploadStatus.retryCount,
+          );
+        });
       }
+    } catch (e) {
+      debugPrint('❌ 發送圖片訊息失敗: $e');
+
+      // 更新為失敗狀態
+      setState(() {
+        final existingStatus = _uploadingImages[messageId];
+        _uploadingImages[messageId] = existingStatus?.copyWith(
+              state: ImageUploadState.failed,
+              errorMessage: e.toString(),
+              retryCount: existingStatus.retryCount,
+            ) ??
+            ImageUploadStatus.failed(
+              localId: localId,
+              messageId: messageId,
+              imageData: image.bytes,
+              fileName: image.name,
+              errorMessage: e.toString(),
+            );
+      });
     }
   }
 
-  /// 刪除暫存圖片訊息
-  void _deletePendingImageMessage(String localId) {
-    setState(() {
-      _pendingImageMessages.removeWhere((msg) => msg.localId == localId);
+  /// 模擬上傳進度更新
+  void _simulateUploadProgress(String messageId) {
+    Timer.periodic(const Duration(milliseconds: 200), (timer) {
+      final status = _uploadingImages[messageId];
+      if (status == null || status.state != ImageUploadState.uploading) {
+        timer.cancel();
+        return;
+      }
+
+      final newProgress = (status.progress + 0.1).clamp(0.0, 0.8);
+      setState(() {
+        _uploadingImages[messageId] = status.copyWith(
+          progress: newProgress,
+          retryCount: status.retryCount,
+        );
+      });
+
+      if (newProgress >= 0.8) {
+        timer.cancel();
+      }
     });
   }
 
-  /// 發送訊息（包含圖片和文字的順序處理）
-  Future<void> _sendMessageWithImages() async {
+  /// 重試圖片上傳
+  Future<void> _retryImageUpload(String messageId) async {
+    final uploadStatus = _uploadingImages[messageId];
+    if (uploadStatus == null) return;
+
+    try {
+      // 重新創建 ImageResult
+      final image = ImageResult(
+        bytes: uploadStatus.imageData,
+        name: uploadStatus.fileName,
+        mimeType: 'image/jpeg', // 預設類型
+        size: uploadStatus.imageData.length,
+      );
+
+      // 更新為上傳中狀態
+      setState(() {
+        _uploadingImages[messageId] = uploadStatus.copyWith(
+          state: ImageUploadState.uploading,
+          progress: 0.0,
+          errorMessage: null,
+          retryCount: uploadStatus.retryCount + 1,
+        );
+      });
+
+      // 使用現有的 messageId 重新上傳
+      await _sendImageMessage(image, existingMessageId: messageId);
+    } catch (e) {
+      debugPrint('❌ 重試上傳失敗: $e');
+      setState(() {
+        _uploadingImages[messageId] = uploadStatus.copyWith(
+          state: ImageUploadState.failed,
+          errorMessage: e.toString(),
+          retryCount: uploadStatus.retryCount,
+        );
+      });
+    }
+  }
+
+  /// 取消圖片上傳
+  Future<void> _cancelImageUpload(String messageId) async {
+    final uploadStatus = _uploadingImages[messageId];
+
+    // 如果有暫存檔案，嘗試清理
+    if (uploadStatus?.tempFilePath != null) {
+      await ImageCleanupService.cleanupFailedUpload(
+          uploadStatus!.tempFilePath!);
+    }
+
+    setState(() {
+      _uploadingImages.remove(messageId);
+    });
+
+    debugPrint('🗑️ 已取消圖片上傳: $messageId');
+  }
+
+  /// 移除失敗的圖片訊息
+  Future<void> _removeFailedImageMessage(String messageId) async {
+    final uploadStatus = _uploadingImages[messageId];
+
+    // 清理失敗的圖片檔案
+    if (uploadStatus?.tempFilePath != null) {
+      final success = await ImageCleanupService.cleanupFailedUpload(
+          uploadStatus!.tempFilePath!);
+      if (success) {
+        debugPrint('✅ 成功清理失敗的圖片檔案: ${uploadStatus.tempFilePath}');
+      }
+    }
+
+    setState(() {
+      _uploadingImages.remove(messageId);
+    });
+
+    debugPrint('🗑️ 已移除失敗的圖片訊息: $messageId');
+
+    // 顯示成功提示
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('已移除失敗的圖片'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  /// 發送文字訊息
+  Future<void> _sendTextMessage() async {
     final text = _controller.text.trim();
+    if (text.isEmpty) return;
 
     // 先清空輸入框
     _controller.clear();
 
-    try {
-      // 1. 先創建暫存圖片訊息
-      if (_imageTrayItems.isNotEmpty) {
-        setState(() {
-          for (final item in _imageTrayItems) {
-            final pendingMessage = PendingImageMessage.fromImageTrayItem(item);
-            _pendingImageMessages.add(pendingMessage);
-          }
-        });
-
-        // 開始批量上傳
-        final uploadedMessageIds =
-            await _imageUploadManager!.startBatchUpload();
-        debugPrint('✅ 批量上傳完成，訊息 IDs: $uploadedMessageIds');
-
-        // 更新我的最後已讀訊息 ID（我發送的圖片訊息自動標記為已讀）
-        if (uploadedMessageIds.isNotEmpty) {
-          final lastUploadedId = uploadedMessageIds.last;
-          final msgId = int.tryParse(lastUploadedId) ?? 0;
-          if (msgId > 0 && msgId > (_myLastReadMessageId ?? 0)) {
-            setState(() {
-              _myLastReadMessageId = msgId;
-            });
-            debugPrint('✅ 更新我的最後已讀訊息 ID (圖片): $_myLastReadMessageId');
-          }
-        }
-
-        // 清空托盤
-        _imageUploadManager!.clearAll();
-
-        // 重新載入聊天訊息以顯示新上傳的圖片
-        if (mounted) {
-          await _loadChatMessagesFromDatabase();
-        }
-      }
-
-      // 2. 最後發送文字訊息（如果有）
-      if (text.isNotEmpty) {
-        await _sendMessage(textOverride: text);
-      }
-    } catch (e) {
-      debugPrint('❌ 發送訊息失敗: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('發送失敗: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
+    await _sendMessage(textOverride: text);
   }
 
   // 已移除 _pickAndSendPhoto - 使用新的圖片上傳邏輯
@@ -1347,8 +1383,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     _focusNode.dispose();
     _listController.dispose();
 
-    // 清理圖片上傳管理器
-    _imageUploadManager?.dispose();
+    // 清理上傳中的圖片狀態
+    _uploadingImages.clear();
 
     super.dispose();
   }
@@ -1423,9 +1459,6 @@ class _ChatDetailPageState extends State<ChatDetailPage>
           }
         });
 
-        // 初始化圖片上傳管理器
-        _initImageUploadManager();
-
         // 提前嘗試加入房間（即便尚未連上 socket，會先排入佇列）
         try {
           _socketService.joinRoom(roomId);
@@ -1454,13 +1487,13 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         _resolveOpponentIdentity();
       }
     } catch (e) {
-      debugPrint('❌ 初始化聊天室失敗: $e');
+      debugPrint('❌ Initialize chat detail failed: $e');
       // 在 initState 中不能使用 ScaffoldMessenger.of(context)
       // 將錯誤存儲到狀態中，在 build 方法中顯示
       if (mounted) {
         setState(() {
           _hasError = true;
-          _errorMessage = '載入聊天室失敗: $e';
+          _errorMessage = 'Load chat detail failed: $e';
         });
       }
     }
@@ -1555,7 +1588,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       debugPrint(
           '🧩 Opponent resolved: id=${oppId ?? 'null'}, name=$_opponentNameCached, avatar=${_opponentAvatarUrlCached ?? 'null'}');
     } catch (e) {
-      debugPrint('❌ 解析對方身份失敗: $e');
+      debugPrint('❌ Resolve opponent identity failed: $e');
     }
   }
 
@@ -2800,7 +2833,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     int totalItemCount = (hasViewResumeMessage ? 1 : 0) +
         _chatMessages.length +
         (_pendingMessages.length) +
-        _pendingImageMessages.length + // 加入暫存圖片訊息
+        _uploadingImages.length + // 加入上傳中圖片訊息
         (hasUnreadSeparator ? 1 : 0); // 加入未讀分隔線
 
     // 減少 debug 輸出頻率
@@ -3041,19 +3074,19 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                     return _buildMessageItem(messageData);
                   }
 
-                  // 檢查是否為暫存圖片訊息
-                  final pendingImageIndex =
+                  // 檢查是否為上傳中圖片訊息
+                  final uploadingImageIndex =
                       adjustedIndex - _chatMessages.length;
-                  if (pendingImageIndex >= 0 &&
-                      pendingImageIndex < _pendingImageMessages.length) {
-                    final pendingMessage =
-                        _pendingImageMessages[pendingImageIndex];
-                    return PendingImageMessageBubble(
-                      message: pendingMessage,
-                      isFromMe: true, // 暫存訊息都是自己發送的
-                      onRetry: () => _retryImageUpload(pendingMessage.localId),
-                      onDelete: () =>
-                          _deletePendingImageMessage(pendingMessage.localId),
+                  if (uploadingImageIndex >= 0 &&
+                      uploadingImageIndex < _uploadingImages.length) {
+                    final messageId =
+                        _uploadingImages.keys.elementAt(uploadingImageIndex);
+                    final uploadStatus = _uploadingImages[messageId]!;
+                    return UploadingImageMessage(
+                      uploadStatus: uploadStatus,
+                      onCancel: () => _cancelImageUpload(messageId),
+                      onRetry: () => _retryImageUpload(messageId),
+                      onRemove: () => _removeFailedImageMessage(messageId),
                     );
                   }
 
@@ -3201,23 +3234,6 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                   child: Container(
                     decoration: BoxDecoration(color: _glassNavColor(context)),
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      // 圖片托盤
-                      if (_imageTrayItems.isNotEmpty) ...[
-                        ImageTray(
-                          items: _imageTrayItems,
-                          onAddImages: _pickAndAddImages,
-                          onRemoveImage: _removeImageFromTray,
-                          onRetryUpload: _retryImageUpload,
-                          isUploading:
-                              _imageUploadManager?.isUploading ?? false,
-                        ),
-                        // 托盤統計信息
-                        ImageTrayStats(
-                          items: _imageTrayItems,
-                          isUploading:
-                              _imageUploadManager?.isUploading ?? false,
-                        ),
-                      ],
                       // 輸入區域
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -3247,7 +3263,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                                     icon: const Icon(Icons.photo_outlined),
                                     onPressed: isInputDisabled
                                         ? null
-                                        : _pickAndAddImages,
+                                        : _pickAndSendImage,
                                   ),
                                 ],
                               ),
@@ -3269,7 +3285,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                                   textInputAction: TextInputAction.send,
                                   onSubmitted: (value) {
                                     if (!isInputDisabled) {
-                                      _sendMessageWithImages();
+                                      _sendTextMessage();
                                     }
                                   },
                                   onEditingComplete: () {
@@ -3294,9 +3310,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                               data: IconThemeData(color: fg),
                               child: IconButton(
                                 icon: const Icon(Icons.send),
-                                onPressed: isInputDisabled
-                                    ? null
-                                    : _sendMessageWithImages,
+                                onPressed:
+                                    isInputDisabled ? null : _sendTextMessage,
                               ),
                             ),
                           ],
@@ -3391,6 +3406,46 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
   /// 構建支援聊天室的 Action Bar
   Widget _buildSupportActionBar() {
+    // 使用新的 ActionBarConfigManager 來獲取客服聊天室的動作
+    final supportStatus = _chatData?['support_event']?['status']?.toString();
+    final actions = ActionBarConfigManager.getActionsForStatus(
+      userRole: ActionBarConfigManager.parseUserRole(_userRole),
+      actionCallbacks: _buildActionCallbacks(),
+      chatRoomType: 'support',
+      supportStatus: supportStatus,
+    );
+
+    if (actions.isEmpty) {
+      // 如果沒有動作，顯示狀態信息
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: _glassNavColor(context),
+          border: const Border(
+            bottom: BorderSide(color: Colors.grey, width: 0.5),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.support_agent,
+              color: Colors.grey[600],
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Support Chat - ${_getSupportStatusDisplay(supportStatus)}',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -3401,23 +3456,29 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          // Issue 按鈕 - 顯示事件時間線
-          _buildSupportActionButton(
-            icon: Icons.timeline,
-            label: 'Issue',
-            onTap: _handleShowSupportTimeline,
-          ),
-          // Solved 按鈕 - 客戶結案
-          _buildSupportActionButton(
-            icon: Icons.check_circle,
-            label: 'Solved',
-            onTap: _handleSupportSolved,
-            backgroundColor: Colors.green,
-          ),
-        ],
+        children: actions.map((action) {
+          return _buildSupportActionButton(
+            icon: action.icon,
+            label: action.label,
+            onTap: action.onTap,
+            backgroundColor: action.backgroundColor,
+          );
+        }).toList(),
       ),
     );
+  }
+
+  String _getSupportStatusDisplay(String? status) {
+    switch (status) {
+      case 'submitted':
+        return 'Submitted';
+      case 'in_progress':
+        return 'In Progress';
+      case 'resolved':
+        return 'Resolved';
+      default:
+        return 'Unknown';
+    }
   }
 
   /// 構建支援動作按鈕
@@ -4948,7 +5009,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
                             Icon(Icons.error, color: Colors.white, size: 64),
                             SizedBox(height: 16),
                             Text(
-                              '圖片載入失敗',
+                              'Image failed to load',
                               style: TextStyle(color: Colors.white),
                             ),
                           ],

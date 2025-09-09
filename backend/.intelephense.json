@@ -1,0 +1,10 @@
+{
+  "stubs": [
+    "curl"
+  ],
+  "environment": {
+    "includePaths": [
+      "."
+    ]
+  }
+}

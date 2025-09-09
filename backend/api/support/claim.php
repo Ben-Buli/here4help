@@ -54,11 +54,18 @@ try {
     }
     
     $adminId = $payload['user_id'];
-    
-    // TODO: 檢查管理員權限
-    // 暫時跳過管理員權限檢查，實際部署時需要實作
-    
     $db = Database::getInstance()->getConnection();
+    
+    // 檢查管理員權限 (users.permission = 99)
+    $adminCheckStmt = $db->prepare("
+        SELECT permission FROM users WHERE id = ?
+    ");
+    $adminCheckStmt->execute([$adminId]);
+    $adminUser = $adminCheckStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$adminUser || $adminUser['permission'] != 99) {
+        Response::error('Access denied. Admin privileges required.', 403);
+    }
     
     // 解析請求資料
     $input = json_decode(file_get_contents('php://input'), true);
@@ -80,7 +87,7 @@ try {
     try {
         // 1. 驗證聊天室存在且為支援類型
         $roomStmt = $db->prepare("
-            SELECT id, type, creator_id, participant_id 
+            SELECT id, type, user_id, admin_id 
             FROM support_chat_rooms 
             WHERE id = ? AND type = 'support'
         ");
@@ -92,7 +99,7 @@ try {
         }
         
         // 2. 檢查是否已被其他管理員接手
-        if (!empty($room['participant_id']) && $room['participant_id'] != $adminId) {
+        if (!empty($room['admin_id']) && $room['admin_id'] != $adminId) {
             Response::error('This support case has already been claimed by another admin', 409);
         }
         
@@ -132,15 +139,13 @@ try {
         ");
         $updateEventStmt->execute([$adminId, $eventId]);
         
-        // 7. 更新聊天室：設定參與者為管理員
-        if ($room['participant_id'] == $room['creator_id']) {
-            $updateRoomStmt = $db->prepare("
-                UPDATE support_chat_rooms 
-                SET participant_id = ?
-                WHERE id = ?
-            ");
-            $updateRoomStmt->execute([$adminId, $roomId]);
-        }
+        // 7. 更新聊天室：設定參與者為管理員（從 NULL 更新為管理員 ID）
+        $updateRoomStmt = $db->prepare("
+            UPDATE support_chat_rooms 
+            SET admin_id = ?
+            WHERE id = ?
+        ");
+        $updateRoomStmt->execute([$adminId, $roomId]);
         
         // 8. 新增事件日誌
         $createLogStmt = $db->prepare("

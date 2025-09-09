@@ -30,6 +30,10 @@ class SocketService {
   Function(Map<String, dynamic>)? onApplicationStatusUpdate;
   // 新增：封鎖狀態變化監聽器
   Function(Map<String, dynamic>)? onBlockStatusUpdate;
+  // 新增：客服事件監聽器
+  Function(Map<String, dynamic>)? onSupportEventNew;
+  Function(Map<String, dynamic>)? onSupportEventUpdate;
+  Function(Map<String, dynamic>)? onSupportEventClosed;
 
   /// 初始化並連接 Socket.IO
   Future<void> connect() async {
@@ -215,6 +219,45 @@ class SocketService {
           onBlockStatusUpdate!(blockData);
         } catch (e) {
           debugPrint('❌ Error parsing block status data: $e');
+        }
+      }
+    });
+
+    // 客服事件：新事件建立
+    _socket!.on('event:new', (data) {
+      debugPrint('🆕 Support event new: $data');
+      if (onSupportEventNew != null) {
+        try {
+          final eventData = Map<String, dynamic>.from(data as Map);
+          onSupportEventNew!(eventData);
+        } catch (e) {
+          debugPrint('❌ Error parsing support event new data: $e');
+        }
+      }
+    });
+
+    // 客服事件：狀態更新
+    _socket!.on('event:update', (data) {
+      debugPrint('🔄 Support event update: $data');
+      if (onSupportEventUpdate != null) {
+        try {
+          final eventData = Map<String, dynamic>.from(data as Map);
+          onSupportEventUpdate!(eventData);
+        } catch (e) {
+          debugPrint('❌ Error parsing support event update data: $e');
+        }
+      }
+    });
+
+    // 客服事件：結案
+    _socket!.on('event:closed', (data) {
+      debugPrint('✅ Support event closed: $data');
+      if (onSupportEventClosed != null) {
+        try {
+          final eventData = Map<String, dynamic>.from(data as Map);
+          onSupportEventClosed!(eventData);
+        } catch (e) {
+          debugPrint('❌ Error parsing support event closed data: $e');
         }
       }
     });

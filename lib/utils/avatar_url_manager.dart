@@ -83,21 +83,6 @@ class AvatarUrlManager {
     return 'backend/uploads/avatars/avatar-1.png';
   }
 
-  /// 獲取隨機預設頭像路徑（用於測試）
-  static String getRandomDefaultAvatar() {
-    final avatars = [
-      'backend/uploads/avatars/avatar-1.png',
-      'backend/uploads/avatars/avatar-2.png',
-      'backend/uploads/avatars/avatar-3.png',
-      'backend/uploads/avatars/avatar-4.png',
-      'backend/uploads/avatars/avatar-5.png',
-    ];
-
-    final now = DateTime.now();
-    final index = now.millisecond % avatars.length;
-    return avatars[index];
-  }
-
   /// 檢查頭像是否為本地資源
   static bool isLocalAsset(String? avatarUrl) {
     return getPathType(avatarUrl) == AvatarPathType.localAsset;

@@ -195,18 +195,16 @@ try {
             $tid = $_SERVER['HTTP_X_TRACE_ID'] ?? null;
             
           try {
-            $logger = new UserActiveLogger();
-            $logger->logAction(
-                $userId,
-                'user',
+            UserActiveLogger::logAction(
+                $pdo,
                 $userId,
                 'profile_update',
                 null,
                 null,
                 null,
                 'User updated profile',
-                $ip,
-                $ua,
+                'user',
+                $userId,
                 $rid,
                 $tid,
                 [

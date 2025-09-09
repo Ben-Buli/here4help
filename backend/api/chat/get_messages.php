@@ -43,13 +43,17 @@ try {
     Response::validationError(['room_id' => 'required']);
   }
 
-  // 驗證用戶是否有權限訪問此聊天室
+  // 驗證用戶是否有權限訪問此聊天室（支援一般聊天室和客服聊天室）
   $room = $db->fetch("
-    SELECT id, task_id, creator_id, participant_id 
+    SELECT 'regular' as source, id, task_id, creator_id, participant_id 
     FROM chat_rooms 
     WHERE id = ? AND (creator_id = ? OR participant_id = ?)
+    UNION ALL
+    SELECT 'support' as source, id, NULL as task_id, user_id as creator_id, admin_id as participant_id
+    FROM support_chat_rooms 
+    WHERE id = ? AND (user_id = ? OR admin_id = ?)
     LIMIT 1
-  ", [$room_id, $user_id, $user_id]);
+  ", [$room_id, $user_id, $user_id, $room_id, $user_id, $user_id]);
 
   if (!$room) {
     Response::error('Room not found or access denied', 404);
@@ -66,26 +70,51 @@ try {
 
   $where_clause = implode(' AND ', $where_conditions);
 
-  // 獲取訊息
-  $messages = $db->fetchAll("
-    SELECT 
-      cm.id,
-      cm.room_id,
-      cm.from_user_id,
-      cm.content as message,
-      cm.content,
-      cm.kind,
-      cm.media_url,
-      cm.mime_type,
-      cm.created_at,
-      u.name as sender_name,
-      u.avatar_url as sender_avatar
-    FROM chat_messages cm
-    LEFT JOIN users u ON cm.from_user_id = u.id
-    WHERE $where_clause
-    ORDER BY cm.created_at DESC
-    LIMIT ?
-  ", array_merge($params, [$limit]));
+  // 根據聊天室類型獲取訊息
+  if ($room['source'] === 'support') {
+    // 客服聊天室訊息
+    $messages = $db->fetchAll("
+      SELECT 
+        scm.id,
+        scm.room_id,
+        scm.from_user_id,
+        scm.content as message,
+        scm.content,
+        scm.kind,
+        scm.media_url,
+        scm.mime_type,
+        scm.created_at,
+        COALESCE(u.name, a.full_name) as sender_name,
+        u.avatar_url as sender_avatar
+      FROM support_chat_messages scm
+      LEFT JOIN users u ON scm.from_user_id = u.id
+      LEFT JOIN admins a ON scm.from_user_id = a.id
+      WHERE $where_clause
+      ORDER BY scm.created_at DESC
+      LIMIT ?
+    ", array_merge($params, [$limit]));
+  } else {
+    // 一般聊天室訊息
+    $messages = $db->fetchAll("
+      SELECT 
+        cm.id,
+        cm.room_id,
+        cm.from_user_id,
+        cm.content as message,
+        cm.content,
+        cm.kind,
+        cm.media_url,
+        cm.mime_type,
+        cm.created_at,
+        u.name as sender_name,
+        u.avatar_url as sender_avatar
+      FROM chat_messages cm
+      LEFT JOIN users u ON cm.from_user_id = u.id
+      WHERE $where_clause
+      ORDER BY cm.created_at DESC
+      LIMIT ?
+    ", array_merge($params, [$limit]));
+  }
 
   // 反轉順序，讓最新的訊息在最後
   $messages = array_reverse($messages);

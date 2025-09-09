@@ -159,7 +159,7 @@ class AvatarUrlTest {
     // debugPrint('\n🎲 測試隨機預設頭像:');
 
     for (int i = 0; i < 5; i++) {
-      final randomAvatar = AvatarUrlManager.getRandomDefaultAvatar();
+      final randomAvatar = AvatarUrlManager.getDefaultAvatarPath();
       // debugPrint('  隨機頭像 ${i + 1}: $randomAvatar');
     }
   }

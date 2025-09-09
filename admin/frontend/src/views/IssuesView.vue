@@ -95,7 +95,7 @@
               <td class="text-sm text-gray-500">{{ formatDateTime(it.last_message_at) }}</td>
               <td>
                 <div class="flex items-center space-x-2">
-                  <!-- 動態顯示 Claim/Room 按鈕 -->
+                  <!-- 動態顯示 Claim/Chat 按鈕 -->
                   <button 
                     v-if="!it.is_claimed" 
                     @click="claimIssue(it)" 
@@ -108,7 +108,7 @@
                     @click="openChatRoom(it)" 
                     class="text-blue-600 hover:text-blue-900 text-sm font-medium"
                   >
-                    Room
+                    Chat
                   </button>
                   <span 
                     v-else 
@@ -241,12 +241,11 @@ const claimIssue = async (it: any) => {
 
 // 開啟聊天室（僅接手管理員可用）
 const openChatRoom = (it: any) => {
-  // TODO: 實現跳轉到管理員聊天室頁面
-  // 這裡需要根據實際的路由設計來實現
+  // 跳轉到管理員聊天室列表頁面
   console.log('Opening chat room for:', it.room_id)
   
-  // 暫時使用 alert 提示
-  alert(`Opening chat room ${it.room_id} - This feature will be implemented later`)
+  // 使用 Vue Router 跳轉到聊天室列表
+  window.open(`/support-chat-list?room_id=${it.room_id}`, '_blank')
 }
 
 // 更新事件狀態

@@ -42,7 +42,7 @@ class ImageUploadManager {
   int get uploadableCount =>
       _uploadQueue.where((item) => item.canUpload).length;
 
-  /// 添加圖片到托盤
+  /// 添加圖片到托盤（支援 Web 環境）
   Future<List<ImageTrayItem>> addImages(List<File> imageFiles) async {
     try {
       // 檢查數量限制
@@ -59,15 +59,9 @@ class ImageUploadManager {
           // 使用 ImageProcessingService 來處理圖片（Web 兼容）
           ImageTrayItem item;
           if (kIsWeb) {
-            // Web 環境：從 File 創建 XFile 然後處理
-            final bytes = await file.readAsBytes();
-            final fileName = file.path.split('/').last.isNotEmpty
-                ? file.path.split('/').last
-                : 'image_${DateTime.now().millisecondsSinceEpoch}.png';
-
-            // 創建一個模擬的 XFile 來使用 ImageProcessingService
-            // 但由於 XFile 構造函數限制，我們直接在這裡處理
-            item = await _processImageFileWeb(bytes, fileName, file);
+            // Web 環境：不能直接讀取 File，拋出錯誤提示使用正確的方法
+            throw Exception(
+                'Web 環境不支援直接處理 File 物件，請使用 CrossPlatformImageService');
           } else {
             // 原生環境：直接處理檔案
             item = await _processImageFile(file);
@@ -95,6 +89,52 @@ class ImageUploadManager {
             status: UploadStatus.failed,
             errorMessage: errorMessage,
           );
+          newItems.add(failedItem);
+          _uploadQueue.add(failedItem);
+        }
+      }
+
+      _notifyItemsUpdated();
+      return newItems;
+    } catch (e) {
+      final errorMessage = getImageUploadErrorMessage(e.toString());
+      debugPrint('❌ 添加圖片失敗[image_upload_manager]: $errorMessage');
+      throw Exception(errorMessage);
+    }
+  }
+
+  /// 添加圖片到托盤（從 ImageResult 物件，Web 兼容）
+  Future<List<ImageTrayItem>> addImagesFromResults(
+      List<ImageResult> imageResults) async {
+    try {
+      // 檢查數量限制
+      final remainingSlots = 9 - _uploadQueue.length;
+      if (remainingSlots <= 0) {
+        throw Exception('托盤已滿，最多只能添加 9 張圖片');
+      }
+
+      final resultsToProcess = imageResults.take(remainingSlots).toList();
+      final List<ImageTrayItem> newItems = [];
+
+      for (final imageResult in resultsToProcess) {
+        try {
+          final item = await _processImageResult(imageResult);
+          newItems.add(item);
+          _uploadQueue.add(item);
+        } catch (e) {
+          debugPrint(
+              '❌ 處理圖片失敗[image_upload_manager]: ${imageResult.name}, 錯誤: $e');
+          final errorMessage = getImageUploadErrorMessage(e.toString());
+
+          // 創建失敗項目
+          final failedItem = ImageTrayItem(
+            localId: DateTime.now().millisecondsSinceEpoch.toString(),
+            originalFile: File(''), // Web 環境使用空 File
+            fileSize: imageResult.size,
+            status: UploadStatus.failed,
+            errorMessage: errorMessage,
+          );
+
           newItems.add(failedItem);
           _uploadQueue.add(failedItem);
         }
@@ -342,11 +382,12 @@ class ImageUploadManager {
     onItemsUpdated?.call(List.unmodifiable(_uploadQueue));
   }
 
-  /// 處理單個圖片檔案（Web 環境）
-  Future<ImageTrayItem> _processImageFileWeb(
-      Uint8List bytes, String fileName, File originalFile) async {
+  /// 處理 ImageResult 物件（Web 兼容）
+  Future<ImageTrayItem> _processImageResult(ImageResult imageResult) async {
     final localId = _uuid.v4();
-    final fileSize = bytes.length;
+    final bytes = imageResult.bytes;
+    final fileName = imageResult.name;
+    final fileSize = imageResult.size;
 
     // 基本驗證
     _validateFile(fileName, fileSize);
@@ -362,22 +403,40 @@ class ImageUploadManager {
       throw Exception('圖片尺寸太小，最小需要 320x320');
     }
 
-    // Web 環境下總是壓縮以確保有數據可用
+    // 壓縮圖片（Web 和原生環境都支援）
     Uint8List? compressedData;
     try {
-      compressedData = await _compressImageWeb(bytes);
+      if (kIsWeb) {
+        compressedData = await _compressImageWeb(bytes);
+      } else {
+        compressedData = await _compressImage(bytes, width, height);
+      }
+      debugPrint('✅ 圖片壓縮完成，大小: ${compressedData?.length ?? 0} bytes');
     } catch (e) {
-      debugPrint('❌ Web 壓縮失敗，使用原始數據: $e');
+      debugPrint('❌ 壓縮失敗，使用原始數據: $e');
       compressedData = bytes;
     }
 
     // 生成縮圖
     Uint8List? thumbnailData;
     try {
-      thumbnailData = await _generateThumbnailWeb(bytes);
+      if (kIsWeb) {
+        thumbnailData = await _generateThumbnailWeb(bytes);
+      } else {
+        thumbnailData = await _generateThumbnail(bytes);
+      }
+      debugPrint('✅ 縮圖生成完成，大小: ${thumbnailData?.length ?? 0} bytes');
     } catch (e) {
-      debugPrint('❌ Web 縮圖生成失敗，使用壓縮數據: $e');
+      debugPrint('❌ 縮圖生成失敗，使用壓縮數據: $e');
       thumbnailData = compressedData;
+    }
+
+    // 確保至少有一種數據可用
+    if ((thumbnailData == null || thumbnailData.isEmpty) &&
+        (compressedData == null || compressedData.isEmpty)) {
+      debugPrint('⚠️ 警告：縮圖和壓縮數據都不可用，使用原始數據');
+      thumbnailData = bytes;
+      compressedData = bytes;
     }
 
     return ImageTrayItem(

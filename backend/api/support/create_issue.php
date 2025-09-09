@@ -3,11 +3,11 @@
  * 整合建立客服事件 API
  * 
  * 功能：
- * - 檢查使用者同時開啟事件數量限制（≤3則 submitted/in_progress）
- * - 若無支援聊天室則建立 chat_rooms(type='support')
+ * - 檢查使用者同時開啟事件數量限制（只允許1個 submitted/in_progress）
+ * - 建立新的 support_chat_rooms(type='support', participant_id=NULL)
  * - 建立 support_events(status='submitted')
  * - 建立 support_event_logs
- * - 插入系統訊息 chat_messages(kind='system')
+ * - 插入系統訊息 support_chat_messages(kind='system')
  * - 回傳 room_id, event_id
  * 
  * 路徑：POST /api/support/create_issue.php
@@ -77,44 +77,32 @@ try {
         Response::error('Description is required', 400);
     }
     
-    // 檢查使用者同時開啟的客服事件數量限制（≤3則）
+    // 檢查使用者同時開啟的客服事件數量限制（改為只允許1個進行中事件）
     $activeCountStmt = $db->prepare("
         SELECT COUNT(*) as active_count
         FROM support_events se
-        JOIN chat_rooms cr ON cr.id = se.support_chat_room_id AND cr.type = 'support'
+        JOIN support_chat_rooms scr ON scr.id = se.support_chat_room_id AND scr.type = 'support'
         WHERE se.user_id = ? AND se.status IN ('submitted', 'in_progress')
     ");
     $activeCountStmt->execute([$userId]);
     $activeCount = $activeCountStmt->fetch(PDO::FETCH_ASSOC)['active_count'];
     
-    if ($activeCount >= 3) {
-        Response::error('You have reached the maximum number of active support cases.', 422);
+    if ($activeCount >= 1) {
+        Response::error('You already have an active support case. Please resolve the existing case before creating a new one.', 422);
     }
     
     // 開始資料庫事務
     $db->beginTransaction();
     
     try {
-        // 1. 檢查是否已有支援聊天室，若無則建立
-        $existingRoomStmt = $db->prepare("
-            SELECT id FROM support_chat_rooms 
-            WHERE type = 'support' AND creator_id = ?
-            LIMIT 1
+        // 1. 建立新的支援聊天室（每次建立新事件都創建新聊天室）
+        // admin_id 初始為 NULL，等待管理員接手
+        $createRoomStmt = $db->prepare("
+            INSERT INTO support_chat_rooms (type, user_id, admin_id, created_at)
+            VALUES ('support', ?, NULL, NOW())
         ");
-        $existingRoomStmt->execute([$userId]);
-        $existingRoom = $existingRoomStmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($existingRoom) {
-            $roomId = $existingRoom['id'];
-        } else {
-            // 建立新的支援聊天室（暫時使用創建者作為 participant_id，管理員接手時會更新）
-            $createRoomStmt = $db->prepare("
-                INSERT INTO support_chat_rooms (type, creator_id, participant_id, created_at)
-                VALUES ('support', ?, ?, NOW())
-            ");
-            $createRoomStmt->execute([$userId, $userId]);
-            $roomId = $db->lastInsertId();
-        }
+        $createRoomStmt->execute([$userId]);
+        $roomId = $db->lastInsertId();
         
         // 2. 建立客服事件
         $createEventStmt = $db->prepare("

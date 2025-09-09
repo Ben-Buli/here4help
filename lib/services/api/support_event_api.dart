@@ -51,6 +51,41 @@ class SupportEventApi {
     }
   }
 
+  /// 獲取客服聊天室列表
+  static Future<Map<String, dynamic>> getSupportChatList() async {
+    try {
+      if (kDebugMode) {
+        debugPrint('SupportEventApi: get support chat list');
+      }
+
+      final response = await HttpClientService.get(
+        AppConfig.api('/support/get_support_chat_list.php?view_type=customer'),
+      );
+
+      if (kDebugMode) {
+        debugPrint(
+            'SupportEventApi: get support chat list response: ${response.statusCode}');
+      }
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return data;
+        } else {
+          throw Exception(data['message'] ?? 'Get support chat list failed');
+        }
+      } else {
+        final errorData = json.decode(response.body);
+        throw Exception(errorData['message'] ?? 'Get support chat list failed');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('SupportEventApi: get support chat list error: $e');
+      }
+      rethrow;
+    }
+  }
+
   /// 獲取用戶的所有客服事件
   static Future<List<Map<String, dynamic>>> getUserEvents() async {
     try {

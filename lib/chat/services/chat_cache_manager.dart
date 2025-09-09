@@ -138,20 +138,17 @@ class ChatCacheManager extends ChangeNotifier {
   Future<void> _loadFullData() async {
     final taskService = TaskService();
 
-    // 載入任務和狀態
-    await Future.wait([
-      taskService.loadTasks(),
-      taskService.loadStatuses(),
-    ]);
+    // 載入任務狀態（仍需要用於UI顯示）
+    await taskService.loadStatuses();
 
-    // 載入 Posted Tasks 數據
+    // 載入 Posted Tasks 數據（使用聚合API）
     await _loadPostedTasksData();
 
     // 載入 My Works 數據
     await _loadMyWorksData();
   }
 
-  /// 載入 Posted Tasks 數據
+  /// 載入 Posted Tasks 數據（使用聚合API提升效能）
   Future<void> _loadPostedTasksData() async {
     try {
       final userService = UserService();
@@ -160,33 +157,21 @@ class ChatCacheManager extends ChangeNotifier {
 
       final taskService = TaskService();
 
-      // 獲取我發布的任務
-      final myPostedTasks = taskService.tasks.where((task) {
-        final creatorId = task['creator_id'];
-        return creatorId == currentUserId ||
-            creatorId?.toString() == currentUserId.toString();
-      }).toList();
+      debugPrint('🔍 [快取管理器] 使用聚合API載入Posted Tasks資料');
 
-      // 載入每個任務的應徵者資料
-      final tasksWithApplications = <Map<String, dynamic>>[];
+      // 使用聚合API一次性載入所有任務及其應徵者資料
+      final result = await taskService.fetchPostedTasksAggregated(
+        limit: 1000, // 設置較大的限制以獲取所有任務
+        offset: 0,
+        creatorId: currentUserId.toString(),
+      );
 
-      for (final task in myPostedTasks) {
-        try {
-          final applications =
-              await taskService.loadApplicationsByTask(task['id'].toString());
-          final taskWithApplications = Map<String, dynamic>.from(task);
-          taskWithApplications['applications'] = applications;
-          tasksWithApplications.add(taskWithApplications);
-        } catch (e) {
-          debugPrint('Failed to load applications for task ${task['id']}: $e');
-          tasksWithApplications.add(task);
-        }
-      }
-
-      _postedTasksCache = tasksWithApplications;
-      debugPrint('📋 Posted Tasks 數據載入完成: ${_postedTasksCache.length} 個任務');
+      _postedTasksCache = result.tasks;
+      debugPrint(
+          '📋 [快取管理器] Posted Tasks 數據載入完成: ${_postedTasksCache.length} 個任務');
+      debugPrint('📊 [快取管理器] 效能提升: 使用聚合API取代逐一載入');
     } catch (e) {
-      debugPrint('❌ Posted Tasks 數據載入失敗: $e');
+      debugPrint('❌ [快取管理器] Posted Tasks 數據載入失敗: $e');
     }
   }
 
@@ -468,5 +453,25 @@ class ChatCacheManager extends ChangeNotifier {
   Future<void> triggerUpdate() async {
     debugPrint('🔔 手動觸發更新');
     await checkForUpdates();
+  }
+
+  /// 更新 Posted Tasks 快取（用於批次載入優化）
+  Future<void> updatePostedTasksCache(List<Map<String, dynamic>> tasks) async {
+    try {
+      _postedTasksCache.clear();
+      _postedTasksCache.addAll(tasks);
+
+      // 更新最後更新時間
+      _lastUpdate = DateTime.now();
+
+      // 儲存到本地儲存
+      await _saveCacheToStorage();
+
+      debugPrint(
+          '💾 [ChatCacheManager] Posted Tasks 快取已更新: ${_postedTasksCache.length} 個任務');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ [ChatCacheManager] 更新 Posted Tasks 快取失敗: $e');
+    }
   }
 }

@@ -28,6 +28,7 @@ import 'package:here4help/auth/pages/student_id_page.dart';
 import 'package:here4help/chat/pages/chat_list_page.dart';
 import 'package:here4help/chat/pages/chat_page_wrapper.dart';
 import 'package:here4help/chat/widgets/chat_detail_wrapper.dart';
+import 'package:here4help/chat/widgets/support_chat_detail_wrapper.dart';
 import 'package:here4help/chat/widgets/chat_title_widget.dart';
 import 'package:here4help/chat/widgets/chat_list_task_widget.dart';
 
@@ -342,16 +343,7 @@ final List<Map<String, dynamic>> shellPages = [
     'icon': Icons.contact_mail,
     'permission': 0, // 新用戶可聯繫客服
   },
-  {
-    'path': '/account/support/faq',
-    'child': const FAQPage(),
-    'title': 'FAQ',
-    'showAppBar': true,
-    'showBottomNav': false,
-    'showBackArrow': true,
-    'icon': Icons.help_outline,
-    'permission': 0, // 新用戶可查看 FAQ
-  },
+
   {
     'path': '/account/support/issue_status',
     'child': const IssueStatusPage(),
@@ -363,39 +355,29 @@ final List<Map<String, dynamic>> shellPages = [
     'permission': 0, // 新用戶可查看問題狀態
   },
   {
-    'path': '/account/support/chat',
+    'path': '/account/support/contact/chat',
     'builder': (context, data) {
-      return ChatDetailWrapper(data: data as Map<String, dynamic>?);
+      return SupportChatDetailWrapper(data: data as Map<String, dynamic>?);
     },
     'title': 'Support Chat',
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.chat,
-    'permission': 1, // 需已認證用戶
+    'permission': 0, // 新用戶可訪問客服聊天室
+    // 'titleWidgetBuilder': (context, data) {
+    //   return ChatTitleWidget(data: data as Map<String, dynamic>?);
+    // },
   },
   {
-    'path': '/account/support/issues',
-    'child': const SupportIssuesPage(),
-    'title': 'My Support Issues',
+    'path': '/account/support/faq',
+    'child': const FAQPage(),
+    'title': 'FAQ',
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
-    'icon': Icons.support_agent,
-    'permission': 0, // 新用戶可查看客服事件
-  },
-  {
-    'path': '/account/support/chat',
-    'builder': (context, data) {
-      // 後續可透過 extra 傳入 roomId 與資料
-      return ChatDetailWrapper(data: data as Map<String, dynamic>?);
-    },
-    'title': 'Support Chat',
-    'showAppBar': true,
-    'showBottomNav': false,
-    'showBackArrow': true,
-    'icon': Icons.chat,
-    'permission': 1, // 需已認證用戶
+    'icon': Icons.help_outline,
+    'permission': 0, // 新用戶可查看 FAQ
   },
   {
     'path': '/pay/setting',

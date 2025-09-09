@@ -8,10 +8,11 @@ class SupportPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // 過濾出 group 為 'support' 的路由
-    final supportRoutes = shellPages
-        .where(
-            (page) => (page['path'] as String).startsWith('/account/support/'))
-        .toList();
+    final supportRoutes = shellPages.where((page) {
+      final path = page['path'] as String;
+      return path.startsWith('/account/support/') &&
+          path != '/account/support/contact/chat';
+    }).toList();
 
     return ListView.builder(
       itemCount: supportRoutes.length,

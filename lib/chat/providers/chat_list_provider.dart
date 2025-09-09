@@ -538,12 +538,12 @@ class ChatListProvider extends ChangeNotifier {
         case tabPostedTasks:
           debugPrint('📡 [ChatListProvider] 開始載入 Posted Tasks 數據');
 
-          // 先載入任務清單和狀態，否則 tasks.length 永遠是 0
-          debugPrint('📡 [ChatListProvider] 載入任務清單和狀態...');
-          await TaskService().loadTasks();
+          // 載入任務狀態（仍需要用於UI顯示）
+          debugPrint('📡 [ChatListProvider] 載入任務狀態...');
           await TaskService().loadStatuses();
-          debugPrint('✅ [ChatListProvider] 任務清單和狀態載入完成');
+          debugPrint('✅ [ChatListProvider] 任務狀態載入完成');
 
+          // 使用聚合API一次性載入任務和應徵者資料
           await _loadApplicationsForPostedTasks();
           debugPrint('✅ [ChatListProvider] Posted Tasks 數據載入完成');
           break;
@@ -1191,46 +1191,89 @@ class ChatListProvider extends ChangeNotifier {
     }
   }
 
-  /// 載入 Posted Tasks 的應徵者資料
+  /// 載入 Posted Tasks 的應徵者資料（使用聚合API提升效能）
   Future<void> _loadApplicationsForPostedTasks() async {
     try {
       final taskService = TaskService();
-      final tasks = taskService.tasks;
+
+      // 獲取當前用戶ID作為creator_id
+      final userService = UserService();
+      final currentUserId = userService.currentUser?.id;
+
+      if (currentUserId == null) {
+        debugPrint('❌ 無法獲取當前用戶ID，跳過應徵者載入');
+        return;
+      }
+
+      // 檢查快取是否有效且不為空
+      if (_cacheManager.isCacheValid &&
+          _cacheManager.postedTasksCache.isNotEmpty) {
+        debugPrint('🔍 [批次載入] 使用有效快取，跳過API請求');
+        debugPrint(
+            '🔍 [批次載入] 快取任務數量: ${_cacheManager.postedTasksCache.length}');
+
+        // 從快取載入應徵者資料
+        _applicationsByTask.clear();
+        for (final task in _cacheManager.postedTasksCache) {
+          final taskId = task['id'].toString();
+          final applicants = task['applicants'] ?? [];
+
+          final List<Map<String, dynamic>> applications = (applicants is List)
+              ? applicants.map((e) => Map<String, dynamic>.from(e)).toList()
+              : [];
+
+          _applicationsByTask[taskId] = applications;
+        }
+
+        debugPrint('📄 [批次載入] 從快取載入完成: ${_applicationsByTask.length} 個任務有應徵者');
+        return;
+      }
 
       _applicationsByTask.clear();
 
-      // 如果沒有任務數據，直接返回
-      if (tasks.isEmpty) {
-        debugPrint('⚠️ 沒有任務數據，跳過應徵者載入(總任務數: ${tasks.length})');
-        return;
-      } else {
-        debugPrint('🔍 開始載入應徵者資料，總任務數: ${tasks.length}');
-      }
+      debugPrint('🔍 [批次載入] 開始使用聚合API載入Posted Tasks及應徵者資料');
+      debugPrint('🔍 [批次載入] 用戶ID: $currentUserId');
 
-      final taskIdAndApplications = <String, List<Map<String, dynamic>>>{};
+      // 使用聚合API一次性載入所有任務及其應徵者資料
+      final result = await taskService.fetchPostedTasksAggregated(
+        limit: 1000, // 設置較大的限制以獲取所有任務
+        offset: 0,
+        creatorId: currentUserId.toString(),
+      );
+
+      final tasks = result.tasks;
+      debugPrint('🔍 [批次載入] 聚合API返回 ${tasks.length} 個任務');
+
+      // 注意：我們不再需要更新TaskService的內部任務列表
+      // 因為我們直接使用聚合API返回的資料
+
+      // 提取每個任務的應徵者資料
       for (final task in tasks) {
         final taskId = task['id'].toString();
-        try {
-          final applications = await taskService.loadApplicationsByTask(taskId);
+        final applicants = task['applicants'] ?? [];
 
-          taskIdAndApplications[taskId] = applications; // 將任務ID和應徵者資料對應
+        // 確保applicants是List<Map<String, dynamic>>格式
+        final List<Map<String, dynamic>> applications = (applicants is List)
+            ? applicants.map((e) => Map<String, dynamic>.from(e)).toList()
+            : [];
 
-          // 無論是否有應徵者，都要記錄任務
-          _applicationsByTask[taskId] = applications;
-          // debugPrint('✅ 任務 $taskId 已儲存，應徵者數量: ${applications.length}');
-        } catch (e) {
-          debugPrint('❌ 載入任務 $taskId 的應徵者失敗: $e');
-          // 即使載入應徵者失敗，也要記錄任務（空應徵者列表）
-          _applicationsByTask[taskId] = [];
-          debugPrint('⚠️ 任務 $taskId 載入應徵者失敗，設置為空列表');
+        _applicationsByTask[taskId] = applications;
+
+        if (applications.isNotEmpty) {
+          debugPrint('🔍 [批次載入] 任務 $taskId: ${applications.length} 個應徵者');
         }
       }
 
-      debugPrint('📄 應徵者資料載入完成: ${_applicationsByTask.length} 個任務有應徵者');
-      // debugPrint('📄 應徵者資料詳細: $_applicationsByTask');
+      // 更新快取管理器的Posted Tasks資料
+      await _cacheManager.updatePostedTasksCache(tasks);
+
+      debugPrint('📄 [批次載入] 應徵者資料載入完成: ${_applicationsByTask.length} 個任務有應徵者');
+      debugPrint('📊 [批次載入] 效能提升: 從 ${tasks.length} 個API請求減少到 1 個API請求');
+      debugPrint(
+          '💾 [批次載入] 已更新快取管理器: ${_cacheManager.postedTasksCache.length} 個任務');
     } catch (e) {
-      debugPrint('❌ 載入應徵者資料失敗: $e');
-      rethrow; //
+      debugPrint('❌ [批次載入] 載入應徵者資料失敗: $e');
+      rethrow;
     }
   }
 

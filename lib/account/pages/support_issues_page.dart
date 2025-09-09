@@ -151,9 +151,9 @@ class _SupportIssuesPageState extends State<SupportIssuesPage> {
           subtitle: Text('${item['type']} · ${item['status']}'),
           trailing: _buildUnread(item['unread'] as int? ?? 0),
           onTap: () {
-            // 導向 /account/support/chat，使用 extra 傳遞 roomId
+            // 導向 /account/support/contact/chat，使用 extra 傳遞 roomId
             // 實際 router 由 shell_pages.dart 接收 extra
-            Navigator.of(context).pushNamed('/account/support/chat');
+            Navigator.of(context).pushNamed('/account/support/contact/chat');
           },
         );
       },
