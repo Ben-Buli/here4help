@@ -17,9 +17,10 @@ class UserController extends Controller
         $validator = Validator::make($request->all(), [
             'page' => 'integer|min:1',
             'per_page' => 'integer|min:1|max:100',
-            'status' => 'string|in:active,pending_review,rejected,banned,inactive',
-            'permission' => 'integer',
-            'search' => 'string|max:255',
+            'status' => 'nullable|string|in:active,pending_review,rejected,banned,inactive',
+            'permission' => 'nullable|integer',
+            'user_id' => 'nullable|integer',
+            'search' => 'nullable|string|max:255',
             'sort_by' => 'string|in:id,name,email,created_at,updated_at,points,permission,status',
             'sort_order' => 'string|in:asc,desc'
         ]);
@@ -266,7 +267,8 @@ class UserController extends Controller
 
             // 2) 若 0 -> 1：
             if ((int)$oldPermission === 0 && (int)$newPermission === 1) {
-                // 2.1 生成 referral_code（若沒有）
+                // 2.1 生成 referral_code（若沒有）- 暫時註解，等 referral_codes 表建立後啟用
+                /*
                 if (!$user->referral_code) {
                     do {
                         $refCode = strtoupper(substr(md5($id . rand()), 0, 6));
@@ -308,6 +310,7 @@ class UserController extends Controller
                         'updated_at' => now(),
                     ]);
                 }
+                */
             }
 
             DB::commit();
@@ -442,6 +445,161 @@ class UserController extends Controller
             'user_agent' => request()->userAgent(),
             'created_at' => now()
         ]);
+    }
+
+    /**
+     * 獲取用戶驗證資料
+     */
+    public function verification($id)
+    {
+        try {
+            $user = DB::table('users')
+                ->select('id', 'name', 'email', 'permission', 'status', 'created_at')
+                ->where('id', $id)
+                ->first();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            // 獲取用戶最新的學生證驗證記錄
+            $verification = DB::table('student_verifications')
+                ->select('id', 'user_id', 'school_name', 'student_name', 'student_id', 
+                        'student_id_image_path', 'verification_status', 'verification_notes', 
+                        'created_at', 'updated_at')
+                ->where('user_id', $id)
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            $responseData = [
+                'user' => $user,
+                'verification' => null
+            ];
+
+            if ($verification) {
+                // 構建完整的圖片 URL
+                $imageUrl = null;
+                if ($verification->student_id_image_path) {
+                    $imagePath = $verification->student_id_image_path;
+                    // 直接使用 /uploads 路徑，讓 Vite 代理處理
+                    $imageUrl = '/uploads/' . ltrim($imagePath, '/');
+                }
+
+                $responseData['verification'] = [
+                    'id' => (int)$verification->id,
+                    'school_name' => $verification->school_name,
+                    'student_name' => $verification->student_name,
+                    'student_id' => $verification->student_id,
+                    'student_id_image' => $imageUrl,
+                    'verification_status' => $verification->verification_status,
+                    'verification_notes' => $verification->verification_notes,
+                    'admin_id' => null, // admin_id 欄位不存在
+                    'created_at' => $verification->created_at,
+                    'updated_at' => $verification->updated_at
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $responseData,
+                'message' => 'User verification data retrieved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Internal server error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * 獲取用戶被推薦資訊
+     */
+    public function introReferralInfo($id)
+    {
+        try {
+            $user = DB::table('users')
+                ->select('id', 'name', 'email', 'permission', 'status', 'created_at', 'intro_referral_code')
+                ->where('id', $id)
+                ->first();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            $responseData = null;
+
+            // 如果用戶有 intro_referral_code，查找推薦人資訊
+            if (!empty($user->intro_referral_code)) {
+                $referrer = DB::table('users')
+                    ->select('id', 'name', 'email', 'status', 'permission', 'referral_code')
+                    ->where('referral_code', $user->intro_referral_code)
+                    ->first();
+
+                if ($referrer) {
+                    // 查找點數交易記錄（推薦獎勵）
+                    $pointTransaction = DB::table('point_transactions')
+                        ->select('id', 'user_id', 'transaction_type', 'amount', 'description', 'related_task_id', 'created_at')
+                        ->where('user_id', $id)
+                        ->where('transaction_type', 'referral_bonus')
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+
+                    $responseData = [
+                        'intro_referral_code' => $user->intro_referral_code,
+                        'referrer' => [
+                            'id' => (int)$referrer->id,
+                            'name' => $referrer->name,
+                            'email' => $referrer->email,
+                            'status' => $referrer->status,
+                            'permission' => (int)$referrer->permission,
+                            'referral_code' => $referrer->referral_code
+                        ],
+                        'referral_event' => $pointTransaction ? [
+                            'id' => (int)$pointTransaction->id,
+                            'status' => 'completed',
+                            'reward_points' => (int)$pointTransaction->amount,
+                            'created_at' => $pointTransaction->created_at,
+                            'completed_at' => $pointTransaction->created_at,
+                            'notes' => $pointTransaction->description
+                        ] : [
+                            'status' => 'pending',
+                            'reward_points' => 500,
+                            'created_at' => null,
+                            'completed_at' => null,
+                            'notes' => '等待管理員審核通過後發放獎勵'
+                        ]
+                    ];
+                } else {
+                    // 推薦碼存在但找不到推薦人（可能是無效的推薦碼）
+                    $responseData = [
+                        'intro_referral_code' => $user->intro_referral_code,
+                        'referrer' => null,
+                        'referral_event' => null,
+                        'error' => 'Referrer not found - invalid referral code'
+                    ];
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $responseData,
+                'message' => 'User intro referral information retrieved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Internal server error: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

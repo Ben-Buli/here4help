@@ -39,9 +39,10 @@ try {
     }
     
     // 可選：推薦碼驗證（如有輸入）
-    $referralCode = trim($input['referral_code'] ?? '');
-    if (!empty($referralCode)) {
-        $ref = $db->fetch("SELECT id, status, permission FROM users WHERE referral_code = ?", [$referralCode]);
+    $introReferralCode = trim($input['intro_referral_code'] ?? '');
+    $referrerId = null;
+    if (!empty($introReferralCode)) {
+        $ref = $db->fetch("SELECT id, status, permission FROM users WHERE referral_code = ?", [$introReferralCode]);
         if (!$ref) {
             Response::error('Invalid referral code');
             exit;
@@ -52,6 +53,7 @@ try {
             Response::error('Referral code owner is not active verified');
             exit;
         }
+        $referrerId = $ref['id'];
     }
 
     // 開始資料庫交易
@@ -63,12 +65,13 @@ try {
         $hashedPassword = password_hash($input['password'], PASSWORD_DEFAULT);
         $hashedPaymentPassword = password_hash($input['payment_password'], PASSWORD_DEFAULT);
         
+        // 新用戶初始狀態為 permission = 0 (未驗證)
         $userSql = "INSERT INTO users (
-            name, nickname, email, password, phone, points, status,
+            name, nickname, email, password, phone, points, status, permission,
             payment_password, date_of_birth, gender, country,
-            address, is_permanent_address, primary_language, referral_code,
+            address, is_permanent_address, primary_language, intro_referral_code,
             created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 0, 'active', ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+        ) VALUES (?, ?, ?, ?, ?, 0, 'active', 0, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
         
         $db->query($userSql, [
             $input['name'],
@@ -83,10 +86,15 @@ try {
             $input['address'],
             $input['is_permanent_address'] ? 1 : 0,
             $input['primary_language'],
-            $referralCode
+            $introReferralCode ?: null
         ]);
         
         $userId = $db->lastInsertId();
+        
+        // 如果有推薦碼，記錄到日誌（等待管理員審核後發放獎勵）
+        if (!empty($introReferralCode) && $referrerId) {
+            error_log("用戶註冊時使用推薦碼：推薦人ID $referrerId，被推薦人ID $userId，推薦碼 $introReferralCode - 等待管理員審核後發放獎勵");
+        }
         
         // 提交交易
         $connection->commit();

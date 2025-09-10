@@ -1,10 +1,22 @@
 // 環境變數配置
 export const config = {
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8888/here4help/backend',
   apiTimeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '10000'),
-  appTitle: import.meta.env.VITE_APP_TITLE || 'Admin Panel',
+  appTitle: import.meta.env.VITE_APP_TITLE || 'Here4Help Admin Panel',
+  appVersion: import.meta.env.VITE_APP_VERSION || '1.0.0',
+  debugMode: import.meta.env.VITE_DEBUG_MODE === 'true',
+  socketUrl: import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001',
+  imageBaseUrl: import.meta.env.VITE_IMAGE_BASE_URL || 'http://localhost:8888/here4help',
   isDevelopment: import.meta.env.DEV,
   isProduction: import.meta.env.PROD,
+  
+  // 功能開關
+  features: {
+    chat: import.meta.env.VITE_ENABLE_CHAT !== 'false',
+    disputes: import.meta.env.VITE_ENABLE_DISPUTES !== 'false',
+    support: import.meta.env.VITE_ENABLE_SUPPORT !== 'false',
+    analytics: import.meta.env.VITE_ENABLE_ANALYTICS !== 'false',
+  }
 }
 
 // 環境檢查

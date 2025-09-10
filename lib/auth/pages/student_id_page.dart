@@ -368,6 +368,9 @@ class _StudentIdPageState extends State<StudentIdPage> {
         throw Exception('User ID not found. Please register again.');
       }
 
+      // 🔧 新增：驗證 user_id 的有效性
+      debugPrint('🔍 驗證用戶 ID: $userId, Email: $email');
+
       // Get student ID data
       final studentIdData = {
         'user_id': userId,
@@ -375,6 +378,7 @@ class _StudentIdPageState extends State<StudentIdPage> {
         'school_name': schoolNameController.text,
         'student_name': studentNameController.text,
         'student_id': studentIdController.text,
+        'is_update': 'false', // 明確標識這是新建操作
       };
 
       debugPrint('📤 準備上傳學生證資料 - User ID: $userId, Email: $email');

@@ -17,12 +17,12 @@ import 'package:here4help/account/pages/support_page.dart';
 import 'package:here4help/account/pages/theme_settings_page.dart';
 import 'package:here4help/account/pages/wallet_page.dart';
 import 'package:here4help/account/pages/point_history_page.dart';
-import 'package:here4help/account/pages/support_issues_page.dart';
 
 // ==================== auth 模組 ====================
 import 'package:here4help/auth/pages/login_page.dart';
 import 'package:here4help/auth/pages/signup_page.dart';
 import 'package:here4help/auth/pages/student_id_page.dart';
+import 'package:here4help/auth/pages/student_id_update_page.dart';
 
 // ==================== chat 模組 ====================
 import 'package:here4help/chat/pages/chat_list_page.dart';
@@ -84,6 +84,31 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'permission': 0, // 新用戶可訪問身份驗證
+  },
+  {
+    'path': '/signup/student-id/update',
+    'builder': (context, extra) {
+      // 確保 extra 參數的類型安全
+      Map<String, dynamic>? rejectedData;
+      if (extra is Map<String, dynamic>) {
+        rejectedData = extra;
+      } else if (extra != null) {
+        // 如果 extra 不是 Map，嘗試轉換
+        try {
+          rejectedData = Map<String, dynamic>.from(extra as Map);
+        } catch (e) {
+          debugPrint('⚠️ 無法轉換 extra 參數為 Map<String, dynamic>: $e');
+          rejectedData = null;
+        }
+      }
+
+      return StudentIdUpdatePage(rejectedData: rejectedData);
+    },
+    'title': 'UPDATE STUDENT ID',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'permission': 0, // 已登入用戶可更新學生證
   },
   {
     'path': '/home',

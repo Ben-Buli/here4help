@@ -1,13 +1,11 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosResponse } from 'axios'
-
-// API 基礎配置
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+import { API_CONFIG, ENV_CONFIG, API_ENDPOINTS } from '@/config/api'
 
 // 建立 axios 實例
 const api: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 10000,
+  baseURL: ENV_CONFIG.isLocal ? '' : API_CONFIG.baseUrl, // 本地開發使用代理
+  timeout: API_CONFIG.timeout,
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
@@ -75,9 +73,9 @@ export const authApi = {
         token: string
         permissions: string[]
       }>
-    >('/api/admin/login', { email, password }),
+    >(API_ENDPOINTS.auth.login(), { email, password }),
 
-  logout: () => api.post<ApiResponse>('/api/admin/logout'),
+  logout: () => api.post<ApiResponse>(API_ENDPOINTS.auth.logout()),
 
   me: () =>
     api.get<
@@ -85,9 +83,9 @@ export const authApi = {
         admin: any
         permissions: string[]
       }>
-    >('/api/admin/me'),
+    >(API_ENDPOINTS.auth.me()),
 
-  refresh: () => api.post<ApiResponse<{ token: string }>>('/api/admin/refresh'),
+  refresh: () => api.post<ApiResponse<{ token: string }>>(API_ENDPOINTS.auth.refresh()),
 }
 
 // 用戶管理 API
@@ -97,10 +95,11 @@ export const userApi = {
     per_page?: number
     status?: string
     permission?: number
+    user_id?: number
     search?: string
     sort_by?: string
     sort_order?: 'asc' | 'desc'
-  }) => api.get<PaginatedResponse<any>>('/api/admin/users', { params }),
+  }) => api.get<PaginatedResponse<any>>(API_ENDPOINTS.users.list(), { params }),
 
   show: (id: number) =>
     api.get<
@@ -110,16 +109,23 @@ export const userApi = {
         recent_activities: any[]
         student_verification?: any
       }>
-    >(`/api/admin/users/${id}`),
+    >(API_ENDPOINTS.users.show(id)),
 
   updateStatus: (id: number, status: string, reason?: string) =>
-    api.patch<ApiResponse>(`/api/admin/users/${id}/status`, { status, reason }),
+    api.patch<ApiResponse>(API_ENDPOINTS.users.updateStatus(id), { status, reason }),
 
   updatePermission: (id: number, permission: number, reason?: string) =>
-    api.patch<ApiResponse>(`/api/admin/users/${id}/permission`, { permission, reason }),
+    api.patch<ApiResponse>(API_ENDPOINTS.users.updatePermission(id), { permission, reason }),
 
   batchAction: (action: string, user_ids: number[], reason?: string) =>
-    api.post<ApiResponse>('/api/admin/users/batch-action', { action, user_ids, reason }),
+    api.post<ApiResponse>(API_ENDPOINTS.users.batchAction(), { action, user_ids, reason }),
+
+  // 新增推薦碼相關 API
+  verification: (id: number) =>
+    api.get<ApiResponse<any>>(API_ENDPOINTS.users.verification(id)),
+
+  introReferralInfo: (id: number) =>
+    api.get<ApiResponse<any>>(API_ENDPOINTS.users.introReferralInfo(id)),
 }
 
 // 任務管理 API
@@ -137,6 +143,8 @@ export const taskApi = {
     sort_order?: 'asc' | 'desc'
   }) => api.get<PaginatedResponse<any>>('/api/admin/tasks', { params }),
 
+  statuses: () => api.get<ApiResponse<any[]>>('/api/tasks/statuses'),
+
   show: (id: string) =>
     api.get<
       ApiResponse<{
@@ -148,18 +156,18 @@ export const taskApi = {
     api.patch<ApiResponse>(`/api/admin/tasks/${id}/status`, { status_id, reason }),
 }
 
-// 支援/客服 API
+// 客服(支援) API
 export const supportApi = {
-  // 獲取客服事件列表（對接新的 issues.php API）
+  // 獲取客服事件列表（對接新的 issues API）
   listIssues: (params?: {
     page?: number
     per_page?: number
     type?: 'all' | 'support' | 'dispute'
     status?: 'submitted' | 'in_progress' | 'resolved'
     search?: string
-  }) => api.get<PaginatedResponse<any>>('/api/support/issues.php', { params }),
+  }) => api.get<PaginatedResponse<any>>('/api/support/issues', { params }),
 
-  // 管理員接手客服事件（對接新的 claim.php API）
+  // 管理員接手客服事件（對接新的 claim API）
   claimIssue: (roomId: string) => 
     api.post<ApiResponse<{
       room_id: string
@@ -168,17 +176,17 @@ export const supportApi = {
       status: string
       old_status: string
       message: string
-    }>>('/api/support/claim.php', { room_id: roomId }),
+    }>>('/api/support/claim', { room_id: roomId }),
 
-  // 更新事件狀態（對接現有的 events.php PATCH API）
+  // 更新事件狀態（對接現有的 events PATCH API）
   updateEventStatus: (eventId: string, status: 'submitted' | 'in_progress' | 'resolved') =>
     api.patch<ApiResponse<{
       event_id: string
       status: string
       message: string
-    }>>('/api/support/events.php', { event_id: eventId, status }),
+    }>>('/api/support/events', { event_id: eventId, status }),
 
-  // 獲取事件詳情和時間線（對接現有的 events.php GET API）
+  // 獲取事件詳情和時間線（對接現有的 events GET API）
   getEventDetails: (chatRoomId: string) =>
     api.get<ApiResponse<{
       events: Array<{
@@ -201,7 +209,7 @@ export const supportApi = {
         }>
       }>
       chat_room_id: string
-    }>>(`/api/support/events.php?chat_room_id=${chatRoomId}`),
+    }>>(`/api/support/events?chat_room_id=${chatRoomId}`),
 
   // 向後相容的舊方法（標記為 deprecated）
   /** @deprecated 使用 claimIssue 替代 */
@@ -210,6 +218,36 @@ export const supportApi = {
   /** @deprecated 使用 updateEventStatus 替代 */
   updateStatus: (roomId: string, status: string) =>
     api.post<ApiResponse>(`/api/admin/support/issues/${roomId}/status`, { status }),
+}
+
+// 管理員客服 API
+export const adminSupportApi = {
+  // 管理員獲取支援問題列表
+  listIssues: (params?: {
+    page?: number
+    per_page?: number
+    type?: 'all' | 'support' | 'dispute'
+    status?: 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed'
+    search?: string
+  }) => api.get<PaginatedResponse<any>>('/api/admin/support/issues', { params }),
+
+  // 管理員接手支援問題
+  claimIssue: (roomId: string) => 
+    api.post<ApiResponse>(`/api/admin/support/issues/${roomId}/accept`),
+
+  // 管理員更新支援問題狀態
+  updateStatus: (roomId: string, status: 'submitted' | 'in_progress' | 'resolved') =>
+    api.post<ApiResponse>(`/api/admin/support/issues/${roomId}/status`, { status }),
+
+  // 向後相容的舊方法
+  /** @deprecated 使用 listIssues 替代 */
+  chatRooms: (params?: {
+    page?: number
+    per_page?: number
+    type?: string
+    status?: string
+    search?: string
+  }) => api.get<PaginatedResponse<any>>('/api/admin/support/issues', { params }),
 }
 
 // 日誌管理 API
@@ -308,7 +346,7 @@ export const userActivityApi = {
     action?: string
     date_from?: string
     date_to?: string
-  }) => api.get<PaginatedResponse<any>>('/api/admin/user-activities-by-user.php', { 
+  }) => api.get<PaginatedResponse<any>>('/api/admin/user-activities-by-user', { 
     params: { ...params, user_id: userId } 
   }),
 }
@@ -346,19 +384,31 @@ export const disputeApi = {
     date_to?: string
     sort_by?: string
     sort_order?: 'asc' | 'desc'
-  }) => api.get<PaginatedResponse<any>>('/api/admin/task-disputes.php', { params }),
+  }) => api.get<PaginatedResponse<any>>('/api/admin/disputes', { params }),
 
-  show: (id: string) => api.get<ApiResponse<any>>(`/api/admin/task-disputes/${id}.php`),
+  show: (id: string) => api.get<ApiResponse<any>>(`/api/admin/disputes/${id}`),
 
-  resolve: (id: string, decision: string, note: string) =>
-    api.patch<ApiResponse>(`/api/admin/task-disputes/resolve.php?id=${id}`, { 
-      decision_result: decision, 
-      decision_note: note 
+  updateStatus: (id: string, action: 'resolve' | 'reject' | 'reopen', notes?: string, resolution?: string) =>
+    api.patch<ApiResponse>(`/api/admin/disputes/${id}/status`, { 
+      action,
+      notes,
+      resolution
     }),
 
-  // 管理員查看聊天室
+  batchAction: (action: 'resolve' | 'reject' | 'reopen', task_ids: string[], notes?: string) =>
+    api.post<ApiResponse>('/api/admin/disputes/batch-action', {
+      action,
+      task_ids,
+      notes
+    }),
+
+  // 管理員查看聊天室 - 暫時保留但可能需要調整
   getChatRoom: (disputeId: string) => 
-    api.get<ApiResponse<any>>(`/api/admin/task-disputes/chat-room.php?dispute_id=${disputeId}`),
+    api.get<ApiResponse<any>>(`/api/admin/disputes/chat-room?dispute_id=${disputeId}`),
+
+  // 管理員查看爭議聊天記錄 - 暫時保留但可能需要調整
+  getChatMessages: (disputeId: number) =>
+    api.get<ApiResponse<any>>(`/api/admin/dispute-chat-messages`, { params: { dispute_id: disputeId } }),
 }
 
 export default api

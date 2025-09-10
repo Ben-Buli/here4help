@@ -17,9 +17,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 try {
     // 驗證JWT Token（需要管理員權限）
     $tokenData = JWTManager::validateRequest();
+    if (!$tokenData['valid']) {
+        Response::error($tokenData['message'], 401);
+    }
     
     // TODO: 添加管理員權限檢查
-    // if (!isAdmin($tokenData['user_id'])) {
+    // if (!isAdmin($tokenData['payload']['user_id'])) {
     //     Response::error('Insufficient permissions', 403);
     // }
     
@@ -73,7 +76,8 @@ try {
     // 獲取交易記錄（包含用戶資訊）
     $transactionsQuery = "
         SELECT 
-            pt.description, pt.related_task_id, pt.related_order_id, pt.status, pt.created_at,
+            pt.id, pt.user_id, pt.transaction_type, pt.amount,
+            pt.description, pt.related_task_id, pt.status, pt.created_at,
             u.name as user_name, u.nickname as user_nickname, u.email as user_email
         FROM point_transactions pt
         LEFT JOIN users u ON pt.user_id = u.id
@@ -114,7 +118,7 @@ try {
             'amount' => (int)$transaction['amount'],
             'description' => $transaction['description'],
             'related_task_id' => $transaction['related_task_id'],
-            'related_order_id' => $transaction['related_order_id'] ? (int)$transaction['related_order_id'] : null,
+            'related_order_id' => null, // 欄位不存在於資料庫中
             'status' => $transaction['status'],
             'created_at' => $transaction['created_at'],
             'formatted_amount' => ($transaction['amount'] >= 0 ? '+' : '') . number_format($transaction['amount']),

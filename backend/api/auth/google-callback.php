@@ -71,6 +71,7 @@ try {
         $redirectUri = $explicitRedirect;
     } else {
         $base = rtrim(EnvLoader::get('APP_URL', 'http://127.0.0.1:8888'), '/');
+        // $redirectUri = $base . '/api/auth/google-callback.php';
         $redirectUri = $base . '/backend/api/auth/google-callback.php';
     }
     

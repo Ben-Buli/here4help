@@ -36,12 +36,12 @@ Route::prefix('admin')->group(function () {
         
         // 用戶管理路由
         Route::prefix('users')->group(function () {
-            Route::middleware('admin:users.list')->group(function () {
-                Route::get('/', [UserController::class, 'index']);
-            });
+            Route::get('/', [UserController::class, 'index']);
             
             Route::middleware('admin:users.view')->group(function () {
                 Route::get('/{id}', [UserController::class, 'show']);
+                Route::get('/{id}/intro-referral-info', [UserController::class, 'introReferralInfo']);
+                Route::get('/{id}/verification', [UserController::class, 'verification']);
             });
             
             Route::middleware('admin:users.edit')->group(function () {
@@ -144,7 +144,7 @@ Route::prefix('admin')->group(function () {
     });
 });
 
-// 測試路由（無需認證）
+// 測試路由（無需認證） 
 Route::get('/test', function () {
     return response()->json([
         'message' => 'Admin API is working',

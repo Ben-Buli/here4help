@@ -261,7 +261,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         'primary_language':
             selectedLanguages.isNotEmpty ? selectedLanguages.first : 'English',
         'school': _getSchoolValue(),
-        'referral_code': referralCodeController.text.trim(),
+        'intro_referral_code': referralCodeController.text.trim(),
         'payment_password': paymentPasswordController.text.isNotEmpty
             ? paymentPasswordController.text
             : null,
@@ -1877,7 +1877,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
           'is_permanent_address': isPermanentAddress,
           'primary_language': selectedLanguages.join(','),
           'school': _getSchoolValue(),
-          'referral_code': referralCodeController.text.trim(),
+          'intro_referral_code': referralCodeController.text.trim(),
         }),
       );
 

@@ -15,72 +15,6 @@
       </div>
     </div>
 
-    <!-- 統計卡片 -->
-    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-      <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="p-5">
-          <div class="flex items-center">
-            <div class="flex-shrink-0">
-              <Icon name="clock" class="h-6 w-6 text-yellow-400" />
-            </div>
-            <div class="ml-5 w-0 flex-1">
-              <dl>
-                <dt class="text-sm font-medium text-gray-500 truncate">Submitted</dt>
-                <dd class="text-lg font-medium text-gray-900">{{ statistics.submitted_count }}</dd>
-              </dl>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="p-5">
-          <div class="flex items-center">
-            <div class="flex-shrink-0">
-              <Icon name="progress" class="h-6 w-6 text-blue-400" />
-            </div>
-            <div class="ml-5 w-0 flex-1">
-              <dl>
-                <dt class="text-sm font-medium text-gray-500 truncate">In Progress</dt>
-                <dd class="text-lg font-medium text-gray-900">{{ statistics.in_progress_count }}</dd>
-              </dl>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="p-5">
-          <div class="flex items-center">
-            <div class="flex-shrink-0">
-              <Icon name="check-circle" class="h-6 w-6 text-green-400" />
-            </div>
-            <div class="ml-5 w-0 flex-1">
-              <dl>
-                <dt class="text-sm font-medium text-gray-500 truncate">Resolved</dt>
-                <dd class="text-lg font-medium text-gray-900">{{ statistics.resolved_count }}</dd>
-              </dl>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white overflow-hidden shadow rounded-lg">
-        <div class="p-5">
-          <div class="flex items-center">
-            <div class="flex-shrink-0">
-              <Icon name="trending-up" class="h-6 w-6 text-purple-400" />
-            </div>
-            <div class="ml-5 w-0 flex-1">
-              <dl>
-                <dt class="text-sm font-medium text-gray-500 truncate">Resolution Rate</dt>
-                <dd class="text-lg font-medium text-gray-900">{{ resolutionRate }}%</dd>
-              </dl>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- 篩選器 -->
     <div class="bg-white shadow rounded-lg">
@@ -229,20 +163,20 @@
               <!-- Task Info -->
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm text-gray-900 max-w-xs truncate">
-                  {{ dispute.task.title }}
+                  {{ dispute.task?.title || 'N/A' }}
                 </div>
                 <div class="text-sm text-gray-500">
-                  {{ dispute.task.reward_point }} points
+                  {{ dispute.task?.reward_point || 0 }} points
                 </div>
               </td>
 
               <!-- Submitter -->
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm text-gray-900">
-                  {{ dispute.submitter.name }}
+                  {{ dispute.submitter?.name || 'N/A' }}
                 </div>
                 <div class="text-sm text-gray-500">
-                  {{ dispute.submitter.email }}
+                  {{ dispute.submitter?.email || 'N/A' }}
                 </div>
               </td>
 
@@ -275,9 +209,9 @@
                 </button>
                 <button
                   v-if="dispute.status !== 'resolved'"
-                  @click="openOperationDialog(dispute)"
+                  @click="openReviewDialog(dispute)"
                   class="text-green-600 hover:text-green-900"
-                  title="Resolve Dispute"
+                  title="Review Dispute"
                 >
                   <Icon name="gavel" class="h-4 w-4" />
                 </button>
@@ -295,19 +229,19 @@
       </div>
 
       <!-- Pagination -->
-      <div v-if="pagination.total_pages > 1" class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+      <div v-if="pagination.last_page > 1" class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
         <div class="flex items-center justify-between">
           <div class="flex-1 flex justify-between sm:hidden">
             <button
               @click="changePage(pagination.current_page - 1)"
-              :disabled="!pagination.has_prev"
+              :disabled="pagination.current_page <= 1"
               class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>
             <button
               @click="changePage(pagination.current_page + 1)"
-              :disabled="!pagination.has_next"
+              :disabled="pagination.current_page >= pagination.last_page"
               class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
@@ -329,7 +263,7 @@
               <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                 <button
                   @click="changePage(pagination.current_page - 1)"
-                  :disabled="!pagination.has_prev"
+                  :disabled="pagination.current_page <= 1"
                   class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Icon name="chevron-left" class="h-5 w-5" />
@@ -349,7 +283,7 @@
                 </button>
                 <button
                   @click="changePage(pagination.current_page + 1)"
-                  :disabled="!pagination.has_next"
+                  :disabled="pagination.current_page >= pagination.last_page"
                   class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Icon name="chevron-right" class="h-5 w-5" />
@@ -361,11 +295,11 @@
       </div>
     </div>
 
-    <!-- Dispute Operation Dialog -->
-    <DisputeOperationDialog
-      v-if="showOperationDialog"
+    <!-- Dispute Review Dialog -->
+    <DisputeReviewDialog
+      :show="showReviewDialog"
       :dispute="selectedDispute"
-      @close="closeOperationDialog"
+      @close="closeReviewDialog"
       @resolved="handleDisputeResolved"
     />
 
@@ -375,6 +309,13 @@
       :dispute="selectedDispute"
       @close="closeDetailDialog"
     />
+
+    <!-- Dispute Chat Room Modal -->
+    <DisputeChatRoomModal
+      :show="showChatRoomModal"
+      :dispute-id="selectedDisputeId"
+      @close="closeChatRoomModal"
+    />
   </div>
 </template>
 
@@ -383,8 +324,9 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { disputeApi } from '@/services/api'
 import Icon from '@/components/Icon.vue'
-import DisputeOperationDialog from '@/components/DisputeOperationDialog.vue'
+import DisputeReviewDialog from '@/components/DisputeReviewDialog.vue'
 import DisputeDetailDialog from '@/components/DisputeDetailDialog.vue'
+import DisputeChatRoomModal from '@/components/DisputeChatRoomModal.vue'
 
 interface Dispute {
   id: number
@@ -418,9 +360,7 @@ interface Pagination {
   current_page: number
   per_page: number
   total: number
-  total_pages: number
-  has_next: boolean
-  has_prev: boolean
+  last_page: number
 }
 
 interface Statistics {
@@ -439,9 +379,7 @@ const pagination = ref<Pagination>({
   current_page: 1,
   per_page: 20,
   total: 0,
-  total_pages: 0,
-  has_next: false,
-  has_prev: false
+  last_page: 1
 })
 
 const statistics = ref<Statistics>({
@@ -460,9 +398,11 @@ const filters = reactive({
 })
 
 // Dialog states
-const showOperationDialog = ref(false)
+const showReviewDialog = ref(false)
 const showDetailDialog = ref(false)
+const showChatRoomModal = ref(false)
 const selectedDispute = ref<Dispute | null>(null)
+const selectedDisputeId = ref<number | null>(null)
 
 // Computed
 const resolutionRate = computed(() => {
@@ -472,7 +412,7 @@ const resolutionRate = computed(() => {
 
 const visiblePages = computed(() => {
   const current = pagination.value.current_page
-  const total = pagination.value.total_pages
+  const total = pagination.value.last_page
   const pages = []
   
   const start = Math.max(1, current - 2)
@@ -492,24 +432,41 @@ const fetchDisputes = async () => {
     const params = {
       page: pagination.value.current_page,
       per_page: pagination.value.per_page,
-      ...(filters.status && { status: filters.status }),
-      ...(filters.dateFrom && { date_from: filters.dateFrom }),
-      ...(filters.dateTo && { date_to: filters.dateTo }),
+      status: filters.status || undefined,
+      date_from: filters.dateFrom || undefined,
+      date_to: filters.dateTo || undefined,
       sort_by: filters.sortBy,
-      sort_order: filters.sortOrder
+      sort_order: filters.sortOrder,
     }
 
     const response = await disputeApi.list(params)
-    
-    // 根據 PaginatedResponse 結構調整
-    if (response.data) {
-      const data = response.data as any
-      disputes.value = data.items || []
-      if (data.pagination) {
-        pagination.value = data.pagination
+
+    if (response.data.success) {
+      // 注意：目前後端 DisputeController@index 回傳結構為
+      // { success, data: items[], pagination: {...}, stats: {...} }
+      // 或者在部分情況下包在 data 物件中。兩者皆容錯支援。
+      const body: any = response.data
+      const items = (body.data && body.data.items) ? body.data.items : (Array.isArray(body.data) ? body.data : [])
+      disputes.value = items || []
+
+      const pg = body.pagination || body.data?.pagination
+      if (pg) {
+        pagination.value = {
+          current_page: pg.current_page || 1,
+          per_page: pg.per_page || 20,
+          total: pg.total || 0,
+          last_page: pg.last_page || 1,
+        }
       }
-      if (data.stats) {
-        statistics.value = data.stats
+
+      const st = body.stats || body.data?.stats
+      if (st) {
+        statistics.value = {
+          total_disputes: st.total_disputes ?? st.total ?? 0,
+          submitted_count: st.submitted_count ?? st.open ?? 0,
+          in_progress_count: st.in_progress_count ?? st.in_review ?? 0,
+          resolved_count: st.resolved_count ?? st.resolved ?? 0,
+        }
       }
     }
   } catch (error) {
@@ -541,7 +498,7 @@ const refreshData = () => {
 }
 
 const changePage = (page: number) => {
-  if (page >= 1 && page <= pagination.value.total_pages) {
+  if (page >= 1 && page <= pagination.value.last_page) {
     pagination.value.current_page = page
     fetchDisputes()
   }
@@ -578,21 +535,30 @@ const formatDateTime = (dateTimeStr: string) => {
 }
 
 const viewChatRoom = (dispute: Dispute) => {
-  router.push(`/task-disputes/${dispute.id}/chat-room`)
-}
-
-const openOperationDialog = (dispute: Dispute) => {
+  // 打開爭議聊天室模態框
   selectedDispute.value = dispute
-  showOperationDialog.value = true
+  selectedDisputeId.value = dispute.id
+  showChatRoomModal.value = true
 }
 
-const closeOperationDialog = () => {
-  showOperationDialog.value = false
+const openReviewDialog = (dispute: Dispute) => {
+  selectedDispute.value = dispute
+  showReviewDialog.value = true
+}
+
+const closeReviewDialog = () => {
+  showReviewDialog.value = false
   selectedDispute.value = null
 }
 
+const closeChatRoomModal = () => {
+  showChatRoomModal.value = false
+  selectedDispute.value = null
+  selectedDisputeId.value = null
+}
+
 const handleDisputeResolved = () => {
-  closeOperationDialog()
+  closeReviewDialog()
   refreshData()
 }
 

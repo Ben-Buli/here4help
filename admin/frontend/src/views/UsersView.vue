@@ -426,12 +426,27 @@
                 {{ formatDate(user.created_at) }}
               </td>
               <td>
-                <button
-                  @click.stop="viewUser(user.id)"
-                  class="admin-button-secondary text-sm"
-                >
-                  Detail
-                </button>
+                <div class="flex items-center space-x-2">
+                  <!-- 審核按鈕 - 僅當 permission = 0 (未驗證) 時顯示 -->
+                  <button
+                    v-if="user.permission === 0"
+                    @click.stop="reviewUser(user)"
+                    class="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Review
+                  </button>
+                  
+                  <!-- 詳情按鈕 -->
+                  <button
+                    @click.stop="viewUser(user.id)"
+                    class="admin-button-secondary text-sm"
+                  >
+                    Detail
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -502,6 +517,14 @@
       @close="showEditModal = false"
       @saved="handleUserSaved"
     />
+
+    <!-- User Review Modal -->
+    <UserReviewModal
+      v-if="showReviewModal"
+      :user="selectedUser"
+      @close="showReviewModal = false"
+      @reviewed="handleUserReviewed"
+    />
   </div>
 </template>
 
@@ -511,6 +534,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { userApi } from '@/services/api'
 import UserEditModal from '@/components/UserEditModal.vue'
+import UserReviewModal from '@/components/UserReviewModal.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -521,6 +545,7 @@ const users = ref<any[]>([])
 const selectedUsers = ref<number[]>([])
 const showBatchActions = ref(false)
 const showEditModal = ref(false)
+const showReviewModal = ref(false)
 const selectedUser = ref<any>(null)
 
 const stats = ref({
@@ -560,10 +585,10 @@ const loadUsers = async (page = 1) => {
     const params = {
       page,
       per_page: filters.per_page,
-      search: filters.search || undefined,
-      user_id: filters.user_id || undefined,
-      status: filters.status || undefined,
-      permission: filters.permission ? parseInt(filters.permission) : undefined,
+      search: filters.search || ''  ,
+      user_id: filters.user_id || '',
+      status: filters.status || '',
+      permission: filters.permission ? parseInt(filters.permission) : '',
       sort_by: filters.sort_by,
       sort_order: filters.sort_order,
     }
@@ -638,6 +663,16 @@ const editUser = (user: any) => {
 
 const handleUserSaved = () => {
   showEditModal.value = false
+  refreshData()
+}
+
+const reviewUser = (user: any) => {
+  selectedUser.value = user
+  showReviewModal.value = true
+}
+
+const handleUserReviewed = () => {
+  showReviewModal.value = false
   refreshData()
 }
 

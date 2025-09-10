@@ -3,7 +3,7 @@
     <div class="md:flex md:items-center md:justify-between">
       <div class="flex-1 min-w-0">
         <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-          Support Chat Rooms
+          Support Chat List
         </h2>
         <p class="mt-1 text-sm text-gray-500">Manage your assigned support chat rooms</p>
       </div>
@@ -22,7 +22,7 @@
             <option value="">All</option>
             <option value="submitted">Submitted</option>
             <option value="in_progress">In Progress</option>
-            <option value="resolved">Resolved</option>
+            <!-- <option value="resolved">Resolved</option> -->
           </select>
         </div>
         <div>
@@ -166,7 +166,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { supportApi } from '@/services/api'
+import { adminSupportApi } from '@/services/api'
 
 interface ChatRoom {
   room_id: string
@@ -195,6 +195,16 @@ const chatRooms = ref<ChatRoom[]>([])
 const pagination = ref({ current_page: 1, per_page: 15, total: 0, last_page: 1 })
 const filters = reactive({ status: '', search: '' })
 
+// 當前管理員 ID
+const currentAdminId = ref<string | null>(null)
+try {
+  const adminUser = localStorage.getItem('admin_user')
+  if (adminUser) {
+    const parsed = JSON.parse(adminUser)
+    currentAdminId.value = String(parsed.id || parsed.admin_id || '')
+  }
+} catch {}
+
 // 如果有 room_id 參數，自動篩選到該聊天室
 const targetRoomId = route.query.room_id as string
 
@@ -202,29 +212,54 @@ const loadChatRooms = async (page = 1) => {
   try {
     isLoading.value = true
     
-    // 使用我們新建立的 get_support_chat_list.php API
-    const response = await fetch(`/api/support/get_support_chat_list.php?${new URLSearchParams({
-      view_type: 'admin',
-      page: page.toString(),
-      per_page: pagination.value.per_page.toString(),
-      ...(filters.status && { status: filters.status }),
+    // 使用管理員 API
+    const params = {
+      page,
+      per_page: pagination.value.per_page,
+      ...(filters.status && { status: filters.status as 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed' }),
       ...(filters.search && { search: filters.search })
-    })}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-        'Content-Type': 'application/json'
-      }
-    })
+    }
     
-    const result = await response.json()
+    const response = await adminSupportApi.listIssues(params)
     
-    if (result.success && result.data) {
-      chatRooms.value = result.data.chat_list || []
+    if (response.data.success && response.data.data) {
+      const data = response.data.data
+      const rawItems: any[] = data.items || []
+
+      // 僅顯示指派給當前管理員的聊天室（若可判斷）
+      const filtered = currentAdminId.value
+        ? rawItems.filter((it: any) => {
+            // 後端欄位為 assignee_admin_id
+            return !it.assignee_admin_id || String(it.assignee_admin_id) === currentAdminId.value
+          })
+        : rawItems
+
+      // 映射為前端使用結構
+      chatRooms.value = filtered.map((it: any) => ({
+        room_id: String(it.room_id),
+        event_id: String(it.event_id || ''),
+        title: it.title || '-',
+        status: it.status || 'open',
+        rating: it.rating || undefined,
+        review: it.review || undefined,
+        created_at: it.event_created_at || it.created_at || '',
+        updated_at: it.updated_at || '',
+        closed_at: it.closed_at || undefined,
+        last_message: it.last_message || '',
+        last_message_time: it.last_message_at || it.updated_at || '',
+        unread_count: it.unread_count || 0,
+        room_created_at: it.created_at || '',
+        customer: {
+          id: String(it.user_id || ''),
+          name: it.user_name || '-',
+          avatar_url: it.user_avatar_url || undefined,
+        },
+      }))
       pagination.value = {
-        current_page: page,
-        per_page: pagination.value.per_page,
-        total: result.data.total_count || 0,
-        last_page: Math.ceil((result.data.total_count || 0) / pagination.value.per_page)
+        current_page: data.pagination?.current_page || page,
+        per_page: data.pagination?.per_page || pagination.value.per_page,
+        total: data.pagination?.total || 0,
+        last_page: data.pagination?.last_page || 1
       }
       
       // 如果有目標 room_id，滾動到該項目
@@ -282,18 +317,22 @@ const getAvatarUrl = (avatarUrl?: string) => {
 
 const getStatusClass = (status: string) => {
   const statusClasses: Record<string, string> = {
-    submitted: 'bg-yellow-100 text-yellow-800',
+    open: 'bg-yellow-100 text-yellow-800',
     in_progress: 'bg-blue-100 text-blue-800',
-    resolved: 'bg-green-100 text-green-800'
+    waiting_customer: 'bg-purple-100 text-purple-800',
+    // resolved: 'bg-green-100 text-green-800', // 管理員後台沒有權限關閉客服事件
+    closed: 'bg-gray-200 text-gray-700',
   }
   return statusClasses[status] || 'bg-gray-100 text-gray-800'
 }
 
 const getStatusDisplay = (status: string) => {
   const statusDisplays: Record<string, string> = {
-    submitted: 'Submitted',
+    open: 'Open',
     in_progress: 'In Progress',
-    resolved: 'Resolved'
+    waiting_customer: 'Waiting Customer',
+    // resolved: 'Resolved', // 管理員後台沒有權限關閉客服事件
+    closed: 'Closed'
   }
   return statusDisplays[status] || status
 }

@@ -3,7 +3,7 @@
     <div class="md:flex md:items-center md:justify-between">
       <div class="flex-1 min-w-0">
         <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-          Support/Dispute Issues
+          Support
         </h2>
         <p class="mt-1 text-sm text-gray-500">Manage support and dispute chat rooms</p>
       </div>
@@ -16,14 +16,14 @@
 
     <div class="admin-card">
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div>
+        <!-- <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
           <select v-model="filters.type" @change="() => loadIssues()" class="admin-input">
             <option value="all">All</option>
             <option value="support">Support</option>
             <option value="dispute">Dispute</option>
           </select>
-        </div>
+        </div> -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
           <select v-model="filters.status" @change="() => loadIssues()" class="admin-input">
@@ -155,7 +155,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { supportApi } from '@/services/api'
+import { adminSupportApi } from '@/services/api'
 
 const isLoading = ref(false)
 const items = ref<any[]>([])
@@ -181,16 +181,25 @@ const initCurrentAdmin = () => {
 const loadIssues = async (page = 1) => {
   try {
     isLoading.value = true
-    const res = await supportApi.listIssues({
+    
+    const params = {
       page,
       per_page: pagination.value.per_page,
-      type: filters.type as any,
-      status: (filters.status || undefined) as any,
+      type: filters.type !== 'all' ? filters.type as 'support' | 'dispute' : undefined,
+      status: filters.status ? filters.status as 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed' : undefined,
       search: filters.search || undefined,
-    })
-    if (res.data.success && res.data.data) {
-      items.value = res.data.data.items || []
-      pagination.value = res.data.data.pagination || pagination.value
+    }
+    
+    const response = await adminSupportApi.listIssues(params)
+    
+    if (response.data.success && response.data.data) {
+      // 直接使用後端返回的數據格式
+            items.value = response.data.data.items || []
+      
+      // 更新分頁信息
+      if (response.data.data.pagination) {
+        pagination.value = response.data.data.pagination
+      }
     }
   } catch (e) {
     console.error('Load issues failed:', e)
@@ -219,20 +228,23 @@ const debouncedSearch = () => {
 const claimIssue = async (it: any) => {
   try {
     isLoading.value = true
-    const result = await supportApi.claimIssue(String(it.room_id))
     
-    if (result.data.success) {
+    const response = await adminSupportApi.claimIssue(String(it.room_id))
+    
+    if (response.data.success) {
       // 顯示成功訊息
-      console.log('Issue claimed successfully:', result.data.data?.message)
+      console.log('Issue claimed successfully:', response.data.data?.message)
       
       // 重新載入列表以更新狀態
       await refreshData()
+    } else {
+      throw new Error(response.data.message || 'Failed to claim issue')
     }
   } catch (error: any) {
     console.error('Failed to claim issue:', error)
     
     // 顯示錯誤訊息
-    const message = error.response?.data?.message || 'Failed to claim issue'
+    const message = error.response?.data?.message || error.message || 'Failed to claim issue'
     alert(`Error: ${message}`)
   } finally {
     isLoading.value = false
@@ -253,17 +265,18 @@ const updateStatus = async (it: any, newStatus: string) => {
   try {
     isLoading.value = true
     
-    // 使用 event_id 而不是 room_id
-    const result = await supportApi.updateEventStatus(String(it.event_id), newStatus as any)
+    const response = await adminSupportApi.updateStatus(String(it.room_id), newStatus as 'submitted' | 'in_progress' | 'resolved')
     
-    if (result.data.success) {
-      console.log('Status updated successfully:', result.data.data?.message)
+    if (response.data.success) {
+      console.log('Status updated successfully:', response.data.data?.message)
       await refreshData()
+    } else {
+      throw new Error(response.data.message || 'Failed to update status')
     }
   } catch (error: any) {
     console.error('Failed to update status:', error)
     
-    const message = error.response?.data?.message || 'Failed to update status'
+    const message = error.response?.data?.message || error.message || 'Failed to update status'
     alert(`Error: ${message}`)
   } finally {
     isLoading.value = false

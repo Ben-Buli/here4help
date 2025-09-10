@@ -76,7 +76,8 @@ class _LoginPageState extends State<LoginPage> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('登入超時，請檢查網路連線後重試'),
+            content: Text(
+                'Login Timeout, Please Check Network Connection and Try Again'),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 4),
           ),
@@ -239,10 +240,21 @@ class _LoginPageState extends State<LoginPage> {
           await _saveGoogleDataForSignup(userData);
           context.go('/signup/oauth');
         } else {
-          // 現有用戶，儲存用戶資料到本地
+          // 現有用戶，使用 AuthService 正確儲存登入資訊
+          debugPrint('✅ Google 登入成功，儲存用戶資料...');
+
+          // 安全地顯示 token 預覽（避免 RangeError）
+          final token = userData['token'] ?? '';
+          final tokenPreview =
+              token.length > 20 ? token.substring(0, 20) : token;
+          debugPrint('🔑 Token preview: ${tokenPreview}...');
+
+          // 使用 AuthService 儲存 token（不添加 Bearer 前綴，避免雙重前綴問題）
+          await AuthService.saveToken(userData['token'] ?? '');
+          await AuthService.saveUserData(userData);
+
+          // 儲存額外的用戶資訊到 SharedPreferences（用於兼容現有邏輯）
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(
-              'auth_token', 'Bearer ${userData['token'] ?? ''}');
           await prefs.setString('user_email', userData['email'] ?? '');
           await prefs.setInt('user_permission', userData['permission'] ?? 0);
           await prefs.setString('user_name', userData['name'] ?? '');
@@ -331,10 +343,21 @@ class _LoginPageState extends State<LoginPage> {
           await _saveFacebookDataForSignup(userData);
           context.go('/signup/oauth');
         } else {
-          // 現有用戶，儲存用戶資料到本地
+          // 現有用戶，使用 AuthService 正確儲存登入資訊
+          debugPrint('✅ Facebook 登入成功，儲存用戶資料...');
+
+          // 安全地顯示 token 預覽（避免 RangeError）
+          final token = userData['token'] ?? '';
+          final tokenPreview =
+              token.length > 20 ? token.substring(0, 20) : token;
+          debugPrint('🔑 Token preview: ${tokenPreview}...');
+
+          // 使用 AuthService 儲存 token（不添加 Bearer 前綴，避免雙重前綴問題）
+          await AuthService.saveToken(userData['token'] ?? '');
+          await AuthService.saveUserData(userData);
+
+          // 儲存額外的用戶資訊到 SharedPreferences（用於兼容現有邏輯）
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(
-              'auth_token', 'Bearer ${userData['token'] ?? ''}');
           await prefs.setString('user_email', userData['email'] ?? '');
           await prefs.setInt('user_permission', userData['permission'] ?? 0);
           await prefs.setString('user_name', userData['name'] ?? '');
@@ -423,10 +446,21 @@ class _LoginPageState extends State<LoginPage> {
           await _saveAppleDataForSignup(userData);
           context.go('/signup/oauth');
         } else {
-          // 現有用戶，儲存用戶資料到本地
+          // 現有用戶，使用 AuthService 正確儲存登入資訊
+          debugPrint('✅ Apple 登入成功，儲存用戶資料...');
+
+          // 安全地顯示 token 預覽（避免 RangeError）
+          final token = userData['token'] ?? '';
+          final tokenPreview =
+              token.length > 20 ? token.substring(0, 20) : token;
+          debugPrint('🔑 Token preview: ${tokenPreview}...');
+
+          // 使用 AuthService 儲存 token（不添加 Bearer 前綴，避免雙重前綴問題）
+          await AuthService.saveToken(userData['token'] ?? '');
+          await AuthService.saveUserData(userData);
+
+          // 儲存額外的用戶資訊到 SharedPreferences（用於兼容現有邏輯）
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(
-              'auth_token', 'Bearer ${userData['token'] ?? ''}');
           await prefs.setString('user_email', userData['email'] ?? '');
           await prefs.setInt('user_permission', userData['permission'] ?? 0);
           await prefs.setString('user_name', userData['name'] ?? '');

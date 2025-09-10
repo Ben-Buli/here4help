@@ -125,8 +125,14 @@ class EnvironmentConfig {
               _getNetworkAddress('http://127.0.0.1:8888/here4help'),
           'google_client_id':
               '102744926949-bhrnm2970bgt3dfm2nmdbqt03mrvdh3i.apps.googleusercontent.com',
+          'google_redirect_uri':
+              'http://127.0.0.1:8888/here4help/backend/api/auth/google-callback.php',
           'facebook_app_id': '1037019294991326',
+          'facebook_redirect_uri':
+              'http://127.0.0.1:8888/here4help/backend/api/auth/facebook-callback.php',
           'apple_service_id': 'com.example.here4help.login',
+          'apple_redirect_uri':
+              'http://127.0.0.1:8888/here4help/backend/api/auth/apple-callback.php',
         },
         'app': {
           'debug_mode': true,
@@ -198,13 +204,25 @@ class EnvironmentConfig {
   static String get googleClientId =>
       _config?['public']?['google_client_id'] ?? '';
 
+  /// Google Redirect URI (公開)
+  static String get googleRedirectUri =>
+      _config?['public']?['google_redirect_uri'] ?? '';
+
   /// Facebook App ID (公開)
   static String get facebookAppId =>
       _config?['public']?['facebook_app_id'] ?? '';
 
+  /// Facebook Redirect URI (公開)
+  static String get facebookRedirectUri =>
+      _config?['public']?['facebook_redirect_uri'] ?? '';
+
   /// Apple Service ID (公開)
   static String get appleServiceId =>
       _config?['public']?['apple_service_id'] ?? '';
+
+  /// Apple Redirect URI (公開)
+  static String get appleRedirectUri =>
+      _config?['public']?['apple_redirect_uri'] ?? '';
 
   /// Google Android Client ID (公開)
   static String get googleAndroidClientId =>
@@ -266,6 +284,8 @@ class EnvironmentConfig {
       print(
           '🔑 Google Client ID: ${googleClientId.isNotEmpty ? "已配置" : "未配置"}');
       print(
+          '🔑 Google Redirect URI: ${googleRedirectUri.isNotEmpty ? "已配置" : "未配置"}');
+      print(
           '🔑 Google Android Client ID: ${googleAndroidClientId.isNotEmpty ? "已配置" : "未配置"}');
       print(
           '🔑 Google iOS Client ID: ${googleIosClientId.isNotEmpty ? "已配置" : "未配置"}');
@@ -273,9 +293,13 @@ class EnvironmentConfig {
           '🔑 Google Web Client Secret: ${googleWebClientSecret.isNotEmpty ? "已配置" : "未配置"}');
       print('🔑 Facebook App ID: ${facebookAppId.isNotEmpty ? "已配置" : "未配置"}');
       print(
+          '🔑 Facebook Redirect URI: ${facebookRedirectUri.isNotEmpty ? "已配置" : "未配置"}');
+      print(
           '🔑 Facebook App Secret: ${facebookAppSecret.isNotEmpty ? "已配置" : "未配置"}');
       print(
           '🔑 Apple Service ID: ${appleServiceId.isNotEmpty ? "已配置" : "未配置"}');
+      print(
+          '🔑 Apple Redirect URI: ${appleRedirectUri.isNotEmpty ? "已配置" : "未配置"}');
       print('🔑 Apple Key ID: ${appleKeyId.isNotEmpty ? "已配置" : "未配置"}');
       print('🔑 Apple Team ID: ${appleTeamId.isNotEmpty ? "已配置" : "未配置"}');
 

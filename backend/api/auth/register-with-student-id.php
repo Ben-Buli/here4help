@@ -33,6 +33,22 @@ try {
         Response::error('Email already exists');
     }
     
+    // 可選：推薦碼驗證（如有輸入）
+    $introReferralCode = trim($_POST['intro_referral_code'] ?? '');
+    $referrerId = null;
+    if (!empty($introReferralCode)) {
+        $ref = $db->fetch("SELECT id, status, permission FROM users WHERE referral_code = ?", [$introReferralCode]);
+        if (!$ref) {
+            Response::error('Invalid referral code');
+        }
+        $isStatusValid = in_array(strtolower($ref['status']), ['active', 'verified'], true);
+        $isPermissionValid = (int)($ref['permission'] ?? 0) > 0;
+        if (!($isStatusValid && $isPermissionValid)) {
+            Response::error('Referral code owner is not active verified');
+        }
+        $referrerId = $ref['id'];
+    }
+    
     // 處理圖片上傳
     if (!isset($_FILES['student_id_image']) || $_FILES['student_id_image']['error'] !== UPLOAD_ERR_OK) {
         Response::error('Student ID image is required');
@@ -72,12 +88,13 @@ try {
         $hashedPassword = password_hash($_POST['password'], PASSWORD_DEFAULT);
         $hashedPaymentPassword = password_hash($_POST['payment_password'], PASSWORD_DEFAULT);
         
+        // 新用戶初始狀態為 permission = 0 (未驗證)
         $userSql = "INSERT INTO users (
-            name, email, password, phone, points, status,
+            name, email, password, phone, points, status, permission,
             payment_password, date_of_birth, gender, country,
-            address, is_permanent_address, primary_language,
+            address, is_permanent_address, primary_language, intro_referral_code,
             created_at, updated_at
-        ) VALUES (?, ?, ?, ?, 0, 'pending_verification', ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+        ) VALUES (?, ?, ?, ?, 0, 'pending_verification', 0, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
         
         $db->query($userSql, [
             $_POST['name'] ,
@@ -90,10 +107,16 @@ try {
             $_POST['country'],
             $_POST['address'],
             $_POST['is_permanent_address'] ? 1 : 0,
-            $_POST['primary_language'] ?? 'English'
+            $_POST['primary_language'] ?? 'English',
+            $introReferralCode ?: null
         ]);
         
         $userId = $db->lastInsertId();
+        
+        // 如果有推薦碼，記錄到日誌（等待管理員審核後發放獎勵）
+        if (!empty($introReferralCode) && $referrerId) {
+            error_log("學生證註冊時使用推薦碼：推薦人ID $referrerId，被推薦人ID $userId，推薦碼 $introReferralCode - 等待管理員審核後發放獎勵");
+        }
         
         // 建立學生證驗證記錄
         $verificationSql = "INSERT INTO student_verifications (

@@ -146,108 +146,7 @@
       </div>
     </div>
 
-    <!-- 統計卡片 -->
-    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-      <div class="admin-card">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-blue-500 rounded-md flex items-center justify-center">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                />
-              </svg>
-            </div>
-          </div>
-          <div class="ml-5 w-0 flex-1">
-            <dl>
-              <dt class="text-sm font-medium text-gray-500 truncate">Total Tasks</dt>
-              <dd class="text-lg font-medium text-gray-900">
-                {{ stats.total_tasks || 0 }}
-              </dd>
-            </dl>
-          </div>
-        </div>
-      </div>
-
-      <div class="admin-card">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-          </div>
-          <div class="ml-5 w-0 flex-1">
-            <dl>
-              <dt class="text-sm font-medium text-gray-500 truncate">Active Tasks</dt>
-              <dd class="text-lg font-medium text-gray-900">
-                {{ stats.active_tasks || 0 }}
-              </dd>
-            </dl>
-          </div>
-        </div>
-      </div>
-
-      <div class="admin-card">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z"
-                />
-              </svg>
-            </div>
-          </div>
-          <div class="ml-5 w-0 flex-1">
-            <dl>
-              <dt class="text-sm font-medium text-gray-500 truncate">Pending Review</dt>
-              <dd class="text-lg font-medium text-gray-900">
-                {{ stats.pending_tasks || 0 }}
-              </dd>
-            </dl>
-          </div>
-        </div>
-      </div>
-
-      <div class="admin-card">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <div class="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-          </div>
-          <div class="ml-5 w-0 flex-1">
-            <dl>
-              <dt class="text-sm font-medium text-gray-500 truncate">Disputed Tasks</dt>
-              <dd class="text-lg font-medium text-gray-900">
-                {{ stats.disputed_tasks || 0 }}
-              </dd>
-            </dl>
-          </div>
-        </div>
-      </div>
-    </div>
+ 
 
     <!-- 任務列表 -->
     <div class="admin-card">
@@ -295,13 +194,16 @@
               <th>Status</th>
               <th>Reward</th>
               <th>Deadline</th>
-              <th>Countdown</th>
               <th>Created</th>
-              <th>Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">
-            <tr v-for="task in tasks" :key="task.id" class="hover:bg-gray-50">
+            <tr 
+              v-for="task in tasks" 
+              :key="task.id" 
+              class="hover:bg-gray-50 cursor-pointer"
+              @click="viewTask(task.id)"
+            >
               <td>
                 <div class="max-w-xs">
                   <div class="text-sm font-medium text-gray-900 truncate">
@@ -331,37 +233,15 @@
               <td>
                 <span
                   class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-                  :class="getStatusBadgeClass(task.status_name)"
+                  :class="getStatusBadgeClass(task.status_code)"
                 >
-                  {{ task.status_display_name || task.status_name }}
+                  {{ task.status_display || task.status_code }}
                 </span>
               </td>
-              <td class="text-sm text-gray-900">{{ task.reward || 0 }} points</td>
+              <td class="text-sm text-gray-900">{{ task.reward_point || task.reward || 0 }} points</td>
               <td class="text-sm text-gray-500">{{ formatDate(task.deadline || task.task_date) }}</td>
-              <td class="text-sm">
-                <span v-if="task.countdown_seconds && task.countdown_seconds > 0">
-                  {{ formatCountdown(task.countdown_seconds) }}
-                </span>
-                <span v-else class="text-gray-400">-</span>
-              </td>
               <td class="text-sm text-gray-500">
                 {{ formatDate(task.created_at) }}
-              </td>
-              <td>
-                <div class="flex items-center space-x-2">
-                  <button
-                    @click="viewTask(task.id)"
-                    class="text-primary-600 hover:text-primary-900 text-sm"
-                  >
-                    View
-                  </button>
-                  <button
-                    @click="editTaskStatus(task)"
-                    class="text-gray-600 hover:text-gray-900 text-sm"
-                  >
-                    Edit
-                  </button>
-                </div>
               </td>
             </tr>
           </tbody>
@@ -399,14 +279,6 @@
       </div>
     </div>
 
-    <!-- Task Status Edit Modal -->
-    <TaskStatusModal
-      v-if="showStatusModal"
-      :task="selectedTask"
-      :statuses="taskStatuses"
-      @close="showStatusModal = false"
-      @saved="handleTaskSaved"
-    />
   </div>
 </template>
 
@@ -415,7 +287,6 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { taskApi } from '@/services/api'
-import TaskStatusModal from '@/components/TaskStatusModal.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -424,8 +295,6 @@ const authStore = useAuthStore()
 const isLoading = ref(false)
 const tasks = ref<any[]>([])
 const taskStatuses = ref<any[]>([])
-const selectedTask = ref<any>(null)
-const showStatusModal = ref(false)
 
 const stats = ref({
   total_tasks: 0,
@@ -473,10 +342,19 @@ const loadTasks = async (page = 1) => {
     const response = await taskApi.list(params)
 
     if (response.data.success && response.data.data) {
+      // 後端回傳鍵為 data.tasks
       const data = response.data.data as any
       tasks.value = data.tasks || data.items || []
-      pagination.value = data.pagination || pagination.value
-      stats.value = data.stats || stats.value
+
+      // 使用後端返回的分頁信息
+      if (data.pagination) {
+        pagination.value = data.pagination
+      }
+      
+      // 使用後端返回的統計信息
+      if (data.stats) {
+        stats.value = data.stats
+      }
     }
   } catch (error) {
     console.error('Failed to load tasks:', error)
@@ -495,18 +373,8 @@ const changePage = (page: number) => {
   }
 }
 
-const viewTask = (taskId: string) => {
+const viewTask = (taskId: string | number) => {
   router.push(`/tasks/${taskId}`)
-}
-
-const editTaskStatus = (task: any) => {
-  selectedTask.value = task
-  showStatusModal.value = true
-}
-
-const handleTaskSaved = () => {
-  showStatusModal.value = false
-  refreshData()
 }
 
 const exportTasks = () => {
@@ -541,33 +409,25 @@ const formatDate = (dateString: string | null) => {
   return new Date(dateString).toLocaleDateString()
 }
 
-const formatCountdown = (seconds: number) => {
-  const s = Math.max(0, Math.floor(seconds))
-  const d = Math.floor(s / 86400)
-  const h = Math.floor((s % 86400) / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  const ss = s % 60
-  if (d > 0) return `${d}d ${h}h ${m}m`
-  if (h > 0) return `${h}h ${m}m ${ss}s`
-  if (m > 0) return `${m}m ${ss}s`
-  return `${ss}s`
-}
-
 // Load task statuses
 const loadTaskStatuses = async () => {
   try {
-    // This would be a separate API call to get task statuses
-    // For now, we'll use hardcoded statuses
-    taskStatuses.value = [
-      { id: 1, name: 'open', display_name: 'Open' },
-      { id: 2, name: 'in_progress', display_name: 'In Progress' },
-      { id: 3, name: 'completed', display_name: 'Completed' },
-      { id: 4, name: 'cancelled', display_name: 'Cancelled' },
-      { id: 5, name: 'disputed', display_name: 'Disputed' },
-      { id: 6, name: 'pending_confirmation', display_name: 'Pending Confirmation' },
-    ]
+    const response = await taskApi.statuses()
+    
+    if (response.data.success && response.data.data) {
+      taskStatuses.value = response.data.data
+    }
   } catch (error) {
     console.error('Failed to load task statuses:', error)
+    // Fallback to hardcoded statuses
+    taskStatuses.value = [
+      { id: 1, code: 'open', display_name: 'Open' },
+      { id: 2, code: 'in_progress', display_name: 'In Progress' },
+      { id: 3, code: 'completed', display_name: 'Completed' },
+      { id: 4, code: 'cancelled', display_name: 'Cancelled' },
+      { id: 5, code: 'disputed', display_name: 'Disputed' },
+      { id: 6, code: 'pending_confirmation', display_name: 'Pending Confirmation' },
+    ]
   }
 }
 

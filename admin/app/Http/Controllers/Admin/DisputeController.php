@@ -11,76 +11,101 @@ use Illuminate\Support\Facades\Validator;
 class DisputeController extends Controller
 {
     /**
-     * 獲取申訴列表
+     * 獲取申訴列表（以 tasks.status_id = 4 為爭議來源）
      */
     public function index(Request $request)
     {
         try {
-            $perPage = $request->get('per_page', 15);
-            $status = $request->get('status');
+            $page = (int) $request->get('page', 1);
+            $perPage = (int) $request->get('per_page', 15);
             $search = $request->get('search');
-            
-            $query = DB::table('task_disputes as td')
-                ->join('tasks as t', 'td.task_id', '=', 't.id')
-                ->join('users as u', 'td.user_id', '=', 'u.id')
+
+            // 以 tasks 當作爭議來源：status_id = 4 代表 dispute
+            $query = DB::table('tasks as t')
                 ->leftJoin('users as creator', 't.creator_id', '=', 'creator.id')
                 ->leftJoin('users as participant', 't.participant_id', '=', 'participant.id')
                 ->select([
-                    'td.id',
-                    'td.task_id',
-                    'td.user_id',
-                    'td.status',
-                    'td.created_at',
-                    'td.updated_at',
-                    'td.resolved_at',
-                    'td.rejected_at',
-                    't.title as task_title',
-                    't.description as task_description',
+                    't.id as task_id',
+                    't.id as id', // 對齊前端預期的 dispute.id
+                    't.title',
+                    't.description',
                     't.reward_point',
-                    'u.name as disputer_name',
-                    'u.email as disputer_email',
+                    't.creator_id',
+                    't.participant_id',
+                    't.created_at',
+                    't.updated_at',
                     'creator.name as creator_name',
                     'creator.email as creator_email',
                     'participant.name as participant_name',
-                    'participant.email as participant_email'
-                ]);
+                    'participant.email as participant_email',
+                ])
+                ->where('t.status_id', 4);
 
-            // 狀態篩選
-            if ($status) {
-                $query->where('td.status', $status);
-            }
-
-            // 搜尋功能
+            // 搜尋條件
             if ($search) {
-                $query->where(function($q) use ($search) {
+                $query->where(function ($q) use ($search) {
                     $q->where('t.title', 'LIKE', "%{$search}%")
-                      ->orWhere('u.name', 'LIKE', "%{$search}%")
-                      ->orWhere('u.email', 'LIKE', "%{$search}%");
+                      ->orWhere('creator.name', 'LIKE', "%{$search}%")
+                      ->orWhere('participant.name', 'LIKE', "%{$search}%");
                 });
             }
 
-            $disputes = $query->orderBy('td.created_at', 'desc')
-                             ->paginate($perPage);
+            $total = $query->count();
 
-            // 統計資料
+            $rows = $query->orderBy('t.created_at', 'desc')
+                ->offset(($page - 1) * $perPage)
+                ->limit($perPage)
+                ->get();
+
+            // 將任務映射為前端期望的爭議物件結構
+            $items = $rows->map(function ($r) {
+                return [
+                    'id' => $r->id,
+                    'task_id' => $r->task_id,
+                    'dispute_title' => $r->title,
+                    'description' => $r->description,
+                    // 沒有額外的爭議子狀態，預設為 submitted（前端顏色/標籤可用）
+                    'status' => 'submitted',
+                    'created_at' => $r->created_at,
+                    'updated_at' => $r->updated_at,
+                    'task' => [
+                        'id' => $r->task_id,
+                        'title' => $r->title,
+                        'reward_point' => $r->reward_point,
+                        'creator_id' => $r->creator_id,
+                        'participant_id' => $r->participant_id,
+                        'creator_name' => $r->creator_name,
+                        'participant_name' => $r->participant_name,
+                    ],
+                    // 以任務建立者視為發起者（無 task_disputes 表時）
+                    'submitter' => [
+                        'id' => $r->creator_id,
+                        'name' => $r->creator_name,
+                        'email' => $r->creator_email,
+                    ],
+                ];
+            });
+
+            // 統計資料（基於 tasks.status_id = 4）
             $stats = [
-                'total' => DB::table('task_disputes')->count(),
-                'open' => DB::table('task_disputes')->where('status', 'open')->count(),
-                'in_review' => DB::table('task_disputes')->where('status', 'in_review')->count(),
-                'resolved' => DB::table('task_disputes')->where('status', 'resolved')->count(),
-                'rejected' => DB::table('task_disputes')->where('status', 'rejected')->count(),
+                'total_disputes' => $total,
+                'submitted_count' => $total,
+                'in_progress_count' => 0,
+                'resolved_count' => 0,
             ];
 
             return response()->json([
                 'success' => true,
-                'data' => $disputes->items(),
-                'pagination' => [
-                    'current_page' => $disputes->currentPage(),
-                    'last_page' => $disputes->lastPage(),
-                    'per_page' => $disputes->perPage(),
-                    'total' => $disputes->total(),
+                'data' => [
+                    'items' => $items,
+                    'pagination' => [
+                        'current_page' => $page,
+                        'per_page' => $perPage,
+                        'total' => $total,
+                        'last_page' => (int) ceil($total / $perPage),
+                    ],
+                    'stats' => $stats,
                 ],
-                'stats' => $stats
             ]);
 
         } catch (\Exception $e) {
@@ -92,35 +117,35 @@ class DisputeController extends Controller
     }
 
     /**
-     * 獲取申訴詳情
+     * 獲取申訴詳情（基於 tasks.status_id = 4）
      */
     public function show($id)
     {
         try {
-            $dispute = DB::table('task_disputes as td')
-                ->join('tasks as t', 'td.task_id', '=', 't.id')
-                ->join('users as u', 'td.user_id', '=', 'u.id')
+            // 改為直接查詢 tasks 表，$id 為 task_id
+            $dispute = DB::table('tasks as t')
                 ->leftJoin('users as creator', 't.creator_id', '=', 'creator.id')
                 ->leftJoin('users as participant', 't.participant_id', '=', 'participant.id')
                 ->leftJoin('task_statuses as ts', 't.status_id', '=', 'ts.id')
                 ->select([
-                    'td.*',
+                    't.id as task_id',
                     't.title as task_title',
                     't.description as task_description',
                     't.reward_point',
                     't.location',
                     't.task_date',
                     't.created_at as task_created_at',
+                    't.updated_at',
                     'ts.display_name as task_status',
-                    'u.name as disputer_name',
-                    'u.email as disputer_email',
-                    'u.phone as disputer_phone',
                     'creator.name as creator_name',
                     'creator.email as creator_email',
+                    'creator.phone as creator_phone',
                     'participant.name as participant_name',
-                    'participant.email as participant_email'
+                    'participant.email as participant_email',
+                    'participant.phone as participant_phone'
                 ])
-                ->where('td.id', $id)
+                ->where('t.id', $id)
+                ->where('t.status_id', 4) // 確保是爭議任務
                 ->first();
 
             if (!$dispute) {
@@ -130,22 +155,28 @@ class DisputeController extends Controller
                 ], 404);
             }
 
-            // 獲取申訴相關的任務日誌
-            $taskLogs = DB::table('task_logs')
-                ->where('task_id', $dispute->task_id)
-                ->orderBy('created_at', 'desc')
-                ->get();
+            // 獲取任務相關日誌（如果 task_logs 表存在）
+            $taskLogs = [];
+            try {
+                $taskLogs = DB::table('task_logs')
+                    ->where('task_id', $dispute->task_id)
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+            } catch (\Exception $e) {
+                // task_logs 表可能不存在，忽略錯誤
+            }
 
-            // 獲取申訴狀態變更日誌
-            $disputeLogs = DB::table('dispute_status_logs as dsl')
-                ->leftJoin('users as u', 'dsl.changed_by', '=', 'u.id')
-                ->select([
-                    'dsl.*',
-                    'u.name as changed_by_name'
-                ])
-                ->where('dsl.dispute_id', $id)
-                ->orderBy('dsl.changed_at', 'desc')
-                ->get();
+            // 獲取管理員活動日誌（替代 dispute_status_logs）
+            $disputeLogs = [];
+            try {
+                $disputeLogs = DB::table('admin_activity_logs as aal')
+                    ->where('aal.table_name', 'tasks')
+                    ->where('aal.record_id', $id)
+                    ->orderBy('aal.created_at', 'desc')
+                    ->get();
+            } catch (\Exception $e) {
+                // 忽略錯誤
+            }
 
             return response()->json([
                 'success' => true,
@@ -165,12 +196,12 @@ class DisputeController extends Controller
     }
 
     /**
-     * 更新申訴狀態
+     * 更新申訴狀態（基於 tasks 表的 status_id）
      */
     public function updateStatus(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'status' => 'required|in:open,in_review,resolved,rejected',
+            'action' => 'required|in:resolve,reject,reopen',
             'notes' => 'nullable|string|max:1000',
             'resolution' => 'nullable|string|max:1000'
         ]);
@@ -186,74 +217,64 @@ class DisputeController extends Controller
         try {
             DB::beginTransaction();
 
-            // 檢查申訴是否存在
-            $dispute = DB::table('task_disputes')->where('id', $id)->first();
-            if (!$dispute) {
+            // 檢查任務是否存在且為爭議狀態
+            $task = DB::table('tasks')->where('id', $id)->where('status_id', 4)->first();
+            if (!$task) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Dispute not found'
+                    'message' => 'Dispute task not found'
                 ], 404);
             }
 
-            $oldStatus = $dispute->status;
-            $newStatus = $request->status;
+            $action = $request->action;
             $adminId = $request->user()->id;
+            
+            // 根據動作決定新的 status_id（基於實際 task_statuses 表）
+            $newStatusId = match($action) {
+                'resolve' => 5, // 5 = "Completed" - 爭議解決，任務完成
+                'reject' => 7,  // 7 = "Rejected" - 爭議被拒絕
+                'reopen' => 4,  // 4 = "Dispute" - 重新開啟爭議
+                default => 4
+            };
 
-            // 更新申訴狀態
-            $updateData = [
-                'status' => $newStatus,
-                'updated_at' => now()
-            ];
-
-            if ($newStatus === 'resolved') {
-                $updateData['resolved_at'] = now();
-            } elseif ($newStatus === 'rejected') {
-                $updateData['rejected_at'] = now();
-            }
-
-            DB::table('task_disputes')
+            // 更新任務狀態
+            DB::table('tasks')
                 ->where('id', $id)
-                ->update($updateData);
+                ->update([
+                    'status_id' => $newStatusId,
+                    'updated_at' => now()
+                ]);
 
-            // 記錄狀態變更日誌
-            DB::table('dispute_status_logs')->insert([
-                'dispute_id' => $id,
-                'status' => $newStatus,
-                'changed_at' => now(),
-                'changed_by' => $adminId
-            ]);
+            // 不使用 dispute_status_logs，改用 admin_activity_logs
 
             // 記錄管理員活動日誌
-            AdminActivityLog::create([
+            DB::table('admin_activity_logs')->insert([
                 'admin_id' => $adminId,
-                'action' => 'dispute_status_updated',
-                'table_name' => 'task_disputes',
+                'action' => "dispute_{$action}",
+                'table_name' => 'tasks',
                 'record_id' => $id,
-                'old_data' => json_encode(['status' => $oldStatus]),
+                'old_data' => json_encode(['status_id' => $task->status_id]),
                 'new_data' => json_encode([
-                    'status' => $newStatus,
+                    'status_id' => $newStatusId,
+                    'action' => $action,
                     'notes' => $request->notes,
                     'resolution' => $request->resolution
                 ]),
                 'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent()
+                'user_agent' => $request->userAgent(),
+                'created_at' => now()
             ]);
-
-            // 如果申訴被解決或拒絕，可能需要更新任務狀態
-            if (in_array($newStatus, ['resolved', 'rejected'])) {
-                // 這裡可以根據業務邏輯決定是否要更新任務狀態
-                // 例如：申訴被拒絕時恢復原狀態，申訴被接受時採取相應行動
-            }
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Dispute status updated successfully',
+                'message' => "Dispute {$action} completed successfully",
                 'data' => [
-                    'id' => $id,
-                    'old_status' => $oldStatus,
-                    'new_status' => $newStatus,
+                    'task_id' => $id,
+                    'old_status_id' => $task->status_id,
+                    'new_status_id' => $newStatusId,
+                    'action' => $action,
                     'updated_at' => now()->toISOString()
                 ]
             ]);
@@ -269,14 +290,14 @@ class DisputeController extends Controller
     }
 
     /**
-     * 批量操作申訴
+     * 批量操作申訴（基於 tasks 表）
      */
     public function batchAction(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'action' => 'required|in:review,resolve,reject',
-            'dispute_ids' => 'required|array|min:1',
-            'dispute_ids.*' => 'integer|exists:task_disputes,id',
+            'action' => 'required|in:resolve,reject,reopen',
+            'task_ids' => 'required|array|min:1',
+            'task_ids.*' => 'string|exists:tasks,id',
             'notes' => 'nullable|string|max:1000'
         ]);
 
@@ -292,63 +313,49 @@ class DisputeController extends Controller
             DB::beginTransaction();
 
             $action = $request->action;
-            $disputeIds = $request->dispute_ids;
+            $taskIds = $request->task_ids;
             $adminId = $request->user()->id;
             
             $statusMap = [
-                'review' => 'in_review',
-                'resolve' => 'resolved',
-                'reject' => 'rejected'
+                'resolve' => 5, // 5 = "Completed" - 爭議解決，任務完成
+                'reject' => 7,  // 7 = "Rejected" - 爭議被拒絕
+                'reopen' => 4   // 4 = "Dispute" - 重新開啟爭議
             ];
             
-            $newStatus = $statusMap[$action];
+            $newStatusId = $statusMap[$action];
             $successCount = 0;
 
-            foreach ($disputeIds as $disputeId) {
-                // 獲取當前狀態
-                $dispute = DB::table('task_disputes')->where('id', $disputeId)->first();
-                if (!$dispute) continue;
+            foreach ($taskIds as $taskId) {
+                // 獲取當前任務（確保是爭議狀態）
+                $task = DB::table('tasks')->where('id', $taskId)->where('status_id', 4)->first();
+                if (!$task) continue;
 
-                $oldStatus = $dispute->status;
+                $oldStatusId = $task->status_id;
 
-                // 更新狀態
-                $updateData = [
-                    'status' => $newStatus,
-                    'updated_at' => now()
-                ];
-
-                if ($newStatus === 'resolved') {
-                    $updateData['resolved_at'] = now();
-                } elseif ($newStatus === 'rejected') {
-                    $updateData['rejected_at'] = now();
-                }
-
-                DB::table('task_disputes')
-                    ->where('id', $disputeId)
-                    ->update($updateData);
-
-                // 記錄狀態變更日誌
-                DB::table('dispute_status_logs')->insert([
-                    'dispute_id' => $disputeId,
-                    'status' => $newStatus,
-                    'changed_at' => now(),
-                    'changed_by' => $adminId
-                ]);
+                // 更新任務狀態
+                DB::table('tasks')
+                    ->where('id', $taskId)
+                    ->update([
+                        'status_id' => $newStatusId,
+                        'updated_at' => now()
+                    ]);
 
                 // 記錄管理員活動日誌
-                AdminActivityLog::create([
+                DB::table('admin_activity_logs')->insert([
                     'admin_id' => $adminId,
                     'action' => "dispute_batch_{$action}",
-                    'table_name' => 'task_disputes',
-                    'record_id' => $disputeId,
-                    'old_data' => json_encode(['status' => $oldStatus]),
+                    'table_name' => 'tasks',
+                    'record_id' => $taskId,
+                    'old_data' => json_encode(['status_id' => $oldStatusId]),
                     'new_data' => json_encode([
-                        'status' => $newStatus,
+                        'status_id' => $newStatusId,
+                        'action' => $action,
                         'notes' => $request->notes,
                         'batch_action' => true
                     ]),
                     'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent()
+                    'user_agent' => $request->userAgent(),
+                    'created_at' => now()
                 ]);
 
                 $successCount++;
@@ -361,9 +368,9 @@ class DisputeController extends Controller
                 'message' => "Successfully processed {$successCount} disputes",
                 'data' => [
                     'processed_count' => $successCount,
-                    'total_count' => count($disputeIds),
+                    'total_count' => count($taskIds),
                     'action' => $action,
-                    'new_status' => $newStatus
+                    'new_status_id' => $newStatusId
                 ]
             ]);
 

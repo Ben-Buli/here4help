@@ -56,80 +56,53 @@ class ThirdPartyAuthService {
     }
   }
 
-  // Web 版 Google 登入 - 使用新的 OAuth 流程
+  // Web 版 Google 登入 - 使用 google_sign_in（統一三端）
   Future<Map<String, dynamic>?> _signInWithGoogleWeb() async {
     try {
-      // 檢查是否已配置 Google Client ID
       if (EnvironmentConfig.googleClientId.isEmpty) {
         debugPrint('❌ Google Client ID 未配置，無法進行 Web 登入');
         throw Exception('Google Client ID 未配置');
       }
 
-      // 使用 Google OAuth 2.0 進行真實登入
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      // google_sign_in 7.1.1 推薦先 initialize + authenticate 流程
+      final GoogleSignIn signIn = GoogleSignIn.instance;
+      await signIn.initialize(clientId: EnvironmentConfig.googleClientId);
 
-      // 創建 Google OAuth 2.0 授權 URL - 直接重定向到後端回調
-      final params = {
-        'client_id': EnvironmentConfig.googleClientId,
-        // 與後端一致：使用 AppConfig.api 組裝回調 URL
-        'redirect_uri': AppConfig.api('/auth/google-callback.php'),
-        'response_type': 'code',
-        'scope': 'email profile',
-        'state': 'web_google_$timestamp', // 防止 CSRF 攻擊
-        'access_type': 'offline',
-        'prompt': 'select_account',
+      // 嘗試輕量驗證（非阻斷）
+      await signIn.attemptLightweightAuthentication();
+
+      // 用戶互動觸發登入
+      await signIn.authenticate();
+
+      // 透過事件取得使用者
+      final signInEvent = await signIn.authenticationEvents.firstWhere(
+        (e) => e is GoogleSignInAuthenticationEventSignIn,
+      ) as GoogleSignInAuthenticationEventSignIn;
+      final user = signInEvent.user;
+
+      // 7.1.1 仍可透過 authentication 取得 access/id token（平台差異化處理由套件處理）
+      final auth = await user.authentication;
+
+      // 嘗試取得 server auth code（可選）
+      String? serverAuthCode;
+      try {
+        final serverAuth =
+            await user.authorizationClient.authorizeServer(const []);
+        serverAuthCode = serverAuth?.serverAuthCode;
+      } catch (_) {}
+
+      final userData = {
+        'provider': 'google',
+        'platform': 'web',
+        'google_id': user.id,
+        'name': user.displayName ?? '',
+        'email': user.email,
+        'avatar_url': user.photoUrl ?? '',
+        'id_token': auth.idToken,
+        if (serverAuthCode != null) 'server_auth_code': serverAuthCode,
       };
 
-      final googleAuthUrl =
-          Uri.https('accounts.google.com', '/o/oauth2/v2/auth', params);
-
-      debugPrint('🔐 準備跳轉到 Google 登入頁面: $googleAuthUrl');
-      debugPrint('🔑 Client ID: ${EnvironmentConfig.googleClientId}');
-      debugPrint(
-          '🔄 Redirect URI: ${AppConfig.api('/auth/google-callback.php')}');
-
-      // 在 Web 環境中直接重定向到 Google OAuth
-      if (isWeb) {
-        try {
-          // 使用 url_launcher 打開 Google 登入頁面
-          final canLaunch = await canLaunchUrl(googleAuthUrl);
-          if (canLaunch) {
-            debugPrint('🌐 正在重定向到 Google 登入頁面...');
-            final launched = await launchUrl(
-              googleAuthUrl,
-              mode: LaunchMode.platformDefault,
-            );
-
-            if (launched) {
-              debugPrint('✅ Google OAuth 流程已啟動');
-              debugPrint('📋 用戶將在瀏覽器中完成登入，然後重定向回應用');
-
-              // 返回成功標記，表示 OAuth 流程已啟動
-              // 實際的登入結果將通過回調處理
-              return {
-                'success': true,
-                'provider': 'google',
-                'platform': 'web',
-                'oauth_started': true,
-                'message': 'OAuth flow started successfully',
-                'timestamp': timestamp,
-              };
-            } else {
-              debugPrint('❌ 無法啟動 Google OAuth 流程');
-              throw Exception('無法啟動 Google OAuth 流程');
-            }
-          } else {
-            debugPrint('❌ 無法啟動 URL: $googleAuthUrl');
-            throw Exception('無法啟動 Google 登入 URL');
-          }
-        } catch (e) {
-          debugPrint('❌ Google OAuth 流程啟動失敗: $e');
-          throw Exception('Google OAuth 流程啟動失敗: $e');
-        }
-      } else {
-        // 非 Web 平台不支援此流程
-        throw UnsupportedError('Web OAuth 流程僅支援 Web 平台');
-      }
+      return await _sendUserDataToBackend(userData);
     } catch (e) {
       debugPrint('Web Google 登入錯誤: $e');
       return null;
@@ -139,23 +112,35 @@ class ThirdPartyAuthService {
   // 移動版 Google 登入
   Future<Map<String, dynamic>?> _signInWithGoogleMobile() async {
     try {
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        scopes: ['email', 'profile'],
-      );
+      final GoogleSignIn signIn = GoogleSignIn.instance;
+      // 可選：若有 server client id，可在此傳入
+      await signIn.initialize();
 
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      if (googleUser == null) return null;
+      // 使用 authenticate 流程
+      await signIn.authenticate();
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      final signInEvent = await signIn.authenticationEvents.firstWhere(
+        (e) => e is GoogleSignInAuthenticationEventSignIn,
+      ) as GoogleSignInAuthenticationEventSignIn;
+      final user = signInEvent.user;
+
+      final auth = await user.authentication;
+
+      // 可選：取得 server auth code
+      String? serverAuthCode;
+      try {
+        final serverAuth =
+            await user.authorizationClient.authorizeServer(const []);
+        serverAuthCode = serverAuth?.serverAuthCode;
+      } catch (_) {}
 
       final userData = {
-        'google_id': googleUser.id,
-        'name': googleUser.displayName ?? '',
-        'email': googleUser.email,
-        'avatar_url': googleUser.photoUrl ?? '',
-        'access_token': googleAuth.accessToken,
-        'id_token': googleAuth.idToken,
+        'google_id': user.id,
+        'name': user.displayName ?? '',
+        'email': user.email,
+        'avatar_url': user.photoUrl ?? '',
+        'id_token': auth.idToken,
+        if (serverAuthCode != null) 'server_auth_code': serverAuthCode,
         'provider': 'google',
         'platform': isIOS ? 'ios' : 'android',
       };
@@ -198,8 +183,8 @@ class ThirdPartyAuthService {
       final facebookAuthUrl =
           Uri.https('www.facebook.com', '/v18.0/dialog/oauth', {
         'client_id': EnvironmentConfig.facebookAppId,
-        'redirect_uri':
-            '${EnvironmentConfig.apiBaseUrl}/backend/api/auth/facebook-callback.php',
+        // 使用環境配置中的統一 redirect_uri
+        'redirect_uri': EnvironmentConfig.facebookRedirectUri,
         'response_type': 'code',
         'scope': 'email,public_profile',
         'state': 'web_facebook_$timestamp',
@@ -311,8 +296,8 @@ class ThirdPartyAuthService {
       // 創建 Apple Sign In 授權 URL
       final appleAuthUrl = Uri.https('appleid.apple.com', '/auth/authorize', {
         'client_id': EnvironmentConfig.appleServiceId,
-        'redirect_uri':
-            '${EnvironmentConfig.apiBaseUrl}/backend/api/auth/apple-callback.php',
+        // 使用環境配置中的統一 redirect_uri
+        'redirect_uri': EnvironmentConfig.appleRedirectUri,
         'response_type': 'code',
         'scope': 'name email',
         'response_mode': 'form_post',
@@ -400,17 +385,9 @@ class ThirdPartyAuthService {
   Future<Map<String, dynamic>?> _sendUserDataToBackend(
       Map<String, dynamic> userData) async {
     try {
-      // 根據平台選擇不同的 API 端點
-      String apiUrl;
-      if (userData['platform'] == 'web') {
-        // Web 平台應該通過 OAuth 回調處理，不應該直接調用此方法
-        throw Exception('Web 平台應使用 OAuth 回調流程');
-      } else {
-        // 移動平台使用統一的第三方登入 API
-        final provider = userData['provider'] ?? 'google';
-        apiUrl =
-            '${EnvironmentConfig.apiBaseUrl}/backend/api/auth/$provider-login.php';
-      }
+      // 統一使用後端 login 端點（web/ios/android 共用）
+      final provider = (userData['provider'] ?? 'google').toString();
+      final apiUrl = AppConfig.api('/auth/${provider}-login.php');
 
       debugPrint('🌐 發送請求到: $apiUrl');
       debugPrint('📦 請求資料: ${userData.keys.toList()}'); // 不記錄敏感資料
@@ -447,10 +424,10 @@ class ThirdPartyAuthService {
     try {
       switch (provider.toLowerCase()) {
         case 'google':
-          if (!isWeb) {
-            final GoogleSignIn googleSignIn = GoogleSignIn();
-            await googleSignIn.signOut();
-          }
+          // 7.1.1 使用單例
+          final signIn = GoogleSignIn.instance;
+          await signIn.initialize();
+          await signIn.disconnect();
           break;
         case 'facebook':
           // TODO: 實作 Facebook 登出
@@ -473,11 +450,18 @@ class ThirdPartyAuthService {
     try {
       switch (provider.toLowerCase()) {
         case 'google':
-          if (!isWeb) {
-            final GoogleSignIn googleSignIn = GoogleSignIn();
-            return await googleSignIn.isSignedIn();
+          final signIn = GoogleSignIn.instance;
+          // 7.1.1 使用事件或嘗試輕量驗證判斷當前使用者
+          await signIn.initialize();
+          await signIn.attemptLightweightAuthentication();
+          try {
+            final event = await signIn.authenticationEvents.first.timeout(
+              const Duration(milliseconds: 100),
+            );
+            return event is GoogleSignInAuthenticationEventSignIn;
+          } catch (_) {
+            return false;
           }
-          return false;
         case 'facebook':
           // TODO: 實作 Facebook 登入狀態檢查
           return false;

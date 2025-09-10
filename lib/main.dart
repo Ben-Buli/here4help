@@ -1,5 +1,6 @@
 // lib/main.dart (或你的路由配置檔)
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/router/app_router.dart';
 import 'package:here4help/auth/services/user_service.dart';
@@ -10,6 +11,7 @@ import 'package:here4help/providers/permission_provider.dart';
 import 'package:here4help/providers/rating_provider.dart';
 import 'package:here4help/providers/achievement_provider.dart';
 import 'package:here4help/chat/providers/chat_list_provider.dart';
+import 'package:here4help/services/web_environment_bridge.dart';
 
 class Here4HelpApp extends StatelessWidget {
   const Here4HelpApp({super.key});
@@ -44,6 +46,11 @@ void main() async {
 
   // 打印環境信息
   EnvironmentConfig.printEnvironmentInfo();
+
+  // 初始化 Web 環境配置橋接器 (僅限 Web 平台)
+  if (kIsWeb) {
+    WebEnvironmentBridge.instance.initializeWebConfig();
+  }
 
   runApp(
     MultiProvider(

@@ -98,7 +98,8 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
         final userData = jsonDecode(userDataStr) as Map<String, dynamic>;
 
         debugPrint('✅ 現有用戶登入成功');
-        debugPrint('   Token: ${token.substring(0, 20)}...');
+        final tokenPreview = token.length > 20 ? token.substring(0, 20) : token;
+        debugPrint('   Token: ${tokenPreview}...');
         debugPrint('   User ID: ${userData['id']}');
         debugPrint('   Name: ${userData['name']}');
 

@@ -48,16 +48,27 @@
   <script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
 </head>
 <body>
+  <!-- 環境配置注入器 -->
+  <script src="js/environment_injector.js"></script>
+  
   <script src="flutter_bootstrap.js" async></script>
   
   <!-- 第三方登入初始化腳本 -->
   <script>
     // Google OAuth 2.0 初始化
     function initGoogleAuth() {
-      google.accounts.id.initialize({
-        client_id: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
-        callback: handleGoogleCredentialResponse
-      });
+      // 從 Flutter 環境配置獲取 Client ID
+      const googleClientId = window.environmentConfig?.googleClientId || '102744926949-bhrnm2970bgt3dfm2nmdbqt03mrvdh3i.apps.googleusercontent.com';
+      
+      if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+        google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: handleGoogleCredentialResponse
+        });
+        console.log('✅ Google OAuth 初始化成功');
+      } else {
+        console.error('❌ Google SDK 未載入');
+      }
     }
 
     function handleGoogleCredentialResponse(response) {
@@ -71,8 +82,10 @@
 
     // Facebook SDK 初始化
     window.fbAsyncInit = function() {
+      // 從 Flutter 環境配置獲取 App ID
+      const facebookAppId = window.environmentConfig?.facebookAppId || 'YOUR_FACEBOOK_APP_ID';
       FB.init({
-        appId: 'YOUR_FACEBOOK_APP_ID',
+        appId: facebookAppId,
         cookie: true,
         xfbml: true,
         version: 'v18.0'
@@ -93,8 +106,10 @@
 
     // Apple Sign-In 初始化
     function initAppleSignIn() {
+      // 從 Flutter 環境配置獲取 Service ID
+      const appleServiceId = window.environmentConfig?.appleServiceId || 'YOUR_APPLE_SERVICE_ID';
       AppleID.auth.init({
-        clientId: 'com.example.here4help.service',
+        clientId: appleServiceId,
         scope: 'email name',
         redirectURI: window.location.origin + '/apple-callback',
         state: 'origin:web'
@@ -113,20 +128,37 @@
       });
     }
 
-    // 頁面載入完成後初始化
-    window.addEventListener('load', function() {
+    // 等待環境配置準備好後初始化第三方服務
+    window.addEventListener('environmentConfigReady', function(event) {
+      console.log('🎉 環境配置已準備好，開始初始化第三方登入服務');
+      
       // 延遲初始化，確保 SDK 已載入
       setTimeout(function() {
-        if (typeof google !== 'undefined') {
+        if (typeof google !== 'undefined' && window.environmentConfig?.googleClientId) {
+          console.log('🔧 初始化 Google OAuth');
           initGoogleAuth();
         }
-        if (typeof FB !== 'undefined') {
-          // Facebook SDK 已在 fbAsyncInit 中初始化
+        if (typeof FB !== 'undefined' && window.environmentConfig?.facebookAppId) {
+          // Facebook SDK 會在 fbAsyncInit 中自動初始化
+          console.log('🔧 Facebook SDK 已準備好');
         }
-        if (typeof AppleID !== 'undefined') {
+        if (typeof AppleID !== 'undefined' && window.environmentConfig?.appleServiceId) {
+          console.log('🔧 初始化 Apple Sign-In');
           initAppleSignIn();
         }
       }, 1000);
+    });
+
+    // 備用：頁面載入完成後也嘗試初始化（如果環境配置已準備好）
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        if (window.environmentConfig) {
+          // 環境配置已存在，直接初始化
+          window.dispatchEvent(new CustomEvent('environmentConfigReady', {
+            detail: window.environmentConfig
+          }));
+        }
+      }, 2000);
     });
   </script>
 </body>

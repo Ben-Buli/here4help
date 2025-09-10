@@ -53,7 +53,7 @@ try {
     $isPermanentAddress = $input['is_permanent_address'] ?? false;
     $primaryLanguage = trim($input['primary_language'] ?? 'English');
     $school = trim($input['school'] ?? '');
-    $referralCode = trim($input['referral_code'] ?? '');
+    $introReferralCode = trim($input['intro_referral_code'] ?? '');
     $paymentPassword = $input['payment_password'] ?? null;
     
     error_log("OAuth Register - 開始處理用戶註冊: $name, Token: " . substr($oauthToken, 0, 8) . "...");
@@ -95,10 +95,10 @@ try {
     }
     
     // 檢查推薦碼（如果提供了）
-    if (!empty($referralCode)) {
+    if (!empty($introReferralCode)) {
         $stmt = $db->query(
             "SELECT id, name, status, permission FROM users WHERE referral_code = ?",
-            [$referralCode]
+            [$introReferralCode]
         );
         
         $referrer = $stmt->fetch();
@@ -123,7 +123,7 @@ try {
             INSERT INTO users (
                 name, email, phone, nickname, date_of_birth, gender, 
                 country, address, is_permanent_address, primary_language, 
-                school, referral_code, payment_password, avatar_url, 
+                school, intro_referral_code, payment_password, avatar_url, 
                 status, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW(), NOW())
         ";
@@ -131,7 +131,7 @@ try {
         $db->query($insertUserQuery, [
             $name, $email, $phone, $nickname, $dateOfBirth, $gender,
             $country, $address, $isPermanentAddress, $primaryLanguage,
-            $school, $referralCode, $paymentPassword, $avatarUrl
+            $school, $introReferralCode, $paymentPassword, $avatarUrl
         ]);
         
         $userId = $db->lastInsertId();
@@ -199,7 +199,7 @@ try {
             'provider' => $oauthProvider,
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s'),
-            'referral_code' => $referralCode,
+            'referral_code' => $introReferralCode,
             'primary_language' => $primaryLanguage,
             'permission' => 0,
             'is_new_user' => true,

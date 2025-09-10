@@ -464,7 +464,9 @@ class ChatService {
         throw Exception('未登入');
       }
 
-      debugPrint('✅ [ChatService] 找到 token: ${token.substring(0, 10)}...');
+      final tokenPreviewShort =
+          token.length > 10 ? token.substring(0, 10) : token;
+      debugPrint('✅ [ChatService] 找到 token: ${tokenPreviewShort}...');
 
       final queryParams = <String, String>{
         'room_id': roomId,
@@ -657,7 +659,8 @@ class ChatService {
 
       debugPrint('📤 [withdrawApplication] 請求內容:');
       debugPrint('  - body: $requestBody');
-      debugPrint('  - token: ${token.substring(0, 20)}...');
+      final tokenPreview = token.length > 20 ? token.substring(0, 20) : token;
+      debugPrint('  - token: ${tokenPreview}...');
 
       final response = await http
           .put(

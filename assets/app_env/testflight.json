@@ -7,8 +7,11 @@
     "socket_url": "https://hero4help.demofhs.com:3001",
     "image_base_url": "https://hero4help.demofhs.com/here4help",
     "google_client_id": "102744926949-bhrnm2970bgt3dfm2nmdbqt03mrvdh3i.apps.googleusercontent.com",
+    "google_redirect_uri": "https://hero4help.demofhs.com/here4help/backend/api/auth/google-callback.php",
     "facebook_app_id": "1037019294991326",
-    "apple_service_id": "com.example.here4help.login"
+    "facebook_redirect_uri": "https://hero4help.demofhs.com/here4help/backend/api/auth/facebook-callback.php",
+    "apple_service_id": "com.example.here4help.login",
+    "apple_redirect_uri": "https://hero4help.demofhs.com/here4help/backend/api/auth/apple-callback.php"
   },
   "app": {
     "debug_mode": false,

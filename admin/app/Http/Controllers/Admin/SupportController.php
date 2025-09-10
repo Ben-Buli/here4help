@@ -38,14 +38,14 @@ class SupportController extends Controller
         $status = $request->get('status');
         $search = $request->get('search');
 
-        $query = DB::table('chat_rooms as cr')
-            ->leftJoin('support_events as se', 'se.chat_room_id', '=', 'cr.id')
-            ->leftJoin('users as u', 'cr.creator_id', '=', 'u.id')
+        $query = DB::table('support_chat_rooms as cr')
+            ->leftJoin('support_events as se', 'se.support_chat_room_id', '=', 'cr.id')
+            ->leftJoin('users as u', 'cr.user_id', '=', 'u.id')
             ->select([
                 'cr.id as room_id',
                 'cr.type',
-                'cr.creator_id',
-                'cr.participant_id',
+                'cr.user_id',
+                'cr.admin_id',
                 'cr.created_at',
                 'se.id as event_id',
                 'se.title',
@@ -101,13 +101,13 @@ class SupportController extends Controller
     public function accept(Request $request, $roomId)
     {
         $adminId = $request->user()->id;
-        $exists = DB::table('chat_rooms')->where('id', $roomId)->exists();
+        $exists = DB::table('support_chat_rooms')->where('id', $roomId)->exists();
         if (!$exists) {
             return response()->json(['success' => false, 'message' => 'Room not found'], 404);
         }
 
         DB::table('support_events')
-            ->where('chat_room_id', $roomId)
+            ->where('support_chat_room_id', $roomId)
             ->update([
                 'admin_id' => $adminId,
                 'status' => 'in_progress',
@@ -145,7 +145,7 @@ class SupportController extends Controller
         }
 
         DB::table('support_events')
-            ->where('chat_room_id', $roomId)
+            ->where('support_chat_room_id', $roomId)
             ->update([
                 'admin_id' => $targetId,
                 'updated_at' => now(),
@@ -176,13 +176,13 @@ class SupportController extends Controller
 
         $adminId = $request->user()->id;
         $newStatus = $request->get('status');
-        $event = DB::table('support_events')->where('chat_room_id', $roomId)->first();
+        $event = DB::table('support_events')->where('support_chat_room_id', $roomId)->first();
         if (!$event) {
             return response()->json(['success' => false, 'message' => 'Event not found'], 404);
         }
 
         DB::table('support_events')
-            ->where('chat_room_id', $roomId)
+            ->where('support_chat_room_id', $roomId)
             ->update([
                 'status' => $newStatus,
                 'updated_at' => now(),

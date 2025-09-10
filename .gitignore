@@ -285,4 +285,5 @@ backend/config/env.production
 backend/config/env.development
 backend/config/env.staging
 backend/config/env.test
-backend/config/database.php
+backend/config/database.phpbackend/.env.backup.*
+backend/.env.bak*

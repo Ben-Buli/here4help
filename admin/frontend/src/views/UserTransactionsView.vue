@@ -384,19 +384,35 @@ const loadTransactions = async () => {
     const params = {
       page: pagination.current_page,
       per_page: pagination.per_page,
-      ...filters
+      user_id: filters.user_id ? parseInt(filters.user_id) : undefined,
+      transaction_type: filters.transaction_type as any || undefined,
+      date_from: filters.date_from || undefined,
+      date_to: filters.date_to || undefined,
+      search: filters.search || undefined,
     }
     
     const response = await userTransactionApi.list(params)
     
-    if (response.data && response.data.success && response.data.data) {
-      transactions.value = response.data.data.items || []
-      if (response.data.data.pagination) {
-        pagination.total = response.data.data.pagination.total
-        pagination.last_page = response.data.data.pagination.last_page
+    if (response.data.success && response.data.data) {
+      const data = response.data.data
+      transactions.value = data.items || []
+      
+      // 更新分頁信息
+      if (data.pagination) {
+        pagination.total = data.pagination.total
+        pagination.last_page = data.pagination.last_page
       }
-      stats.value = response.data.data.stats || null
-      typeStats.value = response.data.data.type_stats || []
+      
+      // 統計信息
+      if (data.stats) {
+        stats.value = {
+          total_transactions: data.pagination?.total || 0,
+          unique_users: data.stats.unique_users || 0,
+          total_income: data.stats.total_income || 0,
+          total_expense: data.stats.total_expense || 0
+        }
+        typeStats.value = data.stats.by_type || []
+      }
     }
   } catch (error) {
     console.error('Failed to load transactions:', error)

@@ -4,10 +4,10 @@
     <div class="md:flex md:items-center md:justify-between">
       <div class="flex-1 min-w-0">
         <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-          儲值審核管理
+          User Deposit Approval Management
         </h2>
         <p class="mt-1 text-sm text-gray-500">
-          管理用戶的儲值申請，審核通過後自動發放點數
+          Manage user deposit requests, approve them to automatically issue points
         </p>
       </div>
       <div class="mt-4 flex md:mt-0 md:ml-4 space-x-3">
@@ -235,14 +235,15 @@
                 <div class="text-xs text-gray-500">{{ deposit.user_email }}</div>
               </td>
               <td class="text-sm font-medium text-green-600">
-                {{ formatPoints(deposit.added_value) }} points
+                {{ formatPoints(deposit.amount_points) }} points
               </td>
               <td>
                 <div class="text-sm text-gray-900">****{{ deposit.bank_account_last5 }}</div>
                 <div v-if="deposit.note" class="text-xs text-gray-500">{{ deposit.note }}</div>
               </td>
-              <td class="text-sm text-gray-500">
-                {{ formatDate(deposit.created_at) }}
+              <td class="text-xs text-gray-500">
+                <div class="font-medium">{{ formatDateOnly(deposit.created_at) }}</div>
+                <div>{{ formatTimeOnly(deposit.created_at) }}</div>
               </td>
               <td>
                 <span
@@ -253,19 +254,25 @@
                 </span>
               </td>
               <td>
-                <div v-if="deposit.status === 'pending'" class="flex space-x-2">
+                <div v-if="deposit.status === 'pending'" class="flex flex-col space-y-1">
                   <button
                     @click="approveDeposit(deposit)"
-                    class="admin-button-success text-xs"
+                    class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     :disabled="processing"
                   >
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
                     Approve
                   </button>
                   <button
                     @click="rejectDeposit(deposit)"
-                    class="admin-button-danger text-xs"
+                    class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     :disabled="processing"
                   >
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
                     Reject
                   </button>
                 </div>
@@ -311,13 +318,13 @@
     </div>
 
     <!-- 審核對話框 -->
-    <div v-if="showApprovalDialog" class="fixed inset-0 z-50 overflow-y-auto">
+    <div v-if="showApprovalDialog" class="fixed inset-0 z-[9999] overflow-y-auto">
       <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         <div class="fixed inset-0 transition-opacity" @click="closeApprovalDialog">
           <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
         </div>
 
-        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+        <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10">
           <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div class="sm:flex sm:items-start">
               <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
@@ -327,7 +334,7 @@
                 
                 <div class="bg-gray-50 rounded-md p-4 mb-4">
                   <p class="text-sm text-gray-700"><strong>User:</strong> {{ selectedDeposit?.user_name }}</p>
-                  <p class="text-sm text-gray-700"><strong>Amount:</strong> {{ formatPoints(selectedDeposit?.added_value || 0) }} points</p>
+                  <p class="text-sm text-gray-700"><strong>Amount:</strong> {{ formatPoints(selectedDeposit?.amount_points || 0) }} points</p>
                   <p class="text-sm text-gray-700"><strong>Bank:</strong> ****{{ selectedDeposit?.bank_account_last5 }}</p>
                 </div>
 
@@ -414,7 +421,7 @@ const loadDeposits = async () => {
         user_id: it.user_id,
         user_name: it.user_name,
         user_email: it.user_email,
-        added_value: it.amount_points,
+        amount_points: it.amount_points,  
         bank_account_last5: it.bank_account_last5 || '',
         note: it.approver_reply_description || '',
         status: it.status,
@@ -513,6 +520,14 @@ const formatPoints = (points: number) => {
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleString()
+}
+
+const formatDateOnly = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString()
+}
+
+const formatTimeOnly = (dateString: string) => {
+  return new Date(dateString).toLocaleTimeString()
 }
 
 const getStatusText = (status: string) => {

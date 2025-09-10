@@ -4,15 +4,21 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 import 'package:here4help/services/scroll_event_bus.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
+import 'package:here4help/auth/services/auth_service.dart';
 import 'package:here4help/constants/app_colors.dart';
 import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/utils/image_helper.dart';
 import 'package:here4help/providers/rating_provider.dart';
 import 'package:here4help/services/rating_service.dart';
 import 'package:here4help/providers/achievement_provider.dart';
+import 'package:here4help/config/app_config.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -24,6 +30,10 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final ScrollController _scrollController = ScrollController();
   StreamSubscription<String>? _scrollSub;
+
+  // 學生證審核狀態相關
+  Map<String, dynamic>? _studentVerificationData;
+  bool _isCheckingStudentVerification = false;
 
   @override
   void initState() {
@@ -40,7 +50,94 @@ class _HomePageState extends State<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<RatingProvider>().loadUserRatingStats();
       context.read<AchievementProvider>().loadUserAchievements();
+      _checkStudentVerificationStatus();
     });
+  }
+
+  // 檢查學生證審核狀態
+  Future<void> _checkStudentVerificationStatus() async {
+    if (_isCheckingStudentVerification || !mounted) return;
+
+    setState(() {
+      _isCheckingStudentVerification = true;
+    });
+
+    try {
+      final userService = context.read<UserService>();
+      final user = userService.currentUser;
+
+      if (user?.id == null) {
+        return;
+      }
+
+      // 檢查本地是否已經隱藏過通知
+      final prefs = await SharedPreferences.getInstance();
+      final hiddenNotificationKey =
+          'student_verification_rejected_hidden_${user!.id}';
+      final isHidden = prefs.getBool(hiddenNotificationKey) ?? false;
+
+      if (isHidden) {
+        return; // 用戶已經隱藏過這個通知，不再顯示
+      }
+
+      // 呼叫API檢查學生證狀態
+      final token = await AuthService.getToken();
+      if (token == null) return;
+
+      final response = await http.get(
+        Uri.parse(
+            '${AppConfig.apiBaseUrl}/api/auth/get-student-verification-status.php'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final verificationData = data['data'] as Map<String, dynamic>;
+
+          // 只有當狀態為 'rejected' 時才顯示按鈕
+          if (verificationData['verification_status'] == 'rejected') {
+            setState(() {
+              _studentVerificationData = verificationData;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('檢查學生證狀態失敗: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCheckingStudentVerification = false;
+        });
+      }
+    }
+  }
+
+  // 隱藏學生證審核失敗通知
+  Future<void> _hideStudentVerificationNotification() async {
+    final userService = context.read<UserService>();
+    final user = userService.currentUser;
+
+    if (user?.id != null) {
+      final prefs = await SharedPreferences.getInstance();
+      final hiddenNotificationKey =
+          'student_verification_rejected_hidden_${user!.id}';
+      await prefs.setBool(hiddenNotificationKey, true);
+
+      setState(() {
+        _studentVerificationData = null;
+      });
+    }
+  }
+
+  // 導航到學生證更新頁面
+  void _navigateToStudentIdUpdate() {
+    // TODO: 實現導航到學生證更新頁面，並傳遞被拒絕的資料
+    context.go('/signup/student-id/update', extra: _studentVerificationData);
   }
 
   @override
@@ -203,6 +300,92 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                     const SizedBox(height: 24),
+
+                    // 學生證審核失敗通知按鈕
+                    if (_studentVerificationData != null) ...[
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border:
+                              Border.all(color: Colors.orange.withOpacity(0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_outlined,
+                                  color: Colors.orange,
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Student ID Verification Failed',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange[800],
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed:
+                                      _hideStudentVerificationNotification,
+                                  icon: Icon(
+                                    Icons.close,
+                                    color: Colors.grey[600],
+                                    size: 20,
+                                  ),
+                                  constraints: const BoxConstraints(
+                                    minWidth: 32,
+                                    minHeight: 32,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (_studentVerificationData![
+                                    'verification_notes'] !=
+                                null) ...[
+                              Text(
+                                'Reason: ${_studentVerificationData!['verification_notes']}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _navigateToStudentIdUpdate,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Re-upload Student ID'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -465,41 +648,4 @@ class HexagonClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(CustomClipper<Path> oldClipper) => false;
-}
-
-class _ChallengeCard extends StatelessWidget {
-  final String title;
-  final String progress;
-  const _ChallengeCard({required this.title, required this.progress});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 200,
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-          if (progress.isNotEmpty)
-            Text('($progress completed)',
-                style: const TextStyle(color: Colors.grey)),
-          const SizedBox(height: 8),
-          ElevatedButton(
-            onPressed: () {},
-            child: const FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text('Take on Task Now'),
-            ),
-          )
-        ],
-      ),
-    );
-  }
 }
