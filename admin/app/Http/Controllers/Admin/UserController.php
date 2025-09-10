@@ -121,7 +121,7 @@ class UserController extends Controller
         // 取得學生證認證資料（若有）
         $studentVerification = DB::table('student_verifications')
             ->where('user_id', $id)
-            ->orderBy('created_at', 'desc')
+            ->orderBy('updated_at', 'desc')
             ->first();
 
         // 獲取用戶相關統計
@@ -471,7 +471,7 @@ class UserController extends Controller
                         'student_id_image_path', 'verification_status', 'verification_notes', 
                         'created_at', 'updated_at')
                 ->where('user_id', $id)
-                ->orderBy('created_at', 'desc')
+                ->orderBy('updated_at', 'desc')
                 ->first();
 
             $responseData = [
@@ -616,6 +616,261 @@ class UserController extends Controller
             'new_data' => json_encode(['action' => $action, 'user_ids' => $userIds, 'reason' => $reason]),
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
+            'created_at' => now()
+        ]);
+    }
+
+    /**
+     * 管理員審核用戶驗證資料
+     */
+    public function review(Request $request, $id)
+    {
+        // 驗證輸入
+        $validator = Validator::make($request->all(), [
+            'decision' => 'required|in:approve,reject',
+            'new_permission' => 'required|integer',
+            'notes' => 'nullable|string|max:1000'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        // 獲取管理員資訊
+        $admin = auth('sanctum')->user();
+        
+        // 檢查用戶是否存在且為未驗證狀態
+        $user = DB::table('users')->where('id', $id)->first();
+        if (!$user || $user->permission !== 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found or not in unverified status'
+            ], 400);
+        }
+
+        // 開始資料庫交易
+        DB::beginTransaction();
+        
+        try {
+            $referralCode = null;
+            $referralReward = null;
+            
+            // 如果是批准且設定為已驗證用戶
+            if ($request->decision === 'approve' && $request->new_permission == 1) {
+                // 生成推薦碼
+                $referralCode = $this->generateReferralCode($id);
+                
+                // 處理推薦獎勵
+                $referralReward = $this->processReferralReward($id, $admin->id);
+            }
+            
+            // 更新用戶權限
+            DB::table('users')
+                ->where('id', $id)
+                ->update([
+                    'permission' => $request->new_permission,
+                    'updated_at' => now()
+                ]);
+            
+            // 更新學生證驗證記錄
+            $verificationStatus = $request->decision === 'approve' ? 'approved' : 'rejected';
+            DB::table('student_verifications')
+                ->where('user_id', $id)
+                ->orderBy('updated_at', 'desc')
+                ->limit(1)
+                ->update([
+                    'verification_status' => $verificationStatus,
+                    'verification_notes' => $request->notes,
+                    'admin_id' => $admin->id,
+                    'updated_at' => now()
+                ]);
+            
+            // 記錄操作日誌
+            $this->logUserReview($id, $admin->id, $request->all(), $referralCode, $referralReward);
+            
+            // 提交交易
+            DB::commit();
+            
+            // 返回成功回應
+            $responseData = [
+                'user_id' => $id,
+                'decision' => $request->decision,
+                'old_permission' => $user->permission,
+                'new_permission' => $request->new_permission,
+                'notes' => $request->notes,
+                'reviewed_by' => $admin->id,
+                'reviewed_at' => now()->toDateTimeString()
+            ];
+            
+            if ($referralCode) {
+                $responseData['referral_code_generated'] = $referralCode;
+            }
+            
+            if ($referralReward) {
+                $responseData['referral_reward'] = $referralReward;
+            }
+            
+            $message = $request->decision === 'approve' 
+                ? 'User verification approved successfully' 
+                : 'User verification rejected successfully';
+                
+            if ($referralReward) {
+                $message .= " - Referral reward of {$referralReward['reward_points']} points awarded to {$referralReward['referrer_name']}";
+            }
+            
+            return response()->json([
+                'success' => true,
+                'data' => $responseData,
+                'message' => $message
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                'success' => false,
+                'message' => 'Internal server error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * 生成推薦碼
+     */
+    private function generateReferralCode($userId)
+    {
+        $length = 12;
+        $maxAttempts = 50;
+        $attempt = 0;
+        
+        do {
+            $attempt++;
+            
+            // 生成推薦碼：字母數字組合，避免容易混淆的字符
+            $characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            $referralCode = '';
+            
+            for ($i = 0; $i < $length; $i++) {
+                $referralCode .= $characters[random_int(0, strlen($characters) - 1)];
+            }
+            
+            // 檢查是否已存在
+            $exists = DB::table('users')
+                ->where('referral_code', $referralCode)
+                ->exists();
+                
+            if (!$exists) {
+                // 更新用戶的推薦碼
+                DB::table('users')
+                    ->where('id', $userId)
+                    ->update(['referral_code' => $referralCode]);
+                    
+                return $referralCode;
+            }
+            
+        } while ($attempt < $maxAttempts);
+        
+        throw new \Exception('Unable to generate unique referral code after ' . $maxAttempts . ' attempts');
+    }
+
+    /**
+     * 處理推薦獎勵
+     */
+    private function processReferralReward($userId, $adminId)
+    {
+        // 檢查用戶是否有 intro_referral_code
+        $user = DB::table('users')
+            ->where('id', $userId)
+            ->first();
+            
+        if (!$user || empty($user->intro_referral_code)) {
+            return null;
+        }
+        
+        // 查找推薦人
+        $referrer = DB::table('users')
+            ->where('referral_code', $user->intro_referral_code)
+            ->where('permission', '>', 0)
+            ->where('status', 'active')
+            ->first();
+            
+        if (!$referrer) {
+            return null;
+        }
+        
+        // 給被推薦人（新用戶）加500點數
+        DB::table('users')
+            ->where('id', $userId)
+            ->increment('points', 500);
+        
+        // 記錄被推薦人的點數交易
+        DB::table('point_transactions')->insert([
+            'user_id' => $userId,
+            'transaction_type' => 'referral_bonus',
+            'amount' => 500,
+            'description' => "使用推薦碼註冊獎勵 - 推薦人ID: {$referrer->id}",
+            'related_task_id' => null,
+            'created_at' => now()
+        ]);
+        
+        // 記錄管理員操作到 admin_activity_logs
+        DB::table('admin_activity_logs')->insert([
+            'admin_id' => $adminId,
+            'action' => 'referral_bonus',
+            'table_name' => 'users',
+            'record_id' => $userId,
+            'old_data' => null,
+            'new_data' => json_encode([
+                'action' => 'referral_bonus',
+                'referee_id' => $userId,
+                'referrer_id' => $referrer->id,
+                'intro_referral_code' => $user->intro_referral_code,
+                'reward_points' => 500
+            ]),
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'created_at' => now()
+        ]);
+        
+        return [
+            'referee_id' => $userId,
+            'referrer_id' => $referrer->id,
+            'referrer_name' => $referrer->name,
+            'reward_points' => 500,
+            'intro_referral_code' => $user->intro_referral_code
+        ];
+    }
+
+    /**
+     * 記錄用戶審核日誌
+     */
+    private function logUserReview($userId, $adminId, $requestData, $referralCode, $referralReward)
+    {
+        $logDetails = [
+            'decision' => $requestData['decision'],
+            'old_permission' => DB::table('users')->where('id', $userId)->value('permission'),
+            'new_permission' => $requestData['new_permission'],
+            'notes' => $requestData['notes'] ?? '',
+            'admin_id' => $adminId,
+            'referral_code_generated' => $referralCode,
+            'referral_reward' => $referralReward
+        ];
+        
+        DB::table('user_active_log')->insert([
+            'user_id' => $userId,
+            'actor_type' => 'admin',
+            'actor_id' => $adminId,
+            'action' => 'user_verification_review',
+            'field' => 'permission',
+            'old_value' => (string)$logDetails['old_permission'],
+            'new_value' => (string)$logDetails['new_permission'],
+            'reason' => $logDetails['notes'],
+            'ip' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'metadata' => json_encode($logDetails),
             'created_at' => now()
         ]);
     }

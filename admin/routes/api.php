@@ -48,6 +48,7 @@ Route::prefix('admin')->group(function () {
                 Route::patch('/{id}/status', [UserController::class, 'updateStatus']);
                 Route::patch('/{id}/permission', [UserController::class, 'updatePermission']);
                 Route::post('/batch-action', [UserController::class, 'batchAction']);
+                Route::post('/{id}/review', [UserController::class, 'review']);
             });
         });
         

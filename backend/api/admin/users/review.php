@@ -8,6 +8,7 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../utils/Response.php';
 require_once __DIR__ . '/../../../utils/JWTManager.php';
 require_once __DIR__ . '/../../../utils/ReferralCodeGenerator.php';
+require_once __DIR__ . '/../../../auth_helper.php';
 
 Response::setCorsHeaders();
 
@@ -83,8 +84,8 @@ try {
         $referralCode = null;
         $referralReward = null;
         
-        // 如果是批准且設定為已驗證用戶 (permission = 1)
-        if ($decision === 'approve' && $newPermission == 1) {
+        // 如果是批准，處理推薦碼生成和推薦獎勵
+        if ($decision === 'approve') {
             // 為用戶生成推薦碼
             $referralCode = ReferralCodeGenerator::generateAndUpdate(Database::getInstance(), $userId);
             
@@ -94,15 +95,11 @@ try {
             $user = $userStmt->fetch(PDO::FETCH_ASSOC);
             
             if ($user && !empty($user['intro_referral_code'])) {
-                // 查找推薦人
-                $referrerStmt = $db->prepare("
-                    SELECT id, name FROM users 
-                    WHERE referral_code = ? AND permission > 0 AND status = 'active'
-                ");
+                // 查找推薦人（Flutter app 已確保只有認證過的推薦人推薦碼才會寫入）
+                $referrerStmt = $db->prepare("SELECT id, name FROM users WHERE referral_code = ?");
                 $referrerStmt->execute([$user['intro_referral_code']]);
                 $referrer = $referrerStmt->fetch(PDO::FETCH_ASSOC);
                 
-                if ($referrer) {
                     // 給被推薦人（新用戶）加500點數
                     $addPointsStmt = $db->prepare("
                         UPDATE users 
@@ -120,7 +117,7 @@ try {
                     ");
                     $pointTransactionStmt->execute([
                         $userId,
-                        "使用推薦碼註冊獎勵 - 推薦人ID: {$referrer['id']}",
+                        "Reward points for using referral code - New user ID: {$userId}",
                         null // related_task_id 為 null，因為這是推薦獎勵
                     ]);
                     
@@ -154,18 +151,21 @@ try {
                         'intro_referral_code' => $user['intro_referral_code']
                     ];
                     
-                    error_log("推薦獎勵已發放：被推薦人ID {$userId}，推薦人ID {$referrer['id']}，獎勵500點數");
-                }
+                    error_log("Reward points for using referral code - New user ID: {$userId}, Reward 500 points");
             }
         }
         
-        // 更新用戶權限
-        $updateUserStmt = $db->prepare("
-            UPDATE users 
-            SET permission = ?, updated_at = NOW() 
-            WHERE id = ?
-        ");
-        $updateUserStmt->execute([$newPermission, $userId]);
+        // 更新用戶權限（只有批准時才更新為1）
+            // 駁回時保持原權限
+        if ($decision === 'approve') {
+            $updateUserStmt = $db->prepare("
+                UPDATE users 
+                SET permission = 1, updated_at = NOW() 
+                WHERE id = ?
+            ");
+            $updateUserStmt->execute([$userId]);
+
+        } 
         
         // 更新學生證驗證記錄（如果存在）
         $verificationStatus = $decision === 'approve' ? 'approved' : 'rejected';
@@ -177,7 +177,7 @@ try {
                 admin_id = ?,
                 updated_at = NOW()
             WHERE user_id = ? 
-            ORDER BY created_at DESC 
+            ORDER BY updated_at DESC 
             LIMIT 1
         ");
         $updateVerificationStmt->execute([
@@ -222,7 +222,7 @@ try {
             'user_id' => $userId,
             'decision' => $decision,
             'old_permission' => (int)$user['permission'],
-            'new_permission' => $newPermission,
+            'new_permission' => $decision === 'approve' ? 1 : $newPermission,
             'notes' => $notes,
             'reviewed_by' => $adminId,
             'reviewed_at' => date('Y-m-d H:i:s')
