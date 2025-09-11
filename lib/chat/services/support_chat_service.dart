@@ -466,7 +466,7 @@ class ChatService {
 
       final tokenPreviewShort =
           token.length > 10 ? token.substring(0, 10) : token;
-      debugPrint('✅ [ChatService] 找到 token: ${tokenPreviewShort}...');
+      debugPrint('✅ [ChatService] 找到 token: $tokenPreviewShort...');
 
       final queryParams = <String, String>{
         'room_id': roomId,
@@ -660,7 +660,7 @@ class ChatService {
       debugPrint('📤 [withdrawApplication] 請求內容:');
       debugPrint('  - body: $requestBody');
       final tokenPreview = token.length > 20 ? token.substring(0, 20) : token;
-      debugPrint('  - token: ${tokenPreview}...');
+      debugPrint('  - token: $tokenPreview...');
 
       final response = await http
           .put(

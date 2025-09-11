@@ -411,7 +411,7 @@ class ImageUploadManager {
       } else {
         compressedData = await _compressImage(bytes, width, height);
       }
-      debugPrint('✅ 圖片壓縮完成，大小: ${compressedData?.length ?? 0} bytes');
+      debugPrint('✅ 圖片壓縮完成，大小: ${compressedData.length ?? 0} bytes');
     } catch (e) {
       debugPrint('❌ 壓縮失敗，使用原始數據: $e');
       compressedData = bytes;
@@ -425,15 +425,14 @@ class ImageUploadManager {
       } else {
         thumbnailData = await _generateThumbnail(bytes);
       }
-      debugPrint('✅ 縮圖生成完成，大小: ${thumbnailData?.length ?? 0} bytes');
+      debugPrint('✅ 縮圖生成完成，大小: ${thumbnailData.length ?? 0} bytes');
     } catch (e) {
       debugPrint('❌ 縮圖生成失敗，使用壓縮數據: $e');
       thumbnailData = compressedData;
     }
 
     // 確保至少有一種數據可用
-    if ((thumbnailData == null || thumbnailData.isEmpty) &&
-        (compressedData == null || compressedData.isEmpty)) {
+    if ((thumbnailData.isEmpty) && (compressedData.isEmpty)) {
       debugPrint('⚠️ 警告：縮圖和壓縮數據都不可用，使用原始數據');
       thumbnailData = bytes;
       compressedData = bytes;

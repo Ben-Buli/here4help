@@ -164,6 +164,12 @@ const router = createRouter({
           component: () => import('../views/SupportChatListView.vue'),
           meta: { title: 'Support Chat List' },
         },
+        {
+          path: ':roomId',
+          name: 'support-chat-detail',
+          component: () => import('../views/SupportChatDetailView.vue'),
+          meta: { title: 'Support Chat Detail' },
+        },
       ],
     },
     {

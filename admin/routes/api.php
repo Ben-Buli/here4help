@@ -96,9 +96,15 @@ Route::prefix('admin')->group(function () {
         // 客服/支援路由
         Route::prefix('support')->group(function () {
             Route::get('/issues', [SupportController::class, 'issues']);
+            Route::get('/chat-rooms', [SupportController::class, 'chatRooms']);
+            Route::get('/chat-rooms/{roomId}', [SupportController::class, 'getChatRoom']);
+            Route::get('/chat-rooms/{roomId}/messages', [SupportController::class, 'getMessages']);
+            Route::post('/chat-rooms/{roomId}/messages', [SupportController::class, 'sendMessage']);
+            Route::post('/chat-rooms/{roomId}/read', [SupportController::class, 'markAsRead']);
             Route::post('/issues/{roomId}/accept', [SupportController::class, 'accept']);
             Route::post('/issues/{roomId}/transfer', [SupportController::class, 'transfer']);
             Route::post('/issues/{roomId}/status', [SupportController::class, 'updateStatus']);
+            Route::post('/upload-image', [SupportController::class, 'uploadImage']);
         });
 
         // 支付/儲值路由

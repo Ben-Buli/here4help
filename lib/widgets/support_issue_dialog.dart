@@ -12,7 +12,7 @@ class _SupportIssueDialogState extends State<SupportIssueDialog> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  bool _isSubmitting = false;
+  final bool _isSubmitting = false;
 
   @override
   void dispose() {

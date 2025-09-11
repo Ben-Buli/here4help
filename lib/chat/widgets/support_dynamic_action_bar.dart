@@ -327,9 +327,9 @@ class SupportActionBarBuilder {
                   children: _actions
                       .map(
                         (action) => Expanded(
-                          child: SupportDynamicActionBar(
+                          child: const SupportDynamicActionBar(
                             userRole: UserRole.customer, // 佔位符
-                            actionCallbacks: const {},
+                            actionCallbacks: {},
                             showStatusBar: false,
                           )._buildActionButton(context, action),
                         ),

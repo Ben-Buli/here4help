@@ -181,8 +181,9 @@ class _DisputeDialogState extends State<DisputeDialog> {
         widget.onDisputeSubmitted?.call();
       }
     } catch (e) {
-      if (kDebugMode)
+      if (kDebugMode) {
         debugPrint('DisputeDialog: Dispute Submission Failed: $e');
+      }
 
       if (mounted) {
         _showErrorMessage(_getErrorMessage(e));

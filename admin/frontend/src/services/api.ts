@@ -239,6 +239,46 @@ export const adminSupportApi = {
   updateStatus: (roomId: string, status: 'submitted' | 'in_progress' | 'resolved') =>
     api.post<ApiResponse>(`/api/admin/support/issues/${roomId}/status`, { status }),
 
+  // 管理員獲取自己負責的聊天室列表
+  listChatRooms: (params?: {
+    page?: number
+    per_page?: number
+    status?: 'open' | 'in_progress' | 'waiting_customer' | 'resolved' | 'closed'
+    search?: string
+  }) => api.get<PaginatedResponse<any>>('/api/admin/support/chat-rooms', { params }),
+
+  // 管理員獲取單個聊天室詳情
+  getChatRoom: (roomId: string) => 
+    api.get<ApiResponse<any>>(`/api/admin/support/chat-rooms/${roomId}`),
+
+  // 管理員獲取聊天室訊息
+  getMessages: (roomId: string, params?: {
+    limit?: number
+    before_id?: number
+  }) => api.get<ApiResponse<{
+    messages: any[]
+    unread_count: number
+    has_more: boolean
+  }>>(`/api/admin/support/chat-rooms/${roomId}/messages`, { params }),
+
+  // 管理員發送訊息
+  sendMessage: (roomId: string, data: {
+    content: string
+    kind?: 'text' | 'image' | 'system'
+  }) => api.post<ApiResponse<{
+    message_id: number
+    content: string
+    kind: string
+    created_at: string
+  }>>(`/api/admin/support/chat-rooms/${roomId}/messages`, data),
+
+  // 管理員標記訊息為已讀
+  markAsRead: (roomId: string, messageId: number) =>
+    api.post<ApiResponse<{
+      message_id: number
+      read_at: string
+    }>>(`/api/admin/support/chat-rooms/${roomId}/read`, { message_id: messageId }),
+
   // 向後相容的舊方法
   /** @deprecated 使用 listIssues 替代 */
   chatRooms: (params?: {

@@ -63,6 +63,7 @@
         <div 
           v-for="room in chatRooms" 
           :key="room.room_id"
+          :data-room-id="room.room_id"
           class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
           @click="openChatRoom(room)"
         >
@@ -220,22 +221,15 @@ const loadChatRooms = async (page = 1) => {
       ...(filters.search && { search: filters.search })
     }
     
-    const response = await adminSupportApi.listIssues(params)
+    const response = await adminSupportApi.listChatRooms(params)
     
     if (response.data.success && response.data.data) {
       const data = response.data.data
       const rawItems: any[] = data.items || []
 
-      // 僅顯示指派給當前管理員的聊天室（若可判斷）
-      const filtered = currentAdminId.value
-        ? rawItems.filter((it: any) => {
-            // 後端欄位為 assignee_admin_id
-            return !it.assignee_admin_id || String(it.assignee_admin_id) === currentAdminId.value
-          })
-        : rawItems
-
+      // 後端已經過濾了當前管理員負責的聊天室，直接使用
       // 映射為前端使用結構
-      chatRooms.value = filtered.map((it: any) => ({
+      chatRooms.value = rawItems.map((it: any) => ({
         room_id: String(it.room_id),
         event_id: String(it.event_id || ''),
         title: it.title || '-',
@@ -298,18 +292,34 @@ const debouncedSearch = () => {
 }
 
 const openChatRoom = (room: ChatRoom) => {
-  // 開啟聊天室詳情頁面
-  // 這裡可以跳轉到專門的客服聊天室頁面
-  window.open(`/support-chat-detail/${room.room_id}`, '_blank')
+  // 跳轉到聊天室詳情頁面
+  window.location.href = `/support-chat-list/${room.room_id}`
 }
 
 const getAvatarUrl = (avatarUrl?: string) => {
   if (!avatarUrl) {
-    return '/default-avatar.png'
+    // 使用管理員預設頭像
+    return '/uploads/avatars/default.png'
   }
   
-  if (avatarUrl.startsWith('backend/')) {
-    return `${import.meta.env.VITE_API_BASE_URL}/${avatarUrl}`
+  // 統一處理 uploads/support_chat/ 路徑
+  if (avatarUrl.startsWith('uploads/support_chat/')) {
+    return avatarUrl
+  }
+  
+  // 處理舊格式：/backend/uploads/avatars/ 或 /backend/uploads/support_chat/
+  if (avatarUrl.startsWith('/backend/uploads/')) {
+    return avatarUrl.replace('/backend', '')
+  }
+  
+  // 處理舊格式：backend/uploads/avatars/ 或 backend/uploads/support_chat/
+  if (avatarUrl.startsWith('backend/uploads/')) {
+    return `/${avatarUrl}`
+  }
+  
+  // 如果是完整 URL，直接返回
+  if (avatarUrl.startsWith('http')) {
+    return avatarUrl
   }
   
   return avatarUrl
