@@ -74,9 +74,8 @@ class AdminMiddleware
             AdminActivityLog::create([
                 'admin_id' => $admin->id,
                 'action' => $action,
-                'resource_type' => $resourceType,
-                'resource_id' => $this->getResourceIdFromRequest($request),
-                'description' => $this->getDescriptionFromRequest($request),
+                'table_name' => $resourceType,
+                'record_id' => $this->getResourceIdFromRequest($request),
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);

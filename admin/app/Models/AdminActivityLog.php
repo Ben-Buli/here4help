@@ -9,21 +9,27 @@ class AdminActivityLog extends Model
 {
     use HasFactory;
 
+    // 禁用自動時間戳記，因為表只有 created_at
+    public $timestamps = false;
+    
+    // 或者只啟用 created_at
+    const CREATED_AT = 'created_at';
+    const UPDATED_AT = null;
+
     protected $fillable = [
         'admin_id',
         'action',
-        'resource_type',
-        'resource_id',
-        'old_values',
-        'new_values',
-        'description',
+        'table_name',
+        'record_id',
+        'old_data',
+        'new_data',
         'ip_address',
         'user_agent',
     ];
 
     protected $casts = [
-        'old_values' => 'array',
-        'new_values' => 'array',
+        'old_data' => 'array',
+        'new_data' => 'array',
     ];
 
     public function admin()
@@ -58,6 +64,6 @@ class AdminActivityLog extends Model
             'roles' => '角色',
         ];
 
-        return $resources[$this->resource_type] ?? $this->resource_type;
+        return $resources[$this->table_name] ?? $this->table_name;
     }
 }

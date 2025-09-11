@@ -37,8 +37,19 @@ class PathMapper {
       return cleanPath;
     }
 
-    // 檢查是否是後端上傳的圖片路徑
-    if (cleanPath.startsWith('backend/uploads/')) {
+    // 特殊處理：uploads/support_chat/ 路徑中的 att_ 前綴檔案
+    if (cleanPath.startsWith('uploads/support_chat/')) {
+      final fileName = cleanPath.split('/').last;
+      if (fileName.startsWith('att_')) {
+        // 檔案實際存儲在 chat 目錄中
+        cleanPath =
+            cleanPath.replaceFirst('uploads/support_chat/', 'uploads/chat/');
+      }
+    }
+
+    // 檢查是否是後端上傳的圖片路徑（支援多種格式）
+    if (cleanPath.startsWith('backend/uploads/') ||
+        cleanPath.startsWith('uploads/')) {
       return '$baseUrl/$cleanPath';
     }
 
@@ -74,7 +85,10 @@ class PathMapper {
   /// 檢查路徑是否為後端上傳檔案
   static bool isBackendUpload(String? path) {
     if (path == null || path.isEmpty) return false;
-    return path.startsWith('backend/uploads/') || path.startsWith('uploads/');
+    return path.startsWith('backend/uploads/') ||
+        path.startsWith('uploads/') ||
+        path.startsWith('/backend/uploads/') ||
+        path.startsWith('/uploads/');
   }
 
   /// 檢查路徑是否為測試圖片

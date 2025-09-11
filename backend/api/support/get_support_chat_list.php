@@ -97,9 +97,9 @@ try {
                  WHERE room_id = scr.id 
                  ORDER BY created_at DESC LIMIT 1) as last_message_time,
                 (SELECT COUNT(*) FROM support_chat_messages scm
-                 LEFT JOIN support_chat_reads scr_read ON scr_read.room_id = scm.room_id AND scr_read.user_id = ?
+                 LEFT JOIN support_chat_reads scr_read ON scr_read.room_id = scm.room_id AND scr_read.admin_id = ? AND scr_read.role = 'admin'
                  WHERE scm.room_id = scr.id 
-                 AND scm.from_user_id != ?
+                 AND scm.role = 'user'
                  AND (scr_read.last_read_message_id IS NULL OR scm.id > scr_read.last_read_message_id)) as unread_count
             FROM support_chat_rooms scr
             JOIN users u ON u.id = scr.user_id

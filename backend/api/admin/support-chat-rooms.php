@@ -87,11 +87,11 @@ try {
              ORDER BY created_at DESC LIMIT 1) as last_message_time,
             (SELECT COUNT(*) FROM support_chat_messages scm
              WHERE scm.room_id = scr.id 
-             AND scm.sender_type = 'user'
-             AND scm.created_at > COALESCE(
-                 (SELECT last_read_at FROM support_chat_reads 
-                  WHERE room_id = scr.id AND user_id = ? AND user_type = 'admin'), 
-                 '1970-01-01'
+             AND scm.role = 'user'
+             AND scm.id > COALESCE(
+                 (SELECT last_read_message_id FROM support_chat_reads 
+                  WHERE room_id = scr.id AND admin_id = ? AND role = 'admin'), 
+                 0
              )) as unread_count
         FROM support_chat_rooms scr
         JOIN support_events se ON scr.event_id = se.id
