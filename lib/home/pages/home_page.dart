@@ -318,7 +318,7 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             Row(
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.warning_amber_outlined,
                                   color: Colors.orange,
                                   size: 24,

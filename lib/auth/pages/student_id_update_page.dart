@@ -111,7 +111,7 @@ class _StudentIdUpdatePageState extends State<StudentIdUpdatePage> {
                       children: [
                         Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.error_outline,
                               color: Colors.red,
                               size: 20,
@@ -417,7 +417,7 @@ class _StudentIdUpdatePageState extends State<StudentIdUpdatePage> {
 
       // Get student ID data for update
       final studentIdData = {
-        'user_id': user!.id.toString(),
+        'user_id': user.id.toString(),
         'school_name': schoolNameController.text,
         'student_name': studentNameController.text,
         'student_id': studentIdController.text,

@@ -62,20 +62,26 @@ try {
     Response::error('Invalid file type', 422);
   }
 
-  // 儲存位置（開發環境）：backend/uploads/chat/
-  $baseDir = dirname(__DIR__, 2) . '/uploads/chat';
+  // 根據聊天室類型決定儲存位置
+  if ($room['source'] === 'support') {
+    // 客服聊天室：uploads/support_chat/
+    $baseDir = dirname(__DIR__, 2) . '/uploads/support_chat';
+    $publicPath = 'uploads/support_chat/' . uniqid('support_') . '.' . $ext;
+  } else {
+    // 一般聊天室：uploads/chat/
+    $baseDir = dirname(__DIR__, 2) . '/uploads/chat';
+    $publicPath = 'uploads/chat/' . uniqid('att_') . '.' . $ext;
+  }
+  
   if (!is_dir($baseDir)) {
     @mkdir($baseDir, 0777, true);
   }
-  $safeName = uniqid('att_') . '.' . $ext;
+  
+  $safeName = basename($publicPath);
   $dest = $baseDir . '/' . $safeName;
   if (!move_uploaded_file($file['tmp_name'], $dest)) {
     Response::error('Failed to move uploaded file', 500);
   }
-
-  // 產出可供前端引用的 URL（相對於 apiBaseUrl）
-  // 確保路徑格式與前端 PathMapper 期望的格式一致
-  $publicPath = 'uploads/chat/' . $safeName;
 
   Response::success([
     'filename' => $file['name'],

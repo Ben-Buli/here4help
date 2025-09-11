@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:here4help/task/services/task_service.dart';
 import 'package:here4help/chat/services/global_chat_room.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:here4help/constants/task_status.dart' as TaskStatusConstants;
 import 'package:here4help/chat/widgets/dynamic_action_bar.dart';
 import 'package:here4help/chat/widgets/countdown_timer_widget.dart';
@@ -125,13 +124,15 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     final lines = text.split('\n');
     for (final line in lines) {
       final trimmed = line.trim();
-      // 允許相對路徑（後端回傳 backend/uploads/...）與完整 URL
-      final httpMatch = RegExp(r'(https?:\/\/[^\s]+\.(png|jpg|jpeg|gif))',
+      // 允許相對路徑（後端回傳 backend/uploads/... 或 uploads/...）與完整 URL
+      final httpMatch = RegExp(r'(https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|webp))',
               caseSensitive: false)
           .firstMatch(trimmed);
       if (httpMatch != null) return httpMatch.group(1);
+
+      // 支援多種相對路徑格式
       final relMatch = RegExp(
-              r'^(?:\/)?(backend\/uploads\/[^\s]+\.(png|jpg|jpeg|gif))$',
+              r'^(?:\/)?(backend\/uploads\/[^\s]+\.(png|jpg|jpeg|gif|webp)|uploads\/[^\s]+\.(png|jpg|jpeg|gif|webp))$',
               caseSensitive: false)
           .firstMatch(trimmed);
       if (relMatch != null) {

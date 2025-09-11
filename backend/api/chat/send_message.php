@@ -182,7 +182,7 @@ try {
   try {
     if ($existingRoom['source'] === 'support') {
       $db->query(
-        "INSERT INTO support_chat_messages (room_id, from_user_id, content, kind) VALUES (?, ?, ?, ?)",
+        "INSERT INTO support_chat_messages (room_id, user_id, admin_id, content, kind, role) VALUES (?, ?, NULL, ?, ?, 'user')",
         [$room_id, $user_id, $message, $kind]
       );
     } else {
@@ -199,7 +199,11 @@ try {
   $msgId = (int)$row['id'];
 
   // Update read of sender to latest
-  $db->query("INSERT INTO chat_reads (user_id, room_id, last_read_message_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE last_read_message_id = VALUES(last_read_message_id)", [$user_id, $room_id, $msgId]);
+  if ($existingRoom['source'] === 'support') {
+    $db->query("INSERT INTO support_chat_reads (user_id, admin_id, role, room_id, last_read_message_id) VALUES (?, NULL, 'user', ?, ?) ON DUPLICATE KEY UPDATE last_read_message_id = VALUES(last_read_message_id)", [$user_id, $room_id, $msgId]);
+  } else {
+    $db->query("INSERT INTO chat_reads (user_id, room_id, last_read_message_id) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE last_read_message_id = VALUES(last_read_message_id)", [$user_id, $room_id, $msgId]);
+  }
 
   // 發送 Socket 通知給聊天室的其他用戶
   $notificationData = [

@@ -101,7 +101,8 @@ class AppConfig {
 
   static String get supportIssuesListUrl => api('/support/issues.php');
 
-  static String get supportClaimUrl => api('/support/claim.php');
+  static String get supportClaimUrl => api(
+      '/admin/support/issues/{id}/accept'); // 已整合到 Laravel SupportController
 
   // 大學列表 API
   static String get universitiesListUrl => api('/universities/list.php');

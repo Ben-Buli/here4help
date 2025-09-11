@@ -247,7 +247,7 @@ class _LoginPageState extends State<LoginPage> {
           final token = userData['token'] ?? '';
           final tokenPreview =
               token.length > 20 ? token.substring(0, 20) : token;
-          debugPrint('🔑 Token preview: ${tokenPreview}...');
+          debugPrint('🔑 Token preview: $tokenPreview...');
 
           // 使用 AuthService 儲存 token（不添加 Bearer 前綴，避免雙重前綴問題）
           await AuthService.saveToken(userData['token'] ?? '');
@@ -350,7 +350,7 @@ class _LoginPageState extends State<LoginPage> {
           final token = userData['token'] ?? '';
           final tokenPreview =
               token.length > 20 ? token.substring(0, 20) : token;
-          debugPrint('🔑 Token preview: ${tokenPreview}...');
+          debugPrint('🔑 Token preview: $tokenPreview...');
 
           // 使用 AuthService 儲存 token（不添加 Bearer 前綴，避免雙重前綴問題）
           await AuthService.saveToken(userData['token'] ?? '');
@@ -453,7 +453,7 @@ class _LoginPageState extends State<LoginPage> {
           final token = userData['token'] ?? '';
           final tokenPreview =
               token.length > 20 ? token.substring(0, 20) : token;
-          debugPrint('🔑 Token preview: ${tokenPreview}...');
+          debugPrint('🔑 Token preview: $tokenPreview...');
 
           // 使用 AuthService 儲存 token（不添加 Bearer 前綴，避免雙重前綴問題）
           await AuthService.saveToken(userData['token'] ?? '');

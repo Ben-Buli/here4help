@@ -69,8 +69,8 @@ try {
         // 3. 根據聊天室類型更新用戶的已讀記錄（確保只能前進，不會倒退）
         if ($roomInfo['source'] === 'support') {
             $upsertSQL = "
-                INSERT INTO support_chat_reads (user_id, room_id, last_read_message_id, updated_at)
-                VALUES (?, ?, ?, NOW())
+                INSERT INTO support_chat_reads (user_id, admin_id, role, room_id, last_read_message_id, updated_at)
+                VALUES (?, NULL, 'user', ?, ?, NOW())
                 ON DUPLICATE KEY UPDATE 
                     last_read_message_id = GREATEST(last_read_message_id, VALUES(last_read_message_id)),
                     updated_at = NOW()
@@ -88,7 +88,7 @@ try {
         
         // 4. 根據聊天室類型獲取更新後的已讀記錄
         if ($roomInfo['source'] === 'support') {
-            $readStatusSQL = "SELECT last_read_message_id FROM support_chat_reads WHERE user_id = ? AND room_id = ?";
+            $readStatusSQL = "SELECT last_read_message_id FROM support_chat_reads WHERE user_id = ? AND role = 'user' AND room_id = ?";
         } else {
             $readStatusSQL = "SELECT last_read_message_id FROM chat_reads WHERE user_id = ? AND room_id = ?";
         }
@@ -102,7 +102,8 @@ try {
                 FROM support_chat_messages scm
                 JOIN support_chat_rooms scr ON scr.id = scm.room_id
                 WHERE scm.room_id = ?
-                  AND scm.from_user_id != ?
+                  AND scm.user_id != ?
+                  AND scm.role = 'user'
                   AND scm.id > ?
             ";
         } else {

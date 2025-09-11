@@ -87,8 +87,8 @@ try {
         COALESCE(u.name, a.full_name) as sender_name,
         u.avatar_url as sender_avatar
       FROM support_chat_messages scm
-      LEFT JOIN users u ON scm.from_user_id = u.id
-      LEFT JOIN admins a ON scm.from_user_id = a.id
+      LEFT JOIN users u ON scm.user_id = u.id AND scm.role = 'user'
+      LEFT JOIN admins a ON scm.admin_id = a.id AND scm.role = 'admin'
       WHERE $where_clause
       ORDER BY scm.created_at DESC
       LIMIT ?

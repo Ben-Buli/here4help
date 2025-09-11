@@ -99,7 +99,7 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
 
         debugPrint('✅ 現有用戶登入成功');
         final tokenPreview = token.length > 20 ? token.substring(0, 20) : token;
-        debugPrint('   Token: ${tokenPreview}...');
+        debugPrint('   Token: $tokenPreview...');
         debugPrint('   User ID: ${userData['id']}');
         debugPrint('   Name: ${userData['name']}');
 

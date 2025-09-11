@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'dart:io';
 import '../models/image_tray_item.dart';
 
 /// 圖片托盤 UI 組件

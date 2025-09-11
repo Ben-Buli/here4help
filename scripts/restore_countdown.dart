@@ -24,8 +24,8 @@ void main(List<String> args) {
       String content = file.readAsStringSync();
 
       // 恢復測試設置為正常設置
-      final testPattern = 'Duration(seconds: 10) // 測試用：原本是 Duration(days: 7)';
-      final originalPattern = 'Duration(days: 7)';
+      const testPattern = 'Duration(seconds: 10) // 測試用：原本是 Duration(days: 7)';
+      const originalPattern = 'Duration(days: 7)';
 
       if (content.contains(testPattern)) {
         content = content.replaceAll(testPattern, originalPattern);

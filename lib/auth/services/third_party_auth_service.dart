@@ -81,7 +81,7 @@ class ThirdPartyAuthService {
       final user = signInEvent.user;
 
       // 7.1.1 仍可透過 authentication 取得 access/id token（平台差異化處理由套件處理）
-      final auth = await user.authentication;
+      final auth = user.authentication;
 
       // 嘗試取得 server auth code（可選）
       String? serverAuthCode;
@@ -124,7 +124,7 @@ class ThirdPartyAuthService {
       ) as GoogleSignInAuthenticationEventSignIn;
       final user = signInEvent.user;
 
-      final auth = await user.authentication;
+      final auth = user.authentication;
 
       // 可選：取得 server auth code
       String? serverAuthCode;
@@ -387,7 +387,7 @@ class ThirdPartyAuthService {
     try {
       // 統一使用後端 login 端點（web/ios/android 共用）
       final provider = (userData['provider'] ?? 'google').toString();
-      final apiUrl = AppConfig.api('/auth/${provider}-login.php');
+      final apiUrl = AppConfig.api('/auth/$provider-login.php');
 
       debugPrint('🌐 發送請求到: $apiUrl');
       debugPrint('📦 請求資料: ${userData.keys.toList()}'); // 不記錄敏感資料
