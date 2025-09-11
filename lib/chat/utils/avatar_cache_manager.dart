@@ -182,7 +182,7 @@ class AvatarCacheManager {
       final sortedEntries = _cacheTimestamps.entries.toList()
         ..sort((a, b) => a.value.compareTo(b.value));
 
-      final removeCount = _maxMemoryCacheSize ~/ 2;
+      const removeCount = _maxMemoryCacheSize ~/ 2;
       for (int i = 0; i < removeCount && i < sortedEntries.length; i++) {
         toRemove.add(sortedEntries[i].key);
       }

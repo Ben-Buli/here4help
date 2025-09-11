@@ -28,7 +28,7 @@ export default defineConfig(({ mode }) => {
       proxy: {
         // 圖片上傳代理
         '/uploads': {
-          target: 'http://localhost:8889',
+          target: 'http://localhost:8888',
           changeOrigin: true,
           rewrite: (path) => {
             const rewrittenPath = `/here4help/backend${path}`

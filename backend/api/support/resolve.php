@@ -133,8 +133,8 @@ try {
         
         $createMessageStmt = $db->prepare("
             INSERT INTO support_chat_messages (
-                room_id, from_user_id, content, kind, created_at
-            ) VALUES (?, 1, ?, 'system', NOW())
+                room_id, user_id, admin_id, content, kind, role, created_at
+            ) VALUES (?, NULL, 1, ?, 'system', 'admin', NOW())
         ");
         $createMessageStmt->execute([$roomId, $systemMessage]);
         
