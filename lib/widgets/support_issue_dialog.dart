@@ -12,7 +12,8 @@ class _SupportIssueDialogState extends State<SupportIssueDialog> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final bool _isSubmitting = false;
+  bool _isSubmitting = false;
+  String? _submitError;
 
   @override
   void dispose() {
@@ -28,6 +29,12 @@ class _SupportIssueDialogState extends State<SupportIssueDialog> {
         'description': _descriptionController.text.trim(),
       });
     }
+  }
+
+  void _setError(String error) {
+    setState(() {
+      _submitError = error;
+    });
   }
 
   @override
@@ -138,6 +145,36 @@ class _SupportIssueDialogState extends State<SupportIssueDialog> {
                 },
               ),
               const SizedBox(height: 24),
+
+              // 錯誤訊息顯示
+              if (_submitError != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline,
+                          color: Colors.red[600], size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _submitError!,
+                          style: TextStyle(
+                            color: Colors.red[700],
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // 按鈕
               Row(

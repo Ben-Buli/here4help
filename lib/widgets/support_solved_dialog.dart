@@ -23,6 +23,7 @@ class _SupportSolvedDialogState extends State<SupportSolvedDialog> {
   final TextEditingController _reviewController = TextEditingController();
   bool _isSubmitting = false;
   String? _reviewError;
+  String? _submitError;
 
   @override
   void dispose() {
@@ -31,19 +32,13 @@ class _SupportSolvedDialogState extends State<SupportSolvedDialog> {
   }
 
   bool get _canSubmit {
-    return _reviewController.text.trim().isNotEmpty && !_isSubmitting;
+    return !_isSubmitting;
   }
 
   void _validateReview() {
     setState(() {
-      final reviewText = _reviewController.text.trim();
-      if (reviewText.isEmpty) {
-        _reviewError = 'Review is required';
-      } else if (reviewText.length < 10) {
-        _reviewError = 'Review must be at least 10 characters';
-      } else {
-        _reviewError = null;
-      }
+      // 移除字數檢查，review 完全可選
+      _reviewError = null;
     });
   }
 
@@ -59,8 +54,14 @@ class _SupportSolvedDialogState extends State<SupportSolvedDialog> {
     });
 
     try {
-      await widget.onSubmit
-          ?.call(_rating.toInt(), _reviewController.text.trim());
+      // 清除之前的錯誤訊息
+      setState(() {
+        _submitError = null;
+      });
+
+      // 允許空 review，如果為空則傳遞空字符串
+      final reviewText = _reviewController.text.trim();
+      await widget.onSubmit?.call(_rating.toInt(), reviewText);
       if (mounted) {
         Navigator.of(context).pop(true);
       }
@@ -68,13 +69,8 @@ class _SupportSolvedDialogState extends State<SupportSolvedDialog> {
       if (mounted) {
         setState(() {
           _isSubmitting = false;
+          _submitError = 'Failed to close support case: $e';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to submit: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     }
   }
@@ -91,9 +87,9 @@ class _SupportSolvedDialogState extends State<SupportSolvedDialog> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Container(
-        constraints: const BoxConstraints(
-          maxWidth: 400,
-          maxHeight: 500,
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.9,
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -135,8 +131,8 @@ class _SupportSolvedDialogState extends State<SupportSolvedDialog> {
             ),
 
             // Content
-            Flexible(
-              child: Padding(
+            Expanded(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -156,7 +152,7 @@ class _SupportSolvedDialogState extends State<SupportSolvedDialog> {
 
                     // Description
                     const Text(
-                      'Please rate your support experience and provide feedback:',
+                      'Please rate your support experience. You may also provide optional feedback:',
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.black87,
@@ -220,7 +216,7 @@ class _SupportSolvedDialogState extends State<SupportSolvedDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Review *',
+                          'Review (Optional)',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -234,7 +230,7 @@ class _SupportSolvedDialogState extends State<SupportSolvedDialog> {
                           enabled: !_isSubmitting,
                           decoration: InputDecoration(
                             hintText:
-                                'Please describe your experience with our support team...',
+                                'Optional: Please describe your experience with our support team...',
                             border: const OutlineInputBorder(),
                             errorText: _reviewError,
                             counterText: '${_reviewController.text.length}/500',
@@ -248,43 +244,83 @@ class _SupportSolvedDialogState extends State<SupportSolvedDialog> {
                       ],
                     ),
 
-                    const SizedBox(height: 20),
-
-                    // Buttons
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: _isSubmitting ? null : _handleCancel,
-                          child: const Text('Cancel'),
+                    // 錯誤訊息顯示
+                    if (_submitError != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red[200]!),
                         ),
-                        const SizedBox(width: 12),
-                        ElevatedButton(
-                          onPressed: _canSubmit ? _handleSubmit : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
+                        child: Row(
+                          children: [
+                            Icon(Icons.error_outline,
+                                color: Colors.red[600], size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _submitError!,
+                                style: TextStyle(
+                                  color: Colors.red[700],
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ),
-                          ),
-                          child: _isSubmitting
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white),
-                                  ),
-                                )
-                              : const Text('Submit'),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 20),
                   ],
                 ),
+              ),
+            ),
+
+            // Buttons - Fixed at bottom
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _isSubmitting ? null : _handleCancel,
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: _canSubmit ? _handleSubmit : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text('Submit'),
+                  ),
+                ],
               ),
             ),
           ],

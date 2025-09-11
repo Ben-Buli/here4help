@@ -7,7 +7,7 @@ import 'auth_service.dart';
 import 'package:here4help/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import '../../chat/services/socket_service.dart';
+import 'package:here4help/chat/services/socket_service.dart';
 
 class UnauthorizedException implements Exception {
   final String message;

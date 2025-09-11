@@ -69,14 +69,12 @@ try {
         Response::error('event_id is required', 400);
     }
     
-    // 強制 rating 和 review 必填
+    // 只強制 rating 必填，review 為可選
     if ($rating === null || $rating === '') {
         Response::error('Rating is required (1-5)', 400);
     }
     
-    if (empty($review)) {
-        Response::error('Review is required', 400);
-    }
+    // Review 為可選，允許空字符串
     
     // 驗證評分範圍
     if ($rating < 1 || $rating > 5) {

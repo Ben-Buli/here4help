@@ -163,28 +163,28 @@
                     </span>
                   </div>
                   
-               <!-- 訊息內容 -->
-<div
-  class="px-3 py-2 rounded-lg text-sm max-w-xs lg:max-w-md"
-  :class="message.is_own 
-    ? 'bg-cyan-600 text-white self-end' 
-    : message.kind === 'system' 
-      ? 'bg-gray-100 text-gray-700 self-start' 
-      : 'bg-gray-200 text-gray-900 self-start'"
->
-  <!-- 圖片訊息 -->
-  <div v-if="message.kind === 'image'">
-    <img 
-      :src="getImageUrl(message.content)" 
-      :alt="'Image from ' + message.sender_name"
-      class="max-w-xs rounded-lg"
-    />
-  </div>
-  <!-- 文字訊息 -->
-  <div v-else>
-    {{ message.content }}
-  </div>
-</div>
+                  <!-- 訊息內容 -->
+                  <div
+                    class="px-3 py-2 rounded-lg text-sm max-w-xs lg:max-w-md"
+                    :class="message.is_own 
+                      ? 'bg-cyan-600 text-white self-end' 
+                      : message.kind === 'system' 
+                        ? 'bg-gray-100 text-gray-700 self-start' 
+                        : 'bg-gray-200 text-gray-900 self-start'"
+                  >
+                    <!-- 圖片訊息 -->
+                    <div v-if="message.kind === 'image'">
+                      <img 
+                        :src="getImageUrl(message.content)" 
+                        :alt="'Image from ' + message.sender_name"
+                        class="max-w-xs rounded-lg"
+                      />
+                    </div>
+                    <!-- 文字訊息 -->
+                    <div v-else>
+                      {{ message.content }}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -192,12 +192,22 @@
           
           <!-- 發送訊息區域 -->
           <div class="mt-6 border-t pt-4">
+            <!-- 已解決狀態提示 -->
+            <div v-if="chatRoom?.status === 'resolved'" class="mb-4 p-3 bg-gray-100 rounded-lg">
+              <div class="flex items-center">
+                <svg class="w-5 h-5 text-gray-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="text-sm text-gray-600">此聊天室已標記為已解決，無法發送新訊息</span>
+              </div>
+            </div>
+            
             <div class="flex space-x-3">
               <!-- 圖片上傳按鈕 -->
               <!-- <button 
                 @click="triggerImageUpload"
                 class="admin-button-secondary"
-                :disabled="isLoading"
+                :disabled="isLoading || chatRoom?.status === 'resolved'"
                 title="Upload Image"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -212,20 +222,23 @@
                 accept="image/*"
                 @change="handleImageUpload"
                 class="hidden"
+                :disabled="chatRoom?.status === 'resolved'"
               />
               
               <input 
                 v-model="newMessage"
                 type="text" 
                 class="flex-1 admin-input"
+                :class="{ 'bg-gray-100 cursor-not-allowed': chatRoom?.status === 'resolved' }"
                 placeholder="Type your message..."
-                @keyup.enter="sendMessage"
-                :disabled="isLoading"
+                @keyup.enter.prevent="sendMessage"
+                :disabled="isLoading || chatRoom?.status === 'resolved'"
               />
               <button 
-                @click="sendMessage"
+                @click="sendMessage($event)"
                 class="admin-button-primary"
-                :disabled="isLoading || !newMessage.trim()"
+                :class="{ 'opacity-50 cursor-not-allowed': chatRoom?.status === 'resolved' }"
+                :disabled="isLoading || !newMessage.trim() || chatRoom?.status === 'resolved'"
               >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
@@ -350,7 +363,7 @@ const modalImageUrl = ref('')
 // Socket 連接狀態
 const isSocketConnected = ref(false)
 
-const loadChatRoom = async () => {
+const loadChatRoom = async (skipSocketSetup = false) => {
   try {
     isLoading.value = true
     
@@ -363,8 +376,10 @@ const loadChatRoom = async () => {
       // 載入聊天訊息
       await loadMessages()
       
-      // 設置 Socket 連接
-      await setupSocket()
+      // 只在首次載入時設置 Socket 連接，避免重複連接
+      if (!skipSocketSetup && !isSocketConnected.value) {
+        await setupSocket()
+      }
     } else {
       console.error('Failed to load chat room:', response.data.message)
     }
@@ -403,18 +418,36 @@ const loadMessages = async () => {
   }
 }
 
-const sendMessage = async () => {
+const sendMessage = async (event?: Event) => {
+  // 阻止默認行為（防止表單提交）
+  if (event) {
+    event.preventDefault()
+  }
+  
   if (!newMessage.value.trim()) return
+  
+  // 檢查聊天室狀態，如果已解決則不允許發送訊息
+  if (chatRoom.value?.status === 'resolved') {
+    alert('此聊天室已標記為已解決，無法發送新訊息')
+    return
+  }
+  
+  // 防止重複發送
+  if (isLoading.value) return
   
   try {
     isLoading.value = true
+    const messageContent = newMessage.value.trim()
     
     const response = await adminSupportApi.sendMessage(roomId, {
-      content: newMessage.value,
+      content: messageContent,
       kind: 'text'
     })
     
     if (response.data.success && response.data.data) {
+      // 立即清空輸入框，提供即時反饋
+      newMessage.value = ''
+      
       // 添加新訊息到列表
       const newMsg = {
         id: response.data.data.message_id,
@@ -432,14 +465,13 @@ const sendMessage = async () => {
       if (isSocketConnected.value) {
         socketService.sendMessage(
           roomId,
-          newMessage.value,
+          messageContent,
           response.data.data.message_id.toString()
         )
       }
       
-      newMessage.value = ''
-      
       // 滾動到底部
+      await nextTick()
       scrollToBottom()
     }
   } catch (error: any) {
@@ -457,7 +489,8 @@ const updateStatus = async (status: string) => {
     const response = await adminSupportApi.updateStatus(roomId, status as 'submitted' | 'in_progress' | 'resolved')
     
     if (response.data.success) {
-      await loadChatRoom()
+      // 只更新聊天室狀態，不重新載入整個聊天室（避免 Socket 重新連接）
+      await loadChatRoom(true) // skipSocketSetup = true
     } else {
       throw new Error(response.data.message || 'Failed to update status')
     }
@@ -470,7 +503,10 @@ const updateStatus = async (status: string) => {
 }
 
 const refreshData = async () => {
-  await loadChatRoom()
+  const response = await adminSupportApi.getChatRoom(roomId)
+  if (response.data.success) {
+    chatRoom.value = response.data.data
+  }
   scrollToBottom()
 }
 
@@ -508,6 +544,11 @@ const getImageUrl = (imagePath: string) => {
     return imagePath
   }
   
+  // 修復常見的拼寫錯誤：backend/ploads/ -> backend/uploads/
+  if (imagePath.startsWith('backend/ploads/')) {
+    imagePath = imagePath.replace('backend/ploads/', 'backend/uploads/')
+  }
+  
   // 統一處理 uploads/support_chat/ 路徑
   if (imagePath.startsWith('uploads/support_chat/')) {
     // 對於客服聊天室圖片，如果檔案名以 att_ 開頭，
@@ -517,7 +558,8 @@ const getImageUrl = (imagePath: string) => {
       // 檔案實際在 chat 目錄中
       return imagePath.replace('uploads/support_chat/', 'uploads/chat/')
     }
-    return imagePath
+    // 確保路徑以 / 開頭，這樣 Vite 代理才能正確處理
+    return `/${imagePath}`
   }
   
   // 處理舊格式：/backend/uploads/chat/ 或 /backend/uploads/support_chat/
@@ -558,6 +600,13 @@ const handleImageUpload = (event: Event) => {
   const files = target.files
   
   if (!files || files.length === 0) return
+  
+  // 檢查聊天室狀態，如果已解決則不允許上傳圖片
+  if (chatRoom.value?.status === 'resolved') {
+    alert('此聊天室已標記為已解決，無法上傳圖片')
+    target.value = ''
+    return
+  }
   
   const file = files[0]
   
@@ -703,10 +752,16 @@ const formatDateTime = (dateTimeStr?: string) => {
 // Socket 設置和事件處理
 const setupSocket = async () => {
   try {
+    // 如果已經連接且在同一房間，不需要重新設置
+    if (isSocketConnected.value && socketService.currentRoom === roomId) {
+      console.log('✅ Socket already connected to room:', roomId)
+      return
+    }
+    
     // 連接 Socket
     await socketService.connect()
     
-    // 設置事件監聽器
+    // 設置事件監聽器（避免重複設置）
     socketService.addMessageListener(onSocketMessage)
     socketService.addConnectionListener(onSocketConnection)
     
@@ -739,6 +794,11 @@ const onSocketMessage = (data: any) => {
       }
       
       messages.value.push(newMsg)
+
+      if (!messages.value.find(m => m.id === newMsg.id)) {
+    messages.value.push(newMsg)
+  }
+
       
       // 滾動到底部
       scrollToBottom()
@@ -765,15 +825,23 @@ const cleanupSocket = () => {
   socketService.removeConnectionListener(onSocketConnection)
 }
 
-// 滾動到聊天室底部
+// 滾動到聊天室底部（優化版本）
+let scrollTimeout: number | null = null
 const scrollToBottom = async () => {
   await nextTick()
-  setTimeout(() => {
+  
+  // 清除之前的滾動定時器，避免重複滾動
+  if (scrollTimeout) {
+    clearTimeout(scrollTimeout)
+  }
+  
+  scrollTimeout = setTimeout(() => {
     const messagesContainer = document.querySelector('.messages-container')
     if (messagesContainer) {
       messagesContainer.scrollTop = messagesContainer.scrollHeight
     }
-  }, 100)
+    scrollTimeout = null
+  }, 50) // 減少延遲時間
 }
 
 onMounted(() => {

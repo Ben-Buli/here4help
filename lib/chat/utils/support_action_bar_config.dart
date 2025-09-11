@@ -106,7 +106,7 @@ class SupportActionBarConfigManager {
                 label: 'View Issue',
                 icon: Icons.info_outline,
                 onTap: actionCallbacks['issue']!,
-                backgroundColor: Colors.cyan,
+                backgroundColor: const Color.fromARGB(255, 55, 94, 99),
                 foregroundColor: Colors.white,
               ),
             );
@@ -115,13 +115,25 @@ class SupportActionBarConfigManager {
         case SupportStatus.inProgress:
           // 進行中，可以結案並評分
           if (actionCallbacks.containsKey('close')) {
+            if (actionCallbacks.containsKey('issue')) {
+              actions.add(
+                ActionBarAction(
+                  id: 'issue',
+                  label: 'View Issue',
+                  icon: Icons.info_outline,
+                  onTap: actionCallbacks['issue']!,
+                  backgroundColor: const Color.fromARGB(255, 55, 94, 99),
+                  foregroundColor: Colors.white,
+                ),
+              );
+            }
             actions.add(
               ActionBarAction(
                 id: 'close',
-                label: 'Close',
-                icon: Icons.close,
+                label: 'Close Issue',
+                icon: Icons.check_circle,
                 onTap: actionCallbacks['close']!,
-                backgroundColor: Colors.orange,
+                backgroundColor: const Color.fromARGB(255, 96, 57, 84),
                 foregroundColor: Colors.white,
               ).withConfirmation(
                 title: 'Close Support Case',
@@ -130,6 +142,7 @@ class SupportActionBarConfigManager {
               ),
             );
           }
+
           break;
         case SupportStatus.resolved:
           // 已結案，只能查看

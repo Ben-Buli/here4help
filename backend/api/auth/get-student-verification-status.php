@@ -29,13 +29,34 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 try {
-    // JWT 認證
-    $tokenData = JWTManager::validateRequest();
-    if (!$tokenData['valid']) {
-        Response::error($tokenData['message'], 401);
+    // JWT 認證 - 支援 Header 和 URL 參數
+    $token = null;
+    
+    // 嘗試從 Authorization header 獲取
+    if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
+        if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+            $token = $matches[1];
+        }
+    }
+    
+    // 如果沒有從 header 獲取到，嘗試從 URL 參數獲取
+    if (!$token && isset($_GET['token'])) {
+        $token = $_GET['token'];
+    }
+    
+    if (!$token) {
+        Response::error('Token is required', 401);
+    }
+    
+    $jwtManager = new JWTManager();
+    $payload = $jwtManager->validateToken($token);
+    
+    if (!$payload) {
+        Response::error('Invalid or expired token', 401);
     }
 
-    $userId = $tokenData['user_id'];
+    $userId = $payload['user_id'];
     error_log('Get Student Verification Status API: user_id: ' . $userId);
     
     $db = Database::getInstance()->getConnection();

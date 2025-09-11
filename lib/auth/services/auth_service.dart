@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
-import '../../config/app_config.dart';
-import '../../utils/debug_helper.dart';
-import '../../chat/services/socket_service.dart';
+import 'package:here4help/config/app_config.dart';
+import 'package:here4help/utils/debug_helper.dart';
+import 'package:here4help/chat/services/socket_service.dart';
 
 class AuthService {
   static const String _tokenKey = 'auth_token';

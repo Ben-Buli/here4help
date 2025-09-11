@@ -91,6 +91,21 @@ try {
         Response::error('You already have an active support case. Please resolve the existing case before creating a new one.', 422);
     }
     
+    // 額外檢查：確保沒有重複的 support_chat_rooms 記錄
+    // 只檢查有活躍事件的聊天室
+    $existingRoomStmt = $db->prepare("
+        SELECT scr.id FROM support_chat_rooms scr
+        JOIN support_events se ON se.support_chat_room_id = scr.id
+        WHERE scr.user_id = ? AND scr.type = 'support' 
+        AND se.status IN ('submitted', 'in_progress')
+    ");
+    $existingRoomStmt->execute([$userId]);
+    $existingRoom = $existingRoomStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($existingRoom) {
+        Response::error('You already have an active support chat room. Please resolve the existing case before creating a new one.', 422);
+    }
+    
     // 開始資料庫事務
     $db->beginTransaction();
     
@@ -124,12 +139,18 @@ try {
         
         // 4. 插入系統訊息
         $systemMessage = "Support case created: {$title}. Please wait for admin assistance.";
+        
+        // 檢查是否有可用的管理員 ID，如果沒有則使用 NULL
+        // $adminCheckStmt = $db->prepare("SELECT id FROM admins LIMIT 1");
+        // $adminCheckStmt->execute();
+        // $adminId = $adminCheckStmt->fetch(PDO::FETCH_ASSOC)['id'] ?? null;
+        
         $createMessageStmt = $db->prepare("
             INSERT INTO support_chat_messages (
                 room_id, user_id, admin_id, content, kind, role, created_at
-            ) VALUES (?, NULL, 1, ?, 'system', 'admin', NOW())
+            ) VALUES (?, NULL, ?, ?, 'system', 'user', NOW())
         ");
-        $createMessageStmt->execute([$roomId, $systemMessage]);
+        $createMessageStmt->execute([$roomId, $userId, $systemMessage]);
         
         // 提交事務
         $db->commit();

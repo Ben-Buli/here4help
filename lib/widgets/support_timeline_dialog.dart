@@ -220,7 +220,7 @@ class SupportTimelineDialog extends StatelessWidget {
               ],
 
               // Timeline
-              if (logs.isNotEmpty) ...[
+              ...[
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 12),
@@ -233,7 +233,9 @@ class SupportTimelineDialog extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                ...logs.map<Widget>((log) => _buildTimelineItem(log)),
+                // 顯示 logs 中的狀態變更，並標記當前狀態
+                ...logs.map<Widget>((log) => _buildTimelineItem(log,
+                    isCurrentStatus: log['new_status']?.toString() == status)),
               ],
             ],
           ),
@@ -318,7 +320,8 @@ class SupportTimelineDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildTimelineItem(Map<String, dynamic> log) {
+  Widget _buildTimelineItem(Map<String, dynamic> log,
+      {bool isCurrentStatus = false}) {
     final newStatus = log['new_status'] ?? '';
     final oldStatus = log['old_status'];
     final createdAt = log['created_at'] ?? '';
@@ -354,8 +357,14 @@ class SupportTimelineDialog extends StatelessWidget {
                           style: const TextStyle(fontWeight: FontWeight.w500),
                         ),
                         const TextSpan(text: ' to '),
-                      ] else
-                        const TextSpan(text: 'Status set to '),
+                      ] else ...[
+                        // 根據是否為當前狀態來決定文案
+                        TextSpan(
+                          text: isCurrentStatus
+                              ? 'Current status: '
+                              : 'Status set to ',
+                        ),
+                      ],
                       TextSpan(
                         text: _formatStatus(newStatus),
                         style: TextStyle(

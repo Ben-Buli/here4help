@@ -138,8 +138,11 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
           .firstMatch(trimmed);
       if (relMatch != null) {
         final rel = relMatch.group(1)!;
+        debugPrint('🔍 [_extractFirstImageUrl] 找到相對路徑: $rel');
         // 映射為可訪問 URL
-        return PathMapper.mapDatabasePathToUrl(rel);
+        final mappedUrl = PathMapper.mapDatabasePathToUrl(rel);
+        debugPrint('🔍 [_extractFirstImageUrl] 映射後 URL: $mappedUrl');
+        return mappedUrl;
       }
     }
     return null;
@@ -1403,16 +1406,21 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
   /// 初始化聊天室
   Future<void> _initializeChat() async {
     try {
+      debugPrint('🚀 [_initializeChat] 開始初始化聊天室');
+
       // 從 widget.data 獲取 room_id
       String? roomId;
 
       if (widget.data != null) {
+        debugPrint('🔍 [_initializeChat] widget.data 內容: ${widget.data}');
         roomId = widget.data!['room']?['id']?.toString();
-        debugPrint('🔍 從 widget.data 獲取 room_id: $roomId');
+        debugPrint('🔍 [_initializeChat] 從 widget.data 獲取 room_id: $roomId');
+      } else {
+        debugPrint('⚠️ [_initializeChat] widget.data 為 null');
       }
 
       if (roomId == null || roomId.isEmpty) {
-        debugPrint('❌ widget.data 中沒有 room_id');
+        debugPrint('❌ [_initializeChat] widget.data 中沒有 room_id');
         setState(() {
           _hasError = true;
           _errorMessage = '無法獲取聊天室 ID，請返回聊天列表重新選擇';
@@ -1420,18 +1428,27 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
         return;
       }
 
-      debugPrint('🔍 初始化聊天室，room_id: $roomId');
+      debugPrint('🔍 [_initializeChat] 初始化聊天室，room_id: $roomId');
 
       // 🔧 清除快取以確保獲取最新資料（用於測試評分修復）
-      await _clearChatCache(roomId);
+      try {
+        await _clearChatCache(roomId);
+        debugPrint('✅ [_initializeChat] 快取清除完成');
+      } catch (e) {
+        debugPrint('⚠️ [_initializeChat] 快取清除失敗: $e');
+      }
 
       // 使用聚合 API 獲取聊天室數據
+      debugPrint('🌐 [_initializeChat] 開始調用 getChatDetailData API');
       final chatData = await SupportChatService.ChatService()
           .getChatDetailData(roomId: roomId);
 
+      debugPrint('📥 [_initializeChat] API 回應數據類型: ${chatData.runtimeType}');
+      debugPrint('📥 [_initializeChat] API 回應數據鍵值: ${chatData.keys.toList()}');
+
       // 驗證返回的數據
       if (chatData.isEmpty) {
-        debugPrint('❌ ChatService.getChatDetailData 返回空數據');
+        debugPrint('❌ [_initializeChat] ChatService.getChatDetailData 返回空數據');
         setState(() {
           _hasError = true;
           _errorMessage = '無法載入聊天室數據，請稍後重試';
@@ -1439,68 +1456,144 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
         return;
       }
 
-      debugPrint('✅ 成功獲取聊天室數據: ${chatData.keys}');
+      debugPrint('✅ [_initializeChat] 成功獲取聊天室數據: ${chatData.keys}');
 
       if (mounted) {
-        setState(() {
-          // 修正應徵狀態數據映射問題
-          final fixedChatData = _fixApplicationStatusMapping(chatData);
+        debugPrint('🔄 [_initializeChat] 開始處理數據並更新狀態');
 
-          // 更新聊天室數據
-          _chatData = fixedChatData;
-          _userRole = chatData['user_role'] ?? 'participant';
-          _currentRoomId = roomId;
-          _isBlocked = chatData['is_blocked'] ?? false;
+        try {
+          setState(() {
+            debugPrint('🔧 [_initializeChat] 開始修正應徵狀態數據映射');
+            // 修正應徵狀態數據映射問題
+            final fixedChatData = _fixApplicationStatusMapping(chatData);
+            debugPrint('✅ [_initializeChat] 應徵狀態數據映射完成');
 
-          // 解析詳細的封鎖狀態
-          final blockInfo = chatData['block_info'];
-          if (blockInfo != null) {
-            _isBlockedByMe = blockInfo['blocked_by_me'] ?? false;
-            _isBlockedByTarget = blockInfo['blocked_by_target'] ?? false;
-          } else {
-            _isBlockedByMe = false;
-            _isBlockedByTarget = false;
-          }
+            // 更新聊天室數據
+            _chatData = fixedChatData;
+            debugPrint('📊 [_initializeChat] _chatData 已更新');
 
-          // 檢查是否已有評分
-          _hasExistingReview = chatData['has_existing_review'] ?? false;
+            _userRole = chatData['user_role'] ?? 'participant';
+            debugPrint('👤 [_initializeChat] _userRole: $_userRole');
 
-          // 動態檢查評分狀態（如果任務已完成）
-          if (_task != null && _task!['status_code'] == 'completed') {
-            _checkReviewStatus();
-          }
-        });
+            _currentRoomId = roomId;
+            debugPrint('🏠 [_initializeChat] _currentRoomId: $_currentRoomId');
+
+            _isBlocked = chatData['is_blocked'] ?? false;
+            debugPrint('🚫 [_initializeChat] _isBlocked: $_isBlocked');
+
+            // 解析詳細的封鎖狀態
+            final blockInfo = chatData['block_info'];
+            if (blockInfo != null) {
+              debugPrint('🔒 [_initializeChat] 解析封鎖狀態: $blockInfo');
+              _isBlockedByMe = blockInfo['blocked_by_me'] ?? false;
+              _isBlockedByTarget = blockInfo['blocked_by_target'] ?? false;
+            } else {
+              debugPrint('🔓 [_initializeChat] 無封鎖狀態信息');
+              _isBlockedByMe = false;
+              _isBlockedByTarget = false;
+            }
+
+            // 檢查是否已有評分
+            _hasExistingReview = chatData['has_existing_review'] ?? false;
+            debugPrint(
+                '⭐ [_initializeChat] _hasExistingReview: $_hasExistingReview');
+
+            // 動態檢查評分狀態（如果任務已完成）
+            if (_task != null && _task!['status_code'] == 'completed') {
+              debugPrint('🔍 [_initializeChat] 任務已完成，檢查評分狀態');
+              _checkReviewStatus();
+            }
+          });
+
+          debugPrint('✅ [_initializeChat] setState 完成');
+        } catch (e) {
+          debugPrint('❌ [_initializeChat] setState 過程中發生錯誤: $e');
+          debugPrint('❌ [_initializeChat] 錯誤類型: ${e.runtimeType}');
+          debugPrint('❌ [_initializeChat] 錯誤堆疊: ${e.toString()}');
+
+          // 設置錯誤狀態
+          setState(() {
+            _hasError = true;
+            _errorMessage = '數據處理失敗: $e';
+          });
+          return;
+        }
 
         // 初始化圖片上傳管理器
+        debugPrint('📸 [_initializeChat] 初始化圖片上傳管理器');
 
         // 提前嘗試加入房間（僅在首次初始化時）
         if (_currentRoomId == null || _currentRoomId != roomId) {
+          debugPrint('🔌 [_initializeChat] 嘗試加入 Socket 房間: $roomId');
           try {
             _socketService.joinRoom(roomId);
-          } catch (_) {}
+            debugPrint('✅ [_initializeChat] Socket 房間加入成功');
+          } catch (e) {
+            debugPrint('⚠️ [_initializeChat] Socket 房間加入失敗: $e');
+          }
         }
 
         // 保存完整的聊天室數據到本地儲存
-        await _saveChatRoomData(chatData, roomId);
+        debugPrint('💾 [_initializeChat] 開始保存聊天室數據到本地儲存');
+        try {
+          await _saveChatRoomData(chatData, roomId);
+          debugPrint('✅ [_initializeChat] 聊天室數據保存完成');
+        } catch (e) {
+          debugPrint('⚠️ [_initializeChat] 聊天室數據保存失敗: $e');
+        }
 
         // 更新任務狀態相關數據
         final task = chatData['task'];
         if (task != null) {
-          // 計算倒數計時結束時間（不觸發 setState）
-          _calculateCountdownEndTime(task);
+          debugPrint('📋 [_initializeChat] 處理任務數據: ${task.keys.toList()}');
+          try {
+            // 計算倒數計時結束時間（不觸發 setState）
+            _calculateCountdownEndTime(task);
+            debugPrint('✅ [_initializeChat] 倒數計時計算完成');
+          } catch (e) {
+            debugPrint('⚠️ [_initializeChat] 倒數計時計算失敗: $e');
+          }
+        } else {
+          debugPrint('ℹ️ [_initializeChat] 無任務數據');
         }
 
         // 載入聊天訊息
-        await _loadChatMessages();
+        debugPrint('💬 [_initializeChat] 開始載入聊天訊息');
+        try {
+          await _loadChatMessages();
+          debugPrint('✅ [_initializeChat] 聊天訊息載入完成');
+        } catch (e) {
+          debugPrint('❌ [_initializeChat] 聊天訊息載入失敗: $e');
+        }
 
         // 載入當前用戶ID
-        await _loadCurrentUserId();
+        debugPrint('👤 [_initializeChat] 開始載入當前用戶ID');
+        try {
+          await _loadCurrentUserId();
+          debugPrint('✅ [_initializeChat] 當前用戶ID載入完成');
+        } catch (e) {
+          debugPrint('❌ [_initializeChat] 當前用戶ID載入失敗: $e');
+        }
 
         // 設置 Socket.IO
-        await _setupSocket();
+        debugPrint('🔌 [_initializeChat] 開始設置 Socket.IO');
+        try {
+          await _setupSocket();
+          debugPrint('✅ [_initializeChat] Socket.IO 設置完成');
+        } catch (e) {
+          debugPrint('❌ [_initializeChat] Socket.IO 設置失敗: $e');
+        }
 
         // 解析對方身份（在載入用戶ID後）
-        _resolveOpponentIdentity();
+        debugPrint('🔍 [_initializeChat] 開始解析對方身份');
+        try {
+          _resolveOpponentIdentity();
+          debugPrint('✅ [_initializeChat] 對方身份解析完成');
+        } catch (e) {
+          debugPrint('❌ [_initializeChat] 對方身份解析失敗: $e');
+        }
+
+        debugPrint('🎉 [_initializeChat] 聊天室初始化完成');
       }
     } catch (e) {
       debugPrint('❌ Initialize support chat detail failed: $e');
@@ -2038,22 +2131,32 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
 
   /// 從資料庫載入聊天訊息
   Future<void> _loadChatMessages() async {
-    if (_isLoadingMessages) return;
+    if (_isLoadingMessages) {
+      debugPrint('⚠️ [_loadChatMessages] 正在載入中，跳過重複請求');
+      return;
+    }
 
     try {
+      debugPrint('🔄 [_loadChatMessages] 開始載入聊天訊息');
+      debugPrint('🔄 [_loadChatMessages] _currentRoomId: $_currentRoomId');
+
       setState(() {
         _isLoadingMessages = true;
       });
 
       if (_currentRoomId == null || _currentRoomId!.isEmpty) {
-        debugPrint('❌ 無法取得 roomId');
+        debugPrint('❌ [_loadChatMessages] 無法取得 roomId');
+        setState(() {
+          _isLoadingMessages = false;
+        });
         return;
       }
 
-      debugPrint('🔍 載入聊天訊息，roomId: $_currentRoomId');
+      debugPrint('🔍 [_loadChatMessages] 載入聊天訊息，roomId: $_currentRoomId');
 
       // 如果已經有聚合數據，直接使用其中的訊息
       if (_chatData != null && _chatData!['messages'] != null) {
+        debugPrint('📊 [_loadChatMessages] 使用聚合數據中的訊息');
         final messages = _chatData!['messages'] as List<dynamic>;
         if (mounted) {
           setState(() {
@@ -2066,10 +2169,11 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
             _scrollToBottom(delayed: true);
           }
         }
-        debugPrint('✅ 從聚合數據載入 ${_chatMessages.length} 條訊息');
+        debugPrint('✅ [_loadChatMessages] 從聚合數據載入 ${_chatMessages.length} 條訊息');
         return;
       }
 
+      debugPrint('🌐 [_loadChatMessages] 調用 API 載入訊息');
       // 備用方案：使用原有的 API
       final result = await SupportChatService.ChatService()
           .getMessages(roomId: _currentRoomId!);
@@ -2084,6 +2188,11 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
       _myLastReadMessageId = (result['my_last_read_message_id'] is int)
           ? result['my_last_read_message_id']
           : int.tryParse('${result['my_last_read_message_id']}') ?? 0;
+
+      debugPrint('📥 [_loadChatMessages] API 回應訊息數量: ${messages.length}');
+      debugPrint(
+          '📥 [_loadChatMessages] 對方最後已讀訊息 ID: $resultOpponentLastReadId');
+      debugPrint('📥 [_loadChatMessages] 我的最後已讀訊息 ID: $_myLastReadMessageId');
 
       if (mounted) {
         setState(() {
@@ -2103,28 +2212,38 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
                   roomId: _currentRoomId!, upToMessageId: '$lastId');
             }
           }
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('⚠️ [_loadChatMessages] 標記已讀失敗: $e');
+        }
+
         // 只有在初次載入時才自動滾動到未讀位置
         if (_isInitialLoad) {
+          debugPrint('🔄 [_loadChatMessages] 初次載入，決定滾動位置');
           // 根據是否有未讀訊息決定滾動位置
           if (_hasUnreadMessages()) {
+            debugPrint('📜 [_loadChatMessages] 有未讀訊息，滾動到未讀分隔線');
             _scrollToUnreadSeparator(delayed: true);
             setState(() {
               _showScrollToBottomButton = true;
             });
           } else {
+            debugPrint('📜 [_loadChatMessages] 無未讀訊息，滾動到底部');
             _scrollToBottom(delayed: true);
           }
           _isInitialLoad = false; // 標記為非初次載入
         } else if (_isAtBottom) {
+          debugPrint('📜 [_loadChatMessages] 非初次載入且用戶在底部，滾動到底部');
           // 非初次載入且用戶在底部時才滾動
           _scrollToBottom(delayed: true);
         }
       }
 
-      debugPrint('✅ 成功載入 ${_chatMessages.length} 條訊息');
+      debugPrint('✅ [_loadChatMessages] 成功載入 ${_chatMessages.length} 條訊息');
     } catch (e) {
-      debugPrint('❌ 載入聊天訊息失敗: $e');
+      debugPrint('❌ [_loadChatMessages] 載入聊天訊息失敗: $e');
+      debugPrint('❌ [_loadChatMessages] 錯誤類型: ${e.runtimeType}');
+      debugPrint('❌ [_loadChatMessages] 錯誤堆疊: ${e.toString()}');
+
       if (mounted) {
         setState(() {
           _isLoadingMessages = false;
@@ -2879,7 +2998,9 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
         _task?['status']?['code'] == 'completed' ||
         _task?['status']?['code'] == 'rejected_tasker' ||
         _task?['status']?['code'] == 'completed_tasker' ||
-        _task?['application']?['status'] == 'withdrawn';
+        _task?['application']?['status'] == 'withdrawn' ||
+        _chatData?['support_event']?['status'] ==
+            'resolved'; // Support event 已解決時禁用輸入
     // --- ALERT BAR SWITCH-CASE 重構 ---
     // 預設 alert bar 不會顯示，只有在特定狀態下才顯示
     Widget? alertContent;
@@ -2921,6 +3042,28 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
                 style: TextStyle(
                   fontSize: 12,
                   color: textColor,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (_chatData?['support_event']?['status'] == 'resolved') {
+      // Support event 已解決狀態
+      alertContent = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        color: Colors.green[50],
+        child: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green[600], size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'This support case has been resolved. You cannot send new messages.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.green[700],
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -3184,17 +3327,30 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
         if (_showActionBar && (_task != null || _isSupportRoom))
           _isSupportRoom
               ? _buildSupportActionBar()
-              : SupportDynamicActionBar(
-                  supportStatus:
-                      SupportActionBarConfigManager.parseSupportStatus(
-                          _chatData?['support_event']?['status']),
-                  userRole:
-                      SupportActionBarConfigManager.parseUserRole(_userRole),
-                  actionCallbacks: _buildActionCallbacks(),
-                  showStatusBar: true,
-                  statusDisplayName:
-                      _getStatusDisplayNameForUserRole(), // 根據用戶角色獲取狀態顯示名稱
-                  backgroundColor: _glassNavColor(context),
+              : Builder(
+                  builder: (context) {
+                    // 對於非支援聊天室，也使用狀態背景色
+                    final supportStatus =
+                        _chatData?['support_event']?['status']?.toString();
+                    final parsedStatus =
+                        SupportActionBarConfigManager.parseSupportStatus(
+                            supportStatus);
+                    final statusColor =
+                        SupportActionBarConfigManager.getSupportStatusColor(
+                            parsedStatus);
+                    final actionBarBackgroundColor =
+                        statusColor.withOpacity(0.3);
+
+                    return SupportDynamicActionBar(
+                      supportStatus: parsedStatus,
+                      userRole: SupportActionBarConfigManager.parseUserRole(
+                          _userRole),
+                      actionCallbacks: _buildActionCallbacks(),
+                      showStatusBar: true,
+                      statusDisplayName: _getStatusDisplayNameForUserRole(),
+                      backgroundColor: actionBarBackgroundColor,
+                    );
+                  },
                 ),
         // ActionBar + Input 區塊採用與 AppBar 相同的背景/前景配色，並提供 hover/pressed/focus 覆蓋色
         Builder(builder: (context) {
@@ -3427,16 +3583,22 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
   /// 構建支援聊天室的 Action Bar
   Widget _buildSupportActionBar() {
     final supportStatus = _chatData?['support_event']?['status']?.toString();
+    final parsedStatus =
+        SupportActionBarConfigManager.parseSupportStatus(supportStatus);
+
+    // 使用與狀態背景色相同的顏色
+    final statusColor =
+        SupportActionBarConfigManager.getSupportStatusColor(parsedStatus);
+    final actionBarBackgroundColor = statusColor.withOpacity(0.3);
 
     // 使用 support_dynamic_action_bar.dart 中的 SupportDynamicActionBar
     return SupportDynamicActionBar(
       userRole: SupportActionBarConfigManager.parseUserRole(_userRole),
       actionCallbacks: _buildActionCallbacks(),
-      supportStatus:
-          SupportActionBarConfigManager.parseSupportStatus(supportStatus),
+      supportStatus: parsedStatus,
       showStatusBar: true,
       statusDisplayName: _getSupportStatusDisplay(supportStatus),
-      backgroundColor: _glassNavColor(context),
+      backgroundColor: actionBarBackgroundColor,
     );
   }
 
@@ -3538,6 +3700,11 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
             rating: rating,
             review: review,
           );
+
+          // 成功關閉後跳轉到 support 頁面
+          if (mounted) {
+            Navigator.of(context).pushReplacementNamed('/account/support');
+          }
         },
       );
 
@@ -3556,10 +3723,9 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
         });
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to close support case: $e')),
-      );
+      // 錯誤會在 SupportSolvedDialog 內部處理，不需要在這裡顯示 SnackBar
+      // 重新拋出錯誤讓 dialog 內部處理
+      rethrow;
     }
   }
 
@@ -5091,71 +5257,121 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
   /// 以便 Action Bar 能夠正確讀取應徵狀態
   Map<String, dynamic> _fixApplicationStatusMapping(
       Map<String, dynamic> chatData) {
-    final result = Map<String, dynamic>.from(chatData);
-    final task = result['task'] as Map<String, dynamic>?;
+    try {
+      debugPrint('🔧 [_fixApplicationStatusMapping] 開始修正應徵狀態映射');
+      debugPrint(
+          '🔧 [_fixApplicationStatusMapping] 輸入數據類型: ${chatData.runtimeType}');
+      debugPrint(
+          '🔧 [_fixApplicationStatusMapping] 輸入數據鍵值: ${chatData.keys.toList()}');
 
-    if (task != null) {
-      final applicationStatus = task['application_status']?.toString();
+      final result = Map<String, dynamic>.from(chatData);
+      final task = result['task'] as Map<String, dynamic>?;
 
-      debugPrint('🔧 [_fixApplicationStatusMapping] 修正應徵狀態映射:');
-      debugPrint('  - application_status: $applicationStatus');
-      debugPrint('  - 現有 application: ${task['application']}');
+      if (task != null) {
+        debugPrint(
+            '🔧 [_fixApplicationStatusMapping] 找到 task 數據: ${task.keys.toList()}');
 
-      // 🔧 改進：處理應徵狀態映射邏輯
-      if (applicationStatus != null &&
-          applicationStatus.isNotEmpty &&
-          applicationStatus != 'null') {
-        // 保持現有的 application 數據（如果存在）
-        final existingApplication =
-            task['application'] as Map<String, dynamic>? ?? {};
+        final applicationStatus = task['application_status']?.toString();
 
-        // 創建或更新 application 巢狀結構
-        task['application'] = {
-          ...existingApplication,
-          'status': applicationStatus,
-          'created_at': task['application_created_at'],
-          'updated_at': task['application_updated_at'],
-        };
+        debugPrint('🔧 [_fixApplicationStatusMapping] 修正應徵狀態映射:');
+        debugPrint('  - application_status: $applicationStatus');
+        debugPrint('  - 現有 application: ${task['application']}');
 
-        debugPrint('  - 已創建/更新 application 巢狀結構: ${task['application']}');
-      } else {
-        // 🔧 新增：如果 application_status 為 null 或空，但存在現有的 application，保持現有狀態
-        final existingApplication =
-            task['application'] as Map<String, dynamic>?;
-        if (existingApplication != null &&
-            existingApplication['status'] != null) {
-          debugPrint(
-              '  - 保持現有 application 狀態: ${existingApplication['status']}');
+        // 🔧 改進：處理應徵狀態映射邏輯
+        if (applicationStatus != null &&
+            applicationStatus.isNotEmpty &&
+            applicationStatus != 'null') {
+          // 保持現有的 application 數據（如果存在）
+          final existingApplication =
+              task['application'] as Map<String, dynamic>? ?? {};
+
+          // 創建或更新 application 巢狀結構
+          task['application'] = {
+            ...existingApplication,
+            'status': applicationStatus,
+            'created_at': task['application_created_at'],
+            'updated_at': task['application_updated_at'],
+          };
+
+          debugPrint('  - 已創建/更新 application 巢狀結構: ${task['application']}');
         } else {
-          debugPrint('  - 無有效的應徵狀態數據');
+          // 🔧 新增：如果 application_status 為 null 或空，但存在現有的 application，保持現有狀態
+          final existingApplication =
+              task['application'] as Map<String, dynamic>?;
+          if (existingApplication != null &&
+              existingApplication['status'] != null) {
+            debugPrint(
+                '  - 保持現有 application 狀態: ${existingApplication['status']}');
+          } else {
+            debugPrint('  - 無有效的應徵狀態數據');
+          }
         }
+
+        result['task'] = task;
+      } else {
+        debugPrint('⚠️ [_fixApplicationStatusMapping] 無 task 數據');
       }
 
-      result['task'] = task;
-    }
+      debugPrint('✅ [_fixApplicationStatusMapping] 應徵狀態映射完成');
+      return result;
+    } catch (e) {
+      debugPrint('❌ [_fixApplicationStatusMapping] 修正應徵狀態映射失敗: $e');
+      debugPrint('❌ [_fixApplicationStatusMapping] 錯誤類型: ${e.runtimeType}');
+      debugPrint('❌ [_fixApplicationStatusMapping] 錯誤堆疊: ${e.toString()}');
 
-    return result;
+      // 返回原始數據，避免崩潰
+      return chatData;
+    }
   }
 
   // 輔助方法：安全地獲取數據
-  Map<String, dynamic>? get _task => _chatData?['task'];
-  Map<String, dynamic>? get _room {
-    final room = _chatData?['room'] ?? _chatData?['chat_room'];
-    // debugPrint(
-    //     '🔍 [ChatDetailPage] _room getter - _chatData keys: ${_chatData?.keys.toList()}');
-    // debugPrint(
-    //     '🔍 [ChatDetailPage] _room getter - room from "room": ${_chatData?['room']}');
-    // debugPrint(
-    //     '🔍 [ChatDetailPage] _room getter - room from "chat_room": ${_chatData?['chat_room']}');
-    // debugPrint('🔍 [ChatDetailPage] _room getter - final result: $room');
-    return room;
+  Map<String, dynamic>? get _task {
+    final task = _chatData?['task'];
+    if (task == null) return null;
+    if (task is Map<String, dynamic>) return task;
+    if (task is Map) {
+      // 安全地轉換 LinkedMap 或其他 Map 類型
+      return Map<String, dynamic>.from(task);
+    }
+    return null;
   }
 
-  Map<String, dynamic>? get _application => _chatData?['application'];
+  Map<String, dynamic>? get _room {
+    final room = _chatData?['room'] ?? _chatData?['chat_room'];
+    if (room == null) return null;
+    if (room is Map<String, dynamic>) return room;
+    if (room is Map) {
+      // 安全地轉換 LinkedMap 或其他 Map 類型
+      return Map<String, dynamic>.from(room);
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? get _application {
+    final application = _chatData?['application'];
+    if (application == null) return null;
+    if (application is Map<String, dynamic>) return application;
+    if (application is Map) {
+      // 安全地轉換 LinkedMap 或其他 Map 類型
+      return Map<String, dynamic>.from(application);
+    }
+    return null;
+  }
 
   /// 檢查是否為支援聊天室
   bool get _isSupportRoom => _room?['type'] == 'support';
-  Map<String, dynamic>? get _chatPartnerInfo => _chatData?['chat_partner_info'];
+
+  Map<String, dynamic>? get _chatPartnerInfo {
+    final partnerInfo = _chatData?['chat_partner_info'];
+    if (partnerInfo == null) return null;
+    if (partnerInfo is Map<String, dynamic>) return partnerInfo;
+    if (partnerInfo is Map) {
+      // 安全地轉換 LinkedMap 或其他 Map 類型
+      return Map<String, dynamic>.from(partnerInfo);
+    }
+    return null;
+  }
+
   List<Map<String, dynamic>> get _applicationQuestions =>
       (_chatData?['application_questions'] as List<dynamic>?)
           ?.map((e) => Map<String, dynamic>.from(e))
@@ -5465,7 +5681,9 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
 
     // 使用 PathMapper 處理圖片 URL
     if (finalImageUrl.isNotEmpty) {
+      debugPrint('🔍 [_buildImageBubble] 原始圖片 URL: $finalImageUrl');
       finalImageUrl = PathMapper.mapDatabasePathToUrl(finalImageUrl);
+      debugPrint('🔍 [_buildImageBubble] 處理後圖片 URL: $finalImageUrl');
     }
 
     if (finalImageUrl.isEmpty) {

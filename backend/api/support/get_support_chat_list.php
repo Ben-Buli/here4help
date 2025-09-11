@@ -115,7 +115,7 @@ try {
         $chatListStmt->execute([$userId, $userId, $userId]);
         
     } else {
-        // 客戶視角：獲取自己創建的客服聊天室（包括管理員作為客戶時）
+        // 客戶視角：獲取自己創建的客服聊天室（只顯示活躍事件）
         $chatListStmt = $db->prepare("
             SELECT 
                 scr.id as room_id,
@@ -141,20 +141,20 @@ try {
                 (SELECT COUNT(*) FROM support_chat_messages scm
                  LEFT JOIN support_chat_reads scr_read ON scr_read.room_id = scm.room_id AND scr_read.user_id = ?
                  WHERE scm.room_id = scr.id 
-                 AND scm.from_user_id != ?
+                 AND scm.role = 'admin'
                  AND (scr_read.last_read_message_id IS NULL OR scm.id > scr_read.last_read_message_id)) as unread_count
             FROM support_chat_rooms scr
             LEFT JOIN users admin_u ON admin_u.id = scr.admin_id
             LEFT JOIN support_events se ON se.support_chat_room_id = scr.id
             WHERE scr.type = 'support' AND scr.user_id = ?
+            AND se.status IN ('submitted', 'in_progress')  -- 只顯示活躍事件
             ORDER BY 
                 CASE WHEN se.status = 'in_progress' THEN 1
                      WHEN se.status = 'submitted' THEN 2
-                     WHEN se.status = 'resolved' THEN 3
-                     ELSE 4 END,
+                     ELSE 3 END,
                 se.updated_at DESC
         ");
-        $chatListStmt->execute([$userId, $userId, $userId]);
+        $chatListStmt->execute([$userId, $userId]);
     }
     
     $chatList = $chatListStmt->fetchAll(PDO::FETCH_ASSOC);

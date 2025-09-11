@@ -71,6 +71,7 @@ async function initDatabase() {
     // Load environment variables
     require('dotenv').config({ path: '../../.env' });
     
+    // 初始化 MySQL 資料庫（MAMP）
     dbPool = mysql.createPool({
       host: process.env.DB_HOST || 'localhost',
       port: process.env.DB_PORT || 8889,
@@ -83,9 +84,10 @@ async function initDatabase() {
       queueLimit: 0
     });
     
-    // Test connection
+    // Test database connection
     await dbPool.query('SELECT 1');
-    console.log('Database connected successfully');
+    console.log('MySQL database connected successfully');
+    
   } catch (error) {
     console.error('Database connection failed:', error.message);
     // Fallback to in-memory mode
@@ -147,8 +149,87 @@ function validateTokenBase64(token, traceId) {
   }
 }
 
+// 驗證管理員 Sanctum Token
+async function validateAdminToken(token, traceId) {
+  if (!dbPool) {
+    console.error(`[${traceId}] ❌ Database not available for admin token validation`);
+    return null;
+  }
+
+  try {
+    // Laravel Sanctum token 格式: {id}|{hash}
+    // 我們需要提取 hash 部分來查詢資料庫
+    const tokenParts = token.split('|');
+    if (tokenParts.length !== 2) {
+      console.error(`[${traceId}] ❌ Invalid Sanctum token format: ${token}`);
+      return null;
+    }
+
+    const tokenId = tokenParts[0];
+    const tokenHash = tokenParts[1];
+
+    console.log(`[${traceId}] 🔍 Validating admin token - ID: ${tokenId}, Hash: ${tokenHash.substring(0, 10)}...`);
+
+    // Laravel Sanctum 會將 token hash 後儲存，我們需要 hash 原始 token 來比較
+    const crypto = require('crypto');
+    const hashedToken = crypto.createHash('sha256').update(tokenHash).digest('hex');
+
+    // 查詢 personal_access_tokens 表
+    const [rows] = await dbPool.query(
+      'SELECT id, tokenable_id, name, abilities, last_used_at, expires_at FROM personal_access_tokens WHERE id = ? AND token = ?',
+      [tokenId, hashedToken]
+    );
+
+    if (rows.length === 0) {
+      console.error(`[${traceId}] ❌ Admin token not found in database (ID: ${tokenId})`);
+      return null;
+    }
+
+    const tokenData = rows[0];
+    
+    // 檢查 token 是否過期
+    if (tokenData.expires_at && new Date(tokenData.expires_at) < new Date()) {
+      console.error(`[${traceId}] ❌ Admin token expired`);
+      return null;
+    }
+    
+    // 查詢管理員資訊
+    const [adminRows] = await dbPool.query(
+      'SELECT id, username, full_name, email, status FROM admins WHERE id = ? AND status = "active"',
+      [tokenData.tokenable_id]
+    );
+
+    if (adminRows.length === 0) {
+      console.error(`[${traceId}] ❌ Admin user not found or inactive (ID: ${tokenData.tokenable_id})`);
+      return null;
+    }
+
+    const admin = adminRows[0];
+    
+    // 更新 token 使用時間
+    await dbPool.query(
+      'UPDATE personal_access_tokens SET last_used_at = NOW() WHERE id = ?',
+      [tokenId]
+    );
+
+    console.log(`[${traceId}] ✅ Admin token validated successfully for admin: ${admin.username} (ID: ${admin.id})`);
+    
+    return {
+      user_id: `admin_${admin.id}`, // 使用 admin_ 前綴區分管理員
+      admin_id: admin.id,
+      username: admin.username,
+      full_name: admin.full_name,
+      email: admin.email,
+      role: 'admin'
+    };
+  } catch (error) {
+    console.error(`[${traceId}] ❌ Admin token validation failed:`, error.message);
+    return null;
+  }
+}
+
 // 統一的 token 驗證函數
-function validateToken(token, socket) {
+async function validateToken(token, socket) {
   const traceId = generateTraceId(socket);
 
   // 調試：顯示 token 格式資訊
@@ -159,22 +240,31 @@ function validateToken(token, socket) {
     console.log(`[${traceId}] - First 50 chars: ${token ? token.slice(0, 50) + '...' : 'null'}`);
   }
 
+  // 1. 嘗試 JWT token 驗證
   let payload = validateJWT(token, traceId);
   if (payload) {
     console.log(`[${traceId}] ✅ JWT token validated successfully`);
     return payload;
   }
 
+  // 2. 嘗試 Base64 token 驗證
   payload = validateTokenBase64(token, traceId);
   if (payload) {
     console.log(`[${traceId}] ✅ Base64 token validated successfully (legacy)`);
     return payload;
   }
 
+  // 3. 嘗試管理員 Sanctum token 驗證
+  payload = await validateAdminToken(token, traceId);
+  if (payload) {
+    console.log(`[${traceId}] ✅ Admin Sanctum token validated successfully`);
+    return payload;
+  }
+
   if (process.env.NODE_ENV === 'development') {
-    console.error(`[${traceId}] ❌ Token validation failed (neither valid JWT nor Base64). Token snippet:`, token ? token.slice(0, 30) + '...' : 'null');
+    console.error(`[${traceId}] ❌ Token validation failed (JWT, Base64 & Admin). Token snippet:`, token ? token.slice(0, 30) + '...' : 'null');
   } else {
-    console.error(`[${traceId}] ❌ Token validation failed (JWT & Base64).`);
+    console.error(`[${traceId}] ❌ Token validation failed (JWT, Base64 & Admin).`);
   }
   return null;
 }
@@ -192,12 +282,27 @@ async function getRoomMembers(roomId) {
   if (!dbPool) return [];
   
   try {
-    const [rows] = await dbPool.query(
+    // 先查詢一般聊天室
+    let [rows] = await dbPool.query(
       'SELECT creator_id, participant_id FROM chat_rooms WHERE id = ?',
       [roomId]
     );
     
-    if (rows.length === 0) return [];
+    // 如果一般聊天室沒找到，查詢客服聊天室
+    if (rows.length === 0) {
+      [rows] = await dbPool.query(
+        'SELECT user_id, admin_id FROM support_chat_rooms WHERE id = ?',
+        [roomId]
+      );
+      
+      if (rows.length === 0) return [];
+      
+      const room = rows[0];
+      const members = [];
+      if (room.user_id) members.push(room.user_id.toString());
+      if (room.admin_id) members.push(`admin_${room.admin_id}`);
+      return members;
+    }
     
     const room = rows[0];
     return [room.creator_id.toString(), room.participant_id.toString()];
@@ -212,11 +317,24 @@ async function getUnreadCount(userId, roomId) {
   if (!dbPool) return 0;
   
   try {
-    const [rows] = await dbPool.query(`
+    // 先查詢一般聊天室的未讀數量
+    let [rows] = await dbPool.query(`
       SELECT COUNT(*) as count
       FROM chat_messages cm
       LEFT JOIN chat_reads cr ON cm.room_id = cr.room_id AND cr.user_id = ?
       WHERE cm.room_id = ? AND cm.id > COALESCE(cr.last_read_message_id, 0)
+    `, [userId, roomId]);
+    
+    if (rows[0].count > 0) {
+      return rows[0].count;
+    }
+    
+    // 如果一般聊天室沒有未讀，查詢客服聊天室
+    [rows] = await dbPool.query(`
+      SELECT COUNT(*) as count
+      FROM support_chat_messages scm
+      LEFT JOIN support_chat_reads scr ON scm.room_id = scr.room_id AND scr.user_id = ?
+      WHERE scm.room_id = ? AND scm.id > COALESCE(scr.last_read_message_id, 0)
     `, [userId, roomId]);
     
     return rows[0].count;
@@ -288,23 +406,59 @@ function initSupportEventHandler() {
 // 在 IO 初始化後創建客服事件處理器
 initSupportEventHandler();
 
-io.use((socket, next) => {
+io.use(async (socket, next) => {
   const { token } = socket.handshake.query || {};
   if (!token) return next(new Error('Unauthorized: token missing'));
-  const payload = validateToken(String(token), socket);
-  if (!payload) return next(new Error('Unauthorized: invalid token'));
-  socket.user = { id: String(payload.user_id) };
-  return next();
+  
+  try {
+    // 確保 token 是字符串且不被截斷
+    const tokenStr = typeof token === 'string' ? token : String(token);
+    
+    // 調試：檢查 token 格式
+    const traceId = generateTraceId(socket);
+    console.log(`[${traceId}] 🔍 Token analysis:`);
+    console.log(`[${traceId}] - Type: ${typeof token}`);
+    console.log(`[${traceId}] - Length: ${tokenStr.length}`);
+    console.log(`[${traceId}] - Parts: ${tokenStr.split('.').length}`);
+    console.log(`[${traceId}] - First 50 chars: ${tokenStr.slice(0, 50)}...`);
+    
+    const payload = await validateToken(tokenStr, socket);
+    if (!payload) return next(new Error('Unauthorized: invalid token'));
+    
+    socket.user = { 
+      id: String(payload.user_id),
+      role: payload.role || 'user',
+      admin_id: payload.admin_id || null,
+      username: payload.username || null,
+      full_name: payload.full_name || null,
+      email: payload.email || null
+    };
+    
+    return next();
+  } catch (error) {
+    console.error('Socket authentication error:', error);
+    return next(new Error('Unauthorized: authentication failed'));
+  }
 });
 
 io.on('connection', (socket) => {
   const userId = socket.user.id;
+  const userRole = socket.user.role;
+  const isAdmin = userRole === 'admin';
+  
   socket.join(getUserRoom(userId));
 
-  console.log(`User ${userId} connected`);
+  if (isAdmin) {
+    console.log(`Admin ${socket.user.username} (ID: ${socket.user.admin_id}) connected`);
+  } else {
+    console.log(`User ${userId} connected`);
+  }
 
-  // Initial push for safety (client can also fetch snapshot via REST)
-  emitUnread(userId);
+  // 只有一般用戶才需要未讀計數推送
+  if (!isAdmin) {
+    // Initial push for safety (client can also fetch snapshot via REST)
+    emitUnread(userId);
+  }
 
   // 處理客服事件相關連線
   if (supportEventHandler) {
@@ -326,7 +480,8 @@ io.on('connection', (socket) => {
   socket.on('send_message', async ({ roomId, messageId, text, toUserIds = [] }) => {
     if (!roomId || !text) return;
 
-    console.log(`User ${userId} sending message to room ${roomId}`);
+    const senderInfo = isAdmin ? `Admin ${socket.user.username}` : `User ${userId}`;
+    console.log(`${senderInfo} sending message to room ${roomId}`);
 
     // Get room members from database
     let recipients = Array.isArray(toUserIds) ? toUserIds.map(String) : [];
@@ -339,13 +494,14 @@ io.on('connection', (socket) => {
       roomId,
       messageId: messageId || `${Date.now()}`,
       text,
-      fromUserId: userId,
+      fromUserId: isAdmin ? 'admin' : userId,
+      fromAdminId: isAdmin ? socket.user.admin_id : null,
       sentAt: Date.now()
     });
 
     // Increment unread counters for recipients (excluding sender)
     for (const uid of recipients) {
-      if (uid && uid !== userId) {
+      if (uid && uid !== userId && !uid.startsWith('admin_')) {
         // Update unread count in database
         if (dbPool) {
           try {
@@ -363,8 +519,8 @@ io.on('connection', (socket) => {
       }
     }
 
-    // Mark sender as read up-to latest
-    if (dbPool) {
+    // Mark sender as read up-to latest (only for non-admin users)
+    if (dbPool && !isAdmin) {
       try {
         // Get latest message ID for this room
         const [rows] = await dbPool.query(
@@ -400,9 +556,11 @@ io.on('connection', (socket) => {
   socket.on('read_room', async ({ roomId }) => {
     if (!roomId) return;
     
-    console.log(`User ${userId} marked room ${roomId} as read`);
+    const senderInfo = isAdmin ? `Admin ${socket.user.username}` : `User ${userId}`;
+    console.log(`${senderInfo} marked room ${roomId} as read`);
     
-    if (dbPool) {
+    // 只有一般用戶才需要更新已讀狀態
+    if (dbPool && !isAdmin) {
       try {
         // Get latest message ID for this room
         const [rows] = await dbPool.query(
@@ -427,7 +585,11 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log(`User ${userId} disconnected`);
+    if (isAdmin) {
+      console.log(`Admin ${socket.user.username} (ID: ${socket.user.admin_id}) disconnected`);
+    } else {
+      console.log(`User ${userId} disconnected`);
+    }
   });
 });
 
@@ -585,7 +747,25 @@ server.listen(PORT, () => {
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
   if (dbPool) {
-    dbPool.end();
+    try {
+      dbPool.end();
+    } catch (error) {
+      console.log('Database pool already closed');
+    }
+  }
+  server.close(() => {
+    console.log('Process terminated');
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, shutting down gracefully');
+  if (dbPool) {
+    try {
+      dbPool.end();
+    } catch (error) {
+      console.log('Database pool already closed');
+    }
   }
   server.close(() => {
     console.log('Process terminated');

@@ -32,6 +32,11 @@ class PathMapper {
     String cleanPath =
         databasePath.startsWith('/') ? databasePath.substring(1) : databasePath;
 
+    // 修復常見的拼寫錯誤：backend/ploads/ -> backend/uploads/
+    if (cleanPath.startsWith('backend/ploads/')) {
+      cleanPath = cleanPath.replaceFirst('backend/ploads/', 'backend/uploads/');
+    }
+
     // 檢查是否是 Flutter assets 路徑
     if (cleanPath.startsWith('assets/')) {
       return cleanPath;
@@ -48,8 +53,11 @@ class PathMapper {
     }
 
     // 檢查是否是後端上傳的圖片路徑（支援多種格式）
-    if (cleanPath.startsWith('backend/uploads/') ||
-        cleanPath.startsWith('uploads/')) {
+    if (cleanPath.startsWith('backend/uploads/')) {
+      // 如果 baseUrl 已經包含 backend，需要移除重複的部分
+      final baseUrlWithoutBackend = baseUrl.replaceAll('/backend', '');
+      return '$baseUrlWithoutBackend/$cleanPath';
+    } else if (cleanPath.startsWith('uploads/')) {
       return '$baseUrl/$cleanPath';
     }
 

@@ -64,9 +64,9 @@ try {
 
   // 根據聊天室類型決定儲存位置
   if ($room['source'] === 'support') {
-    // 客服聊天室：uploads/support_chat/
-    $baseDir = dirname(__DIR__, 2) . '/uploads/support_chat';
-    $publicPath = 'uploads/support_chat/' . uniqid('support_') . '.' . $ext;
+    // 客服聊天室：backend/uploads/support_chat/
+    $baseDir = dirname(__DIR__, 2) . '/backend/uploads/support_chat';
+    $publicPath = '/backend/uploads/support_chat/' . uniqid('support_') . '.' . $ext;
   } else {
     // 一般聊天室：uploads/chat/
     $baseDir = dirname(__DIR__, 2) . '/uploads/chat';

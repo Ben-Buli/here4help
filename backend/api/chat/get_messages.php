@@ -16,13 +16,28 @@ try {
     Response::error('Method not allowed', 405);
   }
 
-  // Auth
+  // Auth - 支援 Header 和 URL 參數
+  $token = null;
+  
+  // 嘗試從 Authorization header 獲取
   $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
-  if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
-    throw new Exception('Authorization header required');
+  if ($auth_header && preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
+    $token = $m[1];
   }
-  $user_id = TokenValidator::validateAuthHeader($auth_header);
-  if (!$user_id) { throw new Exception('Invalid or expired token'); }
+  
+  // 如果沒有從 header 獲取到，嘗試從 URL 參數獲取
+  if (!$token && isset($_GET['token'])) {
+    $token = $_GET['token'];
+  }
+  
+  if (!$token) {
+    throw new Exception('Token is required');
+  }
+  
+  $user_id = TokenValidator::validateToken($token);
+  if (!$user_id) { 
+    throw new Exception('Invalid or expired token'); 
+  }
   $user_id = (int)$user_id;
 
   $db = Database::getInstance();
@@ -77,7 +92,11 @@ try {
       SELECT 
         scm.id,
         scm.room_id,
-        scm.from_user_id,
+        CASE 
+          WHEN scm.role = 'user' THEN scm.user_id
+          WHEN scm.role = 'admin' THEN scm.admin_id
+          ELSE NULL
+        END as from_user_id,
         scm.content as message,
         scm.content,
         scm.kind,
@@ -125,31 +144,62 @@ try {
     $message['is_own'] = $message['from_user_id'] == $user_id;
   }
 
-  // 獲取未讀訊息數量（只計算他人發送的訊息，排除 from_user_id 為 NULL 的訊息，避免重複計算）
-  $unread_count = $db->fetch("
-    SELECT COUNT(DISTINCT cm.id) as count
-    FROM chat_messages cm
-    LEFT JOIN chat_reads cr ON cm.room_id = cr.room_id AND cr.user_id = ?
-    WHERE cm.room_id = ? 
-    AND cm.from_user_id IS NOT NULL
-    AND cm.from_user_id != ? 
-    AND cm.id > COALESCE(cr.last_read_message_id, 0)
-  ", [$user_id, $room_id, $user_id]);
+  // 獲取未讀訊息數量（根據聊天室類型使用不同的表）
+  if ($room['source'] === 'support') {
+    // 客服聊天室未讀訊息計數
+    $unread_count = $db->fetch("
+      SELECT COUNT(DISTINCT scm.id) as count
+      FROM support_chat_messages scm
+      LEFT JOIN support_chat_reads scr ON scm.room_id = scr.room_id AND scr.user_id = ?
+      WHERE scm.room_id = ? 
+      AND scm.role = 'admin'
+      AND scm.id > COALESCE(scr.last_read_message_id, 0)
+    ", [$user_id, $room_id]);
+  } else {
+    // 一般聊天室未讀訊息計數
+    $unread_count = $db->fetch("
+      SELECT COUNT(DISTINCT cm.id) as count
+      FROM chat_messages cm
+      LEFT JOIN chat_reads cr ON cm.room_id = cr.room_id AND cr.user_id = ?
+      WHERE cm.room_id = ? 
+      AND cm.from_user_id IS NOT NULL
+      AND cm.from_user_id != ? 
+      AND cm.id > COALESCE(cr.last_read_message_id, 0)
+    ", [$user_id, $room_id, $user_id]);
+  }
 
-  // 取得對方的最後已讀訊息 ID（用於前端顯示我的訊息是否被已讀）
-  $opponent_id = ($room['creator_id'] == $user_id) ? (int)$room['participant_id'] : (int)$room['creator_id'];
-  $opponent_read = $db->fetch(
-    "SELECT COALESCE(last_read_message_id, 0) AS last_read_message_id FROM chat_reads WHERE user_id = ? AND room_id = ?",
-    [$opponent_id, $room_id]
-  );
-  $opponent_last_read_id = isset($opponent_read['last_read_message_id']) ? (int)$opponent_read['last_read_message_id'] : 0;
+  // 取得對方的最後已讀訊息 ID（根據聊天室類型使用不同的表）
+  if ($room['source'] === 'support') {
+    // 客服聊天室：取得管理員的最後已讀
+    $opponent_id = $room['participant_id']; // admin_id
+    $opponent_read = $db->fetch(
+      "SELECT COALESCE(last_read_message_id, 0) AS last_read_message_id FROM support_chat_reads WHERE admin_id = ? AND room_id = ?",
+      [$opponent_id, $room_id]
+    );
+    $opponent_last_read_id = isset($opponent_read['last_read_message_id']) ? (int)$opponent_read['last_read_message_id'] : 0;
 
-  // 也回傳自己最後已讀（可選）
-  $my_read = $db->fetch(
-    "SELECT COALESCE(last_read_message_id, 0) AS last_read_message_id FROM chat_reads WHERE user_id = ? AND room_id = ?",
-    [$user_id, $room_id]
-  );
-  $my_last_read_id = isset($my_read['last_read_message_id']) ? (int)$my_read['last_read_message_id'] : 0;
+    // 也回傳自己最後已讀（客服聊天室）
+    $my_read = $db->fetch(
+      "SELECT COALESCE(last_read_message_id, 0) AS last_read_message_id FROM support_chat_reads WHERE user_id = ? AND room_id = ?",
+      [$user_id, $room_id]
+    );
+    $my_last_read_id = isset($my_read['last_read_message_id']) ? (int)$my_read['last_read_message_id'] : 0;
+  } else {
+    // 一般聊天室：取得對方的最後已讀
+    $opponent_id = ($room['creator_id'] == $user_id) ? (int)$room['participant_id'] : (int)$room['creator_id'];
+    $opponent_read = $db->fetch(
+      "SELECT COALESCE(last_read_message_id, 0) AS last_read_message_id FROM chat_reads WHERE user_id = ? AND room_id = ?",
+      [$opponent_id, $room_id]
+    );
+    $opponent_last_read_id = isset($opponent_read['last_read_message_id']) ? (int)$opponent_read['last_read_message_id'] : 0;
+
+    // 也回傳自己最後已讀（一般聊天室）
+    $my_read = $db->fetch(
+      "SELECT COALESCE(last_read_message_id, 0) AS last_read_message_id FROM chat_reads WHERE user_id = ? AND room_id = ?",
+      [$user_id, $room_id]
+    );
+    $my_last_read_id = isset($my_read['last_read_message_id']) ? (int)$my_read['last_read_message_id'] : 0;
+  }
 
   Response::success([
     'messages' => $messages,

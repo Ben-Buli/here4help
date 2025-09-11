@@ -635,21 +635,10 @@ class _LoginPageState extends State<LoginPage> {
                                       const EdgeInsets.symmetric(vertical: 14),
                                 ),
                                 onPressed: isLoading ? null : _submitForm,
-                                child: isLoading
-                                    ? const SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                                  Colors.white),
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Login',
-                                        style: TextStyle(color: Colors.white),
-                                      ),
+                                child: const Text(
+                                  'Login',
+                                  style: TextStyle(color: Colors.white),
+                                ),
                               ),
                             ),
                             const SizedBox(height: 24),

@@ -62,7 +62,7 @@ $files = [
     '/api/admin/tasks.php',
     '/api/admin/task-disputes.php', 
     '/api/admin/support-chat-rooms.php',
-    '/api/admin/support/claim-issue.php',
+    '/api/admin/support/issues/{id}/accept', // 已整合到 Laravel SupportController
     '/api/admin/support/update-status.php'
 ];
 
