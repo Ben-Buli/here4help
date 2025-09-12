@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:here4help/config/environment_config.dart';
+import 'package:here4help/config/environment_config_legacy.dart';
 
 // 條件導入：根據平台選擇不同的實現
 import 'web_environment_bridge_stub.dart'

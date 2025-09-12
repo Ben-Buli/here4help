@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:here4help/config/environment_config.dart';
+import 'package:here4help/config/environment_config_legacy.dart';
 
 /// 頭像路徑類型
 enum AvatarPathType {

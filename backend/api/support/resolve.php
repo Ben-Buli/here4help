@@ -143,7 +143,7 @@ try {
         
         // 觸發 Socket 事件通知
         try {
-            $socketUrl = 'http://localhost:3001/support/event/resolve';
+            $socketUrl = ($_ENV['SOCKET_SERVER_URL'] ?? 'http://localhost:3001') . '/support/event/resolve';
             $socketData = [
                 'chatRoomId' => $roomId,
                 'eventId' => $eventId,

@@ -1,9 +1,26 @@
+/// ⚠️ 此文件已廢棄 - 請使用新的 .env 系統
+///
+/// 舊的 JSON 配置系統已被新的 .env 系統取代
+/// 所有功能已遷移到 environment_config_legacy.dart
+///
+/// 新系統特點：
+/// - 使用 flutter_dotenv 管理環境變數
+/// - 支持多環境配置 (.env.development, .env.production 等)
+/// - 更安全的敏感資訊管理
+/// - 統一的端口和 URL 配置
+///
+/// @deprecated 使用 environment_config_legacy.dart 替代
+library;
+
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:here4help/config/env_config.dart';
 
+@Deprecated('使用新的 .env 系統和 environment_config_legacy.dart')
 class EnvironmentConfig {
   static Map<String, dynamic>? _config;
+  static bool _useEnvConfig = true; // 切換到新的 .env 系統
 
   /// 檢測是否為 Android 模擬器
   static bool _isAndroidEmulator() {
@@ -68,6 +85,18 @@ class EnvironmentConfig {
     }
   }
 
+  /// 獲取環境變數值（安全方式）
+  static String _getEnvValue(String key) {
+    try {
+      return EnvConfig.get(key);
+    } catch (e) {
+      if (kDebugMode) {
+        print('⚠️ 無法獲取環境變數 $key: $e');
+      }
+      return '';
+    }
+  }
+
   /// 初始化配置
   static Future<void> initialize() async {
     if (_config != null) return;
@@ -115,24 +144,20 @@ class EnvironmentConfig {
         print('❌ 載入環境配置失敗: $e');
         print('💡 使用預設配置');
       }
-      // 使用預設配置
+      // 使用預設配置 - 移除所有硬編程的敏感資訊
       _config = {
         'environment': 'development',
         'public': {
-          'api_base_url': _getNetworkAddress('http://127.0.0.1:8888/here4help'),
-          'socket_url': _getNetworkAddress('http://127.0.0.1:3001'),
-          'image_base_url':
-              _getNetworkAddress('http://127.0.0.1:8888/here4help'),
-          'google_client_id':
-              '102744926949-bhrnm2970bgt3dfm2nmdbqt03mrvdh3i.apps.googleusercontent.com',
-          'google_redirect_uri':
-              'http://127.0.0.1:8888/here4help/backend/api/auth/google-callback.php',
-          'facebook_app_id': '1037019294991326',
-          'facebook_redirect_uri':
-              'http://127.0.0.1:8888/here4help/backend/api/auth/facebook-callback.php',
-          'apple_service_id': 'com.example.here4help.login',
-          'apple_redirect_uri':
-              'http://127.0.0.1:8888/here4help/backend/api/auth/apple-callback.php',
+          'api_base_url': _getNetworkAddress(EnvConfig.apiBaseUrl),
+          'socket_url': _getNetworkAddress(EnvConfig.socketUrl),
+          'image_base_url': _getNetworkAddress(EnvConfig.imageBaseUrl),
+          // 使用環境變數而非硬編程敏感資訊
+          'google_client_id': _getEnvValue('GOOGLE_CLIENT_ID'),
+          'google_redirect_uri': _getEnvValue('GOOGLE_REDIRECT_URI'),
+          'facebook_app_id': _getEnvValue('FACEBOOK_APP_ID'),
+          'facebook_redirect_uri': _getEnvValue('FACEBOOK_REDIRECT_URI'),
+          'apple_service_id': _getEnvValue('APPLE_SERVICE_ID'),
+          'apple_redirect_uri': _getEnvValue('APPLE_REDIRECT_URI'),
         },
         'app': {
           'debug_mode': true,
@@ -157,8 +182,7 @@ class EnvironmentConfig {
 
   /// API 基礎 URL
   static String get apiBaseUrl {
-    final baseUrl = _config?['public']?['api_base_url'] ??
-        'http://127.0.0.1:8888/here4help';
+    final baseUrl = _config?['public']?['api_base_url'] ?? EnvConfig.apiBaseUrl;
     return _getNetworkAddress(baseUrl);
   }
 
@@ -177,8 +201,7 @@ class EnvironmentConfig {
 
   /// Socket 伺服器 URL
   static String get socketUrl {
-    final socketUrl =
-        _config?['public']?['socket_url'] ?? 'http://127.0.0.1:3001';
+    final socketUrl = _config?['public']?['socket_url'] ?? EnvConfig.socketUrl;
     // 使用正確的網路地址分流邏輯
     return _getNetworkAddress(socketUrl);
   }
@@ -309,24 +332,12 @@ class EnvironmentConfig {
 
   /// 預設 API 基礎 URL
   static String _getDefaultApiBaseUrl() {
-    // Web 平台使用 127.0.0.1
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8888/here4help';
-    }
-
-    // 其他平台使用 127.0.0.1
-    return 'http://127.0.0.1:8888/here4help';
+    return EnvConfig.apiBaseUrl;
   }
 
   /// 預設 Socket 伺服器 URL
   static String _getDefaultSocketUrl() {
-    // Web 平台使用 127.0.0.1
-    if (kIsWeb) {
-      return 'http://127.0.0.1:3001';
-    }
-
-    // 其他平台使用 127.0.0.1
-    return 'http://127.0.0.1:3001';
+    return EnvConfig.socketUrl;
   }
 
   /// 檢查是否為 Android 模擬器

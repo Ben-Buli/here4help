@@ -5,7 +5,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/services/http_client_service.dart';
-import 'package:here4help/config/environment_config.dart';
+import 'package:here4help/config/environment_config_legacy.dart';
 
 /// 全域錯誤上報服務
 class ErrorReportingService {

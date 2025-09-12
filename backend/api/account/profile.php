@@ -6,6 +6,9 @@ require_once __DIR__ . '/../../utils/UserActiveLogger.php';
 require_once __DIR__ . '/../../utils/ErrorCodes.php';
 require_once __DIR__ . '/../../auth_helper.php';
 
+// 確保環境配置已載入
+EnvLoader::load();
+
 // CORS headers
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');

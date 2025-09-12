@@ -58,6 +58,9 @@ class ApiDocGenerator {
             }
         }
         
+        // 從環境變數獲取 API 基礎 URL
+        $apiBaseUrl = EnvLoader::get('API_BASE_URL', 'http://localhost:8888/here4help/backend');
+        
         // 返回基本結構
         return [
             'info' => $result['info'] ?? [
@@ -66,7 +69,7 @@ class ApiDocGenerator {
                 'description' => 'Here4Help 平台 API'
             ],
             'servers' => [
-                ['url' => 'http://localhost:8888/here4help/backend/api']
+                ['url' => $apiBaseUrl]
             ]
         ];
     }

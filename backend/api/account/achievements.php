@@ -8,10 +8,14 @@
  * - 平均評分 (user_ratings where tasker_id=user_id)
  */
 
+require_once __DIR__ . '/../../config/env_loader.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/Response.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../auth_helper.php';
+
+// 確保環境配置已載入
+EnvLoader::load();
 
 Response::setCorsHeaders();
 

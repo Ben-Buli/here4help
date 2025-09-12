@@ -90,7 +90,7 @@ FACEBOOK_CLIENT_TOKEN=your_facebook_client_token
 ```bash
 APPLE_TEAM_ID=your_apple_team_id
 APPLE_KEY_ID=your_apple_key_id
-APPLE_SERVICE_ID=com.example.here4help.login
+APPLE_SERVICE_ID=your_apple_service_id_here
 APPLE_BUNDLE_ID=com.example.here4help
 ```
 

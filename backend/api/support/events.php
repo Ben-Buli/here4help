@@ -248,7 +248,7 @@ function handleCreateEvent($db, $userId) {
         
         // 觸發 WebSocket 事件
         try {
-            $socketUrl = 'http://localhost:3001/api/support-events/broadcast';
+            $socketUrl = ($_ENV['SOCKET_SERVER_URL'] ?? 'http://localhost:3001') . '/api/support-events/broadcast';
             $postData = json_encode([
                 'type' => 'event_new',
                 'chat_room_id' => $chatRoomId,

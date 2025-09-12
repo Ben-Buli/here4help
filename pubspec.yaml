@@ -49,6 +49,7 @@ dependencies:
   # 圖片壓縮和處理
   flutter_image_compress: ^2.4.0
   uuid: ^4.3.3
+  flutter_dotenv: ^6.0.0
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +69,13 @@ flutter:
   assets:
     - assets/icon/
     - assets/app_env/
-    - assets/app_env/development.json
-    - assets/app_env/android_emulator.json
-    - assets/app_env/ios_simulator.json
+    # Environment configuration files (for Web platform)
+    - assets/env/
+    # Environment configuration files (for native platforms)
+    - .env.development
+    - .env.staging
+    - .env.production
+    - .env.testflight
+    - .env.android_emulator
+    - .env.ios_simulator
+    - env.example

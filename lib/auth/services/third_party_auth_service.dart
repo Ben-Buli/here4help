@@ -1,4 +1,4 @@
-import 'package:here4help/config/environment_config.dart';
+import 'package:here4help/config/environment_config_legacy.dart';
 import 'package:here4help/config/app_config.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';

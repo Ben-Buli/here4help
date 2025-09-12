@@ -31,25 +31,22 @@ class JWTManager {
      * @throws Exception
      */
     private static function getSecret() {
+        // 載入環境配置
+        require_once __DIR__ . '/../config/env_loader.php';
+        EnvLoader::load();
+        
         // 從環境變數獲取密鑰
-        $secret = getenv('JWT_SECRET');
+        $secret = EnvLoader::get('JWT_SECRET');
         if (!$secret) {
-            // 嘗試從項目根目錄的 .env 檔案載入
-            $envPath = __DIR__ . '/../../.env';
-            if (file_exists($envPath)) {
-                $envContent = file_get_contents($envPath);
-                preg_match('/JWT_SECRET=([^\s]+)/', $envContent, $matches);
-                if (isset($matches[1])) {
-                    $secret = trim($matches[1]);
-                    error_log("JWT_SECRET loaded from .env file");
-                }
-            }
+            // 嘗試從 getenv() 獲取（向後兼容）
+            $secret = getenv('JWT_SECRET');
         }
         
         if (!$secret) {
             throw new Exception('JWT_SECRET not configured. Please check your .env file.');
         }
         
+        error_log("JWT_SECRET loaded successfully (length: " . strlen($secret) . ")");
         return $secret;
     }
     

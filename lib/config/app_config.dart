@@ -1,4 +1,4 @@
-import 'environment_config.dart';
+import 'environment_config_legacy.dart';
 
 class AppConfig {
   // 新通用 API 組裝器：以環境的 apiOrigin + apiPrefix 組裝

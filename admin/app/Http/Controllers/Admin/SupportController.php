@@ -737,7 +737,7 @@ class SupportController extends Controller
     private function sendSocketNotification($chatRoomId, $eventId, $oldStatus, $newStatus, $adminId)
     {
         try {
-            $socketUrl = 'http://localhost:3001/support/event/update';
+            $socketUrl = env('SOCKET_SERVER_URL', 'http://localhost:3001') . '/support/event/update';
             $socketData = [
                 'chatRoomId' => $chatRoomId,
                 'eventId' => $eventId,
@@ -768,7 +768,7 @@ class SupportController extends Controller
     private function sendSocketMessage($roomId, $messageId, $fromUserId, $content, $kind)
     {
         try {
-            $socketUrl = 'http://localhost:3001/support/message';
+            $socketUrl = env('SOCKET_SERVER_URL', 'http://localhost:3001') . '/support/message';
             $socketData = [
                 'roomId' => (string)$roomId,
                 'messageId' => $messageId,

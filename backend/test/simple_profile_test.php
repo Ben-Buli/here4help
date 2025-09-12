@@ -1,8 +1,12 @@
 <?php
-require_once __DIR__ . '/../config/env_loader.php';
+require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/../utils/JWTManager.php';
 
 echo "=== 簡化個人資料 API 測試 ===\n\n";
+
+// 打印測試配置
+TestConfig::printConfig();
+echo "\n";
 
 // 生成測試 JWT token
 $jwtManager = new JWTManager();
@@ -10,8 +14,8 @@ $testToken = $jwtManager->generateToken(['user_id' => 1]);
 
 echo "測試 Token: " . substr($testToken, 0, 50) . "...\n\n";
 
-// 測試 URL
-$url = 'http://localhost:8888/here4help/backend/api/account/profile.php?token=' . urlencode($testToken);
+// 使用測試配置獲取 URL
+$url = TestConfig::getApiUrl('/account/profile.php') . '?token=' . urlencode($testToken);
 
 echo "請求 URL: $url\n\n";
 

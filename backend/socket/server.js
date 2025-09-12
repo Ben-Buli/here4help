@@ -23,7 +23,7 @@ const jwt = require('jsonwebtoken');
 // 引入客服事件處理器
 const SupportEventHandler = require('./support_events');
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.SOCKET_PORT || 3001;
 
 // Load environment variables once at startup (try root .env, then backend/config/.env)
 const path = require('path');

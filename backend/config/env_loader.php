@@ -37,7 +37,8 @@ class EnvLoader {
         }
 
         if ($path === null) {
-            $path = __DIR__ . '/.env';
+            // 優先從 backend/.env 載入
+            $path = dirname(__DIR__) . '/.env';
         }
 
         if (!file_exists($path)) {

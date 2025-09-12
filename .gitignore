@@ -232,6 +232,10 @@ web/.firebase/
 .env.staging
 .env.test
 
+# Flutter Web environment files
+assets/env/.env
+assets/env/.env.*
+
 # Backend environment files
 backend/config/env.local
 backend/config/env.production

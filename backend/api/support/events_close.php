@@ -139,7 +139,7 @@ try {
         
         // 觸發 Socket 事件通知
         try {
-            $socketUrl = 'http://localhost:3001/support/event/closed';
+            $socketUrl = ($_ENV['SOCKET_SERVER_URL'] ?? 'http://localhost:3001') . '/support/event/closed';
             $socketData = [
                 'chatRoomId' => $event['support_chat_room_id'],
                 'eventId' => $eventId,

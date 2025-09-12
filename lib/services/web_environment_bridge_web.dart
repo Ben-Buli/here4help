@@ -1,6 +1,6 @@
 import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
-import 'package:here4help/config/environment_config.dart';
+import 'package:here4help/config/environment_config_legacy.dart';
 
 /// Web 平台專用的環境配置橋接器實現
 class WebEnvironmentBridgeImpl {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:here4help/config/environment_config.dart';
+import 'package:here4help/config/environment_config_legacy.dart';
 
 /// 頭像快取管理器
 /// 提供記憶體快取和磁碟快取功能，避免重複載入相同的頭像圖片

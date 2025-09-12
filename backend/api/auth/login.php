@@ -19,9 +19,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // 引入資料庫配置
+require_once __DIR__ . '/../../config/env_loader.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
+
+// 確保環境配置已載入
+EnvLoader::load();
 
 try {
     // 獲取 POST 資料
