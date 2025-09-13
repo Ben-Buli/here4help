@@ -1,8 +1,23 @@
 <?php
-header('Content-Type: application/json');
+// 完整的 CORS 標頭，支援三域跨域
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS, HEAD');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Origin, Accept');
+header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Max-Age: 86400'); // 24 小時
+
+// 方案 A：允許跨 origin 溝通，解除瀏覽器 COOP 限制
+// 針對三域跨域 popup 使用最寬鬆的設定
+header("Cross-Origin-Opener-Policy: unsafe-none");
+header("Cross-Origin-Embedder-Policy: unsafe-none");
+header("Cross-Origin-Resource-Policy: cross-origin");
+
+// 針對 popup 頁面，使用 text/html 而不是 application/json
+if (isset($_GET['popup']) && $_GET['popup'] === 'true') {
+    header('Content-Type: text/html; charset=utf-8');
+} else {
+    header('Content-Type: application/json');
+}
 
 // 處理 OPTIONS 請求
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -69,11 +84,25 @@ try {
     $explicitRedirect = trim(EnvLoader::get('GOOGLE_REDIRECT_URI', ''));
     if (!empty($explicitRedirect)) {
         $redirectUri = $explicitRedirect;
-    } else {
+} else {
         $base = rtrim(EnvLoader::get('APP_URL', 'http://127.0.0.1:8888'), '/');
         // $redirectUri = $base . '/api/auth/google-callback.php';
         $redirectUri = $base . '/backend/api/auth/google-callback.php';
     }
+    // 檢查是否在 popup 視窗中，如果是則調整 redirect_uri
+    $isPopup = isset($_GET['popup']) && $_GET['popup'] === 'true';
+    error_log("🔍 Popup 檢測: " . ($isPopup ? 'true' : 'false'));
+    error_log("🔍 GET 參數: " . json_encode($_GET));
+    
+    if ($isPopup) {
+        $redirectUri = $redirectUri . '?popup=true';
+        error_log("🔍 調整後的 redirect_uri: $redirectUri");
+    }
+    
+    error_log("GOOGLE_CLIENT_ID: " . $clientId);
+    error_log("GOOGLE_CLIENT_SECRET: " . (empty($clientSecret) ? 'MISSING' : 'LOADED'));
+    error_log("GOOGLE_REDIRECT_URI: " . $redirectUri);
+    error_log("IS_POPUP_MODE: " . ($isPopup ? 'true' : 'false'));
     
     if (empty($clientId) || empty($clientSecret)) {
         throw new Exception('Google OAuth configuration is missing');
@@ -93,6 +122,10 @@ try {
         'redirect_uri' => $redirectUri,
     ];
     
+    // 記錄詳細的 token 請求參數
+    error_log("Token Request URL: " . $tokenUrl);
+    error_log("Token Request Data: " . json_encode($tokenData, JSON_UNESCAPED_UNICODE));
+    
     // 使用 file_get_contents 替代 cURL（如果 cURL 不可用）
     $context = stream_context_create([
         'http' => [
@@ -104,8 +137,16 @@ try {
     
     $tokenResponse = file_get_contents($tokenUrl, false, $context);
     if ($tokenResponse === false) {
-        throw new Exception('Failed to exchange authorization code for access token');
+        // 獲取詳細的錯誤資訊
+        $error = error_get_last();
+        $errorMsg = $error ? $error['message'] : 'Unknown error';
+        error_log("Token request failed: " . $errorMsg);
+        throw new Exception('Failed to exchange authorization code for access token: ' . $errorMsg);
     }
+    
+    // 記錄 token 回應（隱藏敏感資訊）
+    error_log("Token Response Length: " . strlen($tokenResponse));
+    error_log("Token Response Preview: " . substr($tokenResponse, 0, 200) . (strlen($tokenResponse) > 200 ? '...' : ''));
     
     $tokenResult = json_decode($tokenResponse, true);
     if (!$tokenResult || !isset($tokenResult['access_token'])) {
@@ -192,27 +233,60 @@ try {
         
         error_log("Google OAuth Callback - 情況1：現有用戶登入成功，前往 /home");
     } else {
-        // 情況2：檢查 user_identities 表中是否存在該 email 但 user_id 不存在於 users.id
+        // 情況2：檢查 users 表中是否存在該 email（直接查詢 users 表）
         $stmt = $db->query(
-            "SELECT ui.* FROM user_identities ui 
-             LEFT JOIN users u ON ui.user_id = u.id 
-             WHERE ui.provider = 'google' AND ui.email = ? AND u.id IS NULL",
+            "SELECT * FROM users WHERE email = ?",
             [$email]
         );
         
-        $existingIdentityWithInvalidUser = $stmt->fetch();
+        $existingUser = $stmt->fetch();
         
-        if ($existingIdentityWithInvalidUser) {
-            error_log("Google OAuth Callback - 情況2：Email 存在但 user_id 無效，user_id: {$existingIdentityWithInvalidUser['user_id']}");
+        if ($existingUser) {
+            error_log("Google OAuth Callback - 情況2：找到現有用戶（直接查詢 users 表），用戶 ID: {$existingUser['id']}");
             
-            $user = null;
-            $isNewUser = true;
-            $redirectToSignup = true;
-            $existingUserId = $existingIdentityWithInvalidUser['user_id'];
+            // 更新最後登入時間
+            $db->query(
+                "UPDATE users SET updated_at = NOW() WHERE id = ?",
+                [$existingUser['id']]
+            );
             
-            error_log("Google OAuth Callback - 情況2：前往註冊頁面，傳遞 user_id: $existingUserId");
+            // 檢查 user_identities 表中是否存在該用戶的 Google 身份
+            $stmt = $db->query(
+                "SELECT * FROM user_identities WHERE user_id = ? AND provider = 'google'",
+                [$existingUser['id']]
+            );
+            
+            $existingIdentity = $stmt->fetch();
+            
+            if ($existingIdentity) {
+                // 更新現有的 user_identity
+                $db->query(
+                    "UPDATE user_identities SET 
+                     provider_user_id = ?, 
+                     access_token = ?, 
+                     avatar_url = ?,
+                     raw_profile = ?,
+                     updated_at = NOW() 
+                     WHERE id = ?",
+                    [$googleId, $accessToken, $avatarUrl, json_encode($userInfo), $existingIdentity['id']]
+                );
+            } else {
+                // 創建新的 user_identity
+                $db->query(
+                    "INSERT INTO user_identities (user_id, provider, provider_user_id, email, name, avatar_url, access_token, raw_profile, created_at, updated_at)
+                     VALUES (?, 'google', ?, ?, ?, ?, ?, ?, NOW(), NOW())",
+                    [$existingUser['id'], $googleId, $email, $name, $avatarUrl, $accessToken, json_encode($userInfo)]
+                );
+            }
+            
+            $user = $existingUser;
+            $isNewUser = false;
+            $redirectToSignup = false;
+            $existingUserId = null;
+            
+            error_log("Google OAuth Callback - 情況2：現有用戶登入成功，前往 /home");
         } else {
-            // 情況3：user_identities.email 不存在且 users 中也不存在
+            // 情況3：完全新用戶，email 不存在於任何表
             error_log("Google OAuth Callback - 情況3：完全新用戶，email 不存在於任何表");
             
             $user = null;
@@ -224,7 +298,7 @@ try {
         }
     }
     
-    // 生成 JWT Token（僅在情況1中）
+    // 生成 JWT Token（情況1和情況2都需要）
     if ($user !== null) {
         $payload = [
             'user_id' => $user['id'],
@@ -334,8 +408,8 @@ try {
             ]
         );
 
-        // 新用戶：直接重定向到註冊頁面
-        $redirectUrl = rtrim($frontendUrl, '/') . '/signup?' . http_build_query([
+        // 新用戶：直接重定向到註冊頁面（使用 hash 路由）
+        $redirectUrl = rtrim($frontendUrl, '/') . '/#/signup?' . http_build_query([
             'token' => $tempToken,
             'provider' => 'google',
             'is_new_user' => 'true'
@@ -346,11 +420,11 @@ try {
             error_log("Google OAuth Callback - 傳遞 existing_user_id: $existingUserId");
         }
     } else {
-        // 情況1：現有用戶，重定向到主頁
+        // 情況1：現有用戶，重定向到主頁（使用 hash 路由）
         $userDataJson = json_encode($userData, JSON_UNESCAPED_UNICODE);
         $userDataB64 = rtrim(strtr(base64_encode($userDataJson), '+/', '-_'), '=');
 
-        $redirectUrl = rtrim($frontendUrl, '/') . '/auth/callback?' . http_build_query([
+        $redirectUrl = rtrim($frontendUrl, '/') . '/#/auth/callback?' . http_build_query([
             'success' => 'true',
             'token' => $token,
             'user_data' => $userDataB64,
@@ -362,22 +436,154 @@ try {
     
     error_log("Google OAuth Callback - 準備重定向到前端: $redirectUrl");
     
-    // 重定向到前端應用
-    header("Location: $redirectUrl");
-    exit;
+    if ($isPopup) {
+        // 在 popup 視窗中，使用 JavaScript 將結果傳回主頁面
+        $result = [
+            'success' => true,
+            'token' => $isNewUser ? $tempToken : $token,
+            'provider' => 'google',
+            'is_new_user' => $isNewUser,
+            'user_data' => $isNewUser ? null : $userData
+        ];
+        
+        error_log("🔍 Popup 結果: " . json_encode($result));
+        
+        echo "<!DOCTYPE html>
+<html>
+<head>
+    <title>OAuth Callback</title>
+    <meta charset=\"utf-8\">
+</head>
+<body>
+    <script>
+        console.log('🔍 Popup 視窗載入完成');
+        console.log('🔍 window.opener 存在:', !!window.opener);
+        console.log('🔍 當前 origin:', window.location.origin);
+        
+        // 方案 B：改進 postMessage 和關閉邏輯（三域跨域）
+        if (window.opener) {
+            console.log('🔍 傳送 postMessage 到主頁面');
+            
+            // 嘗試多個可能的 origin（優先使用正確的 origin）
+            const possibleOrigins = [
+                'http://localhost:3000',  // 主要 origin
+                'http://127.0.0.1:3000', // 備用 origin
+                '*'  // 最後備用：允許所有 origin
+            ];
+            
+            // 發送到所有可能的 origin
+            possibleOrigins.forEach(origin => {
+                try {
+                    window.opener.postMessage({
+                        type: 'oauth_result',
+                        data: " . json_encode($result) . "
+                    }, origin);
+                    console.log('🔍 已發送到 origin:', origin);
+                } catch (e) {
+                    console.log('⚠️ 發送到 origin 失敗:', origin, e);
+                }
+            });
+            
+            // 嘗試關閉 popup，但不強求成功
+            try {
+                console.log('🔍 嘗試關閉 popup 視窗');
+                window.close();
+            } catch (e) {
+                console.log('⚠️ 無法關閉 popup，交給主頁處理:', e);
+            }
+        } else {
+            console.log('🔍 window.opener 不存在，重定向到主頁面');
+            // 如果無法關閉 popup，重定向到主頁面（使用 hash 路由）
+            window.location.href = '$redirectUrl';
+        }
+    </script>
+    <p>正在處理登入結果...</p>
+</body>
+</html>";
+        exit;
+    } else {
+        // 正常重定向到前端應用
+        header("Location: $redirectUrl");
+        exit;
+    }
     
 } catch (Exception $e) {
     error_log("Google OAuth Callback Error: " . $e->getMessage());
     
-    // 重定向到前端應用，並傳遞錯誤資訊
-    $frontendUrl = EnvLoader::get('FRONTEND_URL', 'http://127.0.0.1:3000');
-    $errorRedirectUrl = $frontendUrl . '/auth/callback?' . http_build_query([
-        'success' => 'false',
-        'provider' => 'google',
-        'error' => $e->getMessage()
-    ]);
-    
-    header("Location: $errorRedirectUrl");
-    exit;
+    if ($isPopup) {
+        // 在 popup 視窗中，使用 JavaScript 將錯誤傳回主頁面
+        $result = [
+            'success' => false,
+            'provider' => 'google',
+            'error' => $e->getMessage()
+        ];
+        
+        error_log("🔍 Popup 錯誤結果: " . json_encode($result));
+        
+        echo "<!DOCTYPE html>
+<html>
+<head>
+    <title>OAuth Error</title>
+    <meta charset=\"utf-8\">
+</head>
+<body>
+    <script>
+        console.log('🔍 Popup 錯誤視窗載入完成');
+        console.log('🔍 window.opener 存在:', !!window.opener);
+        console.log('🔍 當前 origin:', window.location.origin);
+        
+        // 方案 B：改進錯誤處理的 postMessage 和關閉邏輯（三域跨域）
+        if (window.opener) {
+            console.log('🔍 傳送錯誤 postMessage 到主頁面');
+            
+            // 嘗試多個可能的 origin（優先使用正確的 origin）
+            const possibleOrigins = [
+                'http://localhost:3000',  // 主要 origin
+                'http://127.0.0.1:3000', // 備用 origin
+                '*'  // 最後備用：允許所有 origin
+            ];
+            
+            // 發送到所有可能的 origin
+            possibleOrigins.forEach(origin => {
+                try {
+                    window.opener.postMessage({
+                        type: 'oauth_result',
+                        data: " . json_encode($result) . "
+                    }, origin);
+                    console.log('🔍 錯誤已發送到 origin:', origin);
+                } catch (e) {
+                    console.log('⚠️ 錯誤發送到 origin 失敗:', origin, e);
+                }
+            });
+            
+            // 嘗試關閉 popup，但不強求成功
+            try {
+                console.log('🔍 嘗試關閉 popup 視窗');
+                window.close();
+            } catch (e) {
+                console.log('⚠️ 無法關閉 popup，交給主頁處理:', e);
+            }
+        } else {
+            console.log('🔍 window.opener 不存在，重定向到錯誤頁面');
+            // 如果無法關閉 popup，重定向到錯誤頁面（使用 hash 路由）
+            window.location.href = '" . EnvLoader::get('FRONTEND_URL', 'http://127.0.0.1:3000') . "/#/auth/callback?success=false&provider=google&error=" . urlencode($e->getMessage()) . "';
+        }
+    </script>
+    <p>登入失敗，正在關閉視窗...</p>
+</body>
+</html>";
+        exit;
+    } else {
+        // 正常重定向到前端應用，並傳遞錯誤資訊（使用 hash 路由）
+        $frontendUrl = EnvLoader::get('FRONTEND_URL', 'http://127.0.0.1:3000');
+        $errorRedirectUrl = $frontendUrl . '/#/auth/callback?' . http_build_query([
+            'success' => 'false',
+            'provider' => 'google',
+            'error' => $e->getMessage()
+        ]);
+        
+        header("Location: $errorRedirectUrl");
+        exit;
+    }
 }
 ?>

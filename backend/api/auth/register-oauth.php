@@ -55,6 +55,7 @@ try {
     $school = trim($input['school'] ?? '');
     $introReferralCode = trim($input['intro_referral_code'] ?? '');
     $paymentPassword = $input['payment_password'] ?? null;
+    $avatarUrl = trim($input['avatar_url'] ?? ''); // 新增：處理前端傳來的頭像 URL
     
     error_log("OAuth Register - 開始處理用戶註冊: $name, Token: " . substr($oauthToken, 0, 8) . "...");
     
@@ -76,10 +77,12 @@ try {
     $oauthProvider = $tempUser['provider'];
     $providerUserId = $tempUser['provider_user_id'];
     $email = $tempUser['email'];
-    $avatarUrl = $tempUser['avatar_url'] ?? '';
+    // 優先使用前端傳來的 avatar_url，如果沒有則使用 OAuth 暫存資料中的
+    $finalAvatarUrl = !empty($avatarUrl) ? $avatarUrl : ($tempUser['avatar_url'] ?? '');
     $rawData = json_decode($tempUser['raw_data'], true) ?? [];
     
     error_log("OAuth Register - 找到臨時用戶資料，Provider: $oauthProvider, Email: $email");
+    error_log("OAuth Register - Avatar URL: $finalAvatarUrl");
     
     // 檢查 email 是否已存在（如果提供了 email）
     if (!empty($email)) {
@@ -131,7 +134,7 @@ try {
         $db->query($insertUserQuery, [
             $name, $email, $phone, $nickname, $dateOfBirth, $gender,
             $country, $address, $isPermanentAddress, $primaryLanguage,
-            $school, $introReferralCode, $paymentPassword, $avatarUrl
+            $school, $introReferralCode, $paymentPassword, $finalAvatarUrl
         ]);
         
         $userId = $db->lastInsertId();
@@ -146,7 +149,7 @@ try {
         ";
         
         $db->query($insertIdentityQuery, [
-            $userId, $oauthProvider, $providerUserId, $email, $name, $avatarUrl,
+            $userId, $oauthProvider, $providerUserId, $email, $name, $finalAvatarUrl,
             null, // access_token 不再從 rawData 獲取
             json_encode($rawData)
         ]);

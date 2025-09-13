@@ -26,13 +26,16 @@ dependencies:
   google_sign_in: ^7.1.1
   googleapis_auth: ^1.4.1
   # Facebook 登入套件
-  flutter_facebook_auth: ^6.0.4
+  flutter_facebook_auth: ^7.1.2
   # Apple 登入套件
   sign_in_with_apple: ^7.0.1
   # 平台檢測
   universal_platform: ^1.0.0+1
   # URL 啟動器 (Web OAuth 支援)
   url_launcher: ^6.2.5
+  # Mobile OAuth 支援
+  flutter_web_auth_2: ^4.1.0
+  flutter_appauth: ^10.0.0
   image_picker: ^1.0.7
   infinite_scroll_pagination: ^4.0.0
   pinput: ^3.0.1

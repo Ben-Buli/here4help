@@ -28,7 +28,7 @@
 
   // 監聽來自 Flutter 的環境配置回應
   window.addEventListener('message', function(event) {
-    if (event.data && event.data.type === 'flutterEnvironmentConfig') {
+    if (event.data && event.data.type === 'ENVIRONMENT_CONFIG_RESPONSE') {
       const config = event.data.config;
       
       // 設置全域環境配置（僅公開配置）

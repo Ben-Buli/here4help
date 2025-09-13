@@ -67,8 +67,7 @@ final List<Map<String, dynamic>> shellPages = [
   },
   {
     'path': '/signup',
-    'builder': (context, extra) =>
-        SignupPage(oauthData: extra as Map<String, dynamic>?),
+    'child': const SignupPage(),
     'title': 'ESSENTIAL INFORMATION',
     'showAppBar': true,
     'showBottomNav': false,

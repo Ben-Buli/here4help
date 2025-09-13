@@ -42,6 +42,8 @@ final GoRouter appRouter = GoRouter(
     final email = prefs.getString('user_email');
 
     debugPrint('🔄 路由重定向檢查: ${state.uri.path}');
+    debugPrint('🔍 完整 URI: ${state.uri.toString()}');
+    debugPrint('🔍 Query Parameters: ${state.uri.queryParameters}');
     debugPrint('👤 用戶狀態: ${email != null ? "已登入 ($email)" : "未登入"}');
 
     // 定義公開頁面（不需要登入驗證）
@@ -52,18 +54,34 @@ final GoRouter appRouter = GoRouter(
       '/auth/callback'
     ];
 
+    // 特殊處理：如果訪問 /signup 且帶有 OAuth token，允許訪問
+    if (state.uri.path == '/signup' &&
+        state.uri.queryParameters.containsKey('token')) {
+      debugPrint('🔐 OAuth 註冊頁面，允許訪問');
+      debugPrint('🔍 Token: ${state.uri.queryParameters['token']}');
+      debugPrint('🔍 Provider: ${state.uri.queryParameters['provider']}');
+      debugPrint('🔍 Is New User: ${state.uri.queryParameters['is_new_user']}');
+      return null;
+    }
+
     // 如果是公開頁面，允許訪問
     if (publicPages.contains(state.uri.path)) {
       return null;
     }
 
     // 如果未登入且不在公開頁面，導向登入頁面
-    if (email == null) {
+    // 但排除 OAuth 註冊頁面（已經在上面處理過了）
+    if (email == null &&
+        !publicPages.contains(state.uri.path) &&
+        !(state.uri.path == '/signup' &&
+            state.uri.queryParameters.containsKey('token'))) {
+      debugPrint('🔄 未登入用戶訪問受保護頁面，重定向到登入頁面');
       return '/login';
     }
 
     // 如果已登入且訪問登入頁面，導向首頁
-    if (state.uri.path == '/login') {
+    if (state.uri.path == '/login' && email != null) {
+      debugPrint('🔄 已登入用戶訪問登入頁面，重定向到首頁');
       return '/home';
     }
 

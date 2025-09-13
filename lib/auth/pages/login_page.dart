@@ -10,6 +10,7 @@ import 'package:here4help/auth/services/third_party_auth_service.dart';
 import 'package:here4help/auth/services/auth_service.dart';
 import 'package:here4help/providers/permission_provider.dart';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -233,6 +234,74 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final userData = await _platformAuthService.signInWithProvider('google');
 
+      // Web 平台特殊處理：OAuth popup 流程
+      if (kIsWeb && userData != null && userData['oauth_started'] == true) {
+        // Web 平台使用 OAuth popup，等待 popup 結果
+        debugPrint('🌐 Web 平台：OAuth popup 已開啟，等待結果...');
+
+        setState(() {
+          isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('正在開啟 Google 登入視窗...'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      // 處理 popup 視窗返回的 OAuth 結果
+      debugPrint('🔍 檢查 OAuth 結果: userData = $userData');
+      debugPrint('🔍 userData 類型: ${userData.runtimeType}');
+      debugPrint('🔍 userData 包含 data: ${userData?['data'] != null}');
+
+      if (kIsWeb && userData != null && userData['data'] != null) {
+        final rawOauthData = userData['data'];
+        final oauthData = rawOauthData is Map
+            ? Map<String, dynamic>.from(rawOauthData)
+            : null;
+        debugPrint('🔍 OAuth 數據: $oauthData');
+
+        if (oauthData != null) {
+          if (oauthData['success'] == true) {
+            // OAuth 成功，處理登入結果
+            debugPrint('🔍 調用 _handleOAuthSuccess');
+            await _handleOAuthSuccess(oauthData);
+            return;
+          } else {
+            // OAuth 失敗
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Google 登入失敗: ${oauthData['error'] ?? '未知錯誤'}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+        } else {
+          debugPrint('❌ OAuth 數據轉換失敗');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Google 登入數據解析失敗'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      }
+
+      // 如果沒有進入上面的條件，檢查是否直接包含 OAuth 數據
+      if (kIsWeb && userData != null && userData['success'] == true) {
+        debugPrint('🔍 直接處理 OAuth 數據: $userData');
+        // 安全地轉換 LinkedMap 為 Map<String, dynamic>
+        final safeUserData = Map<String, dynamic>.from(userData);
+        await _handleOAuthSuccess(safeUserData);
+        return;
+      }
+
       if (userData != null) {
         // 檢查是否為新用戶，如果是則導向註冊頁面
         if (userData['is_new_user'] == true) {
@@ -286,6 +355,7 @@ class _LoginPageState extends State<LoginPage> {
             SnackBar(
                 content: Text('Google Login Success: ${userData['email']}')),
           );
+          // 使用 hash 路由重定向到主頁
           context.go('/home');
         }
       } else {
@@ -305,6 +375,88 @@ class _LoginPageState extends State<LoginPage> {
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  // 處理 OAuth popup 成功結果
+  Future<void> _handleOAuthSuccess(Map<String, dynamic> oauthData) async {
+    try {
+      final isNewUser = oauthData['is_new_user'] == true;
+
+      if (isNewUser) {
+        // 新用戶：重定向到註冊頁面（使用 hash 路由）
+        final token = oauthData['token'];
+        if (token != null) {
+          final signupUrl = Uri(
+            path: '/signup',
+            queryParameters: {
+              'token': token,
+              'provider': oauthData['provider'] ?? 'google',
+              'is_new_user': 'true',
+            },
+          ).toString();
+
+          debugPrint('🔄 重定向到註冊頁面: $signupUrl');
+          // 使用 hash 路由重定向
+          context.go(
+              '/signup?token=$token&provider=${oauthData['provider'] ?? 'google'}&is_new_user=true');
+        } else {
+          throw Exception('OAuth token 缺失');
+        }
+      } else {
+        // 現有用戶：處理登入
+        final rawUserData = oauthData['user_data'];
+        final userData =
+            rawUserData is Map ? Map<String, dynamic>.from(rawUserData) : null;
+        final token = oauthData['token'];
+
+        if (userData != null && token != null) {
+          // 使用 AuthService 儲存登入資訊
+          await AuthService.saveToken(token);
+          await AuthService.saveUserData(userData);
+
+          // 儲存用戶資訊到 SharedPreferences
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_email', userData['email'] ?? '');
+          await prefs.setInt('user_permission', userData['permission'] ?? 0);
+          await prefs.setString('user_name', userData['name'] ?? '');
+          await prefs.setInt('user_points', userData['points'] ?? 0);
+          await prefs.setString('user_avatarUrl', userData['avatar_url'] ?? '');
+          await prefs.setString(
+              'user_primaryLang', userData['primary_language'] ?? '');
+
+          // 更新 Provider
+          Provider.of<UserService>(context, listen: false).setUser(UserModel(
+            id: userData['id'],
+            name: userData['name'],
+            nickname: userData['nickname'] ?? userData['name'],
+            email: userData['email'],
+            phone: userData['phone'] ?? '',
+            points: userData['points'] ?? 0,
+            avatar_url: userData['avatar_url'] ?? '',
+            status: userData['status'] ?? 'active',
+            provider: userData['provider'] ?? 'google',
+            created_at: userData['created_at'] ?? '',
+            updated_at: userData['updated_at'] ?? '',
+            referral_code: userData['referral_code'],
+            google_id: userData['google_id'],
+            primary_language: userData['primary_language'] ?? 'English',
+            permission: userData['permission'] ?? 0,
+          ));
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Google 登入成功: ${userData['email']}')),
+          );
+          context.go('/home');
+        } else {
+          throw Exception('用戶資料或 token 缺失');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ 處理 OAuth 成功結果失敗: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('處理登入結果失敗: $e')),
+      );
     }
   }
 

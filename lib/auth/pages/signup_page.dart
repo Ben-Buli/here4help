@@ -65,6 +65,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
 
   // 以下為表單狀態
   late String selectedGender;
+  String? oauthAvatarUrl; // 新增：OAuth 頭像 URL
   bool isPermanentAddress = false;
   bool isLoading = false;
   bool showPassword = false;
@@ -82,7 +83,10 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     _loadLanguages();
     _loadUniversities();
     _loadCountries(); // 新增：載入國家列表
-    _loadThirdPartyData(); // 新增：載入第三方登入資料
+    // 延遲載入第三方登入資料，確保其他資料先載入完成
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadThirdPartyData();
+    });
   }
 
   bool showPaymentPassword = false;
@@ -106,24 +110,46 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
 
   // 新增：載入第三方登入資料
   Future<void> _loadThirdPartyData() async {
+    debugPrint('🚀 [SignupPage] 開始載入第三方登入資料...');
+
     // 支援 token 預填：/signup?token=...
     final uri = Uri.base;
     debugPrint('🔍 [SignupPage] 當前 URL: ${uri.toString()}');
     debugPrint('🔍 [SignupPage] URL 參數: ${uri.queryParameters}');
 
-    final tokenParam = uri.queryParameters['token'];
-    debugPrint('🔍 [SignupPage] Token 參數: $tokenParam');
+    // 在 Flutter Web 中，優先從 Uri.base 獲取參數
+    String? tokenParam = uri.queryParameters['token'];
+    debugPrint('🔍 [SignupPage] 從 Uri.base 獲取 Token 參數: $tokenParam');
+
+    // 如果 Uri.base 沒有參數，嘗試從 GoRouter 獲取（在 didChangeDependencies 中）
+    if (tokenParam == null || tokenParam.isEmpty) {
+      try {
+        // 嘗試從 GoRouter 獲取當前路由的 query 參數
+        final routerState = GoRouterState.of(context);
+        tokenParam = routerState.uri.queryParameters['token'];
+        debugPrint('🔍 [SignupPage] GoRouter Token 參數: $tokenParam');
+      } catch (e) {
+        debugPrint('⚠️ [SignupPage] 無法從 GoRouter 獲取參數: $e');
+      }
+    }
+
+    debugPrint('🔍 [SignupPage] 最終 Token 參數: $tokenParam');
 
     if (tokenParam != null && tokenParam.isNotEmpty) {
       try {
+        debugPrint('🔍 開始獲取 OAuth 暫存資料，token: $tokenParam');
         final temp = await OAuthApi.fetchTempUser(tokenParam);
         if (temp != null) {
+          debugPrint('✅ 成功獲取 OAuth 暫存資料: $temp');
           _prefillOAuthData(temp);
-          setState(() {});
+        } else {
+          debugPrint('⚠️ OAuth 暫存資料為空');
         }
       } catch (e) {
         debugPrint('❌ OAuth token 預填失敗: $e');
       }
+    } else {
+      debugPrint('⚠️ 沒有找到 OAuth token 參數');
     }
 
     // 優先使用傳入的 oauthData
@@ -161,24 +187,105 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   // 預填第三方登入資料
   void _prefillOAuthData(Map<String, dynamic> oauthData) {
     try {
+      debugPrint('🔍 開始預填 OAuth 資料: $oauthData');
+
       // 預填基本資料
-      if (oauthData['name'] != null) {
-        fullNameController.text = oauthData['name'];
+      if (oauthData['name'] != null &&
+          oauthData['name'].toString().isNotEmpty) {
+        fullNameController.text = oauthData['name'].toString();
+        debugPrint('✅ 預填姓名: ${oauthData['name']}');
       }
 
-      if (oauthData['email'] != null) {
-        emailController.text = oauthData['email'];
+      if (oauthData['email'] != null &&
+          oauthData['email'].toString().isNotEmpty) {
+        emailController.text = oauthData['email'].toString();
+        debugPrint('✅ 預填郵箱: ${oauthData['email']}');
       }
 
-      if (oauthData['avatar_url'] != null) {
-        // TODO: 處理頭像 URL
-        print('🖼️ 第三方登入頭像: ${oauthData['avatar_url']}');
+      // 預填暱稱（如果沒有則使用姓名）
+      if (oauthData['nickname'] != null &&
+          oauthData['nickname'].toString().isNotEmpty) {
+        nicknameController.text = oauthData['nickname'].toString();
+      } else if (oauthData['name'] != null &&
+          oauthData['name'].toString().isNotEmpty) {
+        nicknameController.text = oauthData['name'].toString();
+      }
+
+      // 處理頭像 URL
+      if (oauthData['avatar_url'] != null &&
+          oauthData['avatar_url'].toString().isNotEmpty) {
+        debugPrint('🖼️ 第三方登入頭像: ${oauthData['avatar_url']}');
+        setState(() {
+          oauthAvatarUrl = oauthData['avatar_url'].toString();
+        });
+      }
+
+      // 預填性別（如果 Google 提供）
+      if (oauthData['gender'] != null &&
+          oauthData['gender'].toString().isNotEmpty) {
+        final gender = oauthData['gender'].toString();
+        if (genderParams.containsKey(gender)) {
+          selectedGender = gender;
+          debugPrint('✅ 預填性別: $gender');
+        }
+      }
+
+      // 預填國家（如果 Google 提供）
+      if (oauthData['country'] != null &&
+          oauthData['country'].toString().isNotEmpty) {
+        countryController.text = oauthData['country'].toString();
+        debugPrint('✅ 預填國家: ${oauthData['country']}');
+      }
+
+      // 預填地址（如果 Google 提供）
+      if (oauthData['address'] != null &&
+          oauthData['address'].toString().isNotEmpty) {
+        addressController.text = oauthData['address'].toString();
+        debugPrint('✅ 預填地址: ${oauthData['address']}');
+      }
+
+      // 預填電話（如果 Google 提供）
+      if (oauthData['phone'] != null &&
+          oauthData['phone'].toString().isNotEmpty) {
+        phoneController.text = oauthData['phone'].toString();
+        debugPrint('✅ 預填電話: ${oauthData['phone']}');
+      }
+
+      // 預填生日（如果 Google 提供）
+      if (oauthData['birthday'] != null &&
+          oauthData['birthday'].toString().isNotEmpty) {
+        dateOfBirthController.text = oauthData['birthday'].toString();
+        debugPrint('✅ 預填生日: ${oauthData['birthday']}');
+      }
+
+      // 預填語言（如果 Google 提供）
+      if (oauthData['language'] != null &&
+          oauthData['language'].toString().isNotEmpty) {
+        final language = oauthData['language'].toString();
+        if (languageOptions.isNotEmpty &&
+            languageOptions.any((lang) => lang['code'] == language)) {
+          selectedLanguages = [language];
+          debugPrint('✅ 預填語言: $language');
+        } else {
+          // 如果語言選項還沒載入，使用預設語言
+          selectedLanguages = ['en'];
+          debugPrint('⚠️ 語言選項未載入，使用預設語言: en');
+        }
+      } else {
+        // 如果沒有語言資訊，使用預設語言
+        selectedLanguages = ['en'];
+        debugPrint('✅ 使用預設語言: en');
       }
 
       // 標記為第三方登入
-      print('✅ 第三方登入資料預填完成');
+      debugPrint('✅ 第三方登入資料預填完成');
+
+      // 觸發 UI 更新
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
-      print('❌ 預填第三方登入資料失敗: $e');
+      debugPrint('❌ 預填第三方登入資料失敗: $e');
     }
   }
 
@@ -224,11 +331,23 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
 
     try {
       // 獲取 OAuth token（從 URL 參數或 widget 資料）
-      final uri = Uri.base;
-      final oauthToken = uri.queryParameters['token'] ??
-          uri.queryParameters['oauth_token'] ??
-          widget.oauthData?['oauth_token'] ??
-          widget.oauthData?['token'];
+      String? oauthToken;
+      try {
+        // 優先從 GoRouter 獲取 query 參數
+        final routerState = GoRouterState.of(context);
+        oauthToken = routerState.uri.queryParameters['token'] ??
+            routerState.uri.queryParameters['oauth_token'];
+      } catch (e) {
+        debugPrint('⚠️ [SignupPage] 無法從 GoRouter 獲取 token: $e');
+        // 備用方案：從 Uri.base 獲取
+        final uri = Uri.base;
+        oauthToken =
+            uri.queryParameters['token'] ?? uri.queryParameters['oauth_token'];
+      }
+
+      // 最後嘗試從 widget 資料獲取
+      oauthToken ??=
+          widget.oauthData?['oauth_token'] ?? widget.oauthData?['token'];
 
       if (oauthToken == null || oauthToken.isEmpty) {
         throw Exception(
@@ -265,6 +384,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         'payment_password': paymentPasswordController.text.isNotEmpty
             ? paymentPasswordController.text
             : null,
+        'avatar_url': oauthAvatarUrl, // 新增：包含 OAuth 頭像 URL
       };
 
       debugPrint('🚀 開始 OAuth 註冊...');
@@ -284,6 +404,9 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
 
         // 保存登入資訊
         await _saveLoginInfo(data['data']['token'], data['data']['user']);
+
+        // 清理 OAuth 暫存資料
+        await _cleanupOAuthTempData(oauthToken);
 
         // 導向到學生證上傳頁面
         _redirectToStudentIdPage();
@@ -325,6 +448,33 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     print('🔄 導向到學生證上傳頁面...');
     if (mounted) {
       context.go('/signup/student-id');
+    }
+  }
+
+  // 清理 OAuth 暫存資料
+  Future<void> _cleanupOAuthTempData(String oauthToken) async {
+    try {
+      debugPrint('🧹 開始清理 OAuth 暫存資料，token: $oauthToken');
+
+      // 調用後端 API 清理暫存資料
+      final response = await http.post(
+        Uri.parse(AppConfig.api('/auth/cleanup-oauth-temp.php')),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'oauth_token': oauthToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          debugPrint('✅ OAuth 暫存資料清理成功');
+        } else {
+          debugPrint('⚠️ OAuth 暫存資料清理失敗: ${data['message']}');
+        }
+      } else {
+        debugPrint('⚠️ OAuth 暫存資料清理請求失敗: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ OAuth 暫存資料清理錯誤: $e');
     }
   }
 
@@ -645,6 +795,57 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // OAuth Avatar Preview (if available)
+            if (oauthAvatarUrl != null) ...[
+              Center(
+                child: Column(
+                  children: [
+                    const Text(
+                      'Profile Picture from Google',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: Image.network(
+                          oauthAvatarUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Icon(
+                              Icons.person,
+                              size: 40,
+                              color: Theme.of(context).colorScheme.primary,
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'This will be your profile picture',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+
             // Full Name
             TextFormField(
               controller: fullNameController,

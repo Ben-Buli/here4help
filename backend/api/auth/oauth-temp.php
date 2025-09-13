@@ -30,8 +30,7 @@ try {
 
 	$db = Database::getInstance();
 	$stmt = $db->query(
-		"SELECT provider, provider_user_id, email, name, avatar_url, raw_data, expired_at \n\
-		 FROM oauth_temp_users WHERE token = ?",
+		"SELECT provider, provider_user_id, email, name, avatar_url, raw_data, expired_at FROM oauth_temp_users WHERE token = ?",
 		[$token]
 	);
 	$row = $stmt->fetch();
