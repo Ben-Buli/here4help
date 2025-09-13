@@ -139,9 +139,8 @@ final GoRouter appRouter = GoRouter(
           }
         }
 
-        debugPrint('🔍 [app_router] 準備創建 AppScaffold');
-        debugPrint('🔍 [app_router] title: ${pageConfig['title']}');
-        debugPrint('🔍 [app_router] titleWidget: ${titleWidget.runtimeType}');
+        debugPrint(
+            '🔍 [app_router] 準備創建 AppScaffold | title: ${pageConfig['title']} | titleWidget: ${titleWidget.runtimeType}');
 
         // 創建頁面內容
         Widget pageContent;

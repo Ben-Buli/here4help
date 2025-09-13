@@ -54,6 +54,7 @@ class SupportController extends Controller
                 'cr.created_at',
                 'se.id as event_id',
                 'se.title',
+                'se.description',
                 'se.status',
                 'se.admin_id as assignee_admin_id',
                 'se.created_at as event_created_at',

@@ -58,12 +58,12 @@ export const getApiUrl = (path: string = '', useAdminPrefix: boolean = true): st
  */
 export const getImageUrl = (path: string): string => {
   if (ENV_CONFIG.isLocal) {
-    // 本地開發使用代理
+    // 本地開發使用代理，Vite 會將 /uploads 代理到後端
     return `/uploads/${path}`
   }
   
   // 生產環境使用完整URL
-  return `${API_CONFIG.baseUrl}/uploads/${path}`
+  return `${API_CONFIG.backendUrl}/uploads/${path}`
 }
 
 /**

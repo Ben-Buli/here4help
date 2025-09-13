@@ -33,10 +33,14 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      // Token 過期或無效，清除本地存儲並跳轉到登入頁
-      localStorage.removeItem('admin_token')
-      localStorage.removeItem('admin_user')
-      window.location.href = '/login'
+      const url: string = error.config?.url || ''
+      const isPhpDisputeApi = url.includes('/api/admin/task-disputes')
+      if (!isPhpDisputeApi) {
+        // 僅對 Laravel 管理端 API 觸發登出；PHP 爭議聊天室 API 的 401 不清除登入狀態
+        localStorage.removeItem('admin_token')
+        localStorage.removeItem('admin_user')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   },
@@ -444,11 +448,23 @@ export const disputeApi = {
 
   // 管理員查看聊天室 - 暫時保留但可能需要調整
   getChatRoom: (disputeId: string) => 
-    api.get<ApiResponse<any>>(`/api/admin/disputes/chat-room?dispute_id=${disputeId}`),
+    api.get<ApiResponse<any>>(`/api/admin/task-disputes/chat-room?dispute_id=${disputeId}`),
+
+  // 以 taskId 取得聊天室（後端已支援 fallback）
+  getChatRoomByTask: (taskId: string) => 
+    api.get<ApiResponse<any>>(`/api/admin/task-disputes/${taskId}/chat-room`),
 
   // 管理員查看爭議聊天記錄 - 暫時保留但可能需要調整
   getChatMessages: (disputeId: number) =>
     api.get<ApiResponse<any>>(`/api/admin/dispute-chat-messages`, { params: { dispute_id: disputeId } }),
+
+  // 解決爭議
+  resolve: (disputeId: string, decision: string, note: string) =>
+    api.post<ApiResponse<any>>('/api/admin/task-disputes/resolve', {
+      dispute_id: disputeId,
+      decision,
+      note
+    }),
 }
 
 export default api

@@ -49,22 +49,20 @@ class PointTransactionLogger
         // 計算交易後餘額
         $balanceAfter = $currentBalance + $amount;
         
-        // 插入交易記錄
+        // 插入交易記錄 - 沒有更新紀錄，此紀錄不可逆，沒有balance_after欄位
         $insertQuery = "
             INSERT INTO point_transactions (
-                user_id, transaction_type, amount, balance_after, description,
-                related_task_id, related_order_id, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                user_id, transaction_type, amount, description,
+                related_task_id, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, NOW())
         ";
         
         $db->query($insertQuery, [
             $userId,
             $transactionType,
             $amount,
-            $balanceAfter,
             $description,
             $relatedTaskId,
-            $relatedOrderId,
             $status
         ]);
         
@@ -214,8 +212,7 @@ class PointTransactionLogger
                     $transaction['transaction_type'],
                     $transaction['amount'],
                     $transaction['description'],
-                    $transaction['related_task_id'] ?? null,
-                    $transaction['related_order_id'] ?? null,
+                    $transaction['related_task_id'],
                     $transaction['status'] ?? 'completed'
                 );
                 

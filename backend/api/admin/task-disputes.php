@@ -116,6 +116,7 @@ try {
         SELECT 
             tde.id,
             tde.task_id,
+            tde.user_id,
             tde.title as dispute_title,
             tde.description,
             tde.status,
@@ -172,7 +173,7 @@ try {
                 'participant_name' => $dispute['participant_name']
             ],
             'submitter' => [
-                'id' => (int)$dispute['creator_id'], // 提交者ID來自 tde.user_id
+                'id' => isset($dispute['user_id']) ? (int)$dispute['user_id'] : null,
                 'name' => $dispute['submitter_name'],
                 'email' => $dispute['submitter_email']
             ]

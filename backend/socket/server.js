@@ -31,7 +31,7 @@ const crypto = require('crypto');
 const dotenv = require('dotenv');
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 if (!process.env.JWT_SECRET) {
-  dotenv.config({ path: path.resolve(__dirname, '../config/.env') });
+  dotenv.config({ path: path.resolve(__dirname, '../.env') });
 }
 
 // Get JWT secret once

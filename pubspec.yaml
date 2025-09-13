@@ -68,7 +68,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon/
-    - assets/app_env/
     # Environment configuration files (for Web platform)
     - assets/env/
     # Environment configuration files (for native platforms)

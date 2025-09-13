@@ -1,22 +1,32 @@
 <template>
-  <div class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 z-[60] overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
     <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
       <!-- Background overlay -->
       <div 
-        class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+        class="fixed inset-0 bg-gray-500/60 transition-opacity" 
         aria-hidden="true"
         @click="$emit('close')"
       ></div>
 
       <!-- Modal panel -->
-      <div class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full sm:p-6">
-        <div class="sm:flex sm:items-start">
+      <div class="relative z-[61] inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full sm:p-6">
+        <!-- Debug Info (temporary) -->
+        <div v-if="!dispute" class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <h4 class="text-red-800 font-medium">⚠️ Debug: Dispute data is null</h4>
+          <p class="text-red-600 text-sm mt-1">
+            The dispute prop is null or undefined. Please check the data structure.
+          </p>
+          <pre class="text-xs mt-2 bg-red-100 p-2 rounded">{{ JSON.stringify(dispute, null, 2) }}</pre>
+        </div>
+        
+        
+        <div class="sm:flex sm:items-start bg-red-50 p-2">
           <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
             <Icon name="gavel" class="h-6 w-6 text-red-600" />
           </div>
           <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
             <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
-              Resolve Dispute #{{ dispute?.id }}
+              Admin Dispute Operation #{{ dispute?.id || 'Unknown' }}
             </h3>
             <div class="mt-2">
               <p class="text-sm text-gray-500">
@@ -32,28 +42,28 @@
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Task</dt>
-              <dd class="mt-1 text-sm text-gray-900">{{ dispute?.task?.title }}</dd>
+              <dd class="mt-1 text-sm text-gray-900">{{ dispute?.task?.title || 'Unknown Task' }}</dd>
             </div>
             <div>
               <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Reward</dt>
-              <dd class="mt-1 text-sm text-gray-900">{{ dispute?.task?.reward_point }} points</dd>
+              <dd class="mt-1 text-sm text-gray-900">{{ dispute?.task?.reward_point || 0 }} points</dd>
             </div>
             <div>
               <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Submitter</dt>
-              <dd class="mt-1 text-sm text-gray-900">{{ dispute?.submitter?.name }}</dd>
+              <dd class="mt-1 text-sm text-gray-900">{{ dispute?.submitter?.name || 'Unknown User' }}</dd>
             </div>
             <div>
               <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Created</dt>
-              <dd class="mt-1 text-sm text-gray-900">{{ formatDateTime(dispute?.created_at) }}</dd>
+              <dd class="mt-1 text-sm text-gray-900">{{ formatDateTime(dispute?.created_at) || 'Unknown' }}</dd>
             </div>
           </div>
           <div class="mt-3">
             <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Dispute Title</dt>
-            <dd class="mt-1 text-sm text-gray-900">{{ dispute?.dispute_title }}</dd>
+            <dd class="mt-1 text-sm text-gray-900">{{ dispute?.dispute_title || 'No title' }}</dd>
           </div>
           <div class="mt-3">
             <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Description</dt>
-            <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{{ dispute?.description }}</dd>
+            <dd class="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{{ dispute?.description || 'No description' }}</dd>
           </div>
         </div>
 
@@ -66,63 +76,57 @@
               <p class="text-sm leading-5 text-gray-500">Choose the resolution for this dispute</p>
               <fieldset class="mt-4">
                 <legend class="sr-only">Decision options</legend>
-                <div class="space-y-4">
-                  <div class="flex items-start">
-                    <div class="flex items-center h-5">
-                      <input
-                        id="completed"
-                        v-model="form.decisionResult"
-                        name="decision"
-                        type="radio"
-                        value="completed"
-                        class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"
-                      />
-                    </div>
+                <div class="space-y-1">
+                  <label class="flex items-start cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+                    <input
+                      id="completed"
+                      v-model="form.decisionResult"
+                      name="decision"
+                      type="radio"
+                      value="completed"
+                      class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 mt-0.5"
+                    />
                     <div class="ml-3 text-sm">
-                      <label for="completed" class="font-medium text-gray-700">Mark Task as Completed</label>
+                      <div class="font-medium text-gray-700">Mark Task as Completed</div>
                       <p class="text-gray-500">
                         Award points to participant, deduct fees from creator, and mark task as completed.
                       </p>
                     </div>
-                  </div>
+                  </label>
 
-                  <div class="flex items-start">
-                    <div class="flex items-center h-5">
-                      <input
-                        id="back_to_progress"
-                        v-model="form.decisionResult"
-                        name="decision"
-                        type="radio"
-                        value="back_to_progress"
-                        class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"
-                      />
-                    </div>
+                  <label class="flex items-start cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition-colors">
+                    <input
+                      id="back_to_progress"
+                      v-model="form.decisionResult"
+                      name="decision"
+                      type="radio"
+                      value="back_to_progress"
+                      class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 mt-0.5"
+                    />
                     <div class="ml-3 text-sm">
-                      <label for="back_to_progress" class="font-medium text-gray-700">Back to In Progress</label>
+                      <div class="font-medium text-gray-700">Back to Progress</div>
                       <p class="text-gray-500">
-                        Return the task to in-progress status for continued work.
+                        Reject the dispute and return the task to in-progress status for continued work.
                       </p>
                     </div>
-                  </div>
+                  </label>
 
-                  <div class="flex items-start">
-                    <div class="flex items-center h-5">
-                      <input
-                        id="reset"
-                        v-model="form.decisionResult"
-                        name="decision"
-                        type="radio"
-                        value="reset"
-                        class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300"
-                      />
-                    </div>
+                  <label class="flex items-start cursor-pointer hover:bg-gray-50 p-3 rounded-lg transition-colors">
+                    <input
+                      id="reset"
+                      v-model="form.decisionResult"
+                      name="decision"
+                      type="radio"
+                      value="reset"
+                      class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 mt-0.5"
+                    />
                     <div class="ml-3 text-sm">
-                      <label for="reset" class="font-medium text-gray-700">Reset Task</label>
+                      <div class="font-medium text-gray-700">Reset Task</div>
                       <p class="text-gray-500">
                         Reset task to open status, remove current participant, and allow new applications.
                       </p>
                     </div>
-                  </div>
+                  </label>
                 </div>
               </fieldset>
             </div>
@@ -140,7 +144,7 @@
                   rows="4"
                   required
                   class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                  placeholder="Provide a detailed explanation for your decision..."
+                  placeholder="Provide a detailed explanation for your decision...(At least 10 characters)"
                 ></textarea>
               </div>
               <p class="mt-2 text-sm text-gray-500">

@@ -72,27 +72,28 @@
         <table class="admin-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Type</th>
-              <th>Status</th>
+              <!-- <th>Room ID</th> -->
               <th>Title</th>
               <th>User</th>
-              <th>Last Message</th>
+              <th>Claimed by</th>
+              <th>Timestamp</th>
+              <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">
             <tr v-for="it in items" :key="it.room_id">
-              <td class="text-sm">{{ it.room_id }}</td>
-              <td class="text-sm capitalize">{{ it.type }}</td>
+              <!-- <td class="text-sm">{{ it.room_id }}</td> -->
+          
+              <td class="text-sm"><span class="block">{{ it.title || '-' }}</span><span class="block text-gray-400 text-xs">#{{ it.room_id }}</span></td>
+              <td class="text-sm">{{ it.user_name }} <br/><small class="text-gray-400">({{ it.user_email }})</small></td>
+              <td class="text-sm">{{ it.admin_name || '-' }} <br/><small class="text-gray-400">({{ it.admin_email || 'Not Assigned' }})</small></td>
+              <td class="text-sm text-gray-500">{{ formatDateTime(it.last_message_at) }}</td>
               <td>
                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full" :class="statusClass(it.status)">
                   {{ it.status.replace('_', ' ') }}
                 </span>
               </td>
-              <td class="text-sm">{{ it.title || '-' }}</td>
-              <td class="text-sm">{{ it.user_name }} <span class="text-gray-400">({{ it.user_email }})</span></td>
-              <td class="text-sm text-gray-500">{{ formatDateTime(it.last_message_at) }}</td>
               <td>
                 <div class="flex items-center space-x-2">
                   <!-- 動態顯示 Claim/Chat 按鈕 -->
@@ -107,8 +108,9 @@
                     </svg>
                     Claim
                   </button>
+                  <!-- 動態顯示聊天按鈕 -->
                   <button 
-                    v-else-if="it.admin_id == currentAdminId && it.status !== 'resolved'" 
+                    v-else-if="isAssignedToMe(it) && it.status !== 'resolved'" 
                     @click="openChatRoom(it)" 
                     class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
                   >
@@ -117,27 +119,21 @@
                     </svg>
                     Chat
                   </button>
-                  <span 
-                    v-else-if="it.status === 'resolved'"
-                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                  
+                  <!-- Issue 詳情按鈕（開啟 modal） -->
+                  <button 
+                    @click="openIssue(it)" 
+                    class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 transition-colors duration-200"
                   >
                     <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    Resolved
-                  </span>
-                  <span 
-                    v-else 
-                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                  >
-                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                    </svg>
-                    Claimed by {{ it.admin_name || 'Admin' }}
-                  </span>
+                    Issue
+                  </button>
+                  
                   
                   <!-- 狀態操作按鈕 -->
-                  <button 
+                  <!-- <button 
                     v-if="it.status === 'in_progress'" 
                     @click="updateStatus(it, 'resolved')" 
                     class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200"
@@ -147,7 +143,7 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                     </svg>
                     Resolve
-                  </button>
+                  </button> -->
                 </div>
               </td>
             </tr>
@@ -174,6 +170,56 @@
       </div>
     </div>
   </div>
+  
+  <!-- Issue Detail Modal -->
+  <div v-if="showIssueModal" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div class="fixed inset-0 bg-black/20 backdrop-blur-sm" @click="closeIssue"></div>
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 z-10">
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <h3 class="text-lg font-medium text-gray-900">Issue Detail</h3>
+        <button @click="closeIssue" class="text-gray-400 hover:text-gray-600 focus:outline-none">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        <div>
+          <div class="text-sm text-gray-500">Title</div>
+          <div class="text-sm text-gray-900">{{ currentIssue?.title || '-' }}</div>
+        </div>
+        <div>
+          <div class="text-sm text-gray-500">Description</div>
+          <div class="text-sm text-gray-900 whitespace-pre-wrap">{{ currentIssue?.description || '-' }}</div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <div class="text-sm text-gray-500">User ID</div>
+            <div class="text-sm text-gray-900">{{ currentIssue?.user_id || '-' }}</div>
+          </div>
+          <div>
+            <div class="text-sm text-gray-500">User Name</div>
+            <div class="text-sm text-gray-900">{{ currentIssue?.user_name || '-' }}</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <div class="text-sm text-gray-500">Status</div>
+            <div class="text-xs inline-flex px-2 py-1 rounded-full" :class="statusClass(currentIssue?.status || '')">
+              {{ (currentIssue?.status || '').replace('_', ' ') || '-' }}
+            </div>
+          </div>
+          <div>
+            <div class="text-sm text-gray-500">Created At</div>
+            <div class="text-sm text-gray-900">{{ formatDateTime(currentIssue?.created_at) }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
+        <button @click="closeIssue" class="admin-button-secondary">Close</button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -186,7 +232,11 @@ const pagination = ref({ current_page: 1, per_page: 15, total: 0, last_page: 1 }
 const filters = reactive({ type: 'all', status: '', search: '' })
 
 // 當前管理員 ID（從 localStorage 或 store 獲取）
-const currentAdminId = ref<string | null>(null)
+const currentAdminId = ref<number | null>(null)
+
+// Issue 詳情 modal 狀態
+const showIssueModal = ref(false)
+const currentIssue = ref<any | null>(null)
 
 // 初始化當前管理員 ID
 const initCurrentAdmin = () => {
@@ -194,7 +244,8 @@ const initCurrentAdmin = () => {
     const adminUser = localStorage.getItem('admin_user')
     if (adminUser) {
       const user = JSON.parse(adminUser)
-      currentAdminId.value = String(user.id || user.admin_id || '')
+      const idNum = Number(user.id || user.admin_id)
+      currentAdminId.value = Number.isFinite(idNum) ? idNum : null
     }
   } catch (e) {
     console.warn('Failed to get current admin ID:', e)
@@ -217,7 +268,8 @@ const loadIssues = async (page = 1) => {
     
     if (response.data.success && response.data.data) {
       // 直接使用後端返回的數據格式
-            items.value = response.data.data.items || []
+      console.log('API Response:', response.data.data.items) // 調試用
+      items.value = response.data.data.items || []
       
       // 更新分頁信息
       if (response.data.data.pagination) {
@@ -315,6 +367,24 @@ const updateStatus = async (it: any, newStatus: string) => {
 /** @deprecated 使用 claimIssue 替代 */
 const accept = async (it: any) => {
   await claimIssue(it)
+}
+
+// 僅當前管理員被指派時可聊天
+const isAssignedToMe = (it: any): boolean => {
+  if (currentAdminId.value == null) return false
+  return Number(it.admin_id) === currentAdminId.value
+}
+
+// 開啟 Issue 詳情 modal
+const openIssue = (it: any) => {
+  console.log('Issue data:', it) // 調試用
+  currentIssue.value = it
+  showIssueModal.value = true
+}
+
+const closeIssue = () => {
+  showIssueModal.value = false
+  currentIssue.value = null
 }
 
 const statusClass = (s: string) => {

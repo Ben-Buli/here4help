@@ -117,7 +117,7 @@ const router = createRouter({
           meta: { title: 'Task Disputes' },
         },
         {
-          path: ':disputeId/chat-room',
+          path: ':taskId/chat-room',
           name: 'admin-dispute-chat-room',
           component: () => import('../views/AdminChatRoomView.vue'),
           meta: { 

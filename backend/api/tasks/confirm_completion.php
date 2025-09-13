@@ -87,7 +87,8 @@ try {
 
   $amount = isset($task['reward_point']) ? (float)$task['reward_point'] : 0.0;
   $feeAmount = round($amount * $feeRate, 2);
-  $netAmount = max(0.0, $amount - $feeAmount);
+  // 修正：接案者獲得完整獎勵，手續費只向發布者額外收取
+  // $netAmount = max(0.0, $amount - $feeAmount); // 錯誤的舊邏輯
 
   // 僅試算：不更動任務狀態、不發送訊息、不寫交易
   if ($preview === 1) {
@@ -96,7 +97,7 @@ try {
       'fee_rate' => $feeRate,
       'fee' => $feeAmount,
       'amount' => $amount,
-      'net' => $netAmount,
+      'net' => $amount, // 修正：預覽時顯示接案者獲得完整獎勵
       'preview' => true,
     ], 'Preview computed');
   }
@@ -144,10 +145,10 @@ try {
         $taskTitle
       );
       
-      // 2. 接案者收入任務獎勵（正數）
+      // 2. 接案者收入完整任務獎勵（不扣除手續費）
       $earningTransactionId = PointTransactionLogger::logTaskEarning(
         $participantId,
-        (int)$netAmount, // 接案者收到淨額（扣除手續費）
+        (int)$amount, // 修正：接案者獲得完整獎勵
         $task_id,
         $taskTitle
       );
@@ -187,7 +188,7 @@ try {
         'task_id' => $task_id,
         'amount' => $amount,
         'fee' => $feeAmount,
-        'net' => $netAmount,
+        'net' => $amount, // 修正：接案者獲得完整獎勵
         'rate' => $feeRate,
         'reward_transaction_id' => $rewardTransactionId,
         'earning_transaction_id' => $earningTransactionId,
@@ -225,7 +226,16 @@ try {
         UPDATE users 
         SET points = points + ? 
         WHERE id = ?
-      ", [(int)$netAmount, $participantId]);
+      ", [(int)$amount, $participantId]); // 修正：接案者獲得完整獎勵
+      
+      // 創建者額外扣除手續費
+      if ($feeAmount > 0) {
+        $db->query("
+          UPDATE users 
+          SET points = points - ? 
+          WHERE id = ?
+        ", [(int)$feeAmount, $creatorId]);
+      }
       
       // 提交交易
       $db->commit();

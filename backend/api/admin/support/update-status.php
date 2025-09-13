@@ -75,6 +75,9 @@ try {
             Response::error('You do not have permission to update this event', 403);
         }
         
+        // 記錄舊狀態用於日誌
+        $oldStatus = $event['status'];
+        
         // 更新事件狀態
         $updateStmt = $db->prepare("
             UPDATE support_events 
@@ -96,13 +99,16 @@ try {
         // 記錄管理員操作日誌
         $logStmt = $db->prepare("
             INSERT INTO admin_activity_logs (
-                admin_id, action, target_type, target_id, description, created_at
-            ) VALUES (?, 'update_support_status', 'support_event', ?, ?, NOW())
+                admin_id, action, table_name, record_id, old_data, new_data, ip_address, user_agent, created_at
+            ) VALUES (?, 'update_support_status', 'support_events', ?, ?, ?, ?, ?, NOW())
         ");
         $logStmt->execute([
             $adminId,
             $eventId,
-            "Admin updated support event {$eventId} status to {$status}"
+            json_encode(['status' => $oldStatus]),
+            json_encode(['status' => $status]),
+            $_SERVER['REMOTE_ADDR'] ?? null,
+            $_SERVER['HTTP_USER_AGENT'] ?? null
         ]);
         
         // 提交事務

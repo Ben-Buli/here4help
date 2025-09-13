@@ -125,36 +125,34 @@
           <thead class="bg-gray-50">
             <tr>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Dispute
+                Dispute Task
               </th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Task
+                Reward Point
               </th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Submitter
+                Applied User
               </th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Created
               </th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
+            
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="dispute in disputes" :key="dispute.id" class="hover:bg-gray-50">
+            <tr v-for="dispute in disputes" :key="dispute.id" class="hover:bg-gray-50 cursor-pointer" @click="viewChatRoom(dispute)">
               <!-- Dispute Info -->
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
                   <div>
                     <div class="text-sm font-medium text-gray-900">
-                      #{{ dispute.id }}
-                    </div>
-                    <div class="text-sm text-gray-500 max-w-xs truncate">
                       {{ dispute.dispute_title }}
+                    </div>
+                    <div class="text-sm text-gray-400 max-w-xs truncate">
+                      Task ID: {{ dispute.task?.id }}
                     </div>
                   </div>
                 </div>
@@ -162,11 +160,8 @@
 
               <!-- Task Info -->
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm text-gray-900 max-w-xs truncate">
-                  {{ dispute.task?.title || 'N/A' }}
-                </div>
                 <div class="text-sm text-gray-500">
-                  {{ dispute.task?.reward_point || 0 }} points
+                  {{ dispute.task?.reward_point || 'N/A' }} points
                 </div>
               </td>
 
@@ -199,7 +194,7 @@
               </td>
 
               <!-- Actions -->
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+              <!-- <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                 <button
                   @click="viewChatRoom(dispute)"
                   class="text-indigo-600 hover:text-indigo-900"
@@ -222,7 +217,7 @@
                 >
                   <Icon name="eye" class="h-4 w-4" />
                 </button>
-              </td>
+              </td> -->
             </tr>
           </tbody>
         </table>
@@ -295,9 +290,9 @@
       </div>
     </div>
 
-    <!-- Dispute Review Dialog -->
-    <DisputeReviewDialog
-      :show="showReviewDialog"
+    <!-- Dispute Operation Dialog -->
+    <DisputeOperationDialog
+      v-if="showReviewDialog"
       :dispute="selectedDispute"
       @close="closeReviewDialog"
       @resolved="handleDisputeResolved"
@@ -308,6 +303,7 @@
       v-if="showDetailDialog"
       :dispute="selectedDispute"
       @close="closeDetailDialog"
+      @openOperation="handleOpenOperation"
     />
 
     <!-- Dispute Chat Room Modal -->
@@ -320,11 +316,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { disputeApi } from '@/services/api'
 import Icon from '@/components/Icon.vue'
-import DisputeReviewDialog from '@/components/DisputeReviewDialog.vue'
+import DisputeOperationDialog from '@/components/DisputeOperationDialog.vue'
 import DisputeDetailDialog from '@/components/DisputeDetailDialog.vue'
 import DisputeChatRoomModal from '@/components/DisputeChatRoomModal.vue'
 
@@ -535,10 +531,26 @@ const formatDateTime = (dateTimeStr: string) => {
 }
 
 const viewChatRoom = (dispute: Dispute) => {
-  // 打開爭議聊天室模態框
-  selectedDispute.value = dispute
-  selectedDisputeId.value = dispute.id
-  showChatRoomModal.value = true
+  router.push(`/task-disputes/${dispute.task.id}/chat-room`)
+}
+
+const handleOpenOperation = async () => {
+  console.log('🔍 Opening operation dialog, selectedDispute:', selectedDispute.value)
+  
+  // 先關閉詳情對話框
+  showDetailDialog.value = false
+  
+  // 等待下一個 tick 確保詳情對話框完全關閉
+  await nextTick()
+  
+  // 確保 selectedDispute 有值（應該已經從之前的操作中設置）
+  if (!selectedDispute.value) {
+    console.error('selectedDispute is null when opening operation dialog')
+    return
+  }
+  
+  // 然後打開審核對話框
+  showReviewDialog.value = true
 }
 
 const openReviewDialog = (dispute: Dispute) => {
@@ -563,6 +575,7 @@ const handleDisputeResolved = () => {
 }
 
 const viewDisputeDetail = (dispute: Dispute) => {
+  console.log('🔍 Opening dispute detail:', dispute)
   selectedDispute.value = dispute
   showDetailDialog.value = true
 }
