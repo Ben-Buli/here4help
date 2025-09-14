@@ -79,7 +79,8 @@ APPLE_SERVICE_ID=com.example.here4help.login
 # Development Redirect URIs
 GOOGLE_REDIRECT_URI=http://127.0.0.1:8888/here4help/backend/api/auth/google-callback.php
 FACEBOOK_REDIRECT_URI=http://127.0.0.1:8888/here4help/backend/api/auth/facebook-callback.php
-APPLE_REDIRECT_URI=http://127.0.0.1:8888/here4help/backend/api/auth/apple-callback.php
+APPLE_REDIRECT_URI=https://b4a869b2989d.ngrok-free.app/here4help/backend/api/auth/apple-callback.php
+# APPLE_REDIRECT_URI=http://127.0.0.1:8888/here4help/backend/api/auth/apple-callback.php
 
 # Feature Flags
 FEATURE_THIRD_PARTY_AUTH=true

@@ -1,6 +1,6 @@
 ENVIRONMENT=development
-API_BASE_URL=http://localhost:8888/here4help
+API_BASE_URL=https://b4a869b2989d.ngrok-free.app/here4help
 SOCKET_URL=http://localhost:3001
-IMAGE_BASE_URL=http://localhost:8888/here4help
+IMAGE_BASE_URL=https://b4a869b2989d.ngrok-free.app/here4help
 DEBUG_MODE=true
 LOG_LEVEL=debug

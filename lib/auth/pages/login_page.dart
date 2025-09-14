@@ -381,25 +381,19 @@ class _LoginPageState extends State<LoginPage> {
   // 處理 OAuth popup 成功結果
   Future<void> _handleOAuthSuccess(Map<String, dynamic> oauthData) async {
     try {
+      debugPrint('🔍 _handleOAuthSuccess 接收到的數據: $oauthData');
+
       final isNewUser = oauthData['is_new_user'] == true;
+      final provider = oauthData['provider'] ?? 'google';
 
       if (isNewUser) {
         // 新用戶：重定向到註冊頁面（使用 hash 路由）
-        final token = oauthData['token'];
+        final token = oauthData['oauth_token'] ?? oauthData['token'];
         if (token != null) {
-          final signupUrl = Uri(
-            path: '/signup',
-            queryParameters: {
-              'token': token,
-              'provider': oauthData['provider'] ?? 'google',
-              'is_new_user': 'true',
-            },
-          ).toString();
-
-          debugPrint('🔄 重定向到註冊頁面: $signupUrl');
+          debugPrint('🔄 新用戶重定向到註冊頁面: token=$token, provider=$provider');
           // 使用 hash 路由重定向
-          context.go(
-              '/signup?token=$token&provider=${oauthData['provider'] ?? 'google'}&is_new_user=true');
+          context
+              .go('/signup?token=$token&provider=$provider&is_new_user=true');
         } else {
           throw Exception('OAuth token 缺失');
         }
@@ -445,7 +439,9 @@ class _LoginPageState extends State<LoginPage> {
           ));
 
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Google 登入成功: ${userData['email']}')),
+            SnackBar(
+                content: Text(
+                    '${provider.toUpperCase()} 登入成功: ${userData['email']}')),
           );
           context.go('/home');
         } else {
@@ -487,6 +483,49 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final userData =
           await _platformAuthService.signInWithProvider('facebook');
+
+      // Web 平台特殊處理：OAuth popup 流程
+      if (kIsWeb && userData != null && userData['oauth_started'] == true) {
+        // Web 平台使用 OAuth popup，等待 popup 結果
+        debugPrint('🌐 Web 平台：Facebook OAuth popup 已開啟，等待結果...');
+
+        setState(() {
+          isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('正在開啟 Facebook 登入視窗...'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      // 處理 popup 視窗返回的 OAuth 結果
+      debugPrint('🔍 檢查 Facebook OAuth 結果: userData = $userData');
+      debugPrint('🔍 userData 類型: ${userData.runtimeType}');
+      debugPrint('🔍 userData 包含 data: ${userData?['data'] != null}');
+
+      if (kIsWeb && userData != null && userData['data'] != null) {
+        final rawOauthData = userData['data'];
+        final oauthData = rawOauthData is Map
+            ? Map<String, dynamic>.from(rawOauthData)
+            : null;
+        debugPrint('🔍 Facebook OAuth 數據: $oauthData');
+
+        if (oauthData != null) {
+          await _handleOAuthSuccess(oauthData);
+        }
+        return;
+      }
+
+      // 處理直接返回的登入結果（非 popup 模式）
+      if (userData != null && userData['success'] == true) {
+        await _handleOAuthSuccess(userData);
+        return;
+      }
 
       if (userData != null) {
         // 檢查是否為新用戶，如果是則導向註冊頁面
@@ -590,6 +629,49 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final userData = await _platformAuthService.signInWithProvider('apple');
+
+      // Web 平台特殊處理：OAuth popup 流程
+      if (kIsWeb && userData != null && userData['oauth_started'] == true) {
+        // Web 平台使用 OAuth popup，等待 popup 結果
+        debugPrint('🌐 Web 平台：Apple OAuth popup 已開啟，等待結果...');
+
+        setState(() {
+          isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('正在開啟 Apple 登入視窗...'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+
+      // 處理 popup 視窗返回的 OAuth 結果
+      debugPrint('🔍 檢查 Apple OAuth 結果: userData = $userData');
+      debugPrint('🔍 userData 類型: ${userData.runtimeType}');
+      debugPrint('🔍 userData 包含 data: ${userData?['data'] != null}');
+
+      if (kIsWeb && userData != null && userData['data'] != null) {
+        final rawOauthData = userData['data'];
+        final oauthData = rawOauthData is Map
+            ? Map<String, dynamic>.from(rawOauthData)
+            : null;
+        debugPrint('🔍 Apple OAuth 數據: $oauthData');
+
+        if (oauthData != null) {
+          await _handleOAuthSuccess(oauthData);
+        }
+        return;
+      }
+
+      // 處理直接返回的登入結果（非 popup 模式）
+      if (userData != null && userData['success'] == true) {
+        await _handleOAuthSuccess(userData);
+        return;
+      }
 
       if (userData != null) {
         // 檢查是否為新用戶，如果是則導向註冊頁面

@@ -800,14 +800,6 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
               Center(
                 child: Column(
                   children: [
-                    const Text(
-                      'Profile Picture from Google',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                     Container(
                       width: 80,
                       height: 80,
@@ -830,14 +822,6 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                             );
                           },
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'This will be your profile picture',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],

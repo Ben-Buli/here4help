@@ -169,8 +169,17 @@ class ThirdPartyAuthService {
   // Web 平台 OAuth popup 視窗處理
   Future<Map<String, dynamic>> _openOAuthPopup(String url) async {
     try {
+      // 修改 URL 以添加 popup=true 參數
+      final uri = Uri.parse(url);
+      final popupUrl = uri.replace(queryParameters: {
+        ...uri.queryParameters,
+        'popup': 'true',
+      }).toString();
+
+      debugPrint('🔍 修改後的 popup URL: $popupUrl');
+
       // 使用 JavaScript 開啟 popup 視窗
-      final popup = html.window.open(url, 'oauth_popup',
+      final popup = html.window.open(popupUrl, 'oauth_popup',
           'width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no');
 
       // 檢查 popup 是否成功開啟（跨域環境下避免 COOP 錯誤）
@@ -190,6 +199,9 @@ class ThirdPartyAuthService {
         debugPrint('⚠️ 跨域 COOP 錯誤，假設 popup 已開啟: $e');
         // 不返回錯誤，繼續執行
       }
+
+      // 如果 popup 存在，表示成功開啟
+      debugPrint('✅ Popup 視窗已成功開啟');
 
       // 監聽 popup 視窗關閉事件
       final completer = Completer<Map<String, dynamic>>();
@@ -244,11 +256,66 @@ class ThirdPartyAuthService {
       // 添加事件監聽器
       html.window.addEventListener('message', messageHandler);
 
+      // 定期檢查 localStorage 作為備用方案（針對 Facebook HTTPS 問題）
+      Timer? localStorageTimer;
+      localStorageTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        try {
+          final storage = html.window.localStorage;
+          final facebookResult = storage['facebook_oauth_result'];
+          if (facebookResult != null) {
+            debugPrint('🔍 從 localStorage 找到 Facebook 結果');
+            storage.remove('facebook_oauth_result');
+            timer.cancel();
+            html.window.removeEventListener('message', messageHandler);
+
+            final resultData = jsonDecode(facebookResult);
+            if (resultData['type'] == 'oauth_result' &&
+                resultData['data'] != null) {
+              final oauthData = Map<String, dynamic>.from(resultData['data']);
+              if (!completer.isCompleted) {
+                completer.complete({
+                  'success': oauthData['success'] == true,
+                  'data': oauthData,
+                  'message': 'OAuth completed via localStorage'
+                });
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('⚠️ localStorage 檢查失敗: $e');
+        }
+      });
+
       // 等待 popup 關閉或完成
       return await completer.future.timeout(const Duration(minutes: 5),
           onTimeout: () {
-        // 超時時也要移除事件監聽器
+        // 超時時也要移除事件監聽器和定時器
         html.window.removeEventListener('message', messageHandler);
+        localStorageTimer?.cancel();
+
+        // 超時時檢查 localStorage 作為備用方案
+        try {
+          final storage = html.window.localStorage;
+          final facebookResult = storage['facebook_oauth_result'];
+          if (facebookResult != null) {
+            debugPrint('🔍 從 localStorage 找到 Facebook 結果');
+            storage.remove('facebook_oauth_result');
+
+            final resultData = jsonDecode(facebookResult);
+            if (resultData['type'] == 'oauth_result' &&
+                resultData['data'] != null) {
+              final oauthData = Map<String, dynamic>.from(resultData['data']);
+              return {
+                'success': oauthData['success'] == true,
+                'data': oauthData,
+                'message': 'OAuth completed via localStorage'
+              };
+            }
+          }
+        } catch (e) {
+          debugPrint('⚠️ localStorage 檢查失敗: $e');
+        }
+
         return {
           'success': false,
           'error': 'OAuth timeout',
@@ -362,15 +429,20 @@ class ThirdPartyAuthService {
         final popupResult = await _openOAuthPopup(facebookAuthUrl.toString());
 
         if (popupResult['success'] == true) {
-          debugPrint('✅ Facebook OAuth popup 視窗已開啟');
-          return {
-            'success': true,
-            'provider': 'facebook',
-            'platform': 'web',
-            'oauth_started': true,
-            'message': 'Facebook OAuth popup opened successfully',
-            'timestamp': timestamp,
-          };
+          if (popupResult['data'] != null) {
+            debugPrint('🔍 返回 Facebook OAuth 數據: ${popupResult['data']}');
+            return popupResult; // Return the actual OAuth data
+          } else {
+            debugPrint('✅ Facebook OAuth popup 視窗已開啟');
+            return {
+              'success': true,
+              'provider': 'facebook',
+              'platform': 'web',
+              'oauth_started': true,
+              'message': 'Facebook OAuth popup opened successfully',
+              'timestamp': timestamp,
+            };
+          }
         } else {
           throw Exception('無法開啟 Facebook OAuth popup 視窗');
         }
@@ -434,7 +506,7 @@ class ThirdPartyAuthService {
     }
   }
 
-  // Web 版 Apple 登入 - 使用新的 OAuth 流程
+  // Web 版 Apple 登入 - 使用 sign_in_with_apple 套件的 Web 支持
   Future<Map<String, dynamic>?> _signInWithAppleWeb() async {
     try {
       // 檢查是否已配置 Apple Service ID
@@ -443,54 +515,41 @@ class ThirdPartyAuthService {
         throw Exception('Apple Service ID 未配置');
       }
 
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      debugPrint('🔐 開始 Apple Web 登入流程');
 
-      // 創建 Apple Sign In 授權 URL
-      final appleAuthUrl = Uri.https('appleid.apple.com', '/auth/authorize', {
-        'client_id': EnvironmentConfig.appleServiceId,
-        // 使用環境配置中的統一 redirect_uri
-        'redirect_uri': EnvironmentConfig.appleRedirectUri,
-        'response_type': 'code',
-        'scope': 'name email',
-        'response_mode': 'form_post',
-        'state': 'web_apple_$timestamp',
-      });
+      // 使用 sign_in_with_apple 套件的 Web 支持
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        webAuthenticationOptions: WebAuthenticationOptions(
+          clientId: EnvironmentConfig.appleServiceId,
+          redirectUri: Uri.parse(EnvironmentConfig.appleRedirectUri),
+        ),
+      );
 
-      debugPrint('🔐 準備跳轉到 Apple 登入頁面: $appleAuthUrl');
+      debugPrint('✅ Apple Web 登入成功');
 
-      if (isWeb) {
-        try {
-          final canLaunch = await canLaunchUrl(appleAuthUrl);
-          if (canLaunch) {
-            debugPrint('🌐 正在重定向到 Apple 登入頁面...');
-            final launched = await launchUrl(
-              appleAuthUrl,
-              mode: LaunchMode.externalApplication,
-            );
-
-            if (launched) {
-              debugPrint('✅ Apple OAuth 流程已啟動');
-              return {
-                'success': true,
-                'provider': 'apple',
-                'platform': 'web',
-                'oauth_started': true,
-                'message': 'Apple OAuth flow started successfully',
-                'timestamp': timestamp,
-              };
-            } else {
-              throw Exception('無法啟動 Apple OAuth 流程');
-            }
-          } else {
-            throw Exception('無法啟動 Apple 登入 URL');
-          }
-        } catch (e) {
-          debugPrint('❌ Apple OAuth 流程啟動失敗: $e');
-          throw Exception('Apple OAuth 流程啟動失敗: $e');
-        }
-      } else {
-        throw UnsupportedError('Web OAuth 流程僅支援 Web 平台');
+      // 組合用戶姓名
+      String fullName = '';
+      if (credential.givenName != null || credential.familyName != null) {
+        fullName =
+            '${credential.givenName ?? ''} ${credential.familyName ?? ''}'
+                .trim();
       }
+
+      final appleData = {
+        'provider': 'apple',
+        'platform': 'web',
+        'apple_id': credential.userIdentifier,
+        'name': fullName.isNotEmpty ? fullName : 'Apple User',
+        'email': credential.email ?? '',
+        'identity_token': credential.identityToken,
+        'authorization_code': credential.authorizationCode,
+      };
+
+      return await _sendUserDataToBackend(appleData);
     } catch (e) {
       debugPrint('Web Apple 登入錯誤: $e');
       return null;

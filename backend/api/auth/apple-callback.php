@@ -17,13 +17,18 @@ require_once __DIR__ . '/../../utils/Response.php';
 // 載入環境配置
 require_once __DIR__ . '/../../config/env_loader.php';
 
-// 啟動 session 管理
-session_start();
-
 try {
     // Apple 回調可能是 POST 或 GET
     if (!in_array($_SERVER['REQUEST_METHOD'], ['GET', 'POST'])) {
         throw new Exception('Invalid request method');
+    }
+    
+    // 檢查是否為 popup 模式
+    $isPopup = false;
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $isPopup = isset($_POST['popup']) && $_POST['popup'] === 'true';
+    } else {
+        $isPopup = isset($_GET['popup']) && $_GET['popup'] === 'true';
     }
     
     // 獲取回調參數（Apple 通常使用 POST）
@@ -148,7 +153,15 @@ try {
                 "INSERT INTO oauth_temp_users (
                     token, provider, provider_user_id, email, name, avatar_url, 
                     raw_data, expired_at, created_at
-                ) VALUES (?, 'apple', ?, ?, ?, ?, ?, ?, NOW())",
+                ) VALUES (?, 'apple', ?, ?, ?, ?, ?, ?, NOW())
+                ON DUPLICATE KEY UPDATE
+                    token = VALUES(token),
+                    email = VALUES(email),
+                    name = VALUES(name),
+                    avatar_url = VALUES(avatar_url),
+                    raw_data = VALUES(raw_data),
+                    expired_at = VALUES(expired_at),
+                    updated_at = NOW()",
                 [
                     $oauthToken, $appleId, $email, $name, '',
                     json_encode($rawData), $expiredAt
@@ -158,14 +171,20 @@ try {
             error_log("Apple OAuth Callback - 新用戶，建立臨時記錄");
         }
         
-        // 準備重定向 URL
+        // 準備結果數據和重定向 URL
         $frontendUrl = EnvLoader::get('FRONTEND_URL', 'http://localhost:3000');
         
         if ($isNewUser) {
-            // 新用戶：重定向到註冊頁面
-            $redirectUrl = $frontendUrl . '/auth/callback?success=true&provider=apple&oauth_token=' . urlencode($oauthToken);
+            // 新用戶：準備註冊數據
+            $result = [
+                'success' => true,
+                'provider' => 'apple',
+                'is_new_user' => true,
+                'oauth_token' => $oauthToken
+            ];
+            $redirectUrl = $frontendUrl . '/#/signup?token=' . urlencode($oauthToken) . '&provider=apple&is_new_user=true';
         } else {
-            // 現有用戶：生成 JWT 並重定向到主頁
+            // 現有用戶：生成 JWT
             $payload = [
                 'user_id' => $user['id'],
                 'email' => $user['email'] ?? '',
@@ -183,14 +202,92 @@ try {
                 'provider' => 'apple',
             ];
             
-            $redirectUrl = $frontendUrl . '/auth/callback?success=true&provider=apple&token=' . urlencode($token) . '&user_data=' . urlencode(json_encode($userData));
+            $result = [
+                'success' => true,
+                'provider' => 'apple',
+                'is_new_user' => false,
+                'token' => $token,
+                'user_data' => $userData
+            ];
+            $redirectUrl = $frontendUrl . '/#/home';
         }
         
-        error_log("Apple OAuth Callback - 重定向到: $redirectUrl");
+        error_log("Apple OAuth Callback - 結果: " . json_encode($result));
         
-        // 重定向到前端
-        header('Location: ' . $redirectUrl);
-        exit;
+        // 根據是否為 popup 模式決定處理方式
+        if ($isPopup) {
+            // Popup 模式：使用 postMessage 傳送結果到主頁面
+            error_log("🔍 Apple Popup 模式 - 使用 postMessage");
+            
+            // 設置 CORS 和 COOP 標頭（與 Google/Facebook 一致）
+            header('Cross-Origin-Opener-Policy: unsafe-none');
+            header('Cross-Origin-Embedder-Policy: unsafe-none');
+            header('Cross-Origin-Resource-Policy: cross-origin');
+            header('Access-Control-Allow-Origin: *');
+            header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+            header('Access-Control-Allow-Headers: Content-Type, Authorization');
+            header('Access-Control-Allow-Credentials: true');
+            header('Access-Control-Max-Age: 86400');
+            header('Content-Type: text/html; charset=utf-8');
+            
+            echo "<!DOCTYPE html>
+<html>
+<head>
+    <title>Apple OAuth Result</title>
+    <meta charset=\"utf-8\">
+</head>
+<body>
+    <script>
+        console.log('🔍 Apple Popup 視窗載入完成');
+        console.log('🔍 window.opener 存在:', !!window.opener);
+        console.log('🔍 當前 origin:', window.location.origin);
+        
+        // 使用 postMessage 傳送結果到主頁面
+        if (window.opener) {
+            console.log('🔍 傳送 Apple postMessage 到主頁面');
+            
+            // 嘗試多個可能的 origin（優先使用正確的 origin）
+            const possibleOrigins = [
+                'http://localhost:3000',  // 主要 origin
+                'http://127.0.0.1:3000', // 備用 origin
+                '*'  // 最後備用：允許所有 origin
+            ];
+            
+            // 發送到所有可能的 origin
+            possibleOrigins.forEach(origin => {
+                try {
+                    window.opener.postMessage({
+                        type: 'oauth_result',
+                        data: " . json_encode($result) . "
+                    }, origin);
+                    console.log('🔍 Apple 結果已發送到 origin:', origin);
+                } catch (e) {
+                    console.log('⚠️ Apple 結果發送到 origin 失敗:', origin, e);
+                }
+            });
+            
+            // 嘗試關閉 popup，但不強求成功
+            try {
+                console.log('🔍 嘗試關閉 Apple popup 視窗');
+                window.close();
+            } catch (e) {
+                console.log('⚠️ 無法關閉 Apple popup，交給主頁處理:', e);
+            }
+        } else {
+            console.log('🔍 window.opener 不存在，重定向到主頁面');
+            // 如果無法關閉 popup，重定向到主頁面（使用 hash 路由）
+            window.location.href = '$redirectUrl';
+        }
+    </script>
+    <p>正在處理 Apple 登入結果...</p>
+</body>
+</html>";
+            exit;
+        } else {
+            // 正常重定向到前端
+            header('Location: ' . $redirectUrl);
+            exit;
+        }
         
     } else {
         throw new Exception('ID token is required for Apple login');
@@ -199,11 +296,95 @@ try {
 } catch (Exception $e) {
     error_log("Apple OAuth Callback Error: " . $e->getMessage());
     
-    // 重定向到錯誤頁面
     $frontendUrl = EnvLoader::get('FRONTEND_URL', 'http://localhost:3000');
-    $errorUrl = $frontendUrl . '/auth/callback?success=false&provider=apple&error=' . urlencode($e->getMessage());
     
-    header('Location: ' . $errorUrl);
-    exit;
+    // 檢查是否為 popup 模式（錯誤處理）
+    $isPopupError = false;
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $isPopupError = isset($_POST['popup']) && $_POST['popup'] === 'true';
+    } else {
+        $isPopupError = isset($_GET['popup']) && $_GET['popup'] === 'true';
+    }
+    
+    if ($isPopupError) {
+        // Popup 模式：使用 postMessage 傳送錯誤結果到主頁面
+        $result = [
+            'success' => false,
+            'provider' => 'apple',
+            'error' => $e->getMessage()
+        ];
+        
+        error_log("🔍 Apple Popup 錯誤結果: " . json_encode($result));
+        
+        // 設置 CORS 和 COOP 標頭
+        header('Cross-Origin-Opener-Policy: unsafe-none');
+        header('Cross-Origin-Embedder-Policy: unsafe-none');
+        header('Cross-Origin-Resource-Policy: cross-origin');
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization');
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Max-Age: 86400');
+        header('Content-Type: text/html; charset=utf-8');
+        
+        echo "<!DOCTYPE html>
+<html>
+<head>
+    <title>Apple OAuth Error</title>
+    <meta charset=\"utf-8\">
+</head>
+<body>
+    <script>
+        console.log('🔍 Apple Popup 錯誤視窗載入完成');
+        console.log('🔍 window.opener 存在:', !!window.opener);
+        console.log('🔍 當前 origin:', window.location.origin);
+        
+        // 使用 postMessage 傳送錯誤結果到主頁面
+        if (window.opener) {
+            console.log('🔍 傳送 Apple 錯誤 postMessage 到主頁面');
+            
+            // 嘗試多個可能的 origin（優先使用正確的 origin）
+            const possibleOrigins = [
+                'http://localhost:3000',  // 主要 origin
+                'http://127.0.0.1:3000', // 備用 origin
+                '*'  // 最後備用：允許所有 origin
+            ];
+            
+            // 發送到所有可能的 origin
+            possibleOrigins.forEach(origin => {
+                try {
+                    window.opener.postMessage({
+                        type: 'oauth_result',
+                        data: " . json_encode($result) . "
+                    }, origin);
+                    console.log('🔍 Apple 錯誤已發送到 origin:', origin);
+                } catch (e) {
+                    console.log('⚠️ Apple 錯誤發送到 origin 失敗:', origin, e);
+                }
+            });
+            
+            // 嘗試關閉 popup，但不強求成功
+            try {
+                console.log('🔍 嘗試關閉 Apple popup 視窗');
+                window.close();
+            } catch (e) {
+                console.log('⚠️ 無法關閉 Apple popup，交給主頁處理:', e);
+            }
+        } else {
+            console.log('🔍 window.opener 不存在，重定向到錯誤頁面');
+            // 如果無法關閉 popup，重定向到錯誤頁面（使用 hash 路由）
+            window.location.href = '" . $frontendUrl . "/#/auth/callback?success=false&provider=apple&error=" . urlencode($e->getMessage()) . "';
+        }
+    </script>
+    <p>Apple 登入失敗，正在關閉視窗...</p>
+</body>
+</html>";
+        exit;
+    } else {
+        // 正常重定向到錯誤頁面
+        $errorUrl = $frontendUrl . '/#/auth/callback?success=false&provider=apple&error=' . urlencode($e->getMessage());
+        header('Location: ' . $errorUrl);
+        exit;
+    }
 }
 ?>
