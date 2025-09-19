@@ -333,15 +333,8 @@ export class ChatRoomPermissionService {
   }
 }
 
-// 導出類型定義
-export type {
-  ChatRoomType,
-  UserRole,
-  ChatRoomStatus,
-  PermissionAction,
-  ChatRoomPermissionConfig,
-  PermissionResult
-}
+// 導出類型定義 (移除重複導出)
+// 這些類型已經在檔案開頭定義，不需要重複導出
 
 // 導出服務實例
 export default ChatRoomPermissionService

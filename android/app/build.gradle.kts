@@ -30,6 +30,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // AppAuth redirect scheme configuration
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.example.here4help"
     }
 
     buildTypes {
@@ -37,6 +40,8 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            isMinifyEnabled = true
         }
     }
 }
@@ -48,4 +53,6 @@ flutter {
 dependencies {
     // Google Sign-In dependency
     implementation("com.google.android.gms:play-services-auth:20.7.0")
+    // Google Credentials API for smart_auth plugin
+    implementation("com.google.android.gms:play-services-identity:18.0.1")
 }

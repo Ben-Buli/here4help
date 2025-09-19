@@ -37,8 +37,29 @@ class EnvLoader {
         }
 
         if ($path === null) {
-            // 優先從 backend/.env 載入
-            $path = dirname(__DIR__) . '/.env';
+            // 自動檢測環境並載入對應配置
+            $envDir = dirname(dirname(__DIR__)) . '/env';
+            
+            // 檢測是否為開發環境 (MAMP)
+            if (file_exists('/Applications/MAMP/tmp/mysql/mysql.sock')) {
+                $envPath = $envDir . '/development.env';
+                if (file_exists($envPath)) {
+                    $path = $envPath;
+                }
+            }
+            
+            // 如果沒有找到開發環境配置，使用生產環境配置
+            if (!isset($path) || !file_exists($path)) {
+                $envPath = $envDir . '/production.env';
+                if (file_exists($envPath)) {
+                    $path = $envPath;
+                }
+            }
+            
+            // 最後回退到 backend/.env
+            if (!isset($path) || !file_exists($path)) {
+                $path = dirname(__DIR__) . '/.env';
+            }
         }
 
         if (!file_exists($path)) {

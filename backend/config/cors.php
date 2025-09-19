@@ -15,6 +15,9 @@ class CorsConfig {
         switch ($env) {
             case 'production':
                 return [
+                    'https://hero4help.demofhs.com',
+                    'https://hero4help.demofhs.com/web',
+                    'https://hero4help.demofhs.com/admin',
                     'https://here4help.com',
                     'https://www.here4help.com',
                     'https://app.here4help.com'

@@ -614,10 +614,6 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     switch (mode) {
       case AppThemeMode.light:
         return Icons.wb_sunny;
-      case AppThemeMode.dark:
-        return Icons.nightlight_round;
-      case AppThemeMode.system:
-        return Icons.settings_system_daydream;
     }
   }
 
@@ -626,10 +622,6 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
     switch (mode) {
       case AppThemeMode.light:
         return 'Light Mode';
-      case AppThemeMode.dark:
-        return 'Dark Mode (Beta)';
-      case AppThemeMode.system:
-        return 'System Default';
     }
   }
 

@@ -46,6 +46,7 @@ class SocketService {
 
       // 創建 Socket.IO 連接
       this.socket = io(config.socketUrl, {
+        path: '/backend/socket',
         transports: ['websocket'],
         autoConnect: false,
         query: {

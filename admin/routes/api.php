@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\TaskController;
@@ -9,153 +10,57 @@ use App\Http\Controllers\Admin\SupportController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\UserActivityController;
 use App\Http\Controllers\Admin\UserTransactionController;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\AdminPingController;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
-
-// 管理員認證路由（無需認證）
 Route::prefix('admin')->group(function () {
+    // 認證（無需 token）
     Route::post('/login', [AuthController::class, 'login']);
-    
-    // 需要認證的路由
+
+
     Route::middleware(['auth:sanctum', 'admin'])->group(function () {
-        // 認證相關
+        // 認證
         Route::post('/logout', [AuthController::class, 'logout']);
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/refresh', [AuthController::class, 'refresh']);
-        
-        // 用戶管理路由
+
+        // 用戶管理
         Route::prefix('users')->group(function () {
             Route::get('/', [UserController::class, 'index']);
-            
-            Route::middleware('admin:users.view')->group(function () {
-                Route::get('/{id}', [UserController::class, 'show']);
-                Route::get('/{id}/intro-referral-info', [UserController::class, 'introReferralInfo']);
-                Route::get('/{id}/verification', [UserController::class, 'verification']);
-            });
-            
-            Route::middleware('admin:users.edit')->group(function () {
-                Route::patch('/{id}/status', [UserController::class, 'updateStatus']);
-                Route::patch('/{id}/permission', [UserController::class, 'updatePermission']);
-                Route::post('/batch-action', [UserController::class, 'batchAction']);
-                Route::post('/{id}/review', [UserController::class, 'review']);
-            });
+            Route::get('/{id}', [UserController::class, 'show'])->middleware('admin:users.view');
+            Route::patch('/{id}/status', [UserController::class, 'updateStatus'])->middleware('admin:users.edit');
         });
-        
-        // 任務管理路由
+
+        // 任務管理
         Route::prefix('tasks')->group(function () {
-            Route::middleware('admin:tasks.list')->group(function () {
-                Route::get('/', [TaskController::class, 'index']);
-            });
-            
-            Route::middleware('admin:tasks.view')->group(function () {
-                Route::get('/{id}', [TaskController::class, 'show']);
-            });
-            
-            Route::middleware('admin:tasks.edit')->group(function () {
-                Route::patch('/{id}/status', [TaskController::class, 'updateStatus']);
-            });
-        });
-        
-        // 日誌管理路由
-        Route::prefix('logs')->group(function () {
-            Route::middleware('admin:logs.view')->group(function () {
-                Route::get('/', [LogController::class, 'index']);
-                Route::get('/activity', [LogController::class, 'activityLogs']);
-                Route::get('/login', [LogController::class, 'loginLogs']);
-                Route::get('/stats', [LogController::class, 'systemStats']);
-            });
-        });
-        
-        // 申訴管理路由
-        Route::prefix('disputes')->group(function () {
-            Route::middleware('admin:disputes.list')->group(function () {
-                Route::get('/', [DisputeController::class, 'index']);
-            });
-            
-            Route::middleware('admin:disputes.view')->group(function () {
-                Route::get('/{id}', [DisputeController::class, 'show']);
-            });
-            
-            Route::middleware('admin:disputes.edit')->group(function () {
-                Route::patch('/{id}/status', [DisputeController::class, 'updateStatus']);
-                Route::post('/batch-action', [DisputeController::class, 'batchAction']);
-            });
+            Route::get('/', [TaskController::class, 'index'])->middleware('admin:tasks.list');
+            Route::get('/{id}', [TaskController::class, 'show'])->middleware('admin:tasks.view');
+            Route::patch('/{id}/status', [TaskController::class, 'updateStatus'])->middleware('admin:tasks.edit');
         });
 
-        // 客服/支援路由
+        // 日誌管理
+        Route::get('/logs', [LogController::class, 'index'])->middleware('admin:logs.view');
+
+        // 申訴管理
+        Route::get('/disputes', [DisputeController::class, 'index'])->middleware('admin:disputes.list');
+
+        // 客服
         Route::prefix('support')->group(function () {
-            Route::get('/issues', [SupportController::class, 'issues']);
             Route::get('/chat-rooms', [SupportController::class, 'chatRooms']);
-            Route::get('/chat-rooms/{roomId}', [SupportController::class, 'getChatRoom']);
-            Route::get('/chat-rooms/{roomId}/messages', [SupportController::class, 'getMessages']);
             Route::post('/chat-rooms/{roomId}/messages', [SupportController::class, 'sendMessage']);
-            Route::post('/chat-rooms/{roomId}/read', [SupportController::class, 'markAsRead']);
-            Route::post('/issues/{roomId}/accept', [SupportController::class, 'accept']);
-            Route::post('/issues/{roomId}/transfer', [SupportController::class, 'transfer']);
-            Route::post('/issues/{roomId}/status', [SupportController::class, 'updateStatus']);
-            Route::post('/upload-image', [SupportController::class, 'uploadImage']);
         });
 
-        // 支付/儲值路由
+        // 支付
         Route::prefix('payment')->group(function () {
             Route::get('/requests', [PaymentController::class, 'requests']);
             Route::post('/requests/{id}/approve', [PaymentController::class, 'approve']);
-            Route::post('/requests/{id}/reject', [PaymentController::class, 'reject']);
-            Route::match(['get', 'post'], '/fee-settings', [PaymentController::class, 'feeSettings']);
-            Route::match(['get', 'post'], '/official-accounts', [PaymentController::class, 'officialAccounts']);
         });
 
-        // 使用者活動紀錄路由
-        Route::prefix('user-activities')->group(function () {
-            Route::middleware('admin:logs.view')->group(function () {
-                Route::get('/', [UserActivityController::class, 'index']);
-                Route::get('/{userId}', [UserActivityController::class, 'show']);
-            });
-        });
+        // 使用者活動 / 交易
+        Route::get('/user-activities', [UserActivityController::class, 'index'])->middleware('admin:logs.view');
+        Route::get('/user-transactions', [UserTransactionController::class, 'index'])->middleware('admin:logs.view');
 
-        // 使用者交易紀錄路由
-        Route::prefix('user-transactions')->group(function () {
-            Route::middleware('admin:logs.view')->group(function () {
-                Route::get('/', [UserTransactionController::class, 'index']);
-                Route::get('/{userId}', [UserTransactionController::class, 'show']);
-            });
-        });
-        
-        // 管理員管理路由（預留）
-        Route::middleware('admin:admins.list')->group(function () {
-            Route::get('/admins', function () {
-                return response()->json(['message' => 'Admins management - coming soon']);
-            });
-        });
-        
-        // 系統資訊路由
-        Route::get('/dashboard', function () {
-            return response()->json([
-                'message' => 'Admin dashboard data',
-                'timestamp' => now(),
-                'server_time' => now()->toDateTimeString(),
-                'uptime' => 'System operational'
-            ]);
-        });
+        // 管理員列表 / 系統資訊
+        Route::get('/admins', [AdminPingController::class, 'admins'])->middleware('admin:admins.list');
+        Route::get('/dashboard', [AdminPingController::class, 'dashboard']);
     });
-});
-
-// 測試路由（無需認證） 
-Route::get('/test', function () {
-    return response()->json([
-        'message' => 'Admin API is working',
-        'timestamp' => now(),
-        'version' => '1.0.0'
-    ]);
 });

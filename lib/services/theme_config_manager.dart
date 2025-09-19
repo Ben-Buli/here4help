@@ -22,7 +22,7 @@ class ThemeConfigManager extends ChangeNotifier {
   static const String _themePresetsKey = 'theme_presets';
 
   ThemeScheme _currentTheme = ThemeScheme.morandiBlue;
-  AppThemeMode _themeMode = AppThemeMode.system;
+  AppThemeMode _themeMode = AppThemeMode.light;
   Map<String, ThemePreset> _themePresets = {};
 
   ThemeScheme get currentTheme => _currentTheme;
@@ -53,7 +53,7 @@ class ThemeConfigManager extends ChangeNotifier {
 
       // 載入主題模式
       final themeModeIndex =
-          prefs.getInt(_themeModeKey) ?? AppThemeMode.system.index;
+          prefs.getInt(_themeModeKey) ?? AppThemeMode.light.index;
       _themeMode = AppThemeMode.values[themeModeIndex];
 
       // 載入主題預設
@@ -238,23 +238,18 @@ class ThemeConfigManager extends ChangeNotifier {
     return groups;
   }
 
-  /// 獲取包含 Dark Mode 的所有主題
+  /// 獲取所有主題（僅支援淺色模式）
   List<ThemeScheme> get allThemesWithDarkMode {
-    final List<ThemeScheme> allThemes = [...ThemeScheme.allThemes];
-
-    // 為每個主題生成 Dark Mode 版本
-    for (final theme in ThemeScheme.allThemes) {
-      allThemes.add(theme.toDarkMode());
-    }
-
-    return allThemes;
+    // 移除 dark mode 支援，只返回淺色主題
+    return [...ThemeScheme.allThemes];
   }
 
-  /// 獲取包含 Dark Mode 的按類型分組主題
+  /// 獲取按類型分組的主題（僅支援淺色模式）
   Map<String, List<ThemeScheme>> get groupedThemesWithDarkMode {
     final Map<String, List<ThemeScheme>> groups = {};
 
-    for (final theme in allThemesWithDarkMode) {
+    // 只使用淺色主題，移除 dark mode 支援
+    for (final theme in allThemes) {
       String groupName = _getThemeGroup(theme);
       groups.putIfAbsent(groupName, () => []).add(theme);
     }
@@ -350,13 +345,13 @@ class ThemeConfigManager extends ChangeNotifier {
     }
   }
 
-  /// 獲取主題模式選項
-  List<AppThemeMode> get themeModes => AppThemeMode.values;
+  /// 獲取主題模式選項（僅支援淺色模式）
+  List<AppThemeMode> get themeModes => [AppThemeMode.light];
 
   /// 重置為預設主題
   Future<void> resetToDefault() async {
     await setTheme(ThemeScheme.morandiBlue);
-    await setThemeMode(AppThemeMode.system);
+    await setThemeMode(AppThemeMode.light);
   }
 
   /// 獲取當前主題的 ThemeData
@@ -364,30 +359,18 @@ class ThemeConfigManager extends ChangeNotifier {
     return effectiveTheme.toThemeData();
   }
 
-  /// 獲取實際生效的主題（考慮 Theme Mode 設置）
+  /// 獲取實際生效的主題（僅支援淺色模式）
   ///
   /// 這個方法會根據當前的主題模式設置返回實際生效的主題：
   /// - [AppThemeMode.light]: 返回淺色主題
-  /// - [AppThemeMode.dark]: 返回深色主題
-  /// - [AppThemeMode.system]: 根據系統設置返回對應主題
   ///
-  /// 如果當前主題已經是目標模式，則直接返回；否則會自動生成對應模式的主題。
+  /// 如果當前主題已經是淺色模式，則直接返回；否則會自動生成對應的淺色主題。
   ThemeScheme get effectiveTheme {
-    // 根據 Theme Mode 決定是否使用 Dark Mode
+    // 根據 Theme Mode 決定使用的主題（移除深色模式和系統模式支援）
     switch (_themeMode) {
       case AppThemeMode.light:
         // Light Mode：確保使用 Light 主題
         return _getLightTheme();
-      case AppThemeMode.dark:
-        // Dark Mode：使用 Dark 主題
-        return _getDarkTheme();
-      case AppThemeMode.system:
-        // System Mode：根據系統設置決定
-        final Brightness brightness =
-            WidgetsBinding.instance.platformDispatcher.platformBrightness;
-        return brightness == Brightness.dark
-            ? _getDarkTheme()
-            : _getLightTheme();
     }
   }
 
@@ -406,18 +389,14 @@ class ThemeConfigManager extends ChangeNotifier {
     return _currentTheme;
   }
 
-  /// 獲取 Dark 主題
+  /// 獲取淺色主題（移除深色模式支援）
   ///
-  /// 如果當前主題是 Light 主題，則生成對應的 Dark 主題；
-  /// 否則直接返回當前主題。
+  /// 由於已移除深色模式支援，此方法始終返回當前主題的淺色版本。
   ///
-  /// 返回 Dark 主題。
+  /// 返回淺色主題。
   ThemeScheme _getDarkTheme() {
-    if (!_currentTheme.name.endsWith('_dark')) {
-      // 如果當前是 Light 主題，生成對應的 Dark 主題
-      return _currentTheme.toDarkMode();
-    }
-    return _currentTheme;
+    // 已移除深色模式支援，始終返回淺色主題
+    return _getLightTheme();
   }
 
   /// 驗證主題配置
@@ -805,69 +784,42 @@ class ThemeConfigManager extends ChangeNotifier {
     }
   }
 
-  /// 獲取輸入框文字顏色 - 確保在 Dark Mode 下使用亮色文字
+  /// 獲取輸入框文字顏色（僅支援淺色模式）
   ///
-  /// 根據當前主題模式返回適合的輸入框文字顏色：
-  /// - Dark Mode：白色文字
-  /// - Light Mode：主題文字顏色
+  /// 根據當前主題返回適合的輸入框文字顏色：
+  /// - 始終使用主題文字顏色
   ///
-  /// 這個方法確保輸入框文字在不同主題模式下都有良好的可讀性。
+  /// 這個方法確保輸入框文字在淺色主題下有良好的可讀性。
   Color get inputTextColor {
     final theme = effectiveTheme;
-    // 在 Dark Mode 下使用亮色文字，在 Light Mode 下使用暗色文字
-    if (_isDarkMode(theme)) {
-      return Colors.white; // Dark Mode 使用白色文字
-    } else {
-      return theme.onSurface; // Light Mode 使用主題文字顏色
-    }
+    // 移除 dark mode 支援，始終使用主題文字顏色
+    return theme.onSurface;
   }
 
-  /// 獲取輸入框提示文字顏色 - 確保在 Dark Mode 下使用亮色文字
+  /// 獲取輸入框提示文字顏色（僅支援淺色模式）
   ///
-  /// 根據當前主題模式返回適合的輸入框提示文字顏色：
-  /// - Dark Mode：半透明白色文字
-  /// - Light Mode：半透明主題文字顏色
+  /// 根據當前主題返回適合的輸入框提示文字顏色：
+  /// - 始終使用半透明主題文字顏色
   ///
-  /// 這個方法確保輸入框提示文字在不同主題模式下都有良好的可讀性。
+  /// 這個方法確保輸入框提示文字在淺色主題下有良好的可讀性。
   Color get inputHintTextColor {
     final theme = effectiveTheme;
-    // 在 Dark Mode 下使用亮色提示文字，在 Light Mode 下使用暗色提示文字
-    if (_isDarkMode(theme)) {
-      return Colors.white.withValues(alpha: 0.7); // Dark Mode 使用半透明白色
-    } else {
-      return theme.onSurface.withValues(alpha: 0.7); // Light Mode 使用半透明主題文字顏色
-    }
+    // 移除 dark mode 支援，始終使用半透明主題文字顏色
+    return theme.onSurface.withValues(alpha: 0.7);
   }
 
-  /// 檢查是否為 Dark Mode 主題
+  /// 檢查是否為淺色模式主題（移除深色模式支援）
   ///
-  /// 根據主題名稱和當前主題模式設置判斷是否為 Dark Mode：
-  /// - 如果主題名稱以 '_dark' 結尾，返回 true
-  /// - 如果主題模式設置為 dark，返回 true
-  /// - 如果主題模式設置為 system 且系統為深色模式，返回 true
-  /// - 其他情況返回 false
+  /// 由於已移除深色模式支援，此方法始終返回 false（表示不是深色模式）。
+  /// 所有主題都將使用淺色模式。
   ///
   /// 參數：
   /// - [theme]: 要檢查的主題
   ///
-  /// 返回 `true` 表示為 Dark Mode，`false` 表示為 Light Mode。
+  /// 返回 `false` 表示始終使用淺色模式。
   bool _isDarkMode(ThemeScheme theme) {
-    // 檢查主題名稱是否包含 dark 後綴
-    if (theme.name.endsWith('_dark')) {
-      return true;
-    }
-
-    // 檢查主題模式設置
-    switch (_themeMode) {
-      case AppThemeMode.dark:
-        return true;
-      case AppThemeMode.light:
-        return false;
-      case AppThemeMode.system:
-        // 根據系統設置決定
-        return WidgetsBinding.instance.platformDispatcher.platformBrightness ==
-            Brightness.dark;
-    }
+    // 已移除深色模式支援，始終返回 false
+    return false;
   }
 
   /// 檢查當前主題是否為指定主題
@@ -885,7 +837,7 @@ class ThemeConfigManager extends ChangeNotifier {
   /// 返回包含當前主題詳細信息的 Map，包括：
   /// - `name`: 主題名稱
   /// - `displayName`: 主題顯示名稱
-  /// - `isDarkMode`: 是否為深色模式
+  /// - `isDarkMode`: 始終為 false（已移除深色模式支援）
   /// - `themeMode`: 主題模式顯示名稱
   /// - `style`: 主題風格類型
   ///
@@ -893,14 +845,14 @@ class ThemeConfigManager extends ChangeNotifier {
   /// ```dart
   /// final info = themeManager.getCurrentThemeInfo();
   /// print('當前主題：${info['displayName']}');
-  /// print('是否深色模式：${info['isDarkMode']}');
+  /// print('是否深色模式：${info['isDarkMode']}'); // 始終為 false
   /// ```
   Map<String, dynamic> getCurrentThemeInfo() {
     final theme = effectiveTheme;
     return {
       'name': theme.name,
       'displayName': theme.displayName,
-      'isDarkMode': _isDarkMode(theme),
+      'isDarkMode': false, // 已移除深色模式支援
       'themeMode': _themeMode.displayName,
       'style': _getThemeStyle(theme),
     };
@@ -1024,7 +976,7 @@ class ThemePreset {
       themes: (json['themes'] as List)
           .map((name) => ThemeScheme.getByName(name))
           .toList(),
-      icon: IconData(json['icon'] as int, fontFamily: 'MaterialIcons'),
+      icon: const IconData(0xe318, fontFamily: 'MaterialIcons'),
     );
   }
 
@@ -1049,28 +1001,20 @@ class ThemePreset {
 ///
 /// 定義了應用程序支持的主題模式：
 /// - [light]: 淺色模式，始終使用淺色主題
-/// - [dark]: 深色模式，始終使用深色主題
-/// - [system]: 系統模式，根據系統設置自動切換
 ///
 /// 使用示例：
 /// ```dart
-/// await themeManager.setThemeMode(AppThemeMode.system);
-/// print(AppThemeMode.system.displayName); // 輸出：跟隨系統
+/// await themeManager.setThemeMode(AppThemeMode.light);
+/// print(AppThemeMode.light.displayName); // 輸出：淺色模式
 /// ```
 enum AppThemeMode {
-  light,
-  dark,
-  system;
+  light;
 
   /// 獲取顯示名稱
   String get displayName {
     switch (this) {
       case AppThemeMode.light:
         return '淺色模式';
-      case AppThemeMode.dark:
-        return '深色模式';
-      case AppThemeMode.system:
-        return '跟隨系統';
     }
   }
 
@@ -1079,10 +1023,6 @@ enum AppThemeMode {
     switch (this) {
       case AppThemeMode.light:
         return 'Light Mode';
-      case AppThemeMode.dark:
-        return 'Dark Mode';
-      case AppThemeMode.system:
-        return 'System';
     }
   }
 
@@ -1091,10 +1031,6 @@ enum AppThemeMode {
     switch (this) {
       case AppThemeMode.light:
         return Icons.light_mode;
-      case AppThemeMode.dark:
-        return Icons.dark_mode;
-      case AppThemeMode.system:
-        return Icons.settings_system_daydream;
     }
   }
 }

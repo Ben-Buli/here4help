@@ -586,9 +586,9 @@ const loadUsers = async (page = 1) => {
       page,
       per_page: filters.per_page,
       search: filters.search || ''  ,
-      user_id: filters.user_id || '',
+      user_id: filters.user_id ? parseInt(filters.user_id) : undefined,
       status: filters.status || '',
-      permission: filters.permission ? parseInt(filters.permission) : '',
+      permission: filters.permission ? parseInt(filters.permission) : undefined,
       sort_by: filters.sort_by,
       sort_order: filters.sort_order,
     }

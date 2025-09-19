@@ -1,0 +1,151 @@
+# Here4Help Simple .htaccess Configuration
+# 適用於 public_html 目錄的簡化配置
+# 支援: Flutter Web + Admin + Backend
+
+RewriteEngine On
+
+# =============================================================================
+# 安全標頭
+# =============================================================================
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options nosniff
+    Header always set X-Frame-Options SAMEORIGIN
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # CORS 設定
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+    
+    # 處理 OPTIONS 請求
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ - [R=200,L]
+</IfModule>
+
+# =============================================================================
+# 根目錄重定向到 Flutter Web
+# =============================================================================
+RewriteCond %{REQUEST_URI} ^/$
+RewriteRule ^$ /web/ [L,R=301]
+
+# =============================================================================
+# Backend API 路由
+# =============================================================================
+# 直接檔案訪問
+RewriteCond %{REQUEST_URI} ^/backend/api/
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^(.*)$ - [L]
+
+# API 路由重寫
+RewriteCond %{REQUEST_URI} ^/backend/api/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^backend/api/(.*)$ backend/api/$1.php [L,QSA]
+
+# 向後兼容
+RewriteCond %{REQUEST_URI} ^/api/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/(.*)$ backend/api/$1.php [L,QSA]
+
+# =============================================================================
+# Admin 路由
+# =============================================================================
+# Admin 靜態檔案
+RewriteCond %{REQUEST_URI} ^/admin/
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^(.*)$ - [L]
+
+# Admin SPA 路由
+RewriteCond %{REQUEST_URI} ^/admin/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^admin/(.*)$ admin/index.html [L]
+
+# =============================================================================
+# Flutter Web 路由
+# =============================================================================
+# Flutter Web 靜態檔案
+RewriteCond %{REQUEST_URI} ^/web/
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^(.*)$ - [L]
+
+# Flutter Web SPA 路由
+RewriteCond %{REQUEST_URI} ^/web/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^web/(.*)$ web/index.html [L]
+
+# =============================================================================
+# 媒體檔案
+# =============================================================================
+RewriteRule ^uploads/(.*)$ backend/uploads/$1 [L]
+
+# =============================================================================
+# 其他請求重定向到 Flutter Web
+# =============================================================================
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/backend
+RewriteCond %{REQUEST_URI} !^/admin
+RewriteCond %{REQUEST_URI} !^/web
+RewriteCond %{REQUEST_URI} !^/api
+RewriteCond %{REQUEST_URI} !^/uploads
+RewriteRule ^(.*)$ /web/index.html [L]
+
+# =============================================================================
+# PHP 設定
+# =============================================================================
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 12M
+    php_value max_execution_time 300
+    php_value memory_limit 256M
+    php_flag display_errors Off
+</IfModule>
+
+<IfModule mod_php8.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 12M
+    php_value max_execution_time 300
+    php_value memory_limit 256M
+    php_flag display_errors Off
+</IfModule>
+
+# =============================================================================
+# 效能優化
+# =============================================================================
+# 壓縮
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json
+</IfModule>
+
+# 快取
+<IfModule mod_expires.c>
+    ExpiresActive on
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType text/html "access plus 1 hour"
+</IfModule>
+
+# =============================================================================
+# 安全防護
+# =============================================================================
+Options -Indexes
+
+# 防止訪問敏感檔案
+<FilesMatch "\.(env|log|ini|conf|bak|backup|old|tmp|sql|json|lock)$">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# 錯誤頁面
+ErrorDocument 404 /web/index.html
+ErrorDocument 500 /web/index.html

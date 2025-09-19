@@ -201,9 +201,10 @@ class EnvironmentConfig {
 
   /// Socket 伺服器 URL
   static String get socketUrl {
-    final socketUrl = _config?['public']?['socket_url'] ?? EnvConfig.socketUrl;
+    final socketUrlValue =
+        _config?['public']?['socket_url'] ?? EnvConfig.socketUrl;
     // 使用正確的網路地址分流邏輯
-    return _getNetworkAddress(socketUrl);
+    return _getNetworkAddress(socketUrlValue);
   }
 
   /// 圖片基礎 URL

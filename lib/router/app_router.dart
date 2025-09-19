@@ -31,7 +31,7 @@ class AccountRouteItem {
 }
 
 final GoRouter appRouter = GoRouter(
-  initialLocation: '/login',
+  initialLocation: '/',
   // 🔁 全域導向邏輯（登入狀態與權限控管）：
   // - 未登入者會被導向 /login
   // - 已登入者若訪問 /login，則導向 /home
@@ -53,6 +53,17 @@ final GoRouter appRouter = GoRouter(
       '/signup/student-id',
       '/auth/callback'
     ];
+
+    // 處理根路徑重定向
+    if (state.uri.path == '/') {
+      if (email == null) {
+        debugPrint('🔄 根路徑訪問，未登入用戶重定向到登入頁面');
+        return '/login';
+      } else {
+        debugPrint('🔄 根路徑訪問，已登入用戶重定向到首頁');
+        return '/home';
+      }
+    }
 
     // 特殊處理：如果訪問 /signup 且帶有 OAuth token，允許訪問
     if (state.uri.path == '/signup' &&

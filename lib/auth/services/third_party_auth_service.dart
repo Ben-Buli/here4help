@@ -1,15 +1,13 @@
-import 'package:here4help/config/environment_config_legacy.dart';
-import 'package:here4help/config/app_config.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'dart:html' as html;
+import 'package:here4help/config/environment_config.dart';
+
+// 條件導入 - 只在 Web 平台導入 dart:html
+import 'dart:html' as html show window if (dart.library.html) 'dart:html';
 
 /// 第三方登入服務 - 統一管理所有第三方登入方式
 class ThirdPartyAuthService {
@@ -18,840 +16,324 @@ class ThirdPartyAuthService {
   factory ThirdPartyAuthService() => _instance;
   ThirdPartyAuthService._internal();
 
-  // 平台檢測
-  bool get isWeb => kIsWeb;
+  // Facebook 登入實例
+  final FacebookAuth _facebookAuth = FacebookAuth.instance;
+
+  /// 檢查是否為 iOS 平台
   bool get isIOS => !kIsWeb && Platform.isIOS;
-  bool get isAndroid => !kIsWeb && Platform.isAndroid;
 
-  /// 第三方登入
-  Future<Map<String, dynamic>?> signInWithProvider(String provider) async {
+  /// 檢查是否為 Web 平台
+  bool get isWeb => kIsWeb;
+
+  /// 安全地檢查是否可以使用 Web API
+  bool get canUseWebAPI {
     try {
-      switch (provider.toLowerCase()) {
-        case 'google':
-          return await _signInWithGoogle();
-        case 'facebook':
-          return await _signInWithFacebook();
-        case 'apple':
-          return await _signInWithApple();
-        default:
-          throw Exception('不支援的登入方式: $provider');
-      }
+      return kIsWeb;
     } catch (e) {
-      print('第三方登入錯誤 ($provider): $e');
-      return null;
-    }
-  }
-
-  /// Google 登入 - 跨平台實現
-  Future<Map<String, dynamic>?> _signInWithGoogle() async {
-    try {
-      if (isWeb) {
-        return await _signInWithGoogleWeb();
-      } else if (isIOS || isAndroid) {
-        return await _signInWithGoogleMobile();
-      } else {
-        throw UnsupportedError('不支援的平台');
-      }
-    } catch (e) {
-      print('Google 登入錯誤: $e');
-      return null;
-    }
-  }
-
-  // Web 版 Google 登入 - 使用 OAuth 回調流程（google_sign_in 7.1.1 Web 平台限制）
-  Future<Map<String, dynamic>?> _signInWithGoogleWeb() async {
-    try {
-      if (EnvironmentConfig.googleClientId.isEmpty) {
-        debugPrint('❌ Google Client ID 未配置，無法進行 Web 登入');
-        throw Exception('Google Client ID 未配置');
-      }
-
-      // 使用 OAuth 回調流程，返回明確的狀態
-      debugPrint('⚠️ google_sign_in 7.1.1 在 Web 平台有限制，使用 OAuth 回調流程');
-      return await _signInWithGoogleWebFallback();
-    } catch (e) {
-      debugPrint('Web Google 登入錯誤: $e');
-      return {
-        'success': false,
-        'provider': 'google',
-        'platform': 'web',
-        'error': e.toString(),
-        'message': 'Google Web 登入失敗'
-      };
-    }
-  }
-
-  // 備用的 Web 版 Google 登入 - 使用 OAuth 回調流程
-  Future<Map<String, dynamic>?> _signInWithGoogleWebFallback() async {
-    try {
-      // Web 平台使用 OAuth 回調流程，跳轉到 Google 授權頁面
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final state = 'web_google_$timestamp';
-
-      // 建立 Google OAuth 授權 URL（使用帶 popup 參數的 redirect_uri）
-      final popupRedirectUri =
-          EnvironmentConfig.googleRedirectUri + '?popup=true';
-      final googleAuthUrl =
-          Uri.https('accounts.google.com', '/o/oauth2/v2/auth', {
-        'client_id': EnvironmentConfig.googleClientId,
-        'redirect_uri': popupRedirectUri,
-        'response_type': 'code',
-        'scope': 'openid email profile',
-        'state': state,
-        'access_type': 'offline',
-        'prompt': 'consent',
-      });
-
-      debugPrint('🔐 準備跳轉到 Google 登入頁面: $googleAuthUrl');
-
-      // Web 平台使用 popup 視窗進行 OAuth
-      if (isWeb) {
-        debugPrint('🌐 正在開啟 Google OAuth popup 視窗...');
-
-        // 使用 JavaScript 開啟 popup 視窗並等待結果
-        final popupResult = await _openOAuthPopup(googleAuthUrl.toString());
-
-        if (popupResult['success'] == true) {
-          debugPrint('✅ Google OAuth popup 視窗已開啟');
-
-          // 檢查是否有 OAuth 數據
-          if (popupResult['data'] != null) {
-            // 有 OAuth 數據，直接返回
-            debugPrint('🔍 返回 OAuth 數據: ${popupResult['data']}');
-            return popupResult;
-          } else {
-            // 沒有 OAuth 數據，返回 oauth_started 狀態
-            return {
-              'success': true,
-              'provider': 'google',
-              'platform': 'web',
-              'oauth_started': true,
-              'message': 'Google OAuth popup opened successfully',
-              'timestamp': timestamp,
-              'state': state,
-            };
-          }
-        } else {
-          throw Exception('無法開啟 Google OAuth popup 視窗');
-        }
-      } else {
-        // 非 Web 平台使用 url_launcher
-        if (await canLaunchUrl(googleAuthUrl)) {
-          debugPrint('🌐 正在重定向到 Google 登入頁面...');
-          await launchUrl(googleAuthUrl, mode: LaunchMode.externalApplication);
-
-          debugPrint('✅ 已跳轉到 Google 授權頁面，等待用戶授權...');
-          return {
-            'success': true,
-            'provider': 'google',
-            'platform': 'mobile',
-            'oauth_started': true,
-            'message': 'Google OAuth flow started successfully',
-            'timestamp': timestamp,
-            'state': state,
-          };
-        } else {
-          throw Exception('無法開啟 Google 登入頁面');
-        }
-      }
-    } catch (e) {
-      debugPrint('Web Google 登入備用流程錯誤: $e');
-      return {
-        'success': false,
-        'provider': 'google',
-        'platform': 'web',
-        'error': e.toString(),
-        'message': 'Google OAuth flow failed'
-      };
-    }
-  }
-
-  // Web 平台 OAuth popup 視窗處理
-  Future<Map<String, dynamic>> _openOAuthPopup(String url) async {
-    try {
-      // 修改 URL 以添加 popup=true 參數
-      final uri = Uri.parse(url);
-      final popupUrl = uri.replace(queryParameters: {
-        ...uri.queryParameters,
-        'popup': 'true',
-      }).toString();
-
-      debugPrint('🔍 修改後的 popup URL: $popupUrl');
-
-      // 使用 JavaScript 開啟 popup 視窗
-      final popup = html.window.open(popupUrl, 'oauth_popup',
-          'width=500,height=600,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no');
-
-      // 檢查 popup 是否成功開啟（跨域環境下避免 COOP 錯誤）
-      try {
-        // 嘗試訪問 popup 的屬性來檢查是否成功開啟
-        // 注意：在跨域情況下，window.closed 可能被 COOP 阻止
-        final isOpened = !popup.closed!;
-        if (!isOpened) {
-          return {
-            'success': false,
-            'error': 'Popup blocked by browser',
-            'message': '瀏覽器阻擋了 popup 視窗'
-          };
-        }
-      } catch (e) {
-        // COOP 錯誤時，假設 popup 已成功開啟
-        debugPrint('⚠️ 跨域 COOP 錯誤，假設 popup 已開啟: $e');
-        // 不返回錯誤，繼續執行
-      }
-
-      // 如果 popup 存在，表示成功開啟
-      debugPrint('✅ Popup 視窗已成功開啟');
-
-      // 監聽 popup 視窗關閉事件
-      final completer = Completer<Map<String, dynamic>>();
-
-      // 跨域環境下完全移除定時器檢查，避免 COOP 錯誤
-      // 只依賴 postMessage 來獲取結果
-      debugPrint('🔍 跨域環境：跳過 popup 狀態檢查，只依賴 postMessage');
-
-      // 監聽來自 popup 的消息（一次性處理）
-      late html.EventListener messageHandler;
-      messageHandler = (html.Event event) {
-        if (event is html.MessageEvent) {
-          debugPrint('🔍 收到 postMessage: ${event.data}');
-
-          // 立即移除事件監聽器，避免重複處理
-          html.window.removeEventListener('message', messageHandler);
-
-          if (event.data is Map) {
-            // 安全地轉換 LinkedMap 為 Map<String, dynamic>
-            final data = Map<String, dynamic>.from(event.data as Map);
-            debugPrint('🔍 解析 postMessage 資料: $data');
-
-            if (data['type'] == 'oauth_result') {
-              // 安全地轉換 data['data'] 為 Map<String, dynamic>
-              final rawOauthData = data['data'];
-              if (rawOauthData is Map) {
-                final oauthData = Map<String, dynamic>.from(rawOauthData);
-                debugPrint('🔍 OAuth 結果: $oauthData');
-
-                // 跨域環境下不嘗試關閉 popup，避免 COOP 錯誤
-                debugPrint('🔍 跨域環境：跳過 popup 關閉嘗試，避免 COOP 錯誤');
-
-                // 檢查 Completer 是否已經完成，避免重複完成
-                if (!completer.isCompleted) {
-                  completer.complete({
-                    'success': oauthData['success'] == true,
-                    'data': oauthData,
-                    'message': oauthData['success'] == true
-                        ? 'OAuth completed successfully'
-                        : 'OAuth failed'
-                  });
-                  debugPrint('✅ Completer 已完成');
-                } else {
-                  debugPrint('⚠️ Completer 已經完成，跳過重複完成');
-                }
-              }
-            }
-          }
-        }
-      };
-
-      // 添加事件監聽器
-      html.window.addEventListener('message', messageHandler);
-
-      // 定期檢查 localStorage 作為備用方案（針對 Facebook HTTPS 問題）
-      Timer? localStorageTimer;
-      localStorageTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        try {
-          final storage = html.window.localStorage;
-          final facebookResult = storage['facebook_oauth_result'];
-          if (facebookResult != null) {
-            debugPrint('🔍 從 localStorage 找到 Facebook 結果');
-            storage.remove('facebook_oauth_result');
-            timer.cancel();
-            html.window.removeEventListener('message', messageHandler);
-
-            final resultData = jsonDecode(facebookResult);
-            if (resultData['type'] == 'oauth_result' &&
-                resultData['data'] != null) {
-              final oauthData = Map<String, dynamic>.from(resultData['data']);
-              if (!completer.isCompleted) {
-                completer.complete({
-                  'success': oauthData['success'] == true,
-                  'data': oauthData,
-                  'message': 'OAuth completed via localStorage'
-                });
-              }
-            }
-          }
-        } catch (e) {
-          debugPrint('⚠️ localStorage 檢查失敗: $e');
-        }
-      });
-
-      // 等待 popup 關閉或完成
-      return await completer.future.timeout(const Duration(minutes: 5),
-          onTimeout: () {
-        // 超時時也要移除事件監聽器和定時器
-        html.window.removeEventListener('message', messageHandler);
-        localStorageTimer?.cancel();
-
-        // 超時時檢查 localStorage 作為備用方案
-        try {
-          final storage = html.window.localStorage;
-          final facebookResult = storage['facebook_oauth_result'];
-          if (facebookResult != null) {
-            debugPrint('🔍 從 localStorage 找到 Facebook 結果');
-            storage.remove('facebook_oauth_result');
-
-            final resultData = jsonDecode(facebookResult);
-            if (resultData['type'] == 'oauth_result' &&
-                resultData['data'] != null) {
-              final oauthData = Map<String, dynamic>.from(resultData['data']);
-              return {
-                'success': oauthData['success'] == true,
-                'data': oauthData,
-                'message': 'OAuth completed via localStorage'
-              };
-            }
-          }
-        } catch (e) {
-          debugPrint('⚠️ localStorage 檢查失敗: $e');
-        }
-
-        return {
-          'success': false,
-          'error': 'OAuth timeout',
-          'message': 'OAuth 流程超時，可能是 COOP 策略阻止了 popup 檢查'
-        };
-      });
-    } catch (e) {
-      return {
-        'success': false,
-        'error': e.toString(),
-        'message': 'Failed to open OAuth popup'
-      };
-    }
-  }
-
-  // 移動版 Google 登入
-  Future<Map<String, dynamic>?> _signInWithGoogleMobile() async {
-    try {
-      final GoogleSignIn signIn = GoogleSignIn.instance;
-      // 可選：若有 server client id，可在此傳入
-      await signIn.initialize();
-
-      // 使用 authenticate 流程
-      await signIn.authenticate();
-
-      final signInEvent = await signIn.authenticationEvents.firstWhere(
-        (e) => e is GoogleSignInAuthenticationEventSignIn,
-      ) as GoogleSignInAuthenticationEventSignIn;
-      final user = signInEvent.user;
-
-      final auth = user.authentication;
-
-      // 可選：取得 server auth code
-      String? serverAuthCode;
-      try {
-        final serverAuth =
-            await user.authorizationClient.authorizeServer(const []);
-        serverAuthCode = serverAuth?.serverAuthCode;
-      } catch (_) {}
-
-      final userData = {
-        'google_id': user.id,
-        'name': user.displayName ?? '',
-        'email': user.email,
-        'avatar_url': user.photoUrl ?? '',
-        'id_token': auth.idToken,
-        if (serverAuthCode != null) 'server_auth_code': serverAuthCode,
-        'provider': 'google',
-        'platform': isIOS ? 'ios' : 'android',
-        'success': true,
-      };
-
-      return await _sendUserDataToBackend(userData);
-    } catch (e) {
-      print('移動版 Google 登入錯誤: $e');
-      return {
-        'success': false,
-        'provider': 'google',
-        'platform': isIOS ? 'ios' : 'android',
-        'error': e.toString(),
-        'message': 'Google Mobile 登入失敗'
-      };
-    }
-  }
-
-  /// Facebook 登入 - 跨平台實現
-  Future<Map<String, dynamic>?> _signInWithFacebook() async {
-    try {
-      if (isWeb) {
-        return await _signInWithFacebookWeb();
-      } else if (isIOS || isAndroid) {
-        return await _signInWithFacebookMobile();
-      } else {
-        throw UnsupportedError('不支援的平台');
-      }
-    } catch (e) {
-      print('Facebook 登入錯誤: $e');
-      return null;
-    }
-  }
-
-  // Web 版 Facebook 登入 - 使用新的 OAuth 流程
-  Future<Map<String, dynamic>?> _signInWithFacebookWeb() async {
-    try {
-      // 檢查是否已配置 Facebook App ID
-      if (EnvironmentConfig.facebookAppId.isEmpty) {
-        debugPrint('❌ Facebook App ID 未配置，無法進行 Web 登入');
-        throw Exception('Facebook App ID 未配置');
-      }
-
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-
-      // 創建 Facebook OAuth 2.0 授權 URL
-      final facebookAuthUrl =
-          Uri.https('www.facebook.com', '/v18.0/dialog/oauth', {
-        'client_id': EnvironmentConfig.facebookAppId,
-        // 使用環境配置中的統一 redirect_uri
-        'redirect_uri': EnvironmentConfig.facebookRedirectUri,
-        'response_type': 'code',
-        'scope': 'email,public_profile',
-        'state': 'web_facebook_$timestamp',
-      });
-
-      debugPrint('🔐 準備跳轉到 Facebook 登入頁面: $facebookAuthUrl');
-
-      // Web 平台使用 popup 視窗進行 OAuth
-      if (isWeb) {
-        debugPrint('🌐 正在開啟 Facebook OAuth popup 視窗...');
-
-        // 使用 JavaScript 開啟 popup 視窗
-        final popupResult = await _openOAuthPopup(facebookAuthUrl.toString());
-
-        if (popupResult['success'] == true) {
-          if (popupResult['data'] != null) {
-            debugPrint('🔍 返回 Facebook OAuth 數據: ${popupResult['data']}');
-            return popupResult; // Return the actual OAuth data
-          } else {
-            debugPrint('✅ Facebook OAuth popup 視窗已開啟');
-            return {
-              'success': true,
-              'provider': 'facebook',
-              'platform': 'web',
-              'oauth_started': true,
-              'message': 'Facebook OAuth popup opened successfully',
-              'timestamp': timestamp,
-            };
-          }
-        } else {
-          throw Exception('無法開啟 Facebook OAuth popup 視窗');
-        }
-      } else {
-        throw UnsupportedError('Facebook Web 登入僅支援 Web 平台');
-      }
-    } catch (e) {
-      debugPrint('Web Facebook 登入錯誤: $e');
-      return null;
-    }
-  }
-
-  // 移動版 Facebook 登入
-  Future<Map<String, dynamic>?> _signInWithFacebookMobile() async {
-    try {
-      // 整合 flutter_facebook_auth 套件
-      final FacebookAuth facebookAuth = FacebookAuth.instance;
-
-      // 執行 Facebook 登入
-      final LoginResult result = await facebookAuth.login();
-
-      if (result.status == LoginStatus.success) {
-        // 獲取用戶資料
-        final userData = await facebookAuth.getUserData();
-
-        final facebookData = {
-          'provider': 'facebook',
-          'platform': isIOS ? 'ios' : 'android',
-          'facebook_id': userData['id'],
-          'name': userData['name'] ?? '',
-          'email': userData['email'] ?? '',
-          'avatar_url': userData['picture']?['data']?['url'] ?? '',
-          'access_token': result.accessToken?.tokenString ?? '',
-        };
-
-        return await _sendUserDataToBackend(facebookData);
-      } else {
-        print('Facebook 登入失敗: ${result.status}');
-        return null;
-      }
-    } catch (e) {
-      print('移動版 Facebook 登入錯誤: $e');
-      return null;
-    }
-  }
-
-  /// Apple 登入 - 跨平台實現
-  Future<Map<String, dynamic>?> _signInWithApple() async {
-    try {
-      if (isWeb) {
-        return await _signInWithAppleWeb();
-      } else if (isIOS) {
-        return await _signInWithAppleIOS();
-      } else {
-        // Android 和 Web 不支援 Apple 登入
-        throw UnsupportedError('此平台不支援 Apple 登入');
-      }
-    } catch (e) {
-      print('Apple 登入錯誤: $e');
-      return null;
-    }
-  }
-
-  // Web 版 Apple 登入 - 使用 sign_in_with_apple 套件的 Web 支持
-  Future<Map<String, dynamic>?> _signInWithAppleWeb() async {
-    try {
-      // 檢查是否已配置 Apple Service ID
-      if (EnvironmentConfig.appleServiceId.isEmpty) {
-        debugPrint('❌ Apple Service ID 未配置，無法進行 Web 登入');
-        throw Exception('Apple Service ID 未配置');
-      }
-
-      debugPrint('🔐 開始 Apple Web 登入流程');
-
-      // 使用 sign_in_with_apple 套件的 Web 支持
-      final credential = await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-        webAuthenticationOptions: WebAuthenticationOptions(
-          clientId: EnvironmentConfig.appleServiceId,
-          redirectUri: Uri.parse(EnvironmentConfig.appleRedirectUri),
-        ),
-      );
-
-      debugPrint('✅ Apple Web 登入成功');
-
-      // 組合用戶姓名
-      String fullName = '';
-      if (credential.givenName != null || credential.familyName != null) {
-        fullName =
-            '${credential.givenName ?? ''} ${credential.familyName ?? ''}'
-                .trim();
-      }
-
-      final appleData = {
-        'provider': 'apple',
-        'platform': 'web',
-        'apple_id': credential.userIdentifier,
-        'name': fullName.isNotEmpty ? fullName : 'Apple User',
-        'email': credential.email ?? '',
-        'identity_token': credential.identityToken,
-        'authorization_code': credential.authorizationCode,
-      };
-
-      return await _sendUserDataToBackend(appleData);
-    } catch (e) {
-      debugPrint('Web Apple 登入錯誤: $e');
-      return null;
-    }
-  }
-
-  // iOS 版 Apple 登入
-  Future<Map<String, dynamic>?> _signInWithAppleIOS() async {
-    try {
-      // 整合 sign_in_with_apple 套件
-      final credential = await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-      );
-
-      // 組合用戶姓名
-      String fullName = '';
-      if (credential.givenName != null || credential.familyName != null) {
-        fullName =
-            '${credential.givenName ?? ''} ${credential.familyName ?? ''}'
-                .trim();
-      }
-
-      final appleData = {
-        'provider': 'apple',
-        'platform': 'ios',
-        'apple_id': credential.userIdentifier,
-        'name': fullName.isNotEmpty ? fullName : 'Apple User',
-        'email': credential.email ?? '',
-        'identity_token': credential.identityToken,
-        'authorization_code': credential.authorizationCode,
-      };
-
-      return await _sendUserDataToBackend(appleData);
-    } catch (e) {
-      print('iOS Apple 登入錯誤: $e');
-      return null;
-    }
-  }
-
-  /// 發送用戶資料到後端 - 使用新的 OAuth 流程
-  Future<Map<String, dynamic>?> _sendUserDataToBackend(
-      Map<String, dynamic> userData) async {
-    try {
-      // 統一使用後端 login 端點（web/ios/android 共用）
-      final provider = (userData['provider'] ?? 'google').toString();
-      final apiUrl = AppConfig.api('/auth/$provider-login.php');
-
-      debugPrint('🌐 發送請求到: $apiUrl');
-      debugPrint('📦 請求資料欄位: ${userData.keys.toList()}'); // 不記錄敏感資料
-
-      // 檢查敏感資料但不記錄
-      final sensitiveKeys = [
-        'id_token',
-        'access_token',
-        'server_auth_code',
-        'password'
-      ];
-      final hasSensitiveData =
-          userData.keys.any((key) => sensitiveKeys.contains(key));
-      if (hasSensitiveData) {
-        debugPrint('⚠️ 請求包含敏感資料，已隱藏');
-      }
-
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(userData),
-      );
-
-      debugPrint('📥 後端回應狀態碼: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          print('✅ 後端處理成功');
-          return data['data'];
-        } else {
-          print('❌ 後端處理失敗: ${data['message']}');
-          return null;
-        }
-      } else {
-        print('❌ 後端回應錯誤: ${response.statusCode} - ${response.body}');
-        return null;
-      }
-    } catch (e) {
-      print('❌ 發送資料到後端錯誤: $e');
-      return null;
-    }
-  }
-
-  /// 登出指定第三方登入
-  Future<void> signOutFromProvider(String provider) async {
-    try {
-      switch (provider.toLowerCase()) {
-        case 'google':
-          // 7.1.1 使用單例
-          final signIn = GoogleSignIn.instance;
-          await signIn.initialize();
-          await signIn.disconnect();
-          break;
-        case 'facebook':
-          // Web 平台 Facebook 登出
-          if (isWeb) {
-            debugPrint('🌐 Facebook Web 登出 - 清除本地狀態');
-            // Web 平台清除 localStorage 或 cookie
-            // 實際實現需要與前端 JavaScript 配合
-          } else {
-            debugPrint('📱 Facebook Mobile 登出 - 使用 SDK');
-            // 移動平台使用 Facebook SDK 登出
-            // await FacebookLogin().logOut();
-          }
-          break;
-        case 'apple':
-          // Web 平台 Apple 登出
-          if (isWeb) {
-            debugPrint('🌐 Apple Web 登出 - 清除本地狀態');
-            // Web 平台清除本地狀態
-          } else {
-            debugPrint('📱 Apple Mobile 登出 - 使用 SDK');
-            // 移動平台使用 Apple Sign-In SDK 登出
-            // await SignInWithApple.getAppleIDCredential().then((_) => null);
-          }
-          break;
-        default:
-          print('不支援的登出方式: $provider');
-      }
-    } catch (e) {
-      print('第三方登出錯誤 ($provider): $e');
-    }
-  }
-
-  /// 檢查指定第三方是否已登入
-  Future<bool> isSignedInWithProvider(String provider) async {
-    try {
-      switch (provider.toLowerCase()) {
-        case 'google':
-          if (isWeb) {
-            // Web 平台：檢查 localStorage 或後端 token
-            debugPrint('🌐 Google Web 登入狀態檢查 - 檢查本地狀態');
-            // 實際實現需要檢查 localStorage 或後端 token
-            // 這裡簡化為 false，實際應該檢查有效的 JWT token
-            return false;
-          } else {
-            // 移動平台：使用 SDK 檢查
-            final signIn = GoogleSignIn.instance;
-            await signIn.initialize();
-            await signIn.attemptLightweightAuthentication();
-            try {
-              final event = await signIn.authenticationEvents.first.timeout(
-                const Duration(milliseconds: 500), // 增加 timeout 時間
-              );
-              return event is GoogleSignInAuthenticationEventSignIn;
-            } catch (_) {
-              return false;
-            }
-          }
-        case 'facebook':
-          // TODO: 實作 Facebook 登入狀態檢查
-          return false;
-        case 'apple':
-          // TODO: 實作 Apple 登入狀態檢查
-          return false;
-        default:
-          return false;
-      }
-    } catch (e) {
-      print('檢查第三方登入狀態錯誤 ($provider): $e');
       return false;
     }
   }
 
-  /// 獲取所有已登入的第三方登入方式
-  Future<List<String>> getSignedInProviders() async {
-    final providers = <String>[];
+  /// 初始化服務
+  Future<void> initialize() async {
+    debugPrint('🔧 初始化第三方登入服務...');
 
-    if (await isSignedInWithProvider('google')) {
-      providers.add('google');
+    // 檢查環境配置
+    try {
+      debugPrint('🔍 第三方登入服務初始化完成');
+    } catch (e) {
+      debugPrint('⚠️ 環境配置初始化失敗: $e');
     }
-    if (await isSignedInWithProvider('facebook')) {
-      providers.add('facebook');
-    }
-    if (await isSignedInWithProvider('apple')) {
-      providers.add('apple');
-    }
-
-    return providers;
   }
 
-  /// 獲取第三方登入配置
-  Map<String, dynamic> getProviderConfig(String provider) {
-    switch (provider.toLowerCase()) {
-      case 'google':
-        return {
-          'web_client_id': EnvironmentConfig.googleClientId,
-          'android_client_id': EnvironmentConfig.googleAndroidClientId,
-          'ios_client_id': EnvironmentConfig.googleIosClientId,
-          'web_client_secret': EnvironmentConfig.googleWebClientSecret,
+  /// Google 登入
+  Future<Map<String, dynamic>?> signInWithGoogle() async {
+    try {
+      debugPrint('🔍 開始 Google 登入...');
+
+      if (kIsWeb) {
+        // Web 平台使用 OAuth popup 流程
+        return await _signInWithGoogleWeb();
+      } else {
+        // 移動平台使用原生流程
+        return await _signInWithGoogleMobile();
+      }
+    } catch (e) {
+      debugPrint('❌ Google 登入失敗: $e');
+      return null;
+    }
+  }
+
+  /// Google 登入 - Web 平台
+  Future<Map<String, dynamic>?> _signInWithGoogleWeb() async {
+    try {
+      debugPrint('🌐 使用 Google Web 登入流程...');
+
+      // 創建 Google 登入 URL
+      final googleClientId = EnvironmentConfig.googleClientId;
+      final redirectUri = EnvironmentConfig.googleRedirectUri;
+
+      // 檢查必要的環境變數
+      if (googleClientId.isEmpty) {
+        debugPrint('❌ Google Client ID 未配置');
+        return null;
+      }
+      if (redirectUri.isEmpty) {
+        debugPrint('❌ Google Redirect URI 未配置');
+        return null;
+      }
+
+      final googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth?'
+          'client_id=$googleClientId&'
+          'redirect_uri=${Uri.encodeComponent(redirectUri)}&'
+          'response_type=code&'
+          'scope=email%20profile&'
+          'access_type=offline';
+
+      debugPrint('🔍 Google 登入 URL: $googleAuthUrl');
+
+      // 使用 popup 進行登入
+      if (canUseWebAPI) {
+        // 使用 dart:html 打開 popup
+        html.window.open(googleAuthUrl, 'google_auth_popup',
+            'width=500,height=600,scrollbars=yes,resizable=yes');
+
+        debugPrint('✅ Google 登入 popup 已打開');
+
+        // 監聽 popup 關閉事件
+        final completer = Completer<Map<String, dynamic>?>();
+
+        late dynamic messageHandler;
+        messageHandler = (event) {
+          if (canUseWebAPI) {
+            debugPrint('🔍 收到 Google 登入消息: ${event.data}');
+
+            html.window.removeEventListener('message', messageHandler);
+
+            try {
+              final data = jsonDecode(event.data);
+              completer.complete(data);
+            } catch (e) {
+              debugPrint('❌ 解析 Google 登入數據失敗: $e');
+              completer.complete(null);
+            }
+          }
         };
-      case 'facebook':
+
+        if (canUseWebAPI) {
+          html.window.addEventListener('message', messageHandler);
+        }
+
+        // 等待 popup 結果
+        return await completer.future;
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('❌ Google Web 登入失敗: $e');
+      return null;
+    }
+  }
+
+  /// Google 登入 - 移動平台
+  Future<Map<String, dynamic>?> _signInWithGoogleMobile() async {
+    try {
+      debugPrint('📱 使用 Google 移動登入流程...');
+
+      // 移動平台暫時返回 null，等待後續實現
+      debugPrint('⚠️ Google 移動登入功能暫未實現');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Google 移動登入失敗: $e');
+      return null;
+    }
+  }
+
+  /// Facebook 登入
+  Future<Map<String, dynamic>?> signInWithFacebook() async {
+    try {
+      debugPrint('🔍 開始 Facebook 登入...');
+
+      final LoginResult result = await _facebookAuth.login();
+
+      if (result.status == LoginStatus.success) {
+        debugPrint('✅ Facebook 登入成功');
+
+        // 獲取用戶信息
+        final userData = await _facebookAuth.getUserData();
+
         return {
-          'app_id': EnvironmentConfig.facebookAppId,
-          'app_secret': EnvironmentConfig.facebookAppSecret,
+          'provider': 'facebook',
+          'provider_id': userData['id'],
+          'email': userData['email'],
+          'name': userData['name'],
+          'avatar_url': userData['picture']?['data']?['url'],
+          'access_token': result.accessToken?.tokenString ?? '',
         };
-      case 'apple':
+      }
+
+      debugPrint('❌ Facebook 登入失敗: ${result.status}');
+      return null;
+    } catch (e) {
+      debugPrint('❌ Facebook 登入失敗: $e');
+      return null;
+    }
+  }
+
+  /// Apple 登入
+  Future<Map<String, dynamic>?> signInWithApple() async {
+    try {
+      debugPrint('🔍 開始 Apple 登入...');
+
+      if (kIsWeb) {
+        // Web 平台使用 OAuth popup 流程
+        return await _signInWithAppleWeb();
+      } else {
+        // 移動平台使用原生流程
+        final credential = await SignInWithApple.getAppleIDCredential(
+          scopes: [
+            AppleIDAuthorizationScopes.email,
+            AppleIDAuthorizationScopes.fullName,
+          ],
+        );
+
+        debugPrint('✅ Apple 登入成功: ${credential.userIdentifier}');
+
         return {
-          'service_id': EnvironmentConfig.appleServiceId,
-          'key_id': EnvironmentConfig.appleKeyId,
-          'team_id': EnvironmentConfig.appleTeamId,
+          'provider': 'apple',
+          'provider_id': credential.userIdentifier,
+          'email': credential.email,
+          'name': '${credential.givenName ?? ''} ${credential.familyName ?? ''}'
+              .trim(),
+          'access_token': credential.identityToken,
+          'authorization_code': credential.authorizationCode,
         };
-      default:
-        return {};
+      }
+    } catch (e) {
+      debugPrint('❌ Apple 登入失敗: $e');
+      return null;
     }
   }
 
-  /// 檢查第三方登入功能是否可用
-  bool isProviderAvailable(String provider) {
+  /// Apple 登入 - Web 平台
+  Future<Map<String, dynamic>?> _signInWithAppleWeb() async {
+    try {
+      debugPrint('🌐 使用 Apple Web 登入流程...');
+
+      // 創建 Apple 登入 URL
+      final appleClientId = EnvironmentConfig.appleServiceId;
+      final redirectUri = EnvironmentConfig.appleRedirectUri;
+
+      // 檢查必要的環境變數
+      if (appleClientId.isEmpty) {
+        debugPrint('❌ Apple Service ID 未配置');
+        return null;
+      }
+      if (redirectUri.isEmpty) {
+        debugPrint('❌ Apple Redirect URI 未配置');
+        return null;
+      }
+
+      final appleAuthUrl = 'https://appleid.apple.com/auth/authorize?'
+          'client_id=$appleClientId&'
+          'redirect_uri=${Uri.encodeComponent(redirectUri)}&'
+          'response_type=code&'
+          'scope=name%20email&'
+          'response_mode=form_post';
+
+      debugPrint('🔍 Apple 登入 URL: $appleAuthUrl');
+
+      // 使用 popup 進行登入
+      if (canUseWebAPI) {
+        // 使用 dart:html 打開 popup
+        html.window.open(appleAuthUrl, 'apple_auth_popup',
+            'width=500,height=600,scrollbars=yes,resizable=yes');
+
+        debugPrint('✅ Apple 登入 popup 已打開');
+
+        // 監聽 popup 關閉事件
+        final completer = Completer<Map<String, dynamic>?>();
+
+        late dynamic messageHandler;
+        messageHandler = (event) {
+          if (canUseWebAPI) {
+            debugPrint('🔍 收到 Apple 登入消息: ${event.data}');
+
+            html.window.removeEventListener('message', messageHandler);
+
+            try {
+              final data = jsonDecode(event.data);
+              completer.complete(data);
+            } catch (e) {
+              debugPrint('❌ 解析 Apple 登入數據失敗: $e');
+              completer.complete(null);
+            }
+          }
+        };
+
+        if (canUseWebAPI) {
+          html.window.addEventListener('message', messageHandler);
+        }
+
+        // 等待 popup 結果
+        return await completer.future;
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('❌ Apple Web 登入失敗: $e');
+      return null;
+    }
+  }
+
+  /// 登出所有服務
+  Future<void> signOut() async {
+    try {
+      debugPrint('🔍 開始登出所有服務...');
+
+      // Facebook 登出
+      await _facebookAuth.logOut();
+
+      debugPrint('✅ 所有服務登出完成');
+    } catch (e) {
+      debugPrint('❌ 登出失敗: $e');
+    }
+  }
+
+  /// 檢查登入狀態
+  Future<bool> isSignedIn() async {
+    try {
+      // 暫時返回 false
+      return false;
+    } catch (e) {
+      debugPrint('❌ 檢查登入狀態失敗: $e');
+      return false;
+    }
+  }
+
+  /// 獲取當前用戶信息
+  Future<Map<String, dynamic>?> getCurrentUser() async {
+    try {
+      // 暫時返回 null
+      return null;
+    } catch (e) {
+      debugPrint('❌ 獲取用戶信息失敗: $e');
+      return null;
+    }
+  }
+
+  /// 統一登入方法 - 根據提供者選擇對應的登入方式
+  Future<Map<String, dynamic>?> signInWithProvider(String provider) async {
     switch (provider.toLowerCase()) {
       case 'google':
-        return EnvironmentConfig.googleClientId.isNotEmpty;
+        return await signInWithGoogle();
       case 'facebook':
-        return EnvironmentConfig.facebookAppId.isNotEmpty;
+        return await signInWithFacebook();
       case 'apple':
-        return EnvironmentConfig.appleServiceId.isNotEmpty;
+        return await signInWithApple();
       default:
-        return false;
-    }
-  }
-
-  /// 獲取所有可用的第三方登入方式
-  List<String> getAvailableProviders() {
-    final providers = <String>[];
-
-    if (isProviderAvailable('google')) {
-      providers.add('google');
-    }
-    if (isProviderAvailable('facebook')) {
-      providers.add('facebook');
-    }
-    if (isProviderAvailable('apple')) {
-      providers.add('apple');
-    }
-
-    return providers;
-  }
-
-  /// 獲取第三方登入的顯示名稱
-  String getProviderDisplayName(String provider) {
-    switch (provider.toLowerCase()) {
-      case 'google':
-        return 'Google';
-      case 'facebook':
-        return 'Facebook';
-      case 'apple':
-        return 'Apple';
-      default:
-        return provider;
-    }
-  }
-
-  /// 獲取第三方登入的圖標名稱
-  String getProviderIconName(String provider) {
-    switch (provider.toLowerCase()) {
-      case 'google':
-        return 'assets/images/auth/google_icon.png';
-      case 'facebook':
-        return 'assets/images/auth/facebook_icon.png';
-      case 'apple':
-        return 'assets/images/auth/apple_icon.png';
-      default:
-        return 'assets/images/auth/default_icon.png';
-    }
-  }
-
-  /// 驗證第三方登入配置
-  Map<String, bool> validateProviderConfigs() {
-    return {
-      'google': EnvironmentConfig.googleClientId.isNotEmpty &&
-          EnvironmentConfig.googleAndroidClientId.isNotEmpty &&
-          EnvironmentConfig.googleIosClientId.isNotEmpty,
-      'facebook': EnvironmentConfig.facebookAppId.isNotEmpty &&
-          EnvironmentConfig.facebookAppSecret.isNotEmpty,
-      'apple': EnvironmentConfig.appleServiceId.isNotEmpty &&
-          EnvironmentConfig.appleKeyId.isNotEmpty,
-    };
-  }
-
-  /// 打印第三方登入配置狀態
-  void printProviderConfigStatus() {
-    if (EnvironmentConfig.debugMode) {
-      print('🔐 第三方登入配置狀態:');
-      print('  Google: ${isProviderAvailable('google') ? "✅" : "❌"}');
-      print('  Facebook: ${isProviderAvailable('facebook') ? "✅" : "❌"}');
-      print('  Apple: ${isProviderAvailable('apple') ? "✅" : "❌"}');
-
-      final validation = validateProviderConfigs();
-      print('🔍 配置驗證:');
-      validation.forEach((provider, isValid) {
-        print('  $provider: ${isValid ? "✅" : "❌"}');
-      });
+        debugPrint('❌ 不支援的登入提供者: $provider');
+        return null;
     }
   }
 }

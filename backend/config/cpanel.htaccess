@@ -1,4 +1,4 @@
-# Here4Help CPanel 部署 .htaccess 配置
+# Here4Help CPanel 部署 .htaccess 配置 (修正版)
 # 適用於 Apache 2.4.65 + CPanel 環境
 
 # 啟用重寫引擎
@@ -22,7 +22,7 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     # HSTS (僅 HTTPS)
     Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
     
-    # 內容安全政策
+    # 內容安全政策 (cPanel 環境調整)
     Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https: wss:; frame-src 'self' https://accounts.google.com https://www.facebook.com"
     
     # 推薦者政策
@@ -51,8 +51,25 @@ RewriteRule ^(.*)$ web/index.html [L]
 # 媒體檔案處理
 RewriteRule ^media/(.*)$ backend/api/media/serve.php?file=$1 [L,QSA]
 
-# 檔案上傳大小限制 (PHP 設置)
+# 檔案上傳大小限制 (cPanel 兼容版本)
+<IfModule mod_php.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 20M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+    php_value memory_limit 256M
+</IfModule>
+
+# 備用 PHP 模組支援
 <IfModule mod_php7.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 20M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+    php_value memory_limit 256M
+</IfModule>
+
+<IfModule mod_php8.c>
     php_value upload_max_filesize 10M
     php_value post_max_size 20M
     php_value max_execution_time 300
@@ -179,16 +196,21 @@ RewriteRule ^media/(.*)$ backend/api/media/serve.php?file=$1 [L,QSA]
     </FilesMatch>
 </Directory>
 
-# CORS 設置 (用於 API)
+# CORS 設置 (cPanel 生產環境調整)
 <IfModule mod_headers.c>
     # 預檢請求處理
     RewriteCond %{REQUEST_METHOD} OPTIONS
     RewriteRule ^(.*)$ $1 [R=200,L]
     
-    # API 端點 CORS
+    # API 端點 CORS (生產環境)
     <LocationMatch "^/api/">
-        # 本機測試允許 localhost:3000
-        Header always set Access-Control-Allow-Origin "http://localhost:3000"
+        # 生產環境允許的來源
+        SetEnvIf Origin "^https://hero4help\.demofhs\.com$" CORS_ALLOW_ORIGIN=$0
+        SetEnvIf Origin "^https://apps\.apple\.com$" CORS_ALLOW_ORIGIN=$0
+        SetEnvIf Origin "^https://play\.google\.com$" CORS_ALLOW_ORIGIN=$0
+        
+        # 設定 CORS 標頭
+        Header always set Access-Control-Allow-Origin "%{CORS_ALLOW_ORIGIN}e" env=CORS_ALLOW_ORIGIN
         Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
         Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
         Header always set Access-Control-Allow-Credentials "true"
@@ -196,9 +218,9 @@ RewriteRule ^media/(.*)$ backend/api/media/serve.php?file=$1 [L,QSA]
     </LocationMatch>
 </IfModule>
 
-# 錯誤頁面
-ErrorDocument 404 /backend/api/errors/404.php
-ErrorDocument 500 /backend/api/errors/500.php
+# 錯誤頁面 (簡化版本，避免路徑問題)
+ErrorDocument 404 "File not found"
+ErrorDocument 500 "Internal server error"
 
 # 防止目錄瀏覽
 Options -Indexes

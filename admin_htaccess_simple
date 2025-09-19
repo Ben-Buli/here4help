@@ -1,0 +1,4 @@
+# Admin 目錄重定向到 public
+RewriteEngine On
+RewriteCond %{REQUEST_URI} !^/admin/public/
+RewriteRule ^(.*)$ /admin/public/$1 [L]

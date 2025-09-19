@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>TEAM_ID</key>
+	<string>Q4C6BSB74K</string>
+	<key>KEY_ID</key>
+	<string>2F963AR7G6</string>
+	<key>SERVICES_ID</key>
+	<string>com.example.here4help.login</string>
+	<key>PRIVATE_KEY</key>
+	<string>-----BEGIN PRIVATE KEY-----
+MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQg008KmIG7/tYkdP1P
+0Q0rdxWSWr8ZAwAAzeaN7Hy7ZaygCgYIKoZIzj0DAQehRANCAATrdAfLCW9+Bz6a
+ge/mE33a+oyWd4LIOYNgnCbVV8OCdn0rE2s5hQORjWGWE3Qi4g/bgO/nYMC92Vb3
+P+lMejAN
+-----END PRIVATE KEY-----</string>
+</dict>
+</plist>

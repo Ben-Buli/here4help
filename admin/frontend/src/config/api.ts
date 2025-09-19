@@ -6,10 +6,10 @@
 // API 基礎配置
 export const API_CONFIG = {
   // Laravel Admin API URL
-  baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  baseUrl: import.meta.env.VITE_API_BASE_URL,
   
   // PHP Backend API URL (for Flutter app compatibility)
-  backendUrl: import.meta.env.VITE_BACKEND_API_URL || 'http://localhost:8888/here4help/backend',
+  backendUrl: import.meta.env.VITE_BACKEND_API_URL,
   
   // API 前綴
   adminPrefix: '/api/admin',

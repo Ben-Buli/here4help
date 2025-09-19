@@ -23,7 +23,10 @@ const jwt = require('jsonwebtoken');
 // 引入客服事件處理器
 const SupportEventHandler = require('./support_events');
 
-const PORT = process.env.SOCKET_PORT || 3001;
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Socket.IO Gateway listening on ${PORT}`);
+});
 
 // Load environment variables once at startup (try root .env, then backend/config/.env)
 const path = require('path');
@@ -35,7 +38,7 @@ if (!process.env.JWT_SECRET) {
 }
 
 // Get JWT secret once
-const JWT_SECRET = process.env.JWT_SECRET || 'here4help_jwt_secret_key_2025_development_environment_secure_random_string';
+const JWT_SECRET = process.env.JWT_SECRET ;
 
 if (!JWT_SECRET) {
   console.error('❌ JWT_SECRET not configured in environment variables');
@@ -57,6 +60,7 @@ app.use(express.json()); // 添加 JSON 解析中間件
 
 const server = http.createServer(app);
 const io = new Server(server, {
+  path: "/backend/socket",
   cors: {
     origin: '*',
     methods: ['GET', 'POST']
