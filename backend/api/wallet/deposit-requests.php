@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * GET /api/wallet/deposit-requests.php
  * 儲值申請記錄API - 獲取用戶的儲值申請歷史

@@ -20,6 +20,13 @@ if (version_compare($phpVersion, '7.4.0', '<')) {
     $errors[] = "PHP 版本過低，需要 7.4.0 或更高版本";
 } else {
     $checks[] = "✅ PHP 版本符合要求";
+    
+    // 檢查是否為 PHP 8.4 或更高版本
+    if (version_compare($phpVersion, '8.4.0', '>=')) {
+        $checks[] = "✅ PHP 8.4+ 版本，已啟用最新功能";
+    } elseif (version_compare($phpVersion, '8.2.0', '>=')) {
+        $warnings[] = "建議升級至 PHP 8.4 以獲得最佳性能和安全性";
+    }
 }
 
 $requiredExtensions = ['pdo_mysql', 'gd', 'curl', 'json', 'mbstring', 'openssl'];

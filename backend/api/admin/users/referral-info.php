@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../../config/php84_compatibility.php';
+
 /**
  * GET /api/admin/users/{user_id}/referral-info
  * 管理員獲取用戶推薦資訊 API

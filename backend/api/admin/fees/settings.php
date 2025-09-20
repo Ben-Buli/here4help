@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../../config/php84_compatibility.php';
+
 /**
  * GET/PUT /api/admin/fees/settings.php
  * 管理員手續費設定管理API

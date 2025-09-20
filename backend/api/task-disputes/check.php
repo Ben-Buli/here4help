@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * 檢查任務爭議是否已存在
  * GET /api/task-disputes/check.php?chat_room_id={chat_room_id}

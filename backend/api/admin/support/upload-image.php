@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../../config/php84_compatibility.php';
+
 /**
  * 管理員客服聊天室圖片上傳 API
  * POST /api/admin/support/upload-image

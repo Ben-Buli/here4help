@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * 媒體檔案安全掃描 API
  * 手動觸發檔案掃描或查詢掃描結果

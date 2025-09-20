@@ -20,7 +20,7 @@ import 'package:here4help/config/env_config.dart';
 @Deprecated('使用新的 .env 系統和 environment_config_legacy.dart')
 class EnvironmentConfig {
   static Map<String, dynamic>? _config;
-  static bool _useEnvConfig = true; // 切換到新的 .env 系統
+  static final bool _useEnvConfig = true; // 切換到新的 .env 系統
 
   /// 檢測是否為 Android 模擬器
   static bool _isAndroidEmulator() {

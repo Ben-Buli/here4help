@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * GET /api/ratings/not-selected
  * 獲取用戶未被選中的申請列表（應徵者視角）

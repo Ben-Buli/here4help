@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * 建立任務爭議
  * POST /api/task-disputes/create.php

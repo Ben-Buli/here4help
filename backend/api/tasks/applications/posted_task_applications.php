@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../../config/php84_compatibility.php';
+
 /**
  * Posted Tasks 聚合 API
  * GET /api/tasks/posted_tasks_aggregated.php

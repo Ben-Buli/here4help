@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../../config/php84_compatibility.php';
+
 /**
  * 簡化版本的 list_by_task.php
  * 用於測試基本的數據庫查詢

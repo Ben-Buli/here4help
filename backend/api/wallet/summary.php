@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * GET /api/wallet/summary.php
  * Wallet summary API - Returns the user's total points, available points, and active tasks

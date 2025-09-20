@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * GET /api/ratings/accepted
  * 獲取用戶接受的任務列表（應徵者視角）

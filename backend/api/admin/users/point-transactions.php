@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../../config/php84_compatibility.php';
+
 /**
  * GET /api/admin/users/point-transactions.php
  * 管理員查詢所有用戶點數交易記錄API

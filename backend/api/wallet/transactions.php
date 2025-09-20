@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * GET /api/wallet/transactions.php
  * 點數交易記錄API - 獲取用戶的點數交易歷史

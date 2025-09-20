@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * 取得任務編輯所需的完整資料（含 application_questions）
  * GET /api/tasks/task_edit_data.php?id={taskId}

@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * GET /api/wallet/bank-accounts.php
  * 銀行帳戶管理API - 獲取啟用的官方銀行帳戶資訊

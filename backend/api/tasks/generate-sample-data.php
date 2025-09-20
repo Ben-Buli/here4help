@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * 任務資料自動生成腳本
  * 用於為現有 tasks 資料空欄位自動生成符合語境的任務資訊

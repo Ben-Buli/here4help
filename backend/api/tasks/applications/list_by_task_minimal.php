@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../../config/php84_compatibility.php';
+
 /**
  * 最簡化版本的 list_by_task.php
  * 只查詢基本的應徵記錄，不做複雜的 JOIN

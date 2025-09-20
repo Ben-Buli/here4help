@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * 媒體檔案上傳 API
  * 支援聊天室、申訴、頭像等不同情境的檔案上傳

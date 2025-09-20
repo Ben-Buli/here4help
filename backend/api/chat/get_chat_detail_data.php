@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * 聊天室聚合詳情 API
  * GET /backend/api/chat/get_chat_detail_data.php?room_id=xxx

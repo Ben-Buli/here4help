@@ -70,22 +70,22 @@ class EnvConfig {
         String.fromEnvironment('ENVIRONMENT', defaultValue: 'development');
 
     // Web 平台需要使用 assets/env/ 路徑
-    final String prefix = kIsWeb ? 'assets/env/' : '';
+    const String prefix = kIsWeb ? 'assets/env/' : '';
 
     switch (environment) {
       case 'production':
-        return '${prefix}.env.production';
+        return '$prefix.env.production';
       case 'testflight':
-        return '${prefix}.env.testflight';
+        return '$prefix.env.testflight';
       case 'staging':
-        return '${prefix}.env.staging';
+        return '$prefix.env.staging';
       case 'android_emulator':
-        return '${prefix}.env.android_emulator';
+        return '$prefix.env.android_emulator';
       case 'ios_simulator':
-        return '${prefix}.env.ios_simulator';
+        return '$prefix.env.ios_simulator';
       case 'development':
       default:
-        return '${prefix}.env.development';
+        return '$prefix.env.development';
     }
   }
 
@@ -251,7 +251,7 @@ class EnvConfig {
     debugPrint('  - API_BASE_URL raw: ${dotenv.env['API_BASE_URL'] ?? "null"}');
     debugPrint('OAuth Configuration:');
     debugPrint(
-        '  - Google Client ID: ${googleClientId.isEmpty ? "未配置" : "已配置 (${googleClientId.length > 10 ? googleClientId.substring(0, 10) + "..." : googleClientId})"}');
+        '  - Google Client ID: ${googleClientId.isEmpty ? "未配置" : "已配置 (${googleClientId.length > 10 ? "${googleClientId.substring(0, 10)}..." : googleClientId})"}');
     debugPrint(
         '  - Facebook App ID: ${facebookAppId.isEmpty ? "未配置" : "已配置 ($facebookAppId)"}');
     debugPrint(

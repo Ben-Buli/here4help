@@ -1,4 +1,7 @@
 <?php
+// 載入 PHP 8.4 相容性配置
+require_once __DIR__ . '/../config/php84_compatibility.php';
+
 /**
  * POST /api/fees/record.php
  * 手續費記錄API - 在任務完成的原子化交易內，同步記錄手續費入帳到 fee_revenue_ledger
