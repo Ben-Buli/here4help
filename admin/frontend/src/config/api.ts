@@ -1,6 +1,9 @@
 /**
- * 統一API配置管理
- * 提供一致的API基礎URL和端點配置
+ * 統一 API 配置管理
+ * - 統一管理 API 基礎 URL、前綴、超時等設定
+ * - 載入並處理 VITE_* 環境變數
+ * - 提供 getApiUrl()、getImageUrl() 等 URL 生成工具
+ * - 定義所有 API 端點的標準化路徑
  */
 
 // API 基礎配置

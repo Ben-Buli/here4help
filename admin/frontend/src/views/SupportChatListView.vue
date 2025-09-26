@@ -56,7 +56,12 @@
       </div>
 
       <div v-else-if="chatRooms.length === 0" class="text-center py-8 text-gray-500">
-        No chat rooms found
+        <div v-if="hasError">
+          No chat rooms found.
+        </div>
+        <div v-else>
+          You have no ongoing chat rooms.
+        </div>
       </div>
 
       <div v-else class="space-y-4">
@@ -168,6 +173,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { adminSupportApi } from '@/services/api'
+import { getImageUrl } from '@/config/api'
 
 interface ChatRoom {
   room_id: string
@@ -192,6 +198,7 @@ interface ChatRoom {
 
 const route = useRoute()
 const isLoading = ref(false)
+const hasError = ref(false)
 const chatRooms = ref<ChatRoom[]>([])
 const pagination = ref({ current_page: 1, per_page: 15, total: 0, last_page: 1 })
 const filters = reactive({ status: '', search: '' })
@@ -212,6 +219,7 @@ const targetRoomId = route.query.room_id as string
 const loadChatRooms = async (page = 1) => {
   try {
     isLoading.value = true
+    hasError.value = false
     
     // 使用管理員 API
     const params = {
@@ -266,9 +274,15 @@ const loadChatRooms = async (page = 1) => {
           }
         }, 100)
       }
+    } else {
+      // API 返回失敗，設置錯誤狀態
+      hasError.value = true
+      chatRooms.value = []
     }
   } catch (error) {
     console.error('Failed to load chat rooms:', error)
+    hasError.value = true
+    chatRooms.value = []
   } finally {
     isLoading.value = false
   }
@@ -292,29 +306,14 @@ const debouncedSearch = () => {
 }
 
 const openChatRoom = (room: ChatRoom) => {
-  // 跳轉到聊天室詳情頁面
-  window.location.href = `/support-chat-list/${room.room_id}`
+  // 跳轉到聊天室詳情頁面 - 確保使用正確的 admin 路由
+  window.location.href = `/admin/support-chat-list/${room.room_id}`
 }
 
 const getAvatarUrl = (avatarUrl?: string) => {
   if (!avatarUrl) {
     // 使用管理員預設頭像
-    return '/uploads/avatars/default.png'
-  }
-  
-  // 統一處理 uploads/support_chat/ 路徑
-  if (avatarUrl.startsWith('uploads/support_chat/')) {
-    return avatarUrl
-  }
-  
-  // 處理舊格式：/backend/uploads/avatars/ 或 /backend/uploads/support_chat/
-  if (avatarUrl.startsWith('/backend/uploads/')) {
-    return avatarUrl.replace('/backend', '')
-  }
-  
-  // 處理舊格式：backend/uploads/avatars/ 或 backend/uploads/support_chat/
-  if (avatarUrl.startsWith('backend/uploads/')) {
-    return `/${avatarUrl}`
+    return getImageUrl('avatars/default.png')
   }
   
   // 如果是完整 URL，直接返回
@@ -322,7 +321,8 @@ const getAvatarUrl = (avatarUrl?: string) => {
     return avatarUrl
   }
   
-  return avatarUrl
+  // 使用統一的圖片 URL 處理邏輯
+  return getImageUrl(avatarUrl)
 }
 
 const getStatusClass = (status: string) => {

@@ -6,8 +6,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:here4help/config/environment_config.dart';
 
-// 條件導入 - 只在 Web 平台導入 dart:html
-import 'dart:html' as html show window if (dart.library.html) 'dart:html';
+// 條件導入 - 使用更安全的方式
+import 'third_party_auth_web.dart'
+    if (dart.library.io) 'third_party_auth_mobile.dart' as platform;
 
 /// 第三方登入服務 - 統一管理所有第三方登入方式
 class ThirdPartyAuthService {
@@ -94,9 +95,8 @@ class ThirdPartyAuthService {
 
       // 使用 popup 進行登入
       if (canUseWebAPI) {
-        // 使用 dart:html 打開 popup
-        html.window.open(googleAuthUrl, 'google_auth_popup',
-            'width=500,height=600,scrollbars=yes,resizable=yes');
+        // 使用平台特定的實現打開 popup
+        platform.PlatformAuth.openAuthPopup(googleAuthUrl, 'google_auth_popup');
 
         debugPrint('✅ Google 登入 popup 已打開');
 
@@ -104,15 +104,15 @@ class ThirdPartyAuthService {
         final completer = Completer<Map<String, dynamic>?>();
 
         late dynamic messageHandler;
-        messageHandler = (event) {
+        messageHandler = (String data) {
           if (canUseWebAPI) {
-            debugPrint('🔍 收到 Google 登入消息: ${event.data}');
+            debugPrint('🔍 收到 Google 登入消息: $data');
 
-            html.window.removeEventListener('message', messageHandler);
+            platform.PlatformAuth.removeMessageListener();
 
             try {
-              final data = jsonDecode(event.data);
-              completer.complete(data);
+              final dataMap = jsonDecode(data);
+              completer.complete(dataMap);
             } catch (e) {
               debugPrint('❌ 解析 Google 登入數據失敗: $e');
               completer.complete(null);
@@ -121,7 +121,7 @@ class ThirdPartyAuthService {
         };
 
         if (canUseWebAPI) {
-          html.window.addEventListener('message', messageHandler);
+          platform.PlatformAuth.addMessageListener(messageHandler);
         }
 
         // 等待 popup 結果
@@ -245,9 +245,8 @@ class ThirdPartyAuthService {
 
       // 使用 popup 進行登入
       if (canUseWebAPI) {
-        // 使用 dart:html 打開 popup
-        html.window.open(appleAuthUrl, 'apple_auth_popup',
-            'width=500,height=600,scrollbars=yes,resizable=yes');
+        // 使用平台特定的實現打開 popup
+        platform.PlatformAuth.openAuthPopup(appleAuthUrl, 'apple_auth_popup');
 
         debugPrint('✅ Apple 登入 popup 已打開');
 
@@ -255,15 +254,15 @@ class ThirdPartyAuthService {
         final completer = Completer<Map<String, dynamic>?>();
 
         late dynamic messageHandler;
-        messageHandler = (event) {
+        messageHandler = (String data) {
           if (canUseWebAPI) {
-            debugPrint('🔍 收到 Apple 登入消息: ${event.data}');
+            debugPrint('🔍 收到 Apple 登入消息: $data');
 
-            html.window.removeEventListener('message', messageHandler);
+            platform.PlatformAuth.removeMessageListener();
 
             try {
-              final data = jsonDecode(event.data);
-              completer.complete(data);
+              final dataMap = jsonDecode(data);
+              completer.complete(dataMap);
             } catch (e) {
               debugPrint('❌ 解析 Apple 登入數據失敗: $e');
               completer.complete(null);
@@ -272,7 +271,7 @@ class ThirdPartyAuthService {
         };
 
         if (canUseWebAPI) {
-          html.window.addEventListener('message', messageHandler);
+          platform.PlatformAuth.addMessageListener(messageHandler);
         }
 
         // 等待 popup 結果

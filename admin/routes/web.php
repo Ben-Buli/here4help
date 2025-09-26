@@ -1,33 +1,51 @@
 <?php
+
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Admin\WebController;
+use Illuminate\Support\Facades\Log;
 
 /*
 |--------------------------------------------------------------------------
-| Health Check / Ping
+| Admin 測試路由 (/admintest/*)
 |--------------------------------------------------------------------------
-| 這個路由用來測試 Laravel 是否運作正常
-| 瀏覽 https://hero4help.demofhs.com/admin/ping
+| 這些路由是為了測試 Laravel 是否正常運作，避免被前端 Vue SPA 吃掉。
 |--------------------------------------------------------------------------
 */
-Route::get('/admin/ping', function () {
-    return response()->json([
-        'pong' => true,
-        'time' => now()->toDateTimeString(),
-        'app'  => config('app.name'),
-        'env'  => config('app.env'),
-    ]);
-});
 
-/*
-|--------------------------------------------------------------------------
-| 測試 Blade View
-|--------------------------------------------------------------------------
-| https://hero4help.demofhs.com/admin/test-view
-|--------------------------------------------------------------------------
-*/
-Route::get('/admin/test-view', function () {
-    return view('test');   // 對應 resources/views/test.blade.php
+Route::prefix('admintest')->group(function () {
+    // 健康檢查
+    Route::get('/ping', function () {
+        return response()->json([
+            'pong' => true,
+            'time' => now(),
+        ]);
+    });
+
+    // 基本測試
+    Route::get('/test', function () {
+        return response()->json([
+            'check' => 'Laravel OK',
+            'time' => now(),
+        ]);
+    });
+
+    // 測試 log 寫入
+    Route::get('/log', function () {
+        Log::error('測試 log 寫入成功 at ' . now());
+        return response()->json(['log' => 'ok']);
+    });
+
+    // 測試 view
+    Route::get('/view', function () {
+        return view('test'); // 確認 resources/views/test.blade.php 存在
+    });
+
+    // phpinfo
+    Route::get('/phpinfo', function () {
+        ob_start();
+        phpinfo();
+        $phpinfo = ob_get_clean();
+        return response($phpinfo)->header('Content-Type', 'text/html');
+    });
 });
 
 /*
@@ -35,23 +53,10 @@ Route::get('/admin/test-view', function () {
 | Admin 前端路由 (Vue.js SPA)
 |--------------------------------------------------------------------------
 | Vue.js 會接管前端路由，Laravel 只需要回傳同一個入口檔。
-| 注意：/admin/ping 已經在上面定義，這裡不會覆蓋它。
 |--------------------------------------------------------------------------
 */
 Route::prefix('admin')->group(function () {
-    Route::get('/', [WebController::class, 'index']);
-    Route::get('/login', [WebController::class, 'index']);
-    Route::get('/dashboard', [WebController::class, 'index']);
-
-    // Vue catch-all (必須放最後)
-    Route::get('/{any}', [WebController::class, 'index'])->where('any', '.*');
+    Route::get('/{any?}', function () {
+        return view('app'); // 確認 resources/views/app.blade.php 存在並載入 Vue
+    })->where('any', '.*');
 });
-
-/*
-|--------------------------------------------------------------------------
-| 根路由重定向 (已移除)
-|--------------------------------------------------------------------------
-| 原本會重定向到 /admin，但會與主站根目錄重定向衝突
-| 已移除以避免路由衝突
-|--------------------------------------------------------------------------
-*/

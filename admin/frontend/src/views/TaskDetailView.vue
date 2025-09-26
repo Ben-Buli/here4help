@@ -84,17 +84,6 @@
           </div>
         </div>
         <div class="mt-4 flex md:mt-0 md:ml-4 space-x-3">
-          <button @click="editTaskStatus" class="admin-button-primary">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-              />
-            </svg>
-            Edit Status
-          </button>
           <button @click="refreshData" class="admin-button-secondary">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -237,14 +226,6 @@
         </div>
       </div>
 
-      <!-- Task Status Edit Modal -->
-      <TaskStatusModal
-        v-if="showStatusModal"
-        :task="task"
-        :statuses="taskStatuses"
-        @close="showStatusModal = false"
-        @saved="handleTaskSaved"
-      />
     </div>
   </div>
 </template>
@@ -253,7 +234,6 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { taskApi } from '@/services/api'
-import TaskStatusModal from '@/components/TaskStatusModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -263,8 +243,6 @@ const isLoading = ref(false)
 const error = ref('')
 const task = ref<any>(null)
 const applications = ref<any[]>([])
-const taskStatuses = ref<any[]>([])
-const showStatusModal = ref(false)
 
 // Methods
 const loadTask = async () => {
@@ -296,35 +274,11 @@ const loadTask = async () => {
   }
 }
 
-const loadTaskStatuses = async () => {
-  try {
-    // This would be a separate API call to get task statuses
-    // For now, we'll use hardcoded statuses
-    taskStatuses.value = [
-      { id: 1, name: 'open', display_name: 'Open' },
-      { id: 2, name: 'in_progress', display_name: 'In Progress' },
-      { id: 3, name: 'completed', display_name: 'Completed' },
-      { id: 4, name: 'cancelled', display_name: 'Cancelled' },
-      { id: 5, name: 'disputed', display_name: 'Disputed' },
-      { id: 6, name: 'pending_confirmation', display_name: 'Pending Confirmation' },
-    ]
-  } catch (error) {
-    console.error('Failed to load task statuses:', error)
-  }
-}
 
 const refreshData = () => {
   loadTask()
 }
 
-const editTaskStatus = () => {
-  showStatusModal.value = true
-}
-
-const handleTaskSaved = () => {
-  showStatusModal.value = false
-  refreshData()
-}
 
 // Utility functions
 const getStatusBadgeClass = (status: string) => {
@@ -373,7 +327,6 @@ const formatCountdown = (seconds: number) => {
 
 // Lifecycle
 onMounted(() => {
-  loadTaskStatuses()
   loadTask()
 })
 </script>

@@ -11,6 +11,55 @@ use Illuminate\Support\Facades\Validator;
 class SupportController extends Controller
 {
     /**
+     * 調試端點：檢查 support_chat_rooms 資料
+     * GET /admin/support/debug-rooms
+     */
+    public function debugRooms(Request $request)
+    {
+        try {
+            $admin = $request->user();
+            $adminId = $admin->id;
+
+            // 檢查資料庫中的所有聊天室
+            $allRooms = DB::table('support_chat_rooms')->get();
+            
+            // 檢查當前管理員的聊天室
+            $adminRooms = DB::table('support_chat_rooms')->where('admin_id', $adminId)->get();
+            
+            // 檢查所有管理員 ID
+            $allAdminIds = DB::table('support_chat_rooms')->pluck('admin_id')->unique()->toArray();
+            
+            // 檢查管理員表
+            $adminInfo = DB::table('admins')->where('id', $adminId)->first();
+            
+            return response()->json([
+                'success' => true,
+                'debug_info' => [
+                    'current_admin' => [
+                        'id' => $adminId,
+                        'info' => $adminInfo,
+                        'user_data' => $admin->toArray()
+                    ],
+                    'database_stats' => [
+                        'total_rooms' => count($allRooms),
+                        'admin_rooms' => count($adminRooms),
+                        'all_admin_ids' => $allAdminIds
+                    ],
+                    'all_rooms' => $allRooms,
+                    'admin_rooms' => $adminRooms
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ], 500);
+        }
+    }
+
+    /**
      * GET /admin/support/issues
      * type: all|support|dispute
      * status: open|in_progress|waiting_customer|resolved|closed
@@ -159,6 +208,15 @@ class SupportController extends Controller
             ]);
 
         // 🔥 關鍵：只顯示當前管理員負責的聊天室
+        // 調試：記錄當前管理員 ID 和查詢條件
+        Log::info('Support chat rooms query', [
+            'admin_id' => $adminId,
+            'admin_user' => $request->user()->toArray(),
+            'total_rooms_in_db' => DB::table('support_chat_rooms')->count(),
+            'rooms_for_admin' => DB::table('support_chat_rooms')->where('admin_id', $adminId)->count(),
+            'all_admin_ids' => DB::table('support_chat_rooms')->pluck('admin_id')->unique()->toArray()
+        ]);
+        
         $query->where('cr.admin_id', $adminId);
 
         if ($status) {
@@ -273,11 +331,15 @@ class SupportController extends Controller
         // 檢查管理員是否有權限訪問此聊天室
         $room = DB::table('support_chat_rooms')
             ->where('id', $roomId)
-            ->where('admin_id', $adminId)
             ->first();
 
         if (!$room) {
-            return response()->json(['success' => false, 'message' => 'Chat room not found or access denied'], 404);
+            return response()->json(['success' => false, 'message' => 'Chat room not found'], 404);
+        }
+
+        // 檢查權限：只有負責該聊天室的管理員可以查看
+        if ($room->admin_id && $room->admin_id != $adminId) {
+            return response()->json(['success' => false, 'message' => 'Access denied'], 403);
         }
 
         // 構建查詢條件
@@ -440,11 +502,15 @@ class SupportController extends Controller
         // 檢查管理員是否有權限訪問此聊天室
         $room = DB::table('support_chat_rooms')
             ->where('id', $roomId)
-            ->where('admin_id', $adminId)
             ->first();
 
         if (!$room) {
-            return response()->json(['success' => false, 'message' => 'Chat room not found or access denied'], 404);
+            return response()->json(['success' => false, 'message' => 'Chat room not found'], 404);
+        }
+
+        // 檢查權限：只有負責該聊天室的管理員可以查看
+        if ($room->admin_id && $room->admin_id != $adminId) {
+            return response()->json(['success' => false, 'message' => 'Access denied'], 403);
         }
 
         // 更新已讀記錄（管理員使用 admin_id，user_id 為 NULL）

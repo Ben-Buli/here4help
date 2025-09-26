@@ -2,6 +2,13 @@ import axios from 'axios'
 import type { AxiosInstance, AxiosResponse } from 'axios'
 import { API_CONFIG, ENV_CONFIG, API_ENDPOINTS } from '@/config/api'
 
+/**
+ * HTTP 客戶端: 建立和管理 axios 實例
+ * 請求/響應攔截器: 處理認證、錯誤處理
+ * API 服務封裝: 提供具體的 API 調用方法
+ * 型別定義: 定義 API 響應的 TypeScript 介面
+ */
+
 // 建立 axios 實例
 const api: AxiosInstance = axios.create({
   baseURL: ENV_CONFIG.isLocal ? '' : API_CONFIG.baseUrl, // 本地開發使用代理
@@ -10,11 +17,22 @@ const api: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
+  withCredentials: true, // 因為 Sanctum 的 CSRF Cookie 機制需要跨域攜帶 cookie，這裡 withCredentials: true 是必須的。
 })
 
-// 請求攔截器 - 添加 token
+// 請求攔截器 - 添加 token 和 CSRF 處理
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    // 對於需要 CSRF 保護的請求，先獲取 CSRF Token
+    if (config.method !== 'get' && !config.url?.includes('/sanctum/csrf-cookie')) {
+      try {
+        await api.get('/sanctum/csrf-cookie')
+      } catch (error) {
+        console.warn('Failed to get CSRF token:', error)
+      }
+    }
+
+    // 添加認證 token
     const token = localStorage.getItem('admin_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -35,8 +53,10 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       const url: string = error.config?.url || ''
       const isPhpDisputeApi = url.includes('/api/admin/task-disputes')
-      if (!isPhpDisputeApi) {
-        // 僅對 Laravel 管理端 API 觸發登出；PHP 爭議聊天室 API 的 401 不清除登入狀態
+      const isLoginApi = url.includes('/api/admin/login')
+      
+      if (!isPhpDisputeApi && !isLoginApi) {
+        // 僅對 Laravel 管理端 API 觸發登出；排除 PHP 爭議聊天室 API 和登入 API
         localStorage.removeItem('admin_token')
         localStorage.removeItem('admin_user')
         window.location.href = '/login'
@@ -70,6 +90,9 @@ export interface PaginatedResponse<T>
 
 // 認證相關 API
 export const authApi = {
+  // 獲取 CSRF Token (Sanctum SPA 認證必需)
+  getCsrfToken: () => api.get('/sanctum/csrf-cookie'),
+
   login: (email: string, password: string) =>
     api.post<
       ApiResponse<{
@@ -147,7 +170,7 @@ export const taskApi = {
     sort_order?: 'asc' | 'desc'
   }) => api.get<PaginatedResponse<any>>('/api/admin/tasks', { params }),
 
-  statuses: () => api.get<ApiResponse<any[]>>('/api/tasks/statuses'),
+  statuses: () => api.get<ApiResponse<any[]>>('/backend/api/tasks/statuses'),
 
   show: (id: string) =>
     api.get<

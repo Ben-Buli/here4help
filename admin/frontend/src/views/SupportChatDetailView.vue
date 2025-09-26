@@ -175,7 +175,7 @@
                     <!-- 圖片訊息 -->
                     <div v-if="message.kind === 'image'">
                       <img 
-                        :src="getImageUrl(message.content)" 
+                        :src="getChatImageUrl(message.content)" 
                         :alt="'Image from ' + message.sender_name"
                         class="max-w-xs rounded-lg"
                       />
@@ -342,6 +342,7 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminSupportApi } from '@/services/api'
 import { socketService } from '@/services/socket'
+import { getImageUrl } from '@/config/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -517,13 +518,7 @@ const goBack = () => {
 const getAvatarUrl = (avatarUrl?: string) => {
   if (!avatarUrl) {
     // 使用管理員預設頭像
-    return '/uploads/avatars/default.png'
-  }
-  
-  // users.avatar_url 的路徑格式：/backend/uploads/avatars/filename
-  if (avatarUrl.startsWith('/backend/')) {
-    // 移除 /backend 前綴，因為 Vite 代理會處理
-    return avatarUrl.replace('/backend', '')
+    return getImageUrl('avatars/default.png')
   }
   
   // 如果是完整 URL，直接返回
@@ -531,12 +526,12 @@ const getAvatarUrl = (avatarUrl?: string) => {
     return avatarUrl
   }
   
-  // 其他情況，假設是相對路徑
-  return avatarUrl
+  // 使用統一的圖片 URL 處理邏輯
+  return getImageUrl(avatarUrl)
 }
 
 // 圖片相關方法
-const getImageUrl = (imagePath: string) => {
+const getChatImageUrl = (imagePath: string) => {
   if (!imagePath) return ''
   
   // 如果是完整 URL，直接返回
@@ -577,7 +572,7 @@ const getImageUrl = (imagePath: string) => {
 }
 
 const openImageModal = (imagePath: string) => {
-  modalImageUrl.value = getImageUrl(imagePath)
+  modalImageUrl.value = getChatImageUrl(imagePath)
   showImageModal.value = true
 }
 

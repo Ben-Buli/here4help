@@ -331,7 +331,7 @@ const navigation: NavigationItem[] = [
       { name: 'User Transactions', href: '/user-transactions' },
     ]
   },
-  { name: 'Settings', href: '/settings' },
+  // { name: 'Settings', href: '/settings' },
 ]
 
 const toggleSubmenu = (menuName: string) => {

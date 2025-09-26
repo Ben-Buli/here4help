@@ -20,22 +20,13 @@ class EnvConfig {
         debugPrint('✅ 環境配置載入成功: $envFile');
       }
     } catch (e) {
-      // Web 平台的回退機制
+      // Web 平台使用 dart-define 或預設值
       if (kIsWeb) {
-        try {
-          // 嘗試載入預設的 Web 配置
-          await dotenv.load(fileName: 'assets/env/.env');
-          _isLoaded = true;
-
-          if (kDebugMode) {
-            debugPrint('✅ 使用預設 Web 環境配置: assets/env/.env');
-          }
-          return;
-        } catch (webFallbackError) {
-          if (kDebugMode) {
-            debugPrint('⚠️ Web 環境配置載入失敗，使用預設值');
-          }
+        if (kDebugMode) {
+          debugPrint('⚠️ Web 環境配置載入失敗，使用 dart-define 或預設值');
         }
+        _isLoaded = true;
+        return;
       } else {
         // 非 Web 平台嘗試載入根目錄的 .env
         try {
@@ -94,9 +85,19 @@ class EnvConfig {
 
   /// 獲取環境變數值
   static String get(String key, {String defaultValue = ''}) {
+    // Web 平台優先使用 dart-define
+    if (kIsWeb) {
+      const value = String.fromEnvironment('API_BASE_URL');
+      if (key == 'API_BASE_URL' && value.isNotEmpty) {
+        return value;
+      }
+      // 其他環境變數也可以用類似方式處理
+    }
+
     if (!_isLoaded) {
       if (kDebugMode) {
-        debugPrint('⚠️ Environment not loaded when accessing key: $key');
+        debugPrint(
+            '⚠️ Environment not loaded when accessing key: $key, using default: $defaultValue');
       }
       return defaultValue;
     }

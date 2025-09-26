@@ -52,6 +52,10 @@ export const useAuthStore = defineStore('auth', () => {
       isLoading.value = true
       error.value = null
 
+      // 1. 先獲取 CSRF Token (Sanctum SPA 認證必需)
+      await authApi.getCsrfToken()
+
+      // 2. 再發送登入請求
       const response = await authApi.login(email, password)
 
       if (response.data.success && response.data.data) {

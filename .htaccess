@@ -1,153 +1,34 @@
-# Here4Help cPanel Production .htaccess Configuration
-# 統一路由架構配置
+# /home/hero4helpdemofhs/public_html/web/.htaccess
 
-# 啟用重寫引擎
+# 預設首頁
+DirectoryIndex index.html
+
+# 啟用 Rewrite 引擎
 RewriteEngine On
+RewriteBase /web/
 
-# =============================================================================
-# 安全標頭設置
-# =============================================================================
-<IfModule mod_headers.c>
-    # 防止 MIME 類型嗅探
-    Header always set X-Content-Type-Options nosniff
-    
-    # 防止點擊劫持
-    Header always set X-Frame-Options DENY
-    
-    # XSS 保護
-    Header always set X-XSS-Protection "1; mode=block"
-    
-    # HSTS (僅 HTTPS)
-    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
-    
-    # CORS 標頭
-    SetEnvIf Origin "^https://hero4help\.demofhs\.com$" CORS_ALLOW_ORIGIN=$0
-    SetEnvIf Origin "^https://hero4help\.demofhs\.com/web$" CORS_ALLOW_ORIGIN=$0
-    SetEnvIf Origin "^https://hero4help\.demofhs\.com/admin$" CORS_ALLOW_ORIGIN=$0
-    SetEnvIf Origin "^https://apps\.apple\.com$" CORS_ALLOW_ORIGIN=$0
-    SetEnvIf Origin "^https://play\.google\.com$" CORS_ALLOW_ORIGIN=$0
-    
-    Header always set Access-Control-Allow-Origin "%{CORS_ALLOW_ORIGIN}e" env=CORS_ALLOW_ORIGIN
-    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Auth-Token"
-    Header always set Access-Control-Allow-Credentials "true"
-    Header always set Access-Control-Max-Age "3600"
-    
-    # 處理 OPTIONS 預檢請求
-    RewriteCond %{REQUEST_METHOD} OPTIONS
-    RewriteRule ^(.*)$ - [R=200,L]
-</IfModule>
+# 允許直接存取存在的檔案或資料夾 (圖片、JS、CSS 等)
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
 
-# =============================================================================
-# 根目錄重定向
-# =============================================================================
-# 重定向根目錄到 Flutter Web 應用
-RewriteCond %{REQUEST_URI} ^/$
-RewriteRule ^$ web/ [L,R=301]
+# 其他所有請求 → index.html (Flutter Web SPA fallback)
+RewriteRule ^ index.html [L]
 
-# =============================================================================
-# Backend API 路由
-# =============================================================================
-RewriteCond %{REQUEST_URI} ^/backend/api/
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^backend/api/(.*)$ backend/api/$1.php [L,QSA]
-
-# =============================================================================
-# Socket 代理配置
-# =============================================================================
-# WebSocket 代理
-RewriteCond %{HTTP:Upgrade} websocket [NC]
-RewriteCond %{HTTP:Connection} upgrade [NC]
-RewriteRule ^backend/socket/(.*)$ "ws://localhost:3001/$1" [P,L]
-
-# Socket 伺服器代理
-RewriteRule ^backend/socket/(.*)$ http://localhost:3001/$1 [P,L]
-
-# =============================================================================
-# Admin 管理員後台路由
-# =============================================================================
-RewriteCond %{REQUEST_URI} ^/admin
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^admin/(.*)$ admin/public/$1 [L,QSA]
-
-# =============================================================================
-# Flutter Web 應用路由
-# =============================================================================
-# Flutter Web 靜態檔案
-RewriteCond %{REQUEST_URI} ^/web/
-RewriteCond %{REQUEST_FILENAME} -f
-RewriteRule ^(.*)$ - [L]
-
-# Flutter Web SPA 路由
-RewriteCond %{REQUEST_URI} ^/web/
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^web/(.*)$ web/index.html [L]
-
-# =============================================================================
-# 媒體檔案處理
-# =============================================================================
-RewriteRule ^uploads/(.*)$ backend/uploads/$1 [L]
-RewriteRule ^backend/uploads/(.*)$ backend/uploads/$1 [L]
-
-# =============================================================================
-# 其他請求重定向到 Flutter Web
-# =============================================================================
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_URI} !^/backend
-RewriteCond %{REQUEST_URI} !^/admin
-RewriteCond %{REQUEST_URI} !^/web
-RewriteCond %{REQUEST_URI} !^/api
-RewriteCond %{REQUEST_URI} !^/socket
-RewriteRule ^(.*)$ web/index.html [L]
-
-# =============================================================================
-# PHP 配置
-# =============================================================================
-<IfModule mod_php7.c>
-    # 上傳限制
-    php_value upload_max_filesize 10M
-    php_value post_max_size 12M
-    php_value max_execution_time 300
-    php_value max_input_time 300
-    php_value memory_limit 256M
-    
-    # 安全設定
-    php_flag display_errors Off
-    php_flag log_errors On
-    php_value error_log /tmp/php_errors.log
-</IfModule>
-
-# =============================================================================
-# 安全防護
-# =============================================================================
-# 防止目錄瀏覽
+# 禁止目錄瀏覽 (避免洩漏檔案清單)
 Options -Indexes
 
-# 防止 HTTP TRACE 方法
-RewriteCond %{REQUEST_METHOD} ^TRACE
-RewriteRule .* - [F]
-
-# 防止常見攻擊
-RewriteCond %{QUERY_STRING} (<|%3C)([^s]*s)+cript.*(>|%3E) [NC,OR]
-RewriteCond %{QUERY_STRING} GLOBALS(=|\[|\%[0-9A-Z]{0,2}) [OR]
-RewriteCond %{QUERY_STRING} _REQUEST(=|\[|\%[0-9A-Z]{0,2}) [OR]
-RewriteCond %{QUERY_STRING} ^.*(\[|\]|\(|\)|<|>|ê|"|;|\?|\*|=$).* [NC,OR]
-RewriteCond %{QUERY_STRING} ^.*("|'|<|>|\|).* [NC,OR]
-RewriteCond %{QUERY_STRING} ^.*(%0|%A|%B|%C|%D|%E|%F|127\.0).* [NC,OR]
-RewriteCond %{QUERY_STRING} ^.*(globals|encode|localhost|loopback).* [NC,OR]
-RewriteCond %{QUERY_STRING} ^.*(request|select|insert|union|declare).* [NC]
-RewriteRule ^(.*)$ - [F,L]
-
-# 防止直接訪問敏感檔案
-<FilesMatch "\.(env|log|ini|conf|bak|backup|old|tmp)$">
-    Require all denied
+# Flutter Web manifest 與資源允許存取
+<FilesMatch "(manifest\.json|FontManifest\.json|AssetManifest\.json)$">
+    Require all granted
 </FilesMatch>
 
-# 防止訪問隱藏檔案
-<FilesMatch "^\.">
+# 確保 web/assets 下所有檔案可讀
+<Directory "/home/hero4helpdemofhs/public_html/web/assets">
+    Require all granted
+</Directory>
+
+# 保護敏感檔案 (但允許 Flutter 需要的 JSON 檔案)
+<FilesMatch "\.(env|sql|log|ini|conf|bak|backup|old|tmp|lock)$">
     Require all denied
 </FilesMatch>

@@ -40,6 +40,6 @@ export const getImageUrl = (path: string) => {
     // 本地開發使用代理
     return `/uploads/${path}`
   }
-  // 生產環境使用完整 URL
-  return `${config.apiBaseUrl}/uploads/${path}`
+  // 生產環境使用圖片基礎 URL
+  return `${config.imageBaseUrl}/uploads/${path}`
 }

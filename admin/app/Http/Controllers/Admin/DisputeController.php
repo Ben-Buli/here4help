@@ -7,6 +7,7 @@ use App\Models\AdminActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class DisputeController extends Controller
 {
@@ -380,6 +381,245 @@ class DisputeController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Batch operation failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * 獲取任務爭議聊天室
+     * GET /api/admin/task-disputes/{taskId}/chat-room
+     */
+    public function chatRoom(Request $request, $taskId)
+    {
+        try {
+            // 驗證管理員權限
+            $admin = $request->user();
+            if (!$admin) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized - Admin authentication required'
+                ], 401);
+            }
+
+            // 獲取任務基本資訊
+            $task = DB::table('tasks')->where('id', $taskId)->first();
+            if (!$task) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Task not found'
+                ], 404);
+            }
+
+            // 獲取爭議事件資訊
+            $dispute = DB::table('task_dispute_events as tde')
+                ->where('task_id', $taskId)
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            // 獲取聊天室資訊
+            $chatRoom = DB::table('chat_rooms as cr')
+                ->leftJoin('users as creator', 'cr.creator_id', '=', 'creator.id')
+                ->leftJoin('users as participant', 'cr.participant_id', '=', 'participant.id')
+                ->select([
+                    'cr.id', 'cr.type', 'cr.task_id', 'cr.creator_id', 'cr.participant_id', 'cr.created_at',
+                    'creator.name as creator_name', 'creator.avatar_url as creator_avatar',
+                    'participant.name as participant_name', 'participant.avatar_url as participant_avatar'
+                ])
+                ->where('cr.task_id', $taskId)
+                ->orderBy('cr.created_at', 'desc')
+                ->first();
+
+            if (!$chatRoom) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Chat room not found'
+                ], 404);
+            }
+
+            // 獲取聊天訊息
+            $messages = DB::table('chat_messages as cm')
+                ->leftJoin('users as u', 'cm.from_user_id', '=', 'u.id')
+                ->select([
+                    'cm.id', 'cm.room_id', 'cm.from_user_id', 'cm.content', 'cm.kind',
+                    'cm.media_url', 'cm.mime_type', 'cm.created_at',
+                    'u.name as user_name', 'u.avatar_url as user_avatar'
+                ])
+                ->where('cm.room_id', $chatRoom->id)
+                ->orderBy('cm.created_at', 'asc')
+                ->get();
+
+            // 獲取用戶資訊
+            $userIds = array_unique(array_filter([$task->creator_id, $task->participant_id]));
+            $users = [];
+            if (!empty($userIds)) {
+                $userResults = DB::table('users')
+                    ->select(['id', 'name', 'email', 'avatar_url'])
+                    ->whereIn('id', $userIds)
+                    ->get();
+                
+                foreach ($userResults as $user) {
+                    $users[$user->id] = [
+                        'id' => (int)$user->id,
+                        'name' => $user->name,
+                        'email' => $user->email,
+                        'avatar_url' => $user->avatar_url
+                    ];
+                }
+            }
+
+            // 記錄管理員查看操作
+            AdminActivityLog::create([
+                'admin_id' => $admin->id,
+                'action' => 'view',
+                'table_name' => 'task_disputes',
+                'record_id' => $taskId,
+                'description' => "Admin viewed dispute chat room for task ID: {$taskId}",
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'chat_room' => [
+                        'id' => $chatRoom->id,
+                        'type' => $chatRoom->type,
+                        'task_id' => $chatRoom->task_id,
+                        'creator_id' => (int)$chatRoom->creator_id,
+                        'participant_id' => (int)$chatRoom->participant_id,
+                        'created_at' => $chatRoom->created_at
+                    ],
+                    'task' => [
+                        'id' => $task->id,
+                        'title' => $task->title,
+                        'creator_id' => (int)$task->creator_id,
+                        'participant_id' => $task->participant_id ? (int)$task->participant_id : null,
+                        'reward_point' => (int)$task->reward_point,
+                    ],
+                    'messages' => array_map(function($message) {
+                        return [
+                            'id' => (int)$message->id,
+                            'room_id' => $message->room_id,
+                            'from_user_id' => $message->from_user_id ? (int)$message->from_user_id : null,
+                            'content' => $message->content,
+                            'kind' => $message->kind,
+                            'created_at' => $message->created_at,
+                            'user_name' => $message->user_name ?? 'System',
+                            'user_avatar' => $message->user_avatar,
+                            'media_url' => $message->media_url,
+                            'mime_type' => $message->mime_type,
+                        ];
+                    }, $messages->toArray()),
+                    'users' => $users,
+                    'dispute_info' => $dispute ? [
+                        'id' => (int)$dispute->id,
+                        'title' => $dispute->title,
+                        'description' => $dispute->description,
+                        'status' => $dispute->status,
+                        'created_at' => $dispute->created_at,
+                        'updated_at' => $dispute->updated_at
+                    ] : null,
+                    'meta' => [
+                        'total_messages' => count($messages),
+                        'viewed_by_admin' => $admin->username ?? $admin->full_name,
+                        'admin_id' => (int)$admin->id,
+                        'viewed_at' => now()->toDateTimeString()
+                    ]
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error in dispute chat room view: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Server error occurred'
+            ], 500);
+        }
+    }
+
+    /**
+     * 解決任務爭議
+     * POST /api/admin/task-disputes/resolve
+     */
+    public function resolveDispute(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'dispute_id' => 'required|string',
+                'decision' => 'required|in:approve_creator,approve_participant,reject',
+                'note' => 'required|string|max:1000'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $disputeId = $request->dispute_id;
+            $decision = $request->decision;
+            $note = $request->note;
+            $admin = $request->user();
+
+            DB::beginTransaction();
+
+            // 更新爭議狀態
+            $updated = DB::table('task_dispute_events')
+                ->where('id', $disputeId)
+                ->update([
+                    'status' => 'resolved',
+                    'decision_result' => $decision,
+                    'decision_note' => $note,
+                    'admin_id' => $admin->id,
+                    'updated_at' => now()
+                ]);
+
+            if (!$updated) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dispute not found or already resolved'
+                ], 404);
+            }
+
+            // 記錄活動日誌
+            AdminActivityLog::create([
+                'admin_id' => $admin->id,
+                'action' => 'resolve',
+                'table_name' => 'task_dispute_events',
+                'record_id' => $disputeId,
+                'description' => "Admin resolved dispute {$disputeId} with decision: {$decision}",
+                'old_data' => null,
+                'new_data' => json_encode([
+                    'decision' => $decision,
+                    'note' => $note
+                ]),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Dispute resolved successfully',
+                'data' => [
+                    'dispute_id' => $disputeId,
+                    'decision' => $decision,
+                    'note' => $note,
+                    'resolved_by' => $admin->username ?? $admin->full_name,
+                    'resolved_at' => now()->toDateTimeString()
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error resolving dispute: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Server error occurred'
             ], 500);
         }
     }
