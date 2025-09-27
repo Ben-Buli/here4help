@@ -14,7 +14,7 @@ class SocketNotifier {
     
     private function __construct() {
         // 從環境變數獲取 Socket.IO 服務器配置
-        $this->socketUrl = $_ENV['SOCKET_SERVER_URL'] ?? 'http://localhost:3001';
+        $this->socketUrl = $_ENV['SOCKET_SERVER_URL'] ?? 'https://hero4help.demofhs.com/socket';
         $this->socketToken = $_ENV['SOCKET_SERVER_TOKEN'] ?? 'your-socket-server-token';
     }
     

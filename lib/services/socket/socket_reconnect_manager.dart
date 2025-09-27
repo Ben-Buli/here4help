@@ -73,7 +73,7 @@ class SocketReconnectManager extends ChangeNotifier {
         'autoConnect': false,
         'timeout': 10000,
         'forceNew': true,
-        'path': '/backend/socket',
+        'path': '/socket',
         ...?options,
       });
 

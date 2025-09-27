@@ -70,6 +70,13 @@ class AvatarUrlManager {
         if (cleanPath.startsWith('/')) {
           cleanPath = cleanPath.substring(1);
         }
+
+        // 避免重複的 /backend 路徑
+        // 如果 imageBaseUrl 已經包含 /backend，而 cleanPath 也包含 backend/，則移除 cleanPath 中的 backend/
+        if (_baseUrl.contains('/backend') && cleanPath.startsWith('backend/')) {
+          cleanPath = cleanPath.substring(8); // 移除 "backend/" 前綴
+        }
+
         return '$_baseUrl/$cleanPath';
 
       case AvatarPathType.invalid:
@@ -114,7 +121,12 @@ class AvatarUrlManager {
 
     // 如果是完整的後端 URL，轉換為相對路徑
     if (avatarUrl.startsWith(_baseUrl)) {
-      return avatarUrl.substring(_baseUrl.length);
+      String relativePath = avatarUrl.substring(_baseUrl.length);
+      // 確保相對路徑以 / 開頭
+      if (!relativePath.startsWith('/')) {
+        relativePath = '/$relativePath';
+      }
+      return relativePath;
     }
 
     // 如果已經是相對路徑，直接返回
@@ -139,12 +151,18 @@ class AvatarUrlManager {
     final pathType = getPathType(avatarUrl);
     final resolvedUrl = resolveAvatarUrl(avatarUrl);
 
-    // debugPrint('🖼️ Avatar 路徑解析:');
-    // debugPrint('   原始路徑: $avatarUrl');
-    // debugPrint('   路徑類型: ${pathType.name}');
-    // debugPrint('   解析結果: $resolvedUrl');
-    // debugPrint('   是否本地資源: ${isLocalAsset(avatarUrl)}');
-    // debugPrint('   是否網路圖片: ${isNetworkImage(avatarUrl)}');
+    debugPrint('🖼️ Avatar 路徑解析:');
+    debugPrint('   原始路徑: $avatarUrl');
+    debugPrint('   路徑類型: ${pathType.name}');
+    debugPrint('   Base URL: $_baseUrl');
+    debugPrint('   解析結果: $resolvedUrl');
+    debugPrint('   是否本地資源: ${isLocalAsset(avatarUrl)}');
+    debugPrint('   是否網路圖片: ${isNetworkImage(avatarUrl)}');
+
+    // 檢查是否有重複的 /backend
+    if (resolvedUrl.contains('/backend/backend/')) {
+      debugPrint('⚠️ 警告：檢測到重複的 /backend/ 路徑！');
+    }
   }
 
   /// 遷移舊格式頭像路徑

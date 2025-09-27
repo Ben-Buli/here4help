@@ -1,6 +1,6 @@
 <?php
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../config/php84_compatibility.php';
+require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * 客服事件管理 API
@@ -251,7 +251,7 @@ function handleCreateEvent($db, $userId) {
         
         // 觸發 WebSocket 事件
         try {
-            $socketUrl = ($_ENV['SOCKET_SERVER_URL'] ?? 'http://localhost:3001') . '/api/support-events/broadcast';
+            $socketUrl = ($_ENV['SOCKET_SERVER_URL'] ?? 'https://hero4help.demofhs.com/socket') . '/api/support-events/broadcast';
             $postData = json_encode([
                 'type' => 'event_new',
                 'chat_room_id' => $chatRoomId,

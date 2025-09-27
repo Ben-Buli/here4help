@@ -1,34 +1,85 @@
-# /home/hero4helpdemofhs/public_html/web/.htaccess
-
-# 預設首頁
-DirectoryIndex index.html
-
-# 啟用 Rewrite 引擎
 RewriteEngine On
-RewriteBase /web/
+RewriteBase /
 
-# 允許直接存取存在的檔案或資料夾 (圖片、JS、CSS 等)
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L]
-
-# 其他所有請求 → index.html (Flutter Web SPA fallback)
-RewriteRule ^ index.html [L]
-
-# 禁止目錄瀏覽 (避免洩漏檔案清單)
-Options -Indexes
-
-# Flutter Web manifest 與資源允許存取
-<FilesMatch "(manifest\.json|FontManifest\.json|AssetManifest\.json)$">
+# ==============================
+# 0. Flutter Web 必要 JSON 檔案允許存取
+# ==============================
+<FilesMatch "(manifest\.json|FontManifest\.json|AssetManifest\.json|AssetManifest\.bin\.json)$">
     Require all granted
+    Header set Content-Type "application/json"
 </FilesMatch>
 
-# 確保 web/assets 下所有檔案可讀
-<Directory "/home/hero4helpdemofhs/public_html/web/assets">
-    Require all granted
-</Directory>
+# ==============================
+# 1. 靜態資源不要被 PHP 誤處理
+# ==============================
+<FilesMatch "\.(js|css|map|ico|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$">
+    SetHandler none
+    ForceType none
+</FilesMatch>
 
-# 保護敏感檔案 (但允許 Flutter 需要的 JSON 檔案)
+AddType application/javascript .js
+AddType text/css .css
+AddType application/json .json
+
+# ==============================
+# 2. API Rewrite
+# ==============================
+RewriteCond %{REQUEST_URI} ^/api/admin [NC]
+RewriteRule ^ admin/index.php [L]
+
+RewriteCond %{REQUEST_URI} ^/api/ [NC]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/(.*)$ backend/api/$1.php [L,QSA]
+
+RewriteRule ^sanctum/(.*)$ admin/index.php [L]
+
+# ==============================
+# 3. Flutter Web SPA (放在 /web/)
+# ==============================
+RewriteCond %{REQUEST_URI} ^/web/(.*)\.(js|json|png|jpg|jpeg|gif|svg|css|map|ico|woff|woff2|ttf|eot)$ [NC]
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+RewriteCond %{REQUEST_URI} ^/web/assets/ [NC]
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+RewriteCond %{REQUEST_URI} ^/web [NC]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ web/index.html [L]
+
+# ==============================
+# 4. Admin Laravel 測試路由 (/admintest/*)
+# ==============================
+RewriteCond %{REQUEST_URI} ^/admintest [NC]
+RewriteRule ^ admin/index.php [L]
+
+# ==============================
+# 5. Admin Panel (Laravel + Vite SPA)
+# ==============================
+RewriteCond %{REQUEST_URI} ^/admin/(ping|logtest|test-view) [NC]
+RewriteRule ^ admin/index.php [L]
+
+RewriteCond %{REQUEST_URI} ^/admin/assets/
+RewriteRule ^admin/assets/(.*)$ admin/public/assets/$1 [L]
+
+RewriteCond %{REQUEST_URI} ^/admin [NC]
+RewriteCond %{REQUEST_URI} !^/admin/api/ [NC]
+RewriteCond %{REQUEST_URI} !^/admin/(ping|logtest|test-view) [NC]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^admin/.*$ admin/public/index.html [L]
+
+# ==============================
+# 6. 禁止目錄瀏覽
+# ==============================
+Options -Indexes
+
+# ==============================
+# 7. 保護敏感檔案
+# ==============================
 <FilesMatch "\.(env|sql|log|ini|conf|bak|backup|old|tmp|lock)$">
     Require all denied
 </FilesMatch>

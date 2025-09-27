@@ -9,34 +9,14 @@
  */
 
 const jwt = require('jsonwebtoken');
-const mysql = require('mysql2/promise');
 
 // 資料庫連線配置
-const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 8889,
-  user: process.env.DB_USERNAME || 'root',
-  password: process.env.DB_PASSWORD || 'root',
-  database: process.env.DB_NAME || 'hero4helpdemofhs_hero4help',
-  charset: process.env.DB_CHARSET || 'utf8mb4'
-};
+// Removed dbConfig and mysql import as per instructions
 
 class SupportEventHandler {
-  constructor(io) {
+  constructor(io, dbPool) {
     this.io = io;
-    this.db = null;
-    this.initDatabase();
-  }
-
-  async initDatabase() {
-    try {
-      this.db = await mysql.createConnection(dbConfig);
-      console.log('✅ Support Events WebSocket: 資料庫連線成功');
-    } catch (error) {
-      console.error('❌ Support Events WebSocket: 資料庫連線失敗', error);
-      console.log('⚠️ Support Events WebSocket: 將使用離線模式運作');
-      this.db = null;
-    }
+    this.dbPool = dbPool;
   }
 
   /**
@@ -211,15 +191,7 @@ class SupportEventHandler {
    */
   async getEventDetail(eventId) {
     try {
-      if (!this.db) {
-        await this.initDatabase();
-        if (!this.db) {
-          console.log('⚠️ Support Events: 資料庫未連線，返回基本事件資料');
-          return { id: eventId, status: 'unknown' };
-        }
-      }
-
-      const [rows] = await this.db.execute(`
+      const [rows] = await this.dbPool.query(`
         SELECT 
           se.*,
           cr.id as chat_room_id,
@@ -239,7 +211,7 @@ class SupportEventHandler {
       const event = rows[0];
 
       // 獲取事件歷程
-      const [logRows] = await this.db.execute(`
+      const [logRows] = await this.dbPool.query(`
         SELECT 
           sel.*,
           u.name as admin_name

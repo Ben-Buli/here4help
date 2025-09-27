@@ -1,6 +1,23 @@
 <?php
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
+// require_once __DIR__ . '/../../config/php84_compatibility.php';
+
+// 啟用輸出緩衝，避免任何非 JSON 前置輸出破壞回應
+ob_start();
+
+// 統一安全輸出 JSON 的輔助函式
+if (!function_exists('send_json')) {
+    function send_json(array $payload, int $statusCode = 200): void {
+        // 清空任何已存在的輸出內容，確保回應是乾淨的 JSON
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        http_response_code($statusCode);
+        header('Content-Type: application/json');
+        echo json_encode($payload);
+        exit;
+    }
+}
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -9,16 +26,12 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-W
 
 // 處理 OPTIONS 請求
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    echo json_encode(['success' => true, 'message' => 'OK']);
-    exit;
+    send_json(['success' => true, 'message' => 'OK'], 200);
 }
 
 // 只允許 POST 請求（錯誤也回 200 + success=false）
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(200);
-    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
-    exit;
+    send_json(['success' => false, 'message' => 'Method not allowed'], 200);
 }
 
 // 引入資料庫配置
@@ -125,20 +138,19 @@ try {
         'permission' => (int)($user['permission'] ?? 0)
     ];
     
-    echo json_encode([
+    send_json([
         'success' => true,
         'message' => 'Login successful',
         'data' => [
             'token' => $token,
             'user' => $userData
         ]
-    ]);
+    ], 200);
     
 } catch (Exception $e) {
     // 錯誤統一回 200 + success=false，避免瀏覽器以 CORS/非 2xx 視為網路錯誤
-    http_response_code(200);
-    echo json_encode([
+    send_json([
         'success' => false,
         'message' => $e->getMessage()
-    ]);
+    ], 200);
 }

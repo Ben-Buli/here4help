@@ -42,10 +42,9 @@ if (is_dir(dirname($errorLogPath))) {
 // 設定 PHP 8.4 相容性選項
 ini_set('default_charset', 'UTF-8');
 
-// 記錄 PHP 8.4 相容性配置已載入
+// 記錄 PHP 8.4 相容性配置已載入（只寫入日誌，不輸出到回應）
 if (function_exists('error_log')) {
     error_log('PHP 8.4 相容性配置已載入 - ' . date('Y-m-d H:i:s'));
 }
 
-echo "✅ PHP 8.4 相容性配置已載入\n";
-?>
+// 注意：不要在此檔案做任何 echo/print 或結尾 PHP close tag，避免破壞 JSON 回應

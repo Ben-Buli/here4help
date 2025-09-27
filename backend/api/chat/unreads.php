@@ -1,6 +1,6 @@
 <?php
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../config/php84_compatibility.php';
+require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * 統一未讀計算 API - 遵循聊天系統規格文件標準

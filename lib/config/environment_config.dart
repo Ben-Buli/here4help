@@ -20,7 +20,7 @@ import 'package:here4help/config/env_config.dart';
 @Deprecated('使用新的 .env 系統和 environment_config_legacy.dart')
 class EnvironmentConfig {
   static Map<String, dynamic>? _config;
-  static final bool _useEnvConfig = true; // 切換到新的 .env 系統
+  static const bool _useEnvConfig = true; // 切換到新的 .env 系統
 
   /// 檢測是否為 Android 模擬器
   static bool _isAndroidEmulator() {
@@ -88,7 +88,12 @@ class EnvironmentConfig {
   /// 獲取環境變數值（安全方式）
   static String _getEnvValue(String key) {
     try {
-      return EnvConfig.get(key);
+      final value = EnvConfig.get(key);
+      if (kDebugMode) {
+        print(
+            '🔍 _getEnvValue($key) = ${value.isEmpty ? "空值" : value.length > 10 ? "${value.substring(0, 10)}..." : value}');
+      }
+      return value;
     } catch (e) {
       if (kDebugMode) {
         print('⚠️ 無法獲取環境變數 $key: $e');
@@ -225,8 +230,14 @@ class EnvironmentConfig {
       Map<String, bool>.from(_config?['app']?['features'] ?? {});
 
   /// Google Client ID (公開)
-  static String get googleClientId =>
-      _config?['public']?['google_client_id'] ?? '';
+  static String get googleClientId {
+    final value = _config?['public']?['google_client_id'] ?? '';
+    if (kDebugMode) {
+      print(
+          '🔍 EnvironmentConfig.googleClientId = ${value.isEmpty ? "空值" : value.length > 10 ? "${value.substring(0, 10)}..." : value}');
+    }
+    return value;
+  }
 
   /// Google Redirect URI (公開)
   static String get googleRedirectUri =>

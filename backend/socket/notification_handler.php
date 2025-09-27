@@ -250,7 +250,7 @@ function handleMessageEvent($data, $userIds) {
  */
 function sendToSocketServer($event, $data) {
     try {
-        $socketServerUrl = $_ENV['SOCKET_SERVER_URL'] ?? 'http://localhost:3001';
+        $socketServerUrl = $_ENV['SOCKET_SERVER_URL'] ?? 'https://hero4help.demofhs.com/socket';
         $socketServerToken = $_ENV['SOCKET_SERVER_TOKEN'] ?? 'your-socket-server-token';
         
         $postData = json_encode([

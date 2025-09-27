@@ -1554,27 +1554,27 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 // Pin 按鈕
-                SizedBox(
-                  width: 40,
-                  child: OutlinedButton(
-                    onPressed: () => _togglePinTask(task),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: colorScheme.primary),
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      minimumSize: const Size(40, 32),
-                    ),
-                    child: Icon(
-                      _isTaskPinned(task['id'].toString())
-                          ? Icons.push_pin
-                          : Icons.push_pin_outlined,
-                      size: 16,
-                      color: _isTaskPinned(task['id'].toString())
-                          ? colorScheme.primary
-                          : colorScheme.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
+                // SizedBox(
+                //   width: 40,
+                //   child: OutlinedButton(
+                //     onPressed: () => _togglePinTask(task),
+                //     style: OutlinedButton.styleFrom(
+                //       side: BorderSide(color: colorScheme.primary),
+                //       padding: const EdgeInsets.symmetric(vertical: 4),
+                //       minimumSize: const Size(40, 32),
+                //     ),
+                //     child: Icon(
+                //       _isTaskPinned(task['id'].toString())
+                //           ? Icons.push_pin
+                //           : Icons.push_pin_outlined,
+                //       size: 16,
+                //       color: _isTaskPinned(task['id'].toString())
+                //           ? colorScheme.primary
+                //           : colorScheme.primary,
+                //     ),
+                //   ),
+                // ),
+                // const SizedBox(width: 8),
                 // Info 按鈕
                 Expanded(
                   child: OutlinedButton.icon(

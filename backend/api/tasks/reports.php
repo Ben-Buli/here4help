@@ -1,6 +1,6 @@
 <?php
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../config/php84_compatibility.php';
+require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * 任務檢舉管理 API
@@ -263,13 +263,10 @@ function handleSubmitReport($db, $userId) {
                 task_id, 
                 reporter_id, 
                 reason, 
-                description, 
-                status,
-                created_at,
-                updated_at
-            ) VALUES (?, ?, ?, ?, 'pending', NOW(), NOW())
+                description
+            ) VALUES (?, ?, ?, ?)
         ");
-        $insertStmt->execute([$taskId, $userId, $reason, $description, 'pending', date('Y-m-d H:i:s'), date('Y-m-d H:i:s')]);
+        $insertStmt->execute([$taskId, $userId, $reason, $description]);
         
         $reportId = $db->lastInsertId();
         

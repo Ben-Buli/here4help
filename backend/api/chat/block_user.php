@@ -1,6 +1,6 @@
 <?php
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../config/php84_compatibility.php';
+require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -23,7 +23,7 @@ EnvLoader::load();
 function sendSocketNotification($event, $data, $roomId = null) {
     try {
         // 從環境變數讀取 Socket 服務配置
-        $socketUrl = $_ENV['SOCKET_URL'] ?? 'http://localhost:3001';
+        $socketUrl = $_ENV['SOCKET_URL'] ?? 'https://hero4help.demofhs.com/socket';
         $socketToken = $_ENV['SOCKET_TOKEN'] ?? 'default-socket-token';
         
         // 從聊天室獲取用戶ID列表

@@ -272,7 +272,7 @@ class SocketNotificationService implements NotificationService {
           AppConfig.socketUrl,
           io.OptionBuilder()
               .setTransports(['websocket'])
-              .setPath('/backend/socket')
+              .setPath('/socket')
               .setQuery({'token': token})
               .enableAutoConnect()
               .setTimeout(10000) // 10秒超時

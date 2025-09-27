@@ -61,7 +61,7 @@ class SocketService {
       _socket = io.io(socketUrl, <String, dynamic>{
         'transports': <String>['websocket'], // 明確指定為 List<String>
         'autoConnect': false,
-        'path': '/backend/socket',
+        'path': '/socket',
         'query': <String, String>{
           // 明確指定為 Map<String, String>
           'token': token,

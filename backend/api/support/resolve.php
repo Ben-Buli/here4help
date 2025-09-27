@@ -1,6 +1,6 @@
 <?php
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../config/php84_compatibility.php';
+require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * 客戶評分結案 API
@@ -146,7 +146,7 @@ try {
         
         // 觸發 Socket 事件通知
         try {
-            $socketUrl = ($_ENV['SOCKET_SERVER_URL'] ?? 'http://localhost:3001') . '/support/event/resolve';
+            $socketUrl = ($_ENV['SOCKET_SERVER_URL'] ?? 'https://hero4help.demofhs.com/socket') . '/support/event/resolve';
             $socketData = [
                 'chatRoomId' => $roomId,
                 'eventId' => $eventId,

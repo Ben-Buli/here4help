@@ -10,6 +10,16 @@ class EnvConfig {
   static Future<void> load({String? envFile}) async {
     if (_isLoaded) return;
 
+    // Web 平台統一使用 dart-define，不載入 .env 檔案
+    if (kIsWeb) {
+      _isLoaded = true;
+      if (kDebugMode) {
+        debugPrint('🌐 Web 平台：使用 dart-define 環境變數（跳過 .env 載入）');
+      }
+      return;
+    }
+
+    // 非 Web 平台載入 .env 檔案
     try {
       // 根據當前環境載入對應的 .env 文件
       envFile ??= _getEnvFileName();
@@ -20,38 +30,25 @@ class EnvConfig {
         debugPrint('✅ 環境配置載入成功: $envFile');
       }
     } catch (e) {
-      // Web 平台使用 dart-define 或預設值
-      if (kIsWeb) {
-        if (kDebugMode) {
-          debugPrint('⚠️ Web 環境配置載入失敗，使用 dart-define 或預設值');
-        }
+      // 非 Web 平台嘗試載入根目錄的 .env
+      try {
+        await dotenv.load(fileName: '.env');
         _isLoaded = true;
-        return;
-      } else {
-        // 非 Web 平台嘗試載入根目錄的 .env
-        try {
-          await dotenv.load(fileName: '.env');
-          _isLoaded = true;
 
-          if (kDebugMode) {
-            debugPrint('✅ 使用預設環境配置: .env');
-          }
-          return;
-        } catch (fallbackError) {
-          if (kDebugMode) {
-            debugPrint('⚠️ 環境配置載入失敗，使用預設值');
-          }
+        if (kDebugMode) {
+          debugPrint('✅ 使用預設環境配置: .env');
+        }
+        return;
+      } catch (fallbackError) {
+        if (kDebugMode) {
+          debugPrint('⚠️ 環境配置載入失敗，使用預設值');
+          debugPrint('   嘗試的文件: $envFile');
+          debugPrint('   錯誤: $e');
         }
       }
 
       // 如果所有載入都失敗，設置為已載入但使用空配置
       _isLoaded = true;
-
-      if (kDebugMode) {
-        debugPrint('⚠️ 無法載入任何環境配置文件，使用預設值');
-        debugPrint('   嘗試的文件: $envFile');
-        debugPrint('   錯誤: $e');
-      }
     }
   }
 
@@ -60,7 +57,8 @@ class EnvConfig {
     const String environment =
         String.fromEnvironment('ENVIRONMENT', defaultValue: 'development');
 
-    // Web 平台需要使用 assets/env/ 路徑
+    // Web 平台統一使用 dart-define，不載入 .env 檔案
+    // 非 Web 平台使用本機 .env 檔案
     const String prefix = kIsWeb ? 'assets/env/' : '';
 
     switch (environment) {
@@ -87,13 +85,33 @@ class EnvConfig {
   static String get(String key, {String defaultValue = ''}) {
     // Web 平台優先使用 dart-define
     if (kIsWeb) {
-      const value = String.fromEnvironment('API_BASE_URL');
-      if (key == 'API_BASE_URL' && value.isNotEmpty) {
-        return value;
+      // 支援所有常用的環境變數
+      const envMap = {
+        'API_BASE_URL': String.fromEnvironment('API_BASE_URL'),
+        'API_ORIGIN': String.fromEnvironment('API_ORIGIN'),
+        'API_PREFIX': String.fromEnvironment('API_PREFIX'),
+        'IMAGE_BASE_URL': String.fromEnvironment('IMAGE_BASE_URL'),
+        'SOCKET_URL': String.fromEnvironment('SOCKET_URL'),
+        'APP_ENVIRONMENT': String.fromEnvironment('APP_ENVIRONMENT'),
+        'APP_DEBUG': String.fromEnvironment('APP_DEBUG'),
+        'GOOGLE_CLIENT_ID': String.fromEnvironment('GOOGLE_CLIENT_ID'),
+        'GOOGLE_REDIRECT_URI': String.fromEnvironment('GOOGLE_REDIRECT_URI'),
+        'FACEBOOK_APP_ID': String.fromEnvironment('FACEBOOK_APP_ID'),
+        'FACEBOOK_REDIRECT_URI':
+            String.fromEnvironment('FACEBOOK_REDIRECT_URI'),
+        'APPLE_SERVICE_ID': String.fromEnvironment('APPLE_SERVICE_ID'),
+        'APPLE_REDIRECT_URI': String.fromEnvironment('APPLE_REDIRECT_URI'),
+      };
+
+      if (envMap.containsKey(key) && envMap[key]!.isNotEmpty) {
+        return envMap[key]!;
       }
-      // 其他環境變數也可以用類似方式處理
+
+      // Web 平台如果沒有找到，返回預設值
+      return defaultValue;
     }
 
+    // 非 Web 平台檢查是否已載入
     if (!_isLoaded) {
       if (kDebugMode) {
         debugPrint(
@@ -102,7 +120,7 @@ class EnvConfig {
       return defaultValue;
     }
 
-    // 直接從 dotenv.env 獲取值
+    // 非 Web 平台從 dotenv.env 獲取值
     final value = dotenv.env[key] ?? defaultValue;
 
     if (kDebugMode &&

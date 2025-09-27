@@ -23,19 +23,18 @@ const jwt = require('jsonwebtoken');
 // 引入客服事件處理器
 const SupportEventHandler = require('./support_events');
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Socket.IO Gateway listening on ${PORT}`);
-});
+const PORT = process.env.PORT || process.env.SOCKET_PORT || 3000;
 
-// Load environment variables once at startup (try root .env, then backend/config/.env)
+// Load environment variables from socket/.env only
 const path = require('path');
 const crypto = require('crypto');
 const dotenv = require('dotenv');
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
-if (!process.env.JWT_SECRET) {
-  dotenv.config({ path: path.resolve(__dirname, '../.env') });
-}
+
+// 明確指定 socket 目錄的 .env
+const envPath = path.resolve(__dirname, '.env');
+dotenv.config({ path: envPath });
+
+console.log(`🔧 Loaded environment from ${envPath}`);
 
 // Get JWT secret once
 const JWT_SECRET = process.env.JWT_SECRET ;
@@ -60,10 +59,11 @@ app.use(express.json()); // 添加 JSON 解析中間件
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  path: "/backend/socket",
+  path: "/socket",
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+    origin: ['http://localhost:3000', 'https://hero4help.demofhs.com'],
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 
@@ -403,7 +403,7 @@ let supportEventHandler = null;
 
 // 創建客服事件處理器
 function initSupportEventHandler() {
-  supportEventHandler = new SupportEventHandler(io);
+  supportEventHandler = new SupportEventHandler(io, dbPool);
   console.log('✅ Support Event Handler initialized');
 }
 
@@ -742,10 +742,15 @@ app.post('/support/event/closed', express.json(), async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`Socket.IO Gateway listening on :${PORT}`);
-  console.log(`Database mode: ${dbPool ? 'connected' : 'in-memory'}`);
-});
+// Passenger / cPanel 相容寫法
+// Cpanel Setup Node.js - Passenger 模式下通常不需要 listen，因為 Passenger 會自己接管 socket
+if (require.main === module) {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Socket.IO Gateway listening on :${PORT}`);
+  });
+} else {
+  module.exports = server;
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

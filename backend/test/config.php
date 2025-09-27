@@ -24,7 +24,7 @@ class TestConfig {
         self::$config = [
             'api_base_url' => EnvLoader::get('API_BASE_URL', 'http://localhost:8888/here4help/backend'),
             'api_prefix' => EnvLoader::get('API_PREFIX', '/here4help/backend/api'),
-            'socket_url' => EnvLoader::get('SOCKET_URL', 'http://localhost:3001'),
+            'socket_url' => EnvLoader::get('SOCKET_URL', 'https://hero4help.demofhs.com/socket'),
             'image_base_url' => EnvLoader::get('IMAGE_BASE_URL', 'http://localhost:8888/here4help'),
             'app_url' => EnvLoader::get('APP_URL', 'http://localhost:8888/here4help'),
             'jwt_secret' => EnvLoader::get('JWT_SECRET', 'test-secret'),

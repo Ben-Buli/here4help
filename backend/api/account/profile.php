@@ -1,6 +1,6 @@
 <?php
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../config/php84_compatibility.php';
+require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 require_once __DIR__ . '/../../config/env_loader.php';
 require_once __DIR__ . '/../../utils/Response.php';
@@ -273,7 +273,11 @@ try {
         Response::error(ErrorCodes::METHOD_NOT_ALLOWED);
     }
     
+} catch (PDOException $e) {
+    error_log("❌ Database error: " . $e->getMessage());
+    Response::serverError('Database error: ' . $e->getMessage());
 } catch (Exception $e) {
-    Response::badRequest($e->getMessage());
+    error_log("❌ General error: " . $e->getMessage());
+    Response::serverError('Internal server error: ' . $e->getMessage());
 }
-?>
+?>a

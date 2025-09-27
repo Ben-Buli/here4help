@@ -78,7 +78,19 @@ class Response {
      * 伺服器錯誤回應
      */
     public static function serverError($customMessage = null) {
-        self::error(ErrorCodes::INTERNAL_SERVER_ERROR, $customMessage);
+        http_response_code(500);
+        header('Content-Type: application/json');
+        $traceId = TraceId::current();
+        $response = [
+            'success' => false,
+            'code' => ErrorCodes::INTERNAL_SERVER_ERROR,
+            'message' => $customMessage ?: ErrorCodes::getMessage(ErrorCodes::INTERNAL_SERVER_ERROR),
+            'traceId' => $traceId,
+            'timestamp' => date('c'),
+            'server_time' => time()
+        ];
+        echo json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
     }
     
     /**
