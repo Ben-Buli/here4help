@@ -1,9 +1,0 @@
-# Admin 目錄重定向到 public
-RewriteEngine On
-
-# 如果請求的是 public 目錄，直接通過
-RewriteCond %{REQUEST_URI} ^/admin/public/
-RewriteRule ^(.*)$ - [L]
-
-# 其他所有請求重定向到 public 目錄
-RewriteRule ^(.*)$ /admin/public/$1 [L]

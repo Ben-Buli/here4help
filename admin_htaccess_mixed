@@ -1,6 +1,0 @@
-# Admin Laravel 簡化路由
-RewriteEngine On
-
-# 重定向到 public 目錄
-RewriteCond %{REQUEST_URI} !^/admin/public/
-RewriteRule ^(.*)$ /admin/public/$1 [L]
