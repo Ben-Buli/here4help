@@ -18,6 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
+    
     // 先驗證 JWT，缺 Token 應回 401 而不是 500
     $jwt = JWTManager::validateRequest();
     if (!$jwt['valid']) {
@@ -33,10 +34,12 @@ try {
         $input = $_POST; // 支援 form-data
     }
     
+    
     // user_id 以 Token 為準，避免偽造
     $userId = $tokenUserId ?: ($input['user_id'] ?? null);
     $amount = (int)($input['amount'] ?? null);
     $bankAccountLast5 = $input['bank_account_last5'] ?? '';
+    
     
     // 驗證必填欄位
     $errors = [];
@@ -118,14 +121,19 @@ try {
     
     // Fetch official bank account info
     $bankInfo = $db->fetch("SELECT bank_name, account_number, account_holder FROM official_bank_accounts WHERE is_active = 1 LIMIT 1");
-    Response::success([
+    
+    $responseData = [
         'request_id' => $requestId,
         'message' => 'Point topup request submitted successfully!',
         'request' => $request,
         'bank_info' => $bankInfo ?: null
-    ], 'Point topup request created');
+    ];
+    
+    
+    Response::success($responseData, 'Point topup request created');
     
 } catch (Exception $e) {
+    error_log("[points/request_topup.php] Error: " . $e->getMessage());
     Response::error('Server error: ' . $e->getMessage(), 500);
 }
 ?>

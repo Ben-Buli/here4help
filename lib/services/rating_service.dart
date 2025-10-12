@@ -1,8 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/auth/services/auth_service.dart';
+import 'package:here4help/services/http_client_service.dart';
 
 class RatingStats {
   final double avgRating;
@@ -130,37 +129,20 @@ class RatingService {
         return null;
       }
 
-      print('🔍 RatingService: Token found, length: ${token.length}');
-      // print(
-      // '🔍 RatingService: Token preview: ${token.substring(0, token.length > 20 ? 20 : token.length)}...');
+      const path = '/ratings/user-stats.php';
+      final queryPath = userId != null ? '$path?user_id=$userId' : path;
 
-      final uri =
-          Uri.parse('$userStatsUrl${userId != null ? '?user_id=$userId' : ''}');
-
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+      final data = await HttpClientService.getJson(
+        AppConfig.api(queryPath),
+        useQueryParamToken: true,
       );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          // print('✅ RatingService: Successfully got rating stats');
-          return RatingStats.fromJson(data['data']);
-        } else {
-          // print('❌ RatingService: API returned error: ${data['message']}');
-          throw Exception(data['message'] ?? 'Failed to get rating stats');
-        }
+      if (data['success'] == true) {
+        return RatingStats.fromJson(data['data']);
       } else {
-        // print(
-        //     '❌ RatingService: HTTP error ${response.statusCode}: ${response.body}');
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        throw Exception(data['message'] ?? 'Failed to get rating stats');
       }
     } catch (e) {
-      // print('❌ RatingService: Error getting user rating stats: $e');
       return null;
     }
   }

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 /// 使用 flutter_dotenv 來管理環境變數，替代 JSON 配置文件
 class EnvConfig {
   static bool _isLoaded = false;
+  static bool _dotenvLoaded = false;
 
   /// 載入環境配置
   static Future<void> load({String? envFile}) async {
@@ -25,6 +26,7 @@ class EnvConfig {
       envFile ??= _getEnvFileName();
       await dotenv.load(fileName: envFile);
       _isLoaded = true;
+      _dotenvLoaded = true;
 
       if (kDebugMode) {
         debugPrint('✅ 環境配置載入成功: $envFile');
@@ -34,6 +36,7 @@ class EnvConfig {
       try {
         await dotenv.load(fileName: '.env');
         _isLoaded = true;
+        _dotenvLoaded = true;
 
         if (kDebugMode) {
           debugPrint('✅ 使用預設環境配置: .env');
@@ -49,6 +52,7 @@ class EnvConfig {
 
       // 如果所有載入都失敗，設置為已載入但使用空配置
       _isLoaded = true;
+      _dotenvLoaded = false;
     }
   }
 
@@ -83,35 +87,38 @@ class EnvConfig {
 
   /// 獲取環境變數值
   static String get(String key, {String defaultValue = ''}) {
-    // Web 平台優先使用 dart-define
+    // 所有平台優先檢查 dart-define
+    const envMap = {
+      'API_BASE_URL': String.fromEnvironment('API_BASE_URL'),
+      'API_ORIGIN': String.fromEnvironment('API_ORIGIN'),
+      'API_PREFIX': String.fromEnvironment('API_PREFIX'),
+      'IMAGE_BASE_URL': String.fromEnvironment('IMAGE_BASE_URL'),
+      'SOCKET_URL': String.fromEnvironment('SOCKET_URL'),
+      'APP_ENVIRONMENT': String.fromEnvironment('APP_ENVIRONMENT'),
+      'APP_DEBUG': String.fromEnvironment('APP_DEBUG'),
+      'ENVIRONMENT': String.fromEnvironment('ENVIRONMENT'),
+      'GOOGLE_CLIENT_ID': String.fromEnvironment('GOOGLE_CLIENT_ID'),
+      'GOOGLE_IOS_CLIENT_ID': String.fromEnvironment('GOOGLE_IOS_CLIENT_ID'),
+      'GOOGLE_REDIRECT_URI': String.fromEnvironment('GOOGLE_REDIRECT_URI'),
+      'FACEBOOK_APP_ID': String.fromEnvironment('FACEBOOK_APP_ID'),
+      'FACEBOOK_REDIRECT_URI': String.fromEnvironment('FACEBOOK_REDIRECT_URI'),
+      'APPLE_SERVICE_ID': String.fromEnvironment('APPLE_SERVICE_ID'),
+      'APPLE_REDIRECT_URI': String.fromEnvironment('APPLE_REDIRECT_URI'),
+      'APPLE_KEY_ID': String.fromEnvironment('APPLE_KEY_ID'),
+      'APPLE_TEAM_ID': String.fromEnvironment('APPLE_TEAM_ID'),
+    };
+
+    // 如果 dart-define 中有值，優先使用
+    if (envMap.containsKey(key) && envMap[key]!.isNotEmpty) {
+      return envMap[key]!;
+    }
+
+    // Web 平台如果沒有 dart-define，返回預設值
     if (kIsWeb) {
-      // 支援所有常用的環境變數
-      const envMap = {
-        'API_BASE_URL': String.fromEnvironment('API_BASE_URL'),
-        'API_ORIGIN': String.fromEnvironment('API_ORIGIN'),
-        'API_PREFIX': String.fromEnvironment('API_PREFIX'),
-        'IMAGE_BASE_URL': String.fromEnvironment('IMAGE_BASE_URL'),
-        'SOCKET_URL': String.fromEnvironment('SOCKET_URL'),
-        'APP_ENVIRONMENT': String.fromEnvironment('APP_ENVIRONMENT'),
-        'APP_DEBUG': String.fromEnvironment('APP_DEBUG'),
-        'GOOGLE_CLIENT_ID': String.fromEnvironment('GOOGLE_CLIENT_ID'),
-        'GOOGLE_REDIRECT_URI': String.fromEnvironment('GOOGLE_REDIRECT_URI'),
-        'FACEBOOK_APP_ID': String.fromEnvironment('FACEBOOK_APP_ID'),
-        'FACEBOOK_REDIRECT_URI':
-            String.fromEnvironment('FACEBOOK_REDIRECT_URI'),
-        'APPLE_SERVICE_ID': String.fromEnvironment('APPLE_SERVICE_ID'),
-        'APPLE_REDIRECT_URI': String.fromEnvironment('APPLE_REDIRECT_URI'),
-      };
-
-      if (envMap.containsKey(key) && envMap[key]!.isNotEmpty) {
-        return envMap[key]!;
-      }
-
-      // Web 平台如果沒有找到，返回預設值
       return defaultValue;
     }
 
-    // 非 Web 平台檢查是否已載入
+    // 非 Web 平台檢查是否已載入 .env 檔案
     if (!_isLoaded) {
       if (kDebugMode) {
         debugPrint(
@@ -120,8 +127,15 @@ class EnvConfig {
       return defaultValue;
     }
 
-    // 非 Web 平台從 dotenv.env 獲取值
-    final value = dotenv.env[key] ?? defaultValue;
+    // 非 Web 平台從 dotenv.env 獲取值（作為後備）
+    String value = defaultValue;
+    if (_dotenvLoaded) {
+      try {
+        value = dotenv.env[key] ?? defaultValue;
+      } catch (_) {
+        value = defaultValue;
+      }
+    }
 
     if (kDebugMode &&
         value == defaultValue &&
@@ -265,9 +279,14 @@ class EnvConfig {
     debugPrint('  - Socket URL: $socketUrl');
     debugPrint('  - Image Base URL: $imageBaseUrl');
     debugPrint('Raw Environment Variables:');
-    debugPrint('  - API_PREFIX raw: ${dotenv.env['API_PREFIX'] ?? "null"}');
-    debugPrint('  - API_ORIGIN raw: ${dotenv.env['API_ORIGIN'] ?? "null"}');
-    debugPrint('  - API_BASE_URL raw: ${dotenv.env['API_BASE_URL'] ?? "null"}');
+    if (_dotenvLoaded) {
+      debugPrint('  - API_PREFIX raw: ${dotenv.env['API_PREFIX'] ?? "null"}');
+      debugPrint('  - API_ORIGIN raw: ${dotenv.env['API_ORIGIN'] ?? "null"}');
+      debugPrint(
+          '  - API_BASE_URL raw: ${dotenv.env['API_BASE_URL'] ?? "null"}');
+    } else {
+      debugPrint('  - dotenv not loaded (using dart-define or defaults)');
+    }
     debugPrint('OAuth Configuration:');
     debugPrint(
         '  - Google Client ID: ${googleClientId.isEmpty ? "未配置" : "已配置 (${googleClientId.length > 10 ? "${googleClientId.substring(0, 10)}..." : googleClientId})"}');

@@ -1,4 +1,10 @@
 RewriteEngine On
+# Preserve Authorization header before rewriting into backend
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+
+
 RewriteBase /
 
 # ==============================
@@ -6,7 +12,7 @@ RewriteBase /
 # ==============================
 <FilesMatch "(manifest\.json|FontManifest\.json|AssetManifest\.json|AssetManifest\.bin\.json)$">
     Require all granted
-    Header set Content-Type "application/json"
+    Header set Content-Type "applicatio n/json"
 </FilesMatch>
 
 # ==============================

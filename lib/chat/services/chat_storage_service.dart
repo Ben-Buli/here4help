@@ -11,6 +11,8 @@ class ChatStorageService {
     required Map<String, dynamic> task,
     String? userRole,
     Map<String, dynamic>? chatPartnerInfo,
+    String? sourceTab,
+    String? returnPath,
   }) async {
     debugPrint('🔍 保存聊天室數據: roomId=$roomId');
     debugPrint('🔍 room: $room');
@@ -24,6 +26,8 @@ class ChatStorageService {
       'task': task,
       if (userRole != null) 'userRole': userRole,
       if (chatPartnerInfo != null) 'chatPartnerInfo': chatPartnerInfo,
+      if (sourceTab != null) 'sourceTab': sourceTab,
+      if (returnPath != null) 'returnPath': returnPath,
       'ts': DateTime.now().millisecondsSinceEpoch,
     };
 

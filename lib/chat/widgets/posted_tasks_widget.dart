@@ -701,8 +701,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
       if (mounted) {
         // 將數據載入到 ChatListProvider 的快取中
-        chatProvider.cacheManager.postedTasksCache.clear();
-        chatProvider.cacheManager.postedTasksCache.addAll(result.tasks);
+        chatProvider.replacePostedTasksAggregated(result.tasks,
+            markLoaded: true);
 
         setState(() {
           _allTasks.clear();
@@ -712,6 +712,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
         });
 
         // 載入應徵者數據
+        // ChatListProvider 已同步資料，此處僅處理視覺前置任務
         await _loadApplicantsData();
 
         // 預載入聊天室數據
@@ -1000,8 +1001,24 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
                     }
                   },
                   child: filteredTasks.isEmpty
-                      ? _buildEmptyState()
+                      ? LayoutBuilder(
+                          builder: (context, constraints) {
+                            return SingleChildScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minHeight: constraints.maxHeight,
+                                ),
+                                child: _buildEmptyState(
+                                  isDataError:
+                                      chatProvider.getTabError(0) != null,
+                                ),
+                              ),
+                            );
+                          },
+                        )
                       : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.only(
                             left: 12,
                             right: 12,
@@ -1074,41 +1091,41 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     }
   }
 
-  /// 顯示無搜尋結果的狀態
-  Widget _buildNoResultsState(ChatListProvider chatProvider) {
-    debugPrint('🔍 [Posted Tasks] [_buildNoResultsState()] 無搜尋結果');
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'No tasks found',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[600],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try adjusting your search or filters',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (chatProvider.hasActiveFilters)
-            ElevatedButton(
-              onPressed: () => chatProvider.resetFilters(),
-              child: const Text('Clear Filters'),
-            ),
-        ],
-      ),
-    );
-  }
+  // /// 顯示無搜尋結果的狀態
+  // Widget _buildNoResultsState(ChatListProvider chatProvider) {
+  //   debugPrint('🔍 [Posted Tasks] [_buildNoResultsState()] 無搜尋結果');
+  //   return Center(
+  //     child: Column(
+  //       mainAxisAlignment: MainAxisAlignment.center,
+  //       children: [
+  //         Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+  //         const SizedBox(height: 16),
+  //         Text(
+  //           'No tasks found',
+  //           style: TextStyle(
+  //             fontSize: 18,
+  //             fontWeight: FontWeight.w600,
+  //             color: Colors.grey[600],
+  //           ),
+  //         ),
+  //         const SizedBox(height: 8),
+  //         Text(
+  //           'Try adjusting your search or filters',
+  //           style: TextStyle(
+  //             fontSize: 14,
+  //             color: Colors.grey[500],
+  //           ),
+  //         ),
+  //         const SizedBox(height: 16),
+  //         if (chatProvider.hasActiveFilters)
+  //           ElevatedButton(
+  //             onPressed: () => chatProvider.resetFilters(),
+  //             child: const Text('Clear Filters'),
+  //           ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildTaskCard(Map<String, dynamic> task) {
     final taskId = task['id'].toString();
@@ -1828,10 +1845,15 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               final chatRoomId = applier['chat_room_id']?.toString();
               if (chatRoomId != null && chatRoomId.isNotEmpty) {
                 // 使用統一的導航服務
+                final currentLocation =
+                    GoRouterState.of(context).uri.toString();
+
                 final success =
                     await ChatNavigationService.navigateToChatDetail(
                   context: context,
                   roomId: chatRoomId,
+                  sourceTab: 'posted-tasks',
+                  returnPath: currentLocation,
                 );
 
                 if (!success) {
@@ -2617,64 +2639,48 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
   }
 
   /// 建構空狀態
-  Widget _buildEmptyState() {
-    debugPrint('🔍 [Posted Tasks] [_buildEmptyState()] 建構空狀態');
+  Widget _buildEmptyState({bool isDataError = false}) {
+    debugPrint(
+        '🔍 [Posted Tasks] [_buildEmptyState()] 建構空狀態 - isDataError: $isDataError');
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.inbox_outlined,
+            isDataError ? Icons.error_outline : Icons.inbox_outlined,
             size: 64,
-            color:
-                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            color: isDataError
+                ? Colors.red[300]
+                : Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.3),
           ),
           const SizedBox(height: 16),
           Text(
-            'No tasks found',
+            isDataError ? 'No tasks found' : 'No posted tasks yet',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w500,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.6),
+              color: isDataError
+                  ? Colors.red[600]
+                  : Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Try adjusting your search or filters',
-            style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.4),
+          if (isDataError) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Please check your connection and try again',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.red[500],
+              ),
             ),
-          ),
+          ],
         ],
-      ),
-    );
-  }
-
-  /// 建構 Scroll to Top 按鈕
-  Widget _buildScrollToTopButton() {
-    return Positioned(
-      right: 16,
-      bottom: 16,
-      child: FloatingActionButton(
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-        onPressed: () {
-          // 滾動到頂部
-          final scrollController = PrimaryScrollController.of(context);
-          scrollController.animateTo(
-            0,
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
-          );
-        },
-        child: const Icon(Icons.keyboard_arrow_up, size: 24),
       ),
     );
   }

@@ -164,88 +164,30 @@ class TaskService extends ChangeNotifier {
         query.addAll(filters);
       }
 
-      final uri = Uri.parse(
-              AppConfig.api('/tasks/applications/posted_task_applications.php'))
-          .replace(queryParameters: query);
+      final path = '/tasks/applications/posted_task_applications.php';
+      final apiUrl = Uri.parse(AppConfig.api(path))
+          .replace(queryParameters: query)
+          .toString();
 
-      debugPrint('🔍 [Posted Tasks Aggregated] API URL: $uri');
+      debugPrint('🔍 [Posted Tasks Aggregated] API URL: $apiUrl');
 
-      // 獲取認證 token（統一使用 AuthService）
-      final token = await AuthService.getToken();
-      if (token == null) {
-        debugPrint('⚠️ [Posted Tasks Aggregated] 沒有認證 token');
-        return (tasks: <Map<String, dynamic>>[], hasMore: false);
-      }
+      // 使用 HttpClientService 以統一 header 與 query token 備援
+      final data = await HttpClientService.getJson(
+        apiUrl,
+        useQueryParamToken: true,
+      );
 
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      };
-
-      debugPrint(
-          '🔐 [Posted Tasks Aggregated] 使用認證 token: ${token.substring(0, math.min(20, token.length))}...');
-
-      final resp = await http
-          .get(uri, headers: headers)
-          .timeout(const Duration(seconds: 30));
-
-      debugPrint(
-          '🔍 [Posted Tasks Aggregated] Response Status: ${resp.statusCode}');
-      // debugPrint('🔍 [Posted Tasks Aggregated] Response Body: ${resp.body}');
-
-      if (resp.statusCode == 200) {
-        if (resp.body.isEmpty) {
-          debugPrint('❌ [Posted Tasks Aggregated] Empty response body');
-          return (tasks: <Map<String, dynamic>>[], hasMore: false);
-        }
-
-        try {
-          final data = jsonDecode(resp.body);
-          debugPrint(
-              '🔍 [Posted Tasks Aggregated] Response Success: ${data['success']}');
-
-          if (data['success'] == true) {
-            final payload = data['data'] ?? {};
-            final itemsRaw = payload['tasks'] ?? [];
-            final List<Map<String, dynamic>> items = (itemsRaw is List)
-                ? itemsRaw.map((e) => Map<String, dynamic>.from(e)).toList()
-                : [];
-            final hasMore =
-                (payload['pagination']?['has_more'] ?? false) == true;
-            debugPrint('🔍 [Posted Tasks Aggregated] 成功獲取 ${items.length} 個任務');
-
-            // 調試：顯示前幾個任務的詳細數據
-            for (int i = 0; i < items.length && i < 3; i++) {
-              final task = items[i];
-              debugPrint('📋 任務 [$i] ID: ${task['id']}');
-            }
-
-            return (tasks: items, hasMore: hasMore);
-          } else {
-            debugPrint(
-                '❌ [Posted Tasks Aggregated] API Error: ${data['message']}');
-            return (tasks: <Map<String, dynamic>>[], hasMore: false);
-          }
-        } catch (jsonError) {
-          debugPrint(
-              '❌ [Posted Tasks Aggregated] JSON Parse Error: $jsonError');
-          debugPrint('❌ [Posted Tasks Aggregated] Raw Response: ${resp.body}');
-          return (tasks: <Map<String, dynamic>>[], hasMore: false);
-        }
+      if (data['success'] == true) {
+        final payload = data['data'] ?? {};
+        final itemsRaw = payload['tasks'] ?? [];
+        final List<Map<String, dynamic>> items = (itemsRaw is List)
+            ? itemsRaw.map((e) => Map<String, dynamic>.from(e)).toList()
+            : [];
+        final hasMore = (payload['pagination']?['has_more'] ?? false) == true;
+        debugPrint('🔍 [Posted Tasks Aggregated] 成功獲取 ${items.length} 個任務');
+        return (tasks: items, hasMore: hasMore);
       } else {
-        debugPrint(
-            '❌ [Posted Tasks Aggregated] HTTP Error: ${resp.statusCode}');
-        debugPrint('❌ [Posted Tasks Aggregated] Response Body: ${resp.body}');
-
-        // 嘗試解析錯誤響應
-        try {
-          final errorData = jsonDecode(resp.body);
-          debugPrint(
-              '❌ [Posted Tasks Aggregated] Error Details: ${errorData['message']}');
-        } catch (_) {
-          debugPrint('❌ [Posted Tasks Aggregated] Cannot parse error response');
-        }
-
+        debugPrint('❌ [Posted Tasks Aggregated] API Error: ${data['message']}');
         return (tasks: <Map<String, dynamic>>[], hasMore: false);
       }
     } catch (e) {

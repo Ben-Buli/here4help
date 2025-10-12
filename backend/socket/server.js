@@ -31,7 +31,7 @@ const crypto = require('crypto');
 const dotenv = require('dotenv');
 
 // 明確指定 socket 目錄的 .env
-const envPath = path.resolve(__dirname, '.env');
+const envPath = path.resolve(__dirname, './.env');
 dotenv.config({ path: envPath });
 
 console.log(`🔧 Loaded environment from ${envPath}`);
@@ -61,7 +61,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   path: "/socket",
   cors: {
-    origin: ['http://localhost:3000', 'https://hero4help.demofhs.com'],
+    origin: ['http://localhost/3000', 'https://hero4help.demofhs.com'],
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -72,9 +72,6 @@ let dbPool = null;
 
 async function initDatabase() {
   try {
-    // Load environment variables
-    require('dotenv').config({ path: '../../.env' });
-    
     // 初始化 MySQL 資料庫（MAMP）
     dbPool = mysql.createPool({
       host: process.env.DB_HOST || 'localhost',
@@ -86,6 +83,15 @@ async function initDatabase() {
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0
+    });
+
+    // 印出 DB Config
+    console.log('DB Config:', {
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      user: process.env.DB_USERNAME,
+      database: process.env.DB_NAME,
+      charset: process.env.DB_CHARSET
     });
     
     // Test database connection

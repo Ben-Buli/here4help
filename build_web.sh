@@ -14,7 +14,7 @@ WEB_PATH="/web/"
 
 # OAuth 參數
 GOOGLE_CLIENT_ID="102744926949-bhrnm2970bgt3dfm2nmdbqt03mrvdh3i.apps.googleusercontent.com"
-FACEBOOK_APP_ID="1037019294991326"
+FACEBOOK_APP_ID="fb1037019294991326"
 APPLE_SERVICE_ID="com.nccu.here4help.login"
 
 # Redirect URIs
@@ -40,7 +40,6 @@ flutter build web --release \
   --dart-define=API_PREFIX=/backend/api \
   --dart-define=IMAGE_BASE_URL=$BASE_URL \
   --dart-define=SOCKET_URL=$BASE_URL \
-  # /socket 透過 server.js 進行代理，使用 3001 端口
   --dart-define=GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID \
   --dart-define=GOOGLE_REDIRECT_URI=$GOOGLE_REDIRECT_URI \
   --dart-define=FACEBOOK_APP_ID=$FACEBOOK_APP_ID \

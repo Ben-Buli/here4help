@@ -30,7 +30,7 @@ class BackupManager {
         
         $this->config = [
             'db_host' => $dbConfig['host'] ?? '127.0.0.1',
-            'db_port' => $dbConfig['port'] ?? '3306',
+            'db_port' => $dbConfig['port'] ?? '8889',
             'db_name' => $dbConfig['dbname'] ?? '',
             'db_user' => $dbConfig['username'] ?? '',
             'db_pass' => $dbConfig['password'] ?? '',

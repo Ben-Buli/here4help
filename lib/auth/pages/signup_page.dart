@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:here4help/services/api/oauth_api.dart';
 import 'dart:convert';
 import 'package:here4help/config/app_config.dart';
+import 'package:here4help/auth/services/signup_draft_service.dart';
 
 class SignupPage extends StatefulWidget {
   final Map<String, dynamic>? oauthData;
@@ -78,14 +79,12 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     selectedGender =
         genderParams['Prefer not to disclose'] ?? 'Prefer not to disclose';
     WidgetsBinding.instance.addObserver(this);
-    _loadExistingData();
-    _loadPrefilledData();
     _loadLanguages();
     _loadUniversities();
     _loadCountries(); // 新增：載入國家列表
     // 延遲載入第三方登入資料，確保其他資料先載入完成
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadThirdPartyData();
+      _initializeDraftStateAndLoadOAuth();
     });
   }
 
@@ -107,6 +106,76 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   List<Country> countryOptions = [];
   Country? selectedCountry;
   bool isLoadingCountries = false;
+
+  Future<void> _initializeDraftStateAndLoadOAuth() async {
+    await _initializeDraftState();
+    await _loadThirdPartyData();
+  }
+
+  Future<void> _initializeDraftState() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_hasOAuthIntent(prefs)) {
+      await _loadExistingData(prefs);
+    } else {
+      await SignupDraftService.clearWithPrefs(prefs, includeOAuth: true);
+      _resetFormFields();
+    }
+  }
+
+  bool _hasOAuthIntent(SharedPreferences prefs) {
+    final uri = Uri.base;
+    final token = uri.queryParameters['token'];
+    final oauthToken = uri.queryParameters['oauth_token'];
+    final hasQueryToken = (token != null && token.isNotEmpty) ||
+        (oauthToken != null && oauthToken.isNotEmpty);
+    final hasWidgetData =
+        widget.oauthData != null && widget.oauthData!.isNotEmpty;
+    final storedProvider = prefs.getString('signup_provider');
+    final storedToken = prefs.getString('signup_oauth_token');
+    return hasQueryToken ||
+        hasWidgetData ||
+        (storedProvider != null && storedProvider.isNotEmpty) ||
+        (storedToken != null && storedToken.isNotEmpty);
+  }
+
+  void _resetFormFields({bool useSetState = true}) {
+    fullNameController.clear();
+    nicknameController.clear();
+    emailController.clear();
+    phoneController.clear();
+    countryController.clear();
+    addressController.clear();
+    passwordController.clear();
+    confirmPasswordController.clear();
+    dateOfBirthController.clear();
+    paymentPasswordController.clear();
+    confirmPaymentPasswordController.clear();
+    schoolController.clear();
+    referralCodeController.clear();
+
+    void updater() {
+      selectedGender =
+          genderParams['Prefer not to disclose'] ?? 'Prefer not to disclose';
+      selectedLanguages = ['en'];
+      selectedUniversityId = null;
+      selectedCountry = null;
+      isPermanentAddress = false;
+      oauthAvatarUrl = null;
+      referralCodeStatus = null;
+      isVerifyingReferralCode = false;
+      showPassword = false;
+      showConfirmPassword = false;
+      showPaymentPassword = false;
+      showConfirmPaymentPassword = false;
+      showPaymentPins = false;
+    }
+
+    if (useSetState && mounted) {
+      setState(updater);
+    } else {
+      updater();
+    }
+  }
 
   // 新增：載入第三方登入資料
   Future<void> _loadThirdPartyData() async {
@@ -135,6 +204,9 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
 
     debugPrint('🔍 [SignupPage] 最終 Token 參數: $tokenParam');
 
+    final prefs = await SharedPreferences.getInstance();
+    var hasPrefilled = false;
+
     if (tokenParam != null && tokenParam.isNotEmpty) {
       try {
         debugPrint('🔍 開始獲取 OAuth 暫存資料，token: $tokenParam');
@@ -142,6 +214,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         if (temp != null) {
           debugPrint('✅ 成功獲取 OAuth 暫存資料: $temp');
           _prefillOAuthData(temp);
+          hasPrefilled = true;
         } else {
           debugPrint('⚠️ OAuth 暫存資料為空');
         }
@@ -153,137 +226,142 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     }
 
     // 優先使用傳入的 oauthData
-    if (widget.oauthData != null) {
+    if (!hasPrefilled &&
+        widget.oauthData != null &&
+        widget.oauthData!.isNotEmpty) {
       print('🔐 載入第三方登入資料: ${widget.oauthData}');
       _prefillOAuthData(widget.oauthData!);
-      return;
+      hasPrefilled = true;
     }
 
     // 備用：從 SharedPreferences 載入
-    final prefs = await SharedPreferences.getInstance();
-    final provider = prefs.getString('signup_provider');
-
-    if (provider != null && provider.isNotEmpty) {
-      setState(() {
-        // 預填第三方登入提供的資料
-        fullNameController.text = prefs.getString('signup_full_name') ?? '';
-        nicknameController.text = prefs.getString('signup_nickname') ?? '';
-        emailController.text = prefs.getString('signup_email') ?? '';
-
-        // 如果有頭像 URL，可以顯示
-        final avatarUrl = prefs.getString('signup_avatar_url');
-        if (avatarUrl != null && avatarUrl.isNotEmpty) {
-          // 這裡可以設定頭像顯示
-        }
-      });
-
-      // 清除第三方登入暫存資料
-      await prefs.remove('signup_provider');
-      await prefs.remove('signup_provider_user_id');
-      await prefs.remove('signup_avatar_url');
+    if (!hasPrefilled) {
+      final provider = prefs.getString('signup_provider');
+      if (provider != null && provider.isNotEmpty) {
+        final storedLanguages = prefs.getStringList('signup_languages');
+        final storedData = <String, dynamic>{
+          'name': prefs.getString('signup_full_name') ?? '',
+          'nickname': prefs.getString('signup_nickname') ?? '',
+          'email': prefs.getString('signup_email') ?? '',
+          'avatar_url': prefs.getString('signup_avatar_url') ?? '',
+          'phone': prefs.getString('signup_phone') ?? '',
+          'country': prefs.getString('signup_country') ?? '',
+          'address': prefs.getString('signup_address') ?? '',
+          'birthday': prefs.getString('signup_date_of_birth') ?? '',
+          'gender': prefs.getString('signup_gender') ?? '',
+          'languages': storedLanguages,
+        };
+        _prefillOAuthData(storedData);
+        hasPrefilled = true;
+      }
     }
+
+    if (!hasPrefilled) {
+      debugPrint('ℹ️ 沒有可用的第三方登入資料，保持空白表單');
+    }
+
+    await prefs.remove('signup_provider');
+    await prefs.remove('signup_provider_user_id');
+    await prefs.remove('signup_avatar_url');
   }
 
   // 預填第三方登入資料
   void _prefillOAuthData(Map<String, dynamic> oauthData) {
     try {
       debugPrint('🔍 開始預填 OAuth 資料: $oauthData');
+      _resetFormFields();
 
-      // 預填基本資料
-      if (oauthData['name'] != null &&
-          oauthData['name'].toString().isNotEmpty) {
-        fullNameController.text = oauthData['name'].toString();
-        debugPrint('✅ 預填姓名: ${oauthData['name']}');
+      final defaultGender =
+          genderParams['Prefer not to disclose'] ?? 'Prefer not to disclose';
+      var resolvedGender = defaultGender;
+      List<String> resolvedLanguages = ['en'];
+      String? resolvedAvatarUrl;
+
+      String? _stringValue(dynamic value) {
+        if (value is String) {
+          final trimmed = value.trim();
+          return trimmed.isNotEmpty ? trimmed : null;
+        }
+        return null;
       }
 
-      if (oauthData['email'] != null &&
-          oauthData['email'].toString().isNotEmpty) {
-        emailController.text = oauthData['email'].toString();
-        debugPrint('✅ 預填郵箱: ${oauthData['email']}');
+      void assignController(TextEditingController controller, dynamic value) {
+        final text = _stringValue(value);
+        if (text != null) {
+          controller.text = text;
+        }
       }
 
-      // 預填暱稱（如果沒有則使用姓名）
-      if (oauthData['nickname'] != null &&
-          oauthData['nickname'].toString().isNotEmpty) {
-        nicknameController.text = oauthData['nickname'].toString();
-      } else if (oauthData['name'] != null &&
-          oauthData['name'].toString().isNotEmpty) {
-        nicknameController.text = oauthData['name'].toString();
+      assignController(fullNameController, oauthData['name']);
+      assignController(emailController, oauthData['email']);
+      assignController(phoneController, oauthData['phone']);
+      assignController(countryController, oauthData['country']);
+      assignController(addressController, oauthData['address']);
+      assignController(dateOfBirthController, oauthData['date_of_birth']);
+      if (dateOfBirthController.text.isEmpty) {
+        assignController(dateOfBirthController, oauthData['birthday']);
       }
 
-      // 處理頭像 URL
-      if (oauthData['avatar_url'] != null &&
-          oauthData['avatar_url'].toString().isNotEmpty) {
-        debugPrint('🖼️ 第三方登入頭像: ${oauthData['avatar_url']}');
+      final nickname = _stringValue(oauthData['nickname']) ??
+          _stringValue(oauthData['name']);
+      if (nickname != null) {
+        nicknameController.text = nickname;
+      }
+
+      final avatarUrl = _stringValue(oauthData['avatar_url']);
+      if (avatarUrl != null) {
+        resolvedAvatarUrl = avatarUrl;
+        debugPrint('🖼️ 第三方登入頭像: $avatarUrl');
+      }
+
+      final gender = _stringValue(oauthData['gender']);
+      if (gender != null && genderParams.containsKey(gender)) {
+        resolvedGender = gender;
+        debugPrint('✅ 預填性別: $gender');
+      }
+
+      final dynamic languagesValue = oauthData['languages'];
+      if (languagesValue is List) {
+        final cleaned = languagesValue
+            .whereType<String>()
+            .map((lang) => lang.trim())
+            .where((lang) => lang.isNotEmpty)
+            .toList();
+        if (cleaned.isNotEmpty) {
+          resolvedLanguages = cleaned;
+          debugPrint('✅ 預填語言列表: $resolvedLanguages');
+        }
+      }
+
+      if (resolvedLanguages.length == 1 &&
+          resolvedLanguages.first == 'en' &&
+          oauthData['language'] != null) {
+        final singleLanguage = _stringValue(oauthData['language']);
+        if (singleLanguage != null) {
+          resolvedLanguages = [singleLanguage];
+          debugPrint('✅ 預填語言: $singleLanguage');
+        }
+      }
+
+      if (resolvedLanguages.length == 1 &&
+          resolvedLanguages.first == 'en' &&
+          oauthData['primary_language'] != null) {
+        final primaryLanguage = _stringValue(oauthData['primary_language']);
+        if (primaryLanguage != null) {
+          resolvedLanguages = [primaryLanguage];
+          debugPrint('✅ 預填主要語言: $primaryLanguage');
+        }
+      }
+
+      if (mounted) {
         setState(() {
-          oauthAvatarUrl = oauthData['avatar_url'].toString();
+          selectedGender = resolvedGender;
+          selectedLanguages = resolvedLanguages;
+          oauthAvatarUrl = resolvedAvatarUrl;
         });
       }
 
-      // 預填性別（如果 Google 提供）
-      if (oauthData['gender'] != null &&
-          oauthData['gender'].toString().isNotEmpty) {
-        final gender = oauthData['gender'].toString();
-        if (genderParams.containsKey(gender)) {
-          selectedGender = gender;
-          debugPrint('✅ 預填性別: $gender');
-        }
-      }
-
-      // 預填國家（如果 Google 提供）
-      if (oauthData['country'] != null &&
-          oauthData['country'].toString().isNotEmpty) {
-        countryController.text = oauthData['country'].toString();
-        debugPrint('✅ 預填國家: ${oauthData['country']}');
-      }
-
-      // 預填地址（如果 Google 提供）
-      if (oauthData['address'] != null &&
-          oauthData['address'].toString().isNotEmpty) {
-        addressController.text = oauthData['address'].toString();
-        debugPrint('✅ 預填地址: ${oauthData['address']}');
-      }
-
-      // 預填電話（如果 Google 提供）
-      if (oauthData['phone'] != null &&
-          oauthData['phone'].toString().isNotEmpty) {
-        phoneController.text = oauthData['phone'].toString();
-        debugPrint('✅ 預填電話: ${oauthData['phone']}');
-      }
-
-      // 預填生日（如果 Google 提供）
-      if (oauthData['birthday'] != null &&
-          oauthData['birthday'].toString().isNotEmpty) {
-        dateOfBirthController.text = oauthData['birthday'].toString();
-        debugPrint('✅ 預填生日: ${oauthData['birthday']}');
-      }
-
-      // 預填語言（如果 Google 提供）
-      if (oauthData['language'] != null &&
-          oauthData['language'].toString().isNotEmpty) {
-        final language = oauthData['language'].toString();
-        if (languageOptions.isNotEmpty &&
-            languageOptions.any((lang) => lang['code'] == language)) {
-          selectedLanguages = [language];
-          debugPrint('✅ 預填語言: $language');
-        } else {
-          // 如果語言選項還沒載入，使用預設語言
-          selectedLanguages = ['en'];
-          debugPrint('⚠️ 語言選項未載入，使用預設語言: en');
-        }
-      } else {
-        // 如果沒有語言資訊，使用預設語言
-        selectedLanguages = ['en'];
-        debugPrint('✅ 使用預設語言: en');
-      }
-
-      // 標記為第三方登入
       debugPrint('✅ 第三方登入資料預填完成');
-
-      // 觸發 UI 更新
-      if (mounted) {
-        setState(() {});
-      }
     } catch (e) {
       debugPrint('❌ 預填第三方登入資料失敗: $e');
     }
@@ -712,8 +790,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _loadExistingData() async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<void> _loadExistingData([SharedPreferences? existingPrefs]) async {
+    final prefs = existingPrefs ?? await SharedPreferences.getInstance();
 
     // 載入已存在的資料
     setState(() {

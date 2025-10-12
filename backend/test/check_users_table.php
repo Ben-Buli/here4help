@@ -7,7 +7,7 @@ try {
     // 建立資料庫連線
     $dbHost = EnvLoader::get('DB_HOST');
     if ($dbHost === 'localhost') { $dbHost = '127.0.0.1'; }
-    $dbPort = EnvLoader::get('DB_PORT') ?: '3306';
+    $dbPort = EnvLoader::get('DB_PORT') ?: '8889';
     $dsn = "mysql:host={$dbHost};port={$dbPort};dbname=" . EnvLoader::get('DB_NAME') . ";charset=utf8mb4";
 
     $pdo = new PDO(

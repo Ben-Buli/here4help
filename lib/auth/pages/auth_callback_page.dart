@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 // import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:here4help/services/api/oauth_api.dart';
+import 'package:here4help/auth/services/signup_draft_service.dart';
 import '../services/third_party_auth_service.dart';
 import '../services/auth_service.dart';
 // 如需判斷 kIsWeb
@@ -83,7 +87,7 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
 
         // 延遲後重定向到註冊頁面
         Future.delayed(const Duration(seconds: 1), () {
-          _redirectToSignupPage(oauthToken, provider);
+          unawaited(_redirectToSignupPage(oauthToken, provider));
         });
       } else {
         // 現有用戶：處理直接登入
@@ -174,24 +178,41 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
     }
   }
 
-  void _redirectToSignupPage(String oauthToken, String provider) {
+  Future<void> _redirectToSignupPage(String oauthToken, String provider) async {
     debugPrint('🔄 重定向到註冊頁面...');
     debugPrint('   OAuth Token: ${oauthToken.substring(0, 8)}...');
     debugPrint('   Provider: $provider');
-    // 重定向到註冊頁面並帶上 OAuth token
-    if (mounted) {
-      final signupUrl = Uri(
-        path: '/signup',
-        queryParameters: {
-          'token': oauthToken,
-          'provider': provider,
-          'is_new_user': 'true',
-        },
-      ).toString();
 
-      debugPrint('🔗 重定向 URL: $signupUrl');
-      context.pushReplacement(signupUrl);
+    Map<String, dynamic>? prefillData;
+
+    try {
+      final tempData = await OAuthApi.fetchTempUser(oauthToken);
+      if (tempData != null) {
+        prefillData = _buildSignupPrefillData(tempData, provider, oauthToken);
+        await _persistSignupDraft(prefillData);
+        debugPrint('✅ 成功取得 OAuth 暫存資料，準備帶入註冊表單');
+      } else {
+        debugPrint('⚠️ 無法取得 OAuth 暫存資料，註冊表單將保持空白');
+        await SignupDraftService.clear(includeOAuth: true);
+      }
+    } catch (e) {
+      debugPrint('❌ 取得 OAuth 暫存資料失敗: $e');
+      await SignupDraftService.clear(includeOAuth: true);
     }
+
+    if (!mounted) return;
+
+    final signupUrl = Uri(
+      path: '/signup',
+      queryParameters: {
+        'token': oauthToken,
+        'provider': provider,
+        'is_new_user': 'true',
+      },
+    ).toString();
+
+    debugPrint('🔗 重定向 URL: $signupUrl');
+    context.pushReplacement(signupUrl, extra: prefillData);
   }
 
   void _retryLogin() {
@@ -199,6 +220,160 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
     // 重新導向到 Google 登入
     final thirdPartyAuth = ThirdPartyAuthService();
     thirdPartyAuth.signInWithProvider('google');
+  }
+
+  Map<String, dynamic> _buildSignupPrefillData(
+    Map<String, dynamic> raw,
+    String provider,
+    String token,
+  ) {
+    final sanitized = <String, dynamic>{
+      'provider': provider,
+      'is_new_user': true,
+      'oauth_token': token,
+      'token': token,
+    };
+
+    String? stringValue(dynamic value) {
+      if (value is String) {
+        final trimmed = value.trim();
+        if (trimmed.isNotEmpty) {
+          return trimmed;
+        }
+      }
+      return null;
+    }
+
+    void addString(String key, [String? alias]) {
+      final value = stringValue(raw[key]);
+      if (value != null) {
+        sanitized[alias ?? key] = value;
+      }
+    }
+
+    void addIfPresent(String key) {
+      final value = raw[key];
+      if (value != null && value.toString().isNotEmpty) {
+        sanitized[key] = value;
+      }
+    }
+
+    addString('name');
+    addString('full_name');
+    addString('nickname');
+    addString('email');
+    addString('avatar_url');
+    addString('phone');
+    addString('country');
+    addString('gender');
+    addString('address');
+    addString('primary_language');
+    addString('language');
+    addString('date_of_birth', 'birthday');
+    addString('birthday');
+
+    addIfPresent('provider_user_id');
+    addIfPresent('existing_user_id');
+    addIfPresent('email_verified');
+    addIfPresent('temp_expires_at');
+
+    final rawData = raw['raw_data'];
+    if (rawData is Map) {
+      void addFromRaw(String key) {
+        final value = stringValue(rawData[key]);
+        if (value != null && !sanitized.containsKey(key)) {
+          sanitized[key] = value;
+        }
+      }
+
+      addFromRaw('name');
+      addFromRaw('email');
+      addFromRaw('birthday');
+      addFromRaw('phone');
+
+      final picture = rawData['picture'];
+      if (picture is Map) {
+        final data = picture['data'];
+        if (data is Map) {
+          final url = stringValue(data['url']);
+          if (url != null) {
+            sanitized['avatar_url'] = url;
+          }
+        }
+      }
+    }
+
+    return sanitized;
+  }
+
+  Future<void> _persistSignupDraft(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    await SignupDraftService.clearWithPrefs(prefs, includeOAuth: true);
+
+    Future<void> setString(String key, String? value) async {
+      if (value != null && value.isNotEmpty) {
+        await prefs.setString(key, value);
+      }
+    }
+
+    Future<void> setStringList(String key, List<String>? values) async {
+      if (values != null && values.isNotEmpty) {
+        await prefs.setStringList(key, values);
+      }
+    }
+
+    final name = data['name'] as String?;
+    final nickname = (data['nickname'] ?? name) as String?;
+    final email = data['email'] as String?;
+    final phone = data['phone'] as String?;
+    final country = data['country'] as String?;
+    final address = data['address'] as String?;
+    final birthday = data['birthday'] as String?;
+    final avatarUrl = data['avatar_url'] as String?;
+    final gender = data['gender'] as String?;
+    final primaryLanguage = data['primary_language'] as String?;
+    final language = data['language'] as String?;
+    final provider = data['provider'] as String?;
+    final providerUserId = data['provider_user_id'];
+    final oauthToken =
+        data['oauth_token'] as String? ?? data['token'] as String?;
+    final expiresAt = data['temp_expires_at'] as String?;
+
+    await setString('signup_full_name', name);
+    await setString('signup_nickname', nickname);
+    await setString('signup_email', email);
+    await setString('signup_phone', phone);
+    await setString('signup_country', country);
+    await setString('signup_address', address);
+    await setString('signup_date_of_birth', birthday);
+    await setString('signup_avatar_url', avatarUrl);
+
+    if (gender != null && gender.isNotEmpty) {
+      await prefs.setString('signup_gender', gender);
+    }
+
+    final preferredLanguage =
+        primaryLanguage != null && primaryLanguage.isNotEmpty
+            ? primaryLanguage
+            : (language != null && language.isNotEmpty ? language : null);
+    await setStringList('signup_languages',
+        preferredLanguage != null ? [preferredLanguage] : null);
+
+    if (provider != null && provider.isNotEmpty) {
+      await prefs.setString('signup_provider', provider);
+    }
+
+    if (providerUserId != null) {
+      await prefs.setString('signup_provider_user_id', '$providerUserId');
+    }
+
+    if (oauthToken != null && oauthToken.isNotEmpty) {
+      await prefs.setString('signup_oauth_token', oauthToken);
+    }
+
+    if (expiresAt != null && expiresAt.isNotEmpty) {
+      await prefs.setString('signup_oauth_token_expires_at', expiresAt);
+    }
   }
 
   @override

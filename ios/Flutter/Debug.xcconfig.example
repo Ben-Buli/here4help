@@ -1,4 +1,5 @@
 #include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"
+#include? "Debug.secrets.xcconfig"
 
-GOOGLE_REVERSED_CLIENT_ID=com.googleusercontent.apps.YOUR_GOOGLE_CLIENT_ID
+// 請複製 Debug.secrets.xcconfig.example 產生本機的 Debug.secrets.xcconfig

@@ -11,6 +11,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
+require_once __DIR__ . '/../../utils/JWTManager.php';
+require_once __DIR__ . '/../../auth_helper.php';
 require_once __DIR__ . '/../../utils/Response.php';
 require_once __DIR__ . '/../../config/env_loader.php';
 
@@ -92,14 +94,12 @@ try {
     Response::error('Method not allowed', 405);
   }
 
-  // Auth
-  $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
-  if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
-    throw new Exception('Authorization header required');
+  // Auth（支援 Authorization header 與 query token）
+  $auth = JWTManager::validateRequest();
+  if (!$auth['valid']) {
+    Response::error($auth['message'] ?? 'Unauthorized', 401);
   }
-  $user_id = TokenValidator::validateAuthHeader($auth_header);
-  if (!$user_id) { throw new Exception('Invalid or expired token'); }
-  $user_id = (int)$user_id;
+  $user_id = (int)$auth['payload']['user_id'];
 
   $db = Database::getInstance();
   $input = json_decode(file_get_contents('php://input'), true) ?? [];

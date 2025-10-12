@@ -50,8 +50,11 @@ class UserService extends ChangeNotifier {
     }
   }
 
-  UserService() {
-    _initializeUser();
+  UserService();
+
+  /// 由 main.dart 主動呼叫，確保環境都準備好再執行
+  Future<void> initialize() async {
+    await _initializeUser();
   }
 
   /// 初始化用戶資訊 - 優先從資料庫獲取，備用 SharedPreferences

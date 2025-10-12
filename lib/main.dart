@@ -1,4 +1,3 @@
-// lib/main.dart (或你的路由配置檔)
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -32,41 +31,63 @@ class Here4HelpApp extends StatelessWidget {
 }
 
 void main() async {
-  // 確保 Flutter 綁定初始化
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    // ✅ 改用 dart-define 讀取環境
+    const appEnv =
+        String.fromEnvironment("ENVIRONMENT", defaultValue: "development");
+    const appDebug = bool.fromEnvironment("APP_DEBUG", defaultValue: false);
 
-  // 初始化環境配置
-  await EnvironmentConfig.initialize();
+    debugPrint("✅ dart-define loaded, ENVIRONMENT=$appEnv, DEBUG=$appDebug");
 
-  // 初始化錯誤報告服務
-  ErrorReportingService.initialize();
+    // 初始化環境配置
+    await EnvironmentConfig.initialize();
 
-  // 初始化權限狀態
-  await PermissionProvider.instance.initialize();
+    // 初始化權限狀態
+    await PermissionProvider.instance.initialize();
 
-  // 打印環境信息
-  EnvironmentConfig.printEnvironmentInfo();
+    // 初始化錯誤報告服務
+    await ErrorReportingService.initialize();
 
-  // 初始化 Web 環境配置橋接器 (僅限 Web 平台)
-  if (kIsWeb) {
-    WebEnvironmentBridge.instance.initializeWebConfig();
+    // 打印環境信息
+    EnvironmentConfig.printEnvironmentInfo();
+
+    // 初始化 Web 環境配置橋接器 (僅限 Web 平台)
+    if (kIsWeb) {
+      WebEnvironmentBridge.instance.initializeWebConfig();
+    }
+
+    // ✅ 主動初始化 UserService
+    final userService = UserService();
+    await userService.initialize();
+
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<UserService>.value(value: userService),
+          ChangeNotifierProvider<ThemeConfigManager>(
+              create: (_) => ThemeConfigManager()),
+          ChangeNotifierProvider<PermissionProvider>.value(
+              value: PermissionProvider.instance),
+          ChangeNotifierProvider<RatingProvider>(
+              create: (_) => RatingProvider()),
+          ChangeNotifierProvider<AchievementProvider>(
+              create: (_) => AchievementProvider()),
+          ChangeNotifierProvider<ChatListProvider>(
+              create: (_) => ChatListProvider(userService: userService)),
+        ],
+        child: const Here4HelpApp(),
+      ),
+    );
+  } catch (e, s) {
+    debugPrint("❌ 初始化失敗: $e");
+    debugPrintStack(stackTrace: s);
+
+    // 不直接 return，給一個錯誤頁
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: Center(child: Text("初始化失敗: $e")),
+      ),
+    ));
   }
-
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider<UserService>(create: (_) => UserService()),
-        ChangeNotifierProvider<ThemeConfigManager>(
-            create: (_) => ThemeConfigManager()),
-        ChangeNotifierProvider<PermissionProvider>(
-            create: (_) => PermissionProvider.instance),
-        ChangeNotifierProvider<RatingProvider>(create: (_) => RatingProvider()),
-        ChangeNotifierProvider<AchievementProvider>(
-            create: (_) => AchievementProvider()),
-        ChangeNotifierProvider<ChatListProvider>(
-            create: (_) => ChatListProvider()),
-      ],
-      child: const Here4HelpApp(),
-    ),
-  );
 }

@@ -67,7 +67,13 @@ final List<Map<String, dynamic>> shellPages = [
   },
   {
     'path': '/signup',
-    'child': const SignupPage(),
+    'builder': (context, extra) {
+      Map<String, dynamic>? oauthData;
+      if (extra is Map<String, dynamic>) {
+        oauthData = Map<String, dynamic>.from(extra);
+      }
+      return SignupPage(oauthData: oauthData);
+    },
     'title': 'ESSENTIAL INFORMATION',
     'showAppBar': true,
     'showBottomNav': false,

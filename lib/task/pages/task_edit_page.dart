@@ -32,10 +32,10 @@ class TaskEditPage extends StatefulWidget {
   final Map<String, dynamic>? editData;
 
   @override
-  State<TaskEditPage> createState() => _PostFormPageState();
+  State<TaskEditPage> createState() => _TaskCreatePageState();
 }
 
-class _PostFormPageState extends State<TaskEditPage> {
+class _TaskCreatePageState extends State<TaskEditPage> {
   int _initialRewardPoint = 0; // 原始任務點數（編輯模式用）
   bool get _isEditing => widget.editData != null && widget.editData!.isNotEmpty;
   int get _effectiveUsablePoints {
@@ -2911,7 +2911,7 @@ Future<String> _reverseGeocode(LatLng point) async {
   }
 }
 
-extension _MoveToSearchLocationExtension on _PostFormPageState {
+extension _MoveToSearchLocationExtension on _TaskCreatePageState {
   Future<void> _moveToSearchLocation(String query,
       [void Function(void Function())? dialogSetState]) async {
     if (query.trim().isEmpty) return;

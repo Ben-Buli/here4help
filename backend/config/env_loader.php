@@ -152,7 +152,7 @@ if (strpos($line, '=') !== false) {
         } else {
             return [
                 'host' => self::get('DB_HOST', 'localhost'),
-                'port' => self::get('DB_PORT', '8889'),
+                'port' => self::get('DB_PORT', '3306'),
                 'dbname' => self::get('DB_NAME'),
                 'username' => self::get('DB_USERNAME'),
                 'password' => self::get('DB_PASSWORD'),

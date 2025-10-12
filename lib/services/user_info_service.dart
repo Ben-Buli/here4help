@@ -1,7 +1,6 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/auth/services/auth_service.dart';
+import 'package:here4help/services/http_client_service.dart';
 
 /// 用戶公開資訊模型
 class UserPublicInfo {
@@ -44,30 +43,18 @@ class UserInfoService {
         return null;
       }
 
-      final uri = Uri.parse('$publicInfoUrl?user_id=$userId');
-
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+      final data = await HttpClientService.getJson(
+        '$publicInfoUrl?user_id=$userId',
+        useQueryParamToken: true,
       );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          print(
-              '✅ UserInfoService: Successfully got user public info for user $userId');
-          return UserPublicInfo.fromJson(data['data']);
-        } else {
-          print('❌ UserInfoService: API returned error: ${data['message']}');
-          throw Exception(data['message'] ?? 'Failed to get user public info');
-        }
-      } else {
+      if (data['success'] == true) {
         print(
-            '❌ UserInfoService: HTTP error ${response.statusCode}: ${response.body}');
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+            '✅ UserInfoService: Successfully got user public info for user $userId');
+        return UserPublicInfo.fromJson(data['data']);
+      } else {
+        print('❌ UserInfoService: API returned error: ${data['message']}');
+        throw Exception(data['message'] ?? 'Failed to get user public info');
       }
     } catch (e) {
       print('❌ UserInfoService: Error getting user public info: $e');
@@ -118,22 +105,13 @@ class UserInfoService {
       final token = await AuthService.getToken();
       if (token == null) return null;
 
-      final uri = Uri.parse(
-          '${AppConfig.api('/ratings/user-stats.php')}?user_id=$userId');
-
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+      final data = await HttpClientService.getJson(
+        '${AppConfig.api('/ratings/user-stats.php')}?user_id=$userId',
+        useQueryParamToken: true,
       );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          return data['data'];
-        }
+      if (data['success'] == true) {
+        return data['data'] as Map<String, dynamic>;
       }
       return null;
     } catch (e) {

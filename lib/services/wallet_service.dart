@@ -5,19 +5,17 @@ import 'package:here4help/services/http_client_service.dart';
 import 'package:flutter/foundation.dart';
 
 class WalletService {
-  static final String _baseUrl = AppConfig.apiBaseUrl;
-
   /// 錢包統計數據模型
   static Future<WalletSummary> getWalletSummary(UserService userService) async {
     try {
-      if (kDebugMode) {
-        debugPrint('[getWalletSummary] $_baseUrl');
-      }
-
       final response = await ApiClient.get(
         '/wallet/summary.php',
         useQueryParamToken: true, // MAMP 兼容性
       );
+
+      if (kDebugMode) {
+        debugPrint('[WalletService] summary status: ${response.statusCode}');
+      }
 
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
@@ -42,6 +40,10 @@ class WalletService {
         '/wallet/fee-settings.php',
         useQueryParamToken: true, // MAMP 兼容性
       );
+
+      if (kDebugMode) {
+        debugPrint('[WalletService] fee status: ${response.statusCode}');
+      }
 
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
@@ -75,6 +77,10 @@ class WalletService {
         '/wallet/bank-accounts.php',
         useQueryParamToken: true, // MAMP 兼容性
       );
+
+      if (kDebugMode) {
+        debugPrint('[WalletService] bank status: ${response.statusCode}');
+      }
 
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');

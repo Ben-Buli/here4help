@@ -1,4 +1,4 @@
-// post_form_page.dart
+// task_create_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -32,10 +32,10 @@ class TaskCreatePage extends StatefulWidget {
   final Map<String, dynamic>? editData;
 
   @override
-  State<TaskCreatePage> createState() => _PostFormPageState();
+  State<TaskCreatePage> createState() => _TaskCreatePageState();
 }
 
-class _PostFormPageState extends State<TaskCreatePage> {
+class _TaskCreatePageState extends State<TaskCreatePage> {
   final MapController _mapController = MapController();
   final TextEditingController _rewardPointController = TextEditingController();
   final TextEditingController _titleController = TextEditingController();
@@ -2952,7 +2952,7 @@ Future<String> _reverseGeocode(LatLng point) async {
   }
 }
 
-extension _MoveToSearchLocationExtension on _PostFormPageState {
+extension _MoveToSearchLocationExtension on _TaskCreatePageState {
   Future<void> _moveToSearchLocation(String query,
       [void Function(void Function())? dialogSetState]) async {
     if (query.trim().isEmpty) return;

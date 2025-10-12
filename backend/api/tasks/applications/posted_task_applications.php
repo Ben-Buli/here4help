@@ -12,6 +12,7 @@ require_once __DIR__ . '/../../../config/env_loader.php';
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../utils/Response.php';
 require_once __DIR__ . '/../../../utils/JWTManager.php';
+require_once __DIR__ . '/../../../auth_helper.php';
 
 // 確保環境變數已載入
 EnvLoader::load();
@@ -25,50 +26,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 try {
-    // 驗證 JWT token
-    $headers = getallheaders();
-    error_log("🔍 [posted_task_applications.php] 收到的所有 headers: " . json_encode($headers));
-    
-    // 嘗試多種方式獲取 Authorization header
-    $authHeader = $headers['Authorization'] ?? 
-                  $headers['authorization'] ?? 
-                  $_SERVER['HTTP_AUTHORIZATION'] ?? 
-                  $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? 
-                  '';
-    
-    // 如果還是沒有，嘗試從 HTTP 頭中直接讀取
-    if (empty($authHeader)) {
-        // 從 HTTP 頭中直接讀取 Authorization
-        $httpHeaders = apache_request_headers();
-        if (function_exists('apache_request_headers')) {
-            $authHeader = $httpHeaders['Authorization'] ?? $httpHeaders['authorization'] ?? '';
-        }
-        
-        // 如果還是沒有，嘗試從 $_SERVER 中查找
-        if (empty($authHeader)) {
-            foreach ($_SERVER as $key => $value) {
-                if (strpos($key, 'HTTP_') === 0) {
-                    error_log("🔍 [posted_task_applications.php] $_SERVER[$key] = $value");
-                }
-            }
-        }
+    // 驗證 JWT（支援 Authorization header 與 query token）
+    $auth = JWTManager::validateRequest();
+    if (!$auth['valid']) {
+        Response::error($auth['message'] ?? 'Unauthorized', 401);
     }
-    
-    error_log("🔍 [posted_task_applications.php] Authorization header: '$authHeader'");
-    
-    if (empty($authHeader) || !str_starts_with($authHeader, 'Bearer ')) {
-        error_log("❌ [posted_task_applications.php] Authorization header 無效或缺失");
-        Response::error('Authorization header required', 401);
-    }
-    
-    $token = substr($authHeader, 7);
-    $decoded = JWTManager::validateToken($token);
-    
-    if (!$decoded || !isset($decoded['user_id'])) {
-        Response::error('Invalid token', 401);
-    }
-    
-    $currentUserId = (int)$decoded['user_id'];
+    $payload = $auth['payload'];
+    $currentUserId = (int)$payload['user_id'];
     error_log("🔍 [posted_task_applications.php] 當前用戶 ID: $currentUserId");
 
     $db = Database::getInstance();

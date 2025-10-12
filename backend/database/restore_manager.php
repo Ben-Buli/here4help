@@ -27,7 +27,7 @@ class RestoreManager {
     private function loadConfig() {
         $this->config = [
             'db_host' => $_ENV['DB_HOST'] ?? 'localhost',
-            'db_port' => $_ENV['DB_PORT'] ?? '3306',
+            'db_port' => $_ENV['DB_PORT'] ?? '8889',
             'db_name' => $_ENV['DB_DATABASE'] ?? '',
             'db_user' => $_ENV['DB_USERNAME'] ?? '',
             'db_pass' => $_ENV['DB_PASSWORD'] ?? '',

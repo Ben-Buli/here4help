@@ -1,6 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+
+import 'package:here4help/auth/services/auth_service.dart';
+import 'package:here4help/config/app_config.dart';
+import 'package:here4help/services/api/oauth_api.dart';
 import 'package:here4help/utils/image_helper.dart';
 
 class OAuthSignupPage extends StatefulWidget {
@@ -21,6 +28,8 @@ class _OAuthSignupPageState extends State<OAuthSignupPage> {
   String? avatarUrl;
   String? provider;
   String? providerUserId;
+  String? oauthToken;
+  String? tempTokenExpiresAt;
   bool isLoading = false;
   String? selectedSchool;
   String? selectedPrimaryLanguage;
@@ -28,30 +37,67 @@ class _OAuthSignupPageState extends State<OAuthSignupPage> {
   @override
   void initState() {
     super.initState();
-    _loadOAuthData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadOAuthData();
+    });
   }
 
   Future<void> _loadOAuthData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
+      Map<String, String> queryParams = {};
+      try {
+        queryParams = GoRouterState.of(context).uri.queryParameters;
+      } catch (_) {
+        queryParams = Uri.base.queryParameters;
+      }
+
+      final queryToken = queryParams['token'] ?? queryParams['oauth_token'];
+      final queryProvider = queryParams['provider'];
+      final queryExpires =
+          queryParams['expires_at'] ?? queryParams['temp_expires_at'];
+
+      if (queryProvider != null && queryProvider.isNotEmpty) {
+        await prefs.setString('signup_provider', queryProvider);
+      }
+      if (queryToken != null && queryToken.isNotEmpty) {
+        await prefs.setString('signup_oauth_token', queryToken);
+      }
+      if (queryExpires != null && queryExpires.isNotEmpty) {
+        await prefs.setString('signup_oauth_token_expires_at', queryExpires);
+      }
+
+      final resolvedToken = (queryToken != null && queryToken.isNotEmpty)
+          ? queryToken
+          : prefs.getString('signup_oauth_token');
+
       setState(() {
         fullNameController.text = prefs.getString('signup_full_name') ?? '';
         nicknameController.text = prefs.getString('signup_nickname') ?? '';
         emailController.text = prefs.getString('signup_email') ?? '';
         avatarUrl = prefs.getString('signup_avatar_url');
-        provider = prefs.getString('signup_provider');
+        provider = queryProvider ?? prefs.getString('signup_provider');
         providerUserId = prefs.getString('signup_provider_user_id');
+        oauthToken = resolvedToken;
+        tempTokenExpiresAt =
+            queryExpires ?? prefs.getString('signup_oauth_token_expires_at');
       });
 
-      print('📱 載入 OAuth 資料:');
-      print('  👤 姓名: ${fullNameController.text}');
-      print('  📧 Email: ${emailController.text}');
-      print('  🔗 提供者: $provider');
-      print('  🆔 提供者用戶ID: $providerUserId');
-      print('  🖼️ 頭像: $avatarUrl');
+      debugPrint('📱 載入 OAuth 資料:');
+      debugPrint('  👤 姓名: ${fullNameController.text}');
+      debugPrint('  📧 Email: ${emailController.text}');
+      debugPrint('  🔗 提供者: $provider');
+      debugPrint('  🆔 提供者用戶ID: $providerUserId');
+      debugPrint('  🖼️ 頭像: $avatarUrl');
+      debugPrint(
+          '  🔑 OAuth Token: ${oauthToken != null ? oauthToken!.substring(0, oauthToken!.length > 8 ? 8 : oauthToken!.length) + '...' : '無'}');
+
+      if (resolvedToken != null && resolvedToken.isNotEmpty) {
+        await _fetchTempUserData(resolvedToken);
+      }
     } catch (e) {
-      print('❌ 載入 OAuth 資料失敗: $e');
+      debugPrint('❌ 載入 OAuth 資料失敗: $e');
     }
   }
 
@@ -62,51 +108,106 @@ class _OAuthSignupPageState extends State<OAuthSignupPage> {
   }
 
   Future<void> _handleOAuthSignup() async {
+    if (oauthToken == null || oauthToken!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('暫存登入資料已失效，請重新以第三方帳戶登入'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       isLoading = true;
     });
 
     try {
-      print('🚀 開始 OAuth 註冊流程...');
+      debugPrint('🚀 開始 OAuth 註冊流程...');
 
-      // 準備註冊資料
-      final signupData = {
-        'full_name': fullNameController.text.trim(),
+      final signupData = <String, dynamic>{
+        'oauth_token': oauthToken,
+        'name': fullNameController.text.trim(),
         'nickname': nicknameController.text.trim(),
-        'email': emailController.text.trim(),
         'phone': phoneController.text.trim(),
-        'referral_code': referralCodeController.text.trim(),
+        'intro_referral_code': referralCodeController.text.trim(),
+        'primary_language':
+            (selectedPrimaryLanguage ?? 'English').trim().isEmpty
+                ? 'English'
+                : (selectedPrimaryLanguage ?? 'English').trim(),
         'school': selectedSchool,
-        'primary_language': selectedPrimaryLanguage,
         'avatar_url': avatarUrl,
-        'provider': provider,
-        'provider_user_id': providerUserId,
       };
 
-      print('📦 註冊資料: $signupData');
+      signupData.removeWhere((key, value) {
+        if (key == 'oauth_token') return false;
+        if (value == null) return true;
+        if (value is String && value.trim().isEmpty) return true;
+        return false;
+      });
 
-      // 這裡應該調用後端 API 完成註冊
-      // 暫時模擬成功回應
-      await Future.delayed(const Duration(seconds: 2));
+      debugPrint('📦 註冊資料鍵值: ${signupData.keys.toList()}');
 
-      // 清除暫存的 OAuth 資料
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('signup_full_name');
-      await prefs.remove('signup_nickname');
-      await prefs.remove('signup_email');
-      await prefs.remove('signup_avatar_url');
-      await prefs.remove('signup_provider');
-      await prefs.remove('signup_provider_user_id');
+      final response = await http
+          .post(
+            Uri.parse(AppConfig.api('/auth/register-oauth.php')),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode(signupData),
+          )
+          .timeout(const Duration(seconds: 30));
 
-      // 顯示成功訊息
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('註冊成功！歡迎加入 Here4Help')),
-      );
+      final body = response.body;
+      debugPrint('📥 OAuth 註冊回應狀態碼: ${response.statusCode}');
+      final preview = body.length > 200 ? '${body.substring(0, 200)}...' : body;
+      debugPrint('📥 OAuth 註冊回應內容: $preview');
 
-      // 跳轉到首頁
-      context.go('/home');
+      final decoded = jsonDecode(body);
+      if (response.statusCode == 200 &&
+          decoded is Map &&
+          decoded['success'] == true) {
+        final data = decoded['data'];
+        if (data is Map && data['token'] != null && data['user'] is Map) {
+          final token = data['token'] as String;
+          final user = Map<String, dynamic>.from(data['user'] as Map);
+
+          await AuthService.saveToken(token);
+          await AuthService.saveUserData(user);
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('user_email', user['email'] ?? '');
+          await prefs.setInt('user_permission', user['permission'] ?? 0);
+          await prefs.setString('user_name', user['name'] ?? '');
+          await prefs.setInt('user_points', user['points'] ?? 0);
+          await prefs.setString('user_avatarUrl', user['avatar_url'] ?? '');
+          await prefs.setString(
+              'user_primaryLang', user['primary_language'] ?? '');
+
+          await _clearCachedOAuthSignupData(prefs);
+
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('註冊成功！請繼續完成學生證驗證'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          context.go('/signup/student-id');
+          return;
+        }
+
+        throw Exception('註冊回應格式不正確');
+      }
+
+      final message = decoded is Map && decoded['message'] != null
+          ? decoded['message']
+          : 'Registration failed';
+      throw Exception(message);
     } catch (e) {
-      print('❌ OAuth 註冊失敗: $e');
+      debugPrint('❌ OAuth 註冊失敗: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('註冊失敗: $e')),
       );
@@ -114,6 +215,82 @@ class _OAuthSignupPageState extends State<OAuthSignupPage> {
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> _clearCachedOAuthSignupData(SharedPreferences prefs) async {
+    await prefs.remove('signup_full_name');
+    await prefs.remove('signup_nickname');
+    await prefs.remove('signup_email');
+    await prefs.remove('signup_avatar_url');
+    await prefs.remove('signup_provider');
+    await prefs.remove('signup_provider_user_id');
+    await prefs.remove('signup_oauth_token');
+    await prefs.remove('signup_oauth_token_expires_at');
+  }
+
+  Future<void> _fetchTempUserData(String token) async {
+    try {
+      final data = await OAuthApi.fetchTempUser(token);
+      if (data == null) {
+        debugPrint('⚠️ 無法取得 OAuth 暫存資料 (token: $token)');
+        return;
+      }
+
+      final fetchedName = data['name']?.toString() ?? '';
+      final fetchedEmail = data['email']?.toString() ?? '';
+      String? fetchedAvatar = data['avatar_url']?.toString();
+      final fetchedProvider = data['provider']?.toString() ?? provider;
+      final fetchedProviderUserId =
+          data['provider_user_id']?.toString() ?? providerUserId;
+
+      if ((fetchedAvatar == null || fetchedAvatar.isEmpty) &&
+          data['raw_data'] is Map) {
+        final rawData = data['raw_data'] as Map;
+        final tokenInfo = rawData['token_info'];
+        if (tokenInfo is Map) {
+          final picture = tokenInfo['picture'];
+          if (picture is String && picture.isNotEmpty) {
+            fetchedAvatar = picture;
+          }
+        }
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        if (fetchedName.isNotEmpty) {
+          fullNameController.text = fetchedName;
+          if (nicknameController.text.trim().isEmpty ||
+              nicknameController.text == fullNameController.text) {
+            nicknameController.text = fetchedName;
+          }
+        }
+        if (fetchedEmail.isNotEmpty) {
+          emailController.text = fetchedEmail;
+        }
+        if (fetchedAvatar != null && fetchedAvatar.isNotEmpty) {
+          avatarUrl = fetchedAvatar;
+        }
+        provider = fetchedProvider;
+        providerUserId = fetchedProviderUserId;
+      });
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('signup_full_name', fullNameController.text);
+      await prefs.setString('signup_nickname', nicknameController.text);
+      await prefs.setString('signup_email', emailController.text);
+      if (avatarUrl != null && avatarUrl!.isNotEmpty) {
+        await prefs.setString('signup_avatar_url', avatarUrl!);
+      }
+      if (provider != null && provider!.isNotEmpty) {
+        await prefs.setString('signup_provider', provider!);
+      }
+      if (providerUserId != null && providerUserId!.isNotEmpty) {
+        await prefs.setString('signup_provider_user_id', providerUserId!);
+      }
+    } catch (e) {
+      debugPrint('❌ 取得 OAuth 暫存資料失敗: $e');
     }
   }
 

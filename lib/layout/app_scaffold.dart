@@ -1,5 +1,6 @@
 // app_scaffold.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/services/theme_config_manager.dart';
@@ -69,6 +70,8 @@ class _AppScaffoldState extends State<AppScaffold> {
     '/task/apply',
     '/chat/detail',
   };
+
+  double _dragOffset = 0.0;
 
   // 靜態方法來獲取當前的路由歷史
   static _AppScaffoldState? _currentInstance;
@@ -184,10 +187,12 @@ class _AppScaffoldState extends State<AppScaffold> {
       // 檢查是否在聊天室中，如果是，使用會話管理器的返回路徑
       if (await ChatSessionManager.isInChatRoom()) {
         final returnPath = await ChatSessionManager.getReturnPath();
-        debugPrint('🔙 從聊天室返回到: $returnPath');
+        debugPrint('🔙 從聊天室返回到: ${returnPath ?? '(history fallback)'}');
         await ChatSessionManager.clearCurrentChatSession(); // 清除會話
-        context.go(returnPath);
-        return;
+        if (returnPath != null && returnPath.isNotEmpty) {
+          context.go(returnPath);
+          return;
+        }
       }
 
       // 特殊處理：如果在權限拒絕頁面，需要智能返回
@@ -228,6 +233,61 @@ class _AppScaffoldState extends State<AppScaffold> {
       debugPrint('❌ 返回操作失敗: $e');
       Navigator.of(context).maybePop();
     }
+  }
+
+  Widget _buildSwipeBackWrapper(BuildContext context, Widget child) {
+    // iOS 原生提供左滑返回手勢，直接使用系統動畫
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      return child;
+    }
+
+    if (!_canGoBack()) {
+      return child;
+    }
+
+    final deviceWidth = MediaQuery.of(context).size.width;
+
+    final double dragPercent =
+        (_dragOffset / deviceWidth).clamp(0.0, 1.0).toDouble();
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Opacity(
+            opacity: dragPercent * 0.6,
+            child: Container(color: Colors.black12),
+          ),
+        ),
+        GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragStart: (_) {
+            setState(() => _dragOffset = 0.0);
+          },
+          onHorizontalDragUpdate: (details) {
+            final delta = details.primaryDelta ?? details.delta.dx;
+            if (delta == 0) return;
+
+            setState(() {
+              _dragOffset = (_dragOffset + delta).clamp(0.0, deviceWidth);
+            });
+          },
+          onHorizontalDragEnd: (_) {
+            final shouldPop = (_dragOffset / deviceWidth).clamp(0.0, 1.0) > 0.3;
+            if (shouldPop) {
+              _handleBack();
+            }
+            setState(() => _dragOffset = 0.0);
+          },
+          onHorizontalDragCancel: () {
+            setState(() => _dragOffset = 0.0);
+          },
+          child: Transform.translate(
+            offset: Offset(_dragOffset, 0),
+            child: child,
+          ),
+        ),
+      ],
+    );
   }
 
   /// 處理權限拒絕頁面的返回邏輯
@@ -312,7 +372,7 @@ class _AppScaffoldState extends State<AppScaffold> {
               body: SafeArea(
                 top: true, // 總是為頂部添加安全區域，避免被瀏海遮住
                 bottom: !widget.showBottomNav,
-                child: widget.child,
+                child: _buildSwipeBackWrapper(context, widget.child),
               ),
               bottomNavigationBar: widget.showBottomNav
                   ? _buildGlassmorphismBottomNav(themeManager, context)
@@ -322,48 +382,51 @@ class _AppScaffoldState extends State<AppScaffold> {
         );
 
         if (isTaipei101 || baseThemeName == 'pride_s_curve' || isMilkTea) {
-          return Stack(
-            children: [
-              // 簡化的點狀燈飾背景：多層次散落的發光點
-              if (isTaipei101) ...[
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _Taipei101LightsPainter(),
-                  ),
-                ),
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _Taipei101TowerPainter(
-                      bodyColor: const Color(0xFF273043).withOpacity(0.55),
-                      edgeColor: Colors.white.withOpacity(0.18),
-                      windowColor: Colors.white.withOpacity(0.16),
+          return Container(
+            color: themeManager.currentTheme.background,
+            child: Stack(
+              children: [
+                // 簡化的點狀燈飾背景：多層次散落的發光點
+                if (isTaipei101) ...[
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _Taipei101LightsPainter(),
                     ),
                   ),
-                ),
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _Taipei101TowerPainter(
+                        bodyColor: const Color(0xFF273043).withOpacity(0.55),
+                        edgeColor: Colors.white.withOpacity(0.18),
+                        windowColor: Colors.white.withOpacity(0.16),
+                      ),
+                    ),
+                  ),
+                ],
+                if (baseThemeName == 'pride_s_curve')
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _SCurveRainbowPainter(),
+                    ),
+                  ),
+                if (isMilkTea)
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _BubbleTeaPatternPainter(
+                        cupColor:
+                            themeManager.currentTheme.accent.withOpacity(0.35),
+                        lidColor: themeManager.currentTheme.background
+                            .withOpacity(0.25),
+                        strawColor:
+                            themeManager.currentTheme.primary.withOpacity(0.35),
+                        pearlColor: themeManager.currentTheme.onSurface
+                            .withOpacity(0.35),
+                      ),
+                    ),
+                  ),
+                backgroundChild,
               ],
-              if (baseThemeName == 'pride_s_curve')
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _SCurveRainbowPainter(),
-                  ),
-                ),
-              if (isMilkTea)
-                Positioned.fill(
-                  child: CustomPaint(
-                    painter: _BubbleTeaPatternPainter(
-                      cupColor:
-                          themeManager.currentTheme.accent.withOpacity(0.35),
-                      lidColor: themeManager.currentTheme.background
-                          .withOpacity(0.25),
-                      strawColor:
-                          themeManager.currentTheme.primary.withOpacity(0.35),
-                      pearlColor:
-                          themeManager.currentTheme.onSurface.withOpacity(0.35),
-                    ),
-                  ),
-                ),
-              backgroundChild,
-            ],
+            ),
           );
         }
 
@@ -383,6 +446,24 @@ class _AppScaffoldState extends State<AppScaffold> {
         );
       },
     );
+  }
+
+  /// 構建 AppBar 標題
+  Widget _buildAppBarTitle(ThemeConfigManager themeManager) {
+    // 只在 debug 模式下輸出一次調試信息
+    if (kDebugMode) {
+      debugPrint('🔍 [AppScaffold] 構建 AppBar title: ${widget.title}');
+    }
+
+    return widget.titleWidget ??
+        Text(
+          widget.title ?? '',
+          style: TextStyle(
+            color: themeManager.appBarTextColor,
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
+          ),
+        );
   }
 
   /// 創建毛玻璃效果的 AppBar
@@ -434,22 +515,7 @@ class _AppScaffoldState extends State<AppScaffold> {
                       onPressed: _handleBack,
                     )
                   : null,
-              title: () {
-                debugPrint('🔍 [AppScaffold] 構建 AppBar title');
-                debugPrint(
-                    '🔍 [AppScaffold] widget.titleWidget: ${widget.titleWidget?.runtimeType}');
-                debugPrint('🔍 [AppScaffold] widget.title: ${widget.title}');
-
-                return widget.titleWidget ??
-                    Text(
-                      widget.title ?? '',
-                      style: TextStyle(
-                        color: themeManager.appBarTextColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 20,
-                      ),
-                    );
-              }(),
+              title: _buildAppBarTitle(themeManager),
               actions: [
                 ...?widget.actions,
               ],
@@ -834,7 +900,7 @@ class _ChatBadgeDotIconState extends State<_ChatBadgeDotIcon> {
         if (currentUserId != null) {
           // 只統計當前用戶有權限的聊天室
           for (final entry in chatProvider.unreadByRoom.entries) {
-            final roomId = entry.key;
+            // final roomId = entry.key; // 暫時不使用 roomId
             final count = entry.value;
 
             // 檢查聊天室是否屬於當前用戶

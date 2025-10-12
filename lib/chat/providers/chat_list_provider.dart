@@ -18,6 +18,11 @@ class ChatListProvider extends ChangeNotifier {
   // 外部 TabController（如 AppBar 中的）//
   TabController? _externalTabController;
 
+  final UserService _userService;
+
+  ChatListProvider({required UserService userService})
+      : _userService = userService;
+
   // 搜索和篩選狀態 - 分頁獨立
   final Map<int, String> _searchQueries = {tabPostedTasks: '', tabMyWorks: ''};
   final Map<int, Set<String>> _selectedLocations = {
@@ -128,6 +133,63 @@ class ChatListProvider extends ChangeNotifier {
   String? getTabError(int tab) => _tabErrors[tab];
 
   List<Map<String, dynamic>> get myWorksApplications => _myWorksApplications;
+
+  /// 使用新的資料來源取代 Posted Tasks 應徵記錄和任務快取，並通知監聽者
+  void replacePostedTasksAggregated(List<Map<String, dynamic>> tasks,
+      {bool markLoaded = false}) {
+    // 同步更新快取管理器的 posted tasks
+    _cacheManager.postedTasksCache
+      ..clear()
+      ..addAll(tasks);
+
+    // 重新收斂每個任務的應徵者列表
+    _applicationsByTask..clear();
+
+    for (final task in tasks) {
+      final taskId = task['id']?.toString();
+      if (taskId == null) {
+        continue;
+      }
+
+      final applicantsRaw = task['applicants'];
+      if (applicantsRaw is List) {
+        final applicants = applicantsRaw
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+        _applicationsByTask[taskId] = applicants;
+      } else {
+        _applicationsByTask[taskId] = <Map<String, dynamic>>[];
+      }
+    }
+
+    if (markLoaded) {
+      // 清除錯誤並標記為已載入
+      setTabError(tabPostedTasks, null);
+      if (!isTabLoaded(tabPostedTasks)) {
+        setTabLoaded(tabPostedTasks, true);
+      }
+    }
+
+    _emit('posted_tasks_data_updated');
+  }
+
+  /// 使用新的資料來源取代 My Works 應徵記錄，並通知監聽者
+  void replaceMyWorksApplications(List<Map<String, dynamic>> items,
+      {bool markLoaded = false}) {
+    _myWorksApplications
+      ..clear()
+      ..addAll(items);
+
+    if (markLoaded) {
+      // 清除錯誤並標記為已載入（僅在狀態變更時觸發事件）
+      setTabError(tabMyWorks, null);
+      if (!isTabLoaded(tabMyWorks)) {
+        setTabLoaded(tabMyWorks, true);
+      }
+    }
+
+    _emit('myworks_data_updated');
+  }
 
   /// 獲取已發布的任務列表
   List<Map<String, dynamic>> get postedTasks => _cacheManager.postedTasksCache;
@@ -1197,8 +1259,7 @@ class ChatListProvider extends ChangeNotifier {
       final taskService = TaskService();
 
       // 獲取當前用戶ID作為creator_id
-      final userService = UserService();
-      final currentUserId = userService.currentUser?.id;
+      final currentUserId = _userService.currentUser?.id;
 
       if (currentUserId == null) {
         debugPrint('❌ 無法獲取當前用戶ID，跳過應徵者載入');
@@ -1282,20 +1343,7 @@ class ChatListProvider extends ChangeNotifier {
     try {
       final taskService = TaskService();
 
-      // 創建 UserService 實例並等待初始化
-      final userService = UserService();
-
-      // 等待用戶服務初始化完成
-      int retryCount = 0;
-      const maxRetries = 3;
-
-      while (userService.currentUser?.id == null && retryCount < maxRetries) {
-        debugPrint('🔄 等待用戶服務初始化，嘗試 $retryCount/$maxRetries');
-        await Future.delayed(const Duration(milliseconds: 500));
-        retryCount++;
-      }
-
-      final currentUserId = userService.currentUser?.id;
+      final currentUserId = _userService.currentUser?.id;
 
       debugPrint('🔍 開始載入 My Works 資料，用戶 ID: $currentUserId');
 
@@ -1313,9 +1361,8 @@ class ChatListProvider extends ChangeNotifier {
       debugPrint(
           '🔍 [ChatListProvider] TaskService.myApplications 長度: ${taskService.myApplications.length}');
 
-      // 將數據載入到本地快取
-      _myWorksApplications.clear();
-      _myWorksApplications.addAll(taskService.myApplications);
+      // 將數據載入到本地快取，並通知監聽者
+      replaceMyWorksApplications(taskService.myApplications);
 
       debugPrint('✅ My Works 資料載入完成');
       debugPrint('📊 My Works 統計: ${_myWorksApplications.length} 個應徵記錄');

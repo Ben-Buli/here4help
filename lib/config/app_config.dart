@@ -20,6 +20,12 @@ class AppConfig {
   // Google 登入 API 端點
   static String get googleLoginUrl => api('/auth/google-login.php');
 
+  // Apple 登入 API 端點
+  static String get appleLoginUrl => api('/auth/apple-login.php');
+
+  // Facebook 登入 API 端點
+  static String get facebookLoginUrl => api('/auth/facebook-login.php');
+
   // 一般登入 API 端點
   static String get loginUrl => api('/auth/login.php');
 

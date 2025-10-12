@@ -196,7 +196,7 @@ class _TokenExpiredErrorWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  '登入已過期',
+                  'Session expired',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -204,7 +204,7 @@ class _TokenExpiredErrorWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  '為了您的帳戶安全，請重新登入以繼續使用。',
+                  'Please log in again to continue.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey),
                 ),
@@ -216,7 +216,7 @@ class _TokenExpiredErrorWidget extends StatelessWidget {
                     );
                   },
                   icon: const Icon(Icons.login),
-                  label: const Text('重新登入'),
+                  label: const Text('Go to Login'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
                     foregroundColor: Colors.white,
@@ -224,7 +224,7 @@ class _TokenExpiredErrorWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  '錯誤詳情: ${error.toString()}',
+                  'Error details: ${error.toString()}',
                   style: const TextStyle(
                     fontSize: 12,
                     color: Colors.grey,

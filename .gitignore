@@ -237,8 +237,8 @@ frontend/js/environment_injector.js
 
 # iOS 配置檔案 (包含敏感資訊)
 ios/Runner/GoogleService-Info.plist
-ios/Flutter/Debug.xcconfig
-ios/Flutter/Release.xcconfig
+ios/Flutter/Debug.secrets.xcconfig
+ios/Flutter/Release.secrets.xcconfig
 
 # Android 配置檔案 (包含敏感資訊)
 android/app/google-services.json

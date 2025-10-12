@@ -5,12 +5,12 @@
  */
 
 // 設定測試環境變數
-putenv('JWT_SECRET=here4help_jwt_secret_key_2025_development_environment_secure_random_string');
+putenv('JWT_SECRET=here4help_jwt_secret_key_2025_production_secure_random_string_64_chars');
 putenv('JWT_EXPIRY=604800');
 
 // 資料庫配置
 putenv('DB_HOST=localhost');
-putenv('DB_PORT=8889');
+putenv('DB_PORT=3306');
 putenv('DB_NAME=hero4helpdemofhs_hero4help');
 putenv('DB_USERNAME=root');
 putenv('DB_PASSWORD=root');

@@ -2367,7 +2367,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('發送訊息失敗: $e'),
+            content: Text('Send message failed: $e'),
             backgroundColor: Colors.red,
           ),
         );

@@ -49,17 +49,23 @@ class EnvironmentConfig {
     // 在 Web 平台不使用模擬器配置
     if (kIsWeb) return false;
 
-    // 檢查環境變數
+    // 檢查環境變數 - 優先使用明確的環境變數
     const iosSimulator =
         bool.fromEnvironment('IOS_SIMULATOR', defaultValue: false);
     if (iosSimulator) {
-      debugPrint('🔧 檢測到 IOS_SIMULATOR 環境變數');
+      debugPrint('🔧 檢測到 IOS_SIMULATOR=true 環境變數');
       return true;
     }
 
-    // 檢查是否在 iOS 平台上運行
+    // 如果明確設定為 false，則為真機
+    if (!iosSimulator && defaultTargetPlatform == TargetPlatform.iOS) {
+      debugPrint('🔧 檢測到 iOS 真機 (IOS_SIMULATOR=false)，使用 development 配置');
+      return false;
+    }
+
+    // 預設情況下，iOS 平台使用模擬器配置
     if (defaultTargetPlatform == TargetPlatform.iOS) {
-      debugPrint('🔧 檢測到 iOS 平台，使用模擬器配置');
+      debugPrint('🔧 檢測到 iOS 平台，預設使用模擬器配置');
       return true;
     }
 

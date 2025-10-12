@@ -13,7 +13,7 @@ flutter run -d chrome \
   --dart-define=API_ORIGIN=http://localhost:8888 \
   --dart-define=API_PREFIX=/here4help/backend/api \
   --dart-define=IMAGE_BASE_URL=http://localhost:8888/here4help \
-  --dart-define=SOCKET_URL=http://localhost:3001 \
+  --dart-define=SOCKET_URL=http://localhost:3000 \
   --dart-define=GOOGLE_CLIENT_ID=102744926949-bhrnm2970bgt3dfm2nmdbqt03mrvdh3i.apps.googleusercontent.com \
   --dart-define=GOOGLE_REDIRECT_URI=http://localhost:8888/here4help/backend/api/auth/google-callback.php \
   --dart-define=FACEBOOK_APP_ID=1037019294991326 \

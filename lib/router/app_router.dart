@@ -40,11 +40,21 @@ final GoRouter appRouter = GoRouter(
   redirect: (context, state) async {
     final prefs = await SharedPreferences.getInstance();
     final email = prefs.getString('user_email');
+    final token = prefs.getString('auth_token');
+
+    // 檢查認證狀態：需要同時有 email 和 token 才算已登入
+    final isAuthenticated = email != null && token != null;
 
     debugPrint('🔄 路由重定向檢查: ${state.uri.path}');
     debugPrint('🔍 完整 URI: ${state.uri.toString()}');
     debugPrint('🔍 Query Parameters: ${state.uri.queryParameters}');
-    debugPrint('👤 用戶狀態: ${email != null ? "已登入 ($email)" : "未登入"}');
+    debugPrint('👤 用戶狀態: ${isAuthenticated ? "已登入 ($email)" : "未登入"}');
+    if (email != null && token == null) {
+      debugPrint('⚠️ 發現不一致的認證狀態：有 email 但無 token，清理資料');
+      // 清理不一致的認證資料
+      await prefs.remove('user_email');
+      await prefs.remove('user_json');
+    }
 
     // 定義公開頁面（不需要登入驗證）
     final publicPages = [
@@ -56,7 +66,7 @@ final GoRouter appRouter = GoRouter(
 
     // 處理根路徑重定向
     if (state.uri.path == '/') {
-      if (email == null) {
+      if (!isAuthenticated) {
         debugPrint('🔄 根路徑訪問，未登入用戶重定向到登入頁面');
         return '/login';
       } else {
@@ -82,7 +92,7 @@ final GoRouter appRouter = GoRouter(
 
     // 如果未登入且不在公開頁面，導向登入頁面
     // 但排除 OAuth 註冊頁面（已經在上面處理過了）
-    if (email == null &&
+    if (!isAuthenticated &&
         !publicPages.contains(state.uri.path) &&
         !(state.uri.path == '/signup' &&
             state.uri.queryParameters.containsKey('token'))) {
@@ -91,7 +101,7 @@ final GoRouter appRouter = GoRouter(
     }
 
     // 如果已登入且訪問登入頁面，導向首頁
-    if (state.uri.path == '/login' && email != null) {
+    if (state.uri.path == '/login' && isAuthenticated) {
       debugPrint('🔄 已登入用戶訪問登入頁面，重定向到首頁');
       return '/home';
     }

@@ -530,10 +530,18 @@ class _TaskListPageState extends State<TaskListPage> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 32),
-
-                // 操作按鈕
-                _buildEmptyStateActions(),
+                const SizedBox(height: 24),
+                Text(
+                  'Pull down to refresh the latest tasks',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.5),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),
@@ -555,29 +563,6 @@ class _TaskListPageState extends State<TaskListPage> {
     } else {
       return 'No tasks are currently applying\nPlease check back later or refresh the page';
     }
-  }
-
-  /// 建構空狀態操作按鈕
-  Widget _buildEmptyStateActions() {
-    // 沒有搜尋或篩選條件時，顯示重新整理按鈕
-    return ElevatedButton.icon(
-      onPressed: () async {
-        await _loadGlobalTasks();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Task list has been updated'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      },
-      icon: const Icon(Icons.refresh),
-      label: const Text('Refresh'),
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      ),
-    );
   }
 
   /// 顯示狀態
@@ -1784,23 +1769,45 @@ class _TaskListPageState extends State<TaskListPage> {
 
               // 任務列表
               Expanded(
-                child: sortedTasks.isEmpty
-                    ? _buildEmptyTasksView()
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.only(
-                          left: 12,
-                          right: 12,
-                          top: 12,
-                          bottom: 80, // 保留底部距離，避免被 scroll to top button 遮擋
-                        ),
-                        itemCount: sortedTasks.length,
-                        itemBuilder: (context, index) {
-                          final task = sortedTasks[index];
-                          final taskId = task['id']?.toString() ?? '';
-                          final isFavorite = _favoriteTaskIds.contains(taskId);
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    await _loadGlobalTasks();
+                  },
+                  child: sortedTasks.isEmpty
+                      ? LayoutBuilder(
+                          builder: (context, constraints) {
+                            return SingleChildScrollView(
+                              controller: _scrollController,
+                              physics:
+                                  const AlwaysScrollableScrollPhysics(),
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minHeight: constraints.maxHeight,
+                                ),
+                                child: _buildEmptyTasksView(),
+                              ),
+                            );
+                          },
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          physics:
+                              const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(
+                            left: 12,
+                            right: 12,
+                            top: 12,
+                            bottom:
+                                80, // 保留底部距離，避免被 scroll to top button 遮擋
+                          ),
+                          itemCount: sortedTasks.length,
+                          itemBuilder: (context, index) {
+                            final task = sortedTasks[index];
+                            final taskId = task['id']?.toString() ?? '';
+                            final isFavorite =
+                                _favoriteTaskIds.contains(taskId);
 
-                          return Card(
+                            return Card(
                             margin: const EdgeInsets.only(bottom: 8),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -2188,8 +2195,9 @@ class _TaskListPageState extends State<TaskListPage> {
                               ),
                             ),
                           );
-                        },
-                      ),
+                          },
+                        ),
+                ),
               ),
             ],
           ),

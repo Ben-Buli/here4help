@@ -14,6 +14,7 @@ class ChatSessionManager {
     required String userRole,
     required Map<String, dynamic> chatPartnerInfo,
     String? sourceTab, // 來源分頁 ('posted-tasks' 或 'my-works')
+    String? returnPath,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -25,6 +26,7 @@ class ChatSessionManager {
         'userRole': userRole,
         'chatPartnerInfo': chatPartnerInfo,
         'sourceTab': sourceTab, // 記錄來源分頁
+        if (returnPath != null) 'returnPath': returnPath,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       };
 
@@ -98,17 +100,25 @@ class ChatSessionManager {
   }
 
   /// 獲取返回路徑
-  static Future<String> getReturnPath() async {
+  static Future<String?> getReturnPath() async {
     final session = await getCurrentChatSession();
-    final sourceTab = session?['sourceTab'] as String?;
+    if (session == null) return null;
 
+    final returnPath = session['returnPath'] as String?;
+    if (returnPath != null && returnPath.isNotEmpty) {
+      return returnPath;
+    }
+
+    final sourceTab = session['sourceTab'] as String?;
     switch (sourceTab) {
       case 'posted-tasks':
         return '/chat/posted-tasks';
       case 'my-works':
         return '/chat/my-works';
+      case 'support':
+        return '/account/support';
       default:
-        return '/chat';
+        return null;
     }
   }
 }

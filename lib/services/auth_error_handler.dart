@@ -67,12 +67,22 @@ class AuthErrorHandler {
       try {
         appRouter.go('/login');
         debugPrint('✅ [AuthErrorHandler] 已跳轉到登入頁面');
+
+        // 5. 延遲顯示用戶友好提示（確保頁面已載入）
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _showTokenExpiredToast();
+        });
       } catch (routerError) {
         debugPrint('❌ [AuthErrorHandler] 路由跳轉失敗: $routerError');
         // 嘗試備用跳轉方法
         try {
           appRouter.pushReplacement('/login');
           debugPrint('✅ [AuthErrorHandler] 使用備用方法跳轉成功');
+
+          // 備用方法也要顯示提示
+          Future.delayed(const Duration(milliseconds: 500), () {
+            _showTokenExpiredToast();
+          });
         } catch (e) {
           debugPrint('❌ [AuthErrorHandler] 備用跳轉也失敗: $e');
         }
@@ -98,11 +108,11 @@ class AuthErrorHandler {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message ?? '登入已過期，請重新登入'),
+          content: Text(message ?? 'Session expired, please log in again'),
           backgroundColor: Colors.orange,
           duration: const Duration(seconds: 4),
           action: SnackBarAction(
-            label: '前往登入',
+            label: 'Go to Login',
             textColor: Colors.white,
             onPressed: () {
               appRouter.go('/login');
@@ -129,7 +139,8 @@ class AuthErrorHandler {
         builder: (BuildContext context) {
           return AlertDialog(
             title: const Text('登入過期'),
-            content: Text(message ?? '您的登入已過期，請重新登入以繼續使用。'),
+            content: Text(message ??
+                'Your session has expired. Please log in again to continue.'),
             actions: <Widget>[
               TextButton(
                 child: const Text('重新登入'),
@@ -173,6 +184,52 @@ class AuthErrorHandler {
     }
 
     return false;
+  }
+
+  /// 顯示 Token 過期的全局提示（不依賴 BuildContext）
+  static void _showTokenExpiredToast() {
+    try {
+      // 使用全局的 ScaffoldMessenger 顯示提示
+      final context = appRouter.routerDelegate.navigatorKey.currentContext;
+      if (context != null && context.mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Session expired, please log in again',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.orange.shade600,
+            duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            action: SnackBarAction(
+              label: 'Go to Login',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              },
+            ),
+          ),
+        );
+        debugPrint('✅ [AuthErrorHandler] Token 過期提示已顯示');
+      } else {
+        debugPrint('⚠️ [AuthErrorHandler] 無法獲取 Context，跳過提示顯示');
+      }
+    } catch (e) {
+      debugPrint('⚠️ [AuthErrorHandler] 顯示 Token 過期提示失敗: $e');
+    }
   }
 
   /// 重置處理狀態（用於測試或特殊情況）

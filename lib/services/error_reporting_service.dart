@@ -17,25 +17,30 @@ class ErrorReportingService {
   static final List<Map<String, dynamic>> _pendingReports = [];
 
   /// 初始化全域錯誤處理
-  static void initialize() {
-    // 設置 Flutter 錯誤處理器
-    FlutterError.onError = (FlutterErrorDetails details) {
-      // 在 debug 模式下仍然顯示錯誤
-      if (kDebugMode) {
-        FlutterError.presentError(details);
-      }
+  static Future<void> initialize() async {
+    try {
+      // 確保環境與 SharedPreferences 已初始化
+      await SharedPreferences.getInstance();
+      await PackageInfo.fromPlatform();
 
-      // 上報錯誤
-      _reportFlutterError(details);
-    };
+      // 設置 Flutter 錯誤處理器
+      FlutterError.onError = (FlutterErrorDetails details) {
+        if (kDebugMode) {
+          FlutterError.presentError(details);
+        }
+        _reportFlutterError(details);
+      };
 
-    // 設置 Dart 未捕獲異常處理器
-    PlatformDispatcher.instance.onError = (error, stack) {
-      _reportDartError(error, stack);
-      return true;
-    };
+      // 設置 Dart 未捕獲異常處理器
+      PlatformDispatcher.instance.onError = (error, stack) {
+        _reportDartError(error, stack);
+        return true;
+      };
 
-    debugPrint('🔍 ErrorReportingService initialized');
+      debugPrint('🔍 ErrorReportingService initialized');
+    } catch (e) {
+      debugPrint('⚠️ ErrorReportingService 初始化失敗: $e');
+    }
   }
 
   /// 手動上報錯誤

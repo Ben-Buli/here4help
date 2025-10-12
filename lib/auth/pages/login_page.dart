@@ -1,12 +1,14 @@
 // login_page.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/auth/models/user_model.dart';
 import 'package:here4help/auth/services/third_party_auth_service.dart';
+import 'package:here4help/auth/services/signup_draft_service.dart';
 import 'package:here4help/auth/services/auth_service.dart';
 import 'package:here4help/providers/permission_provider.dart';
 import 'dart:async';
@@ -26,6 +28,12 @@ class _LoginPageState extends State<LoginPage> {
   bool isLoading = false;
   bool rememberMe = false;
   Timer? _timeoutTimer;
+
+  static const double _socialButtonHeight = 52;
+  static const Color _googleTextColor = Color(0xFF3C4043);
+  static const Color _googleBorderColor = Color(0xFFDADCE0);
+  static const Color _facebookBlue = Color(0xFF1877F2);
+  static const Color _appleBlack = Color(0xFF000000);
 
   // 登入超時設定（秒）
   static const int _loginTimeoutSeconds = 30;
@@ -181,41 +189,127 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Widget _buildSocialButton(
-      IconData icon, String label, VoidCallback? onPressed) {
-    return Container(
+  Widget _buildBrandedButton({
+    required VoidCallback? onPressed,
+    required Widget icon,
+    required String label,
+    required Color backgroundColor,
+    required Color textColor,
+    Color? borderColor,
+  }) {
+    final bool disableInteraction = isLoading || onPressed == null;
+    final Color effectiveTextColor =
+        disableInteraction ? textColor.withOpacity(0.6) : textColor;
+    final Color? effectiveBorderColor = borderColor != null
+        ? (disableInteraction ? borderColor.withOpacity(0.6) : borderColor)
+        : null;
+
+    final borderRadius = BorderRadius.circular(8);
+    final Color effectiveBackgroundColor =
+        disableInteraction ? backgroundColor.withOpacity(0.6) : backgroundColor;
+
+    return SizedBox(
       width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: TextButton(
-        onPressed: isLoading ? null : onPressed,
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      child: Material(
+        color: effectiveBackgroundColor,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: borderRadius,
+          side: effectiveBorderColor != null
+              ? BorderSide(color: effectiveBorderColor, width: 1)
+              : BorderSide.none,
         ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Icon(
-                icon,
-                color: isLoading ? Colors.grey : Colors.black54,
-              ),
-            ),
-            Center(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: isLoading ? Colors.grey : Colors.black87,
+        child: InkWell(
+          onTap: disableInteraction ? null : onPressed,
+          borderRadius: borderRadius,
+          child: SizedBox(
+            height: _socialButtonHeight,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Opacity(
+                      opacity: disableInteraction ? 0.6 : 1,
+                      child: icon,
+                    ),
+                  ),
                 ),
-              ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: effectiveTextColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildGoogleButton() {
+    return _buildBrandedButton(
+      onPressed: _handleGoogleLogin,
+      icon: SvgPicture.asset(
+        'assets/third-party-login-icon/google_icon.svg',
+        width: 24,
+        height: 24,
+      ),
+      label: 'Sign in with Google',
+      backgroundColor: Colors.white,
+      textColor: _googleTextColor,
+      borderColor: _googleBorderColor,
+    );
+  }
+
+  Widget _buildFacebookButton() {
+    return _buildBrandedButton(
+      onPressed: _handleFacebookLogin,
+      icon: SvgPicture.asset(
+        'assets/third-party-login-icon/facebook_icon.svg',
+        width: 24,
+        height: 24,
+      ),
+      label: 'Continue with Facebook',
+      backgroundColor: _facebookBlue,
+      textColor: Colors.white,
+    );
+  }
+
+  Widget _buildAppleButton() {
+    return _buildBrandedButton(
+      onPressed: _handleAppleLogin,
+      icon: SvgPicture.asset(
+        'assets/third-party-login-icon/apple_icon.svg',
+        width: 20,
+        height: 20,
+        colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+      ),
+      label: 'Sign in with Apple',
+      backgroundColor: _appleBlack,
+      textColor: Colors.white,
+    );
+  }
+
+  Widget _buildEmailButton() {
+    return _buildBrandedButton(
+      onPressed: () {
+        unawaited(_handleEmailSignupNavigation());
+      },
+      icon: const Icon(
+        Icons.mail_outline,
+        size: 24,
+        color: _googleTextColor,
+      ),
+      label: 'Sign up with Email',
+      backgroundColor: Colors.white,
+      textColor: _googleTextColor,
+      borderColor: _googleBorderColor,
     );
   }
 
@@ -305,9 +399,32 @@ class _LoginPageState extends State<LoginPage> {
       if (userData != null) {
         // 檢查是否為新用戶，如果是則導向註冊頁面
         if (userData['is_new_user'] == true) {
-          // 將 Google 資料傳遞到註冊頁面
-          await _saveGoogleDataForSignup(userData);
-          context.go('/signup/oauth');
+          final tempToken = _extractOAuthTempToken(userData);
+          if (tempToken == null) {
+            debugPrint('❌ 缺少 OAuth 暫存 token，無法導向註冊流程');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('暫存登入資料缺失，請重新嘗試 Google 登入'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          } else {
+            final provider = (userData['provider'] ?? 'google').toString();
+            await _saveGoogleDataForSignup(userData);
+            final prefillData =
+                _buildSignupPrefillData(userData, provider, tempToken);
+            final uri = Uri(
+              path: '/signup',
+              queryParameters: {
+                'token': tempToken,
+                'provider': provider,
+                'is_new_user': 'true',
+              },
+            );
+            context.go(uri.toString(), extra: prefillData);
+            return;
+          }
         } else {
           // 現有用戶，使用 AuthService 正確儲存登入資訊
           debugPrint('✅ Google 登入成功，儲存用戶資料...');
@@ -391,9 +508,19 @@ class _LoginPageState extends State<LoginPage> {
         final token = oauthData['oauth_token'] ?? oauthData['token'];
         if (token != null) {
           debugPrint('🔄 新用戶重定向到註冊頁面: token=$token, provider=$provider');
+          await _saveOAuthDataForSignup(oauthData, provider);
+          final prefillData =
+              _buildSignupPrefillData(oauthData, provider, token);
           // 使用 hash 路由重定向
-          context
-              .go('/signup?token=$token&provider=$provider&is_new_user=true');
+          final signupUri = Uri(
+            path: '/signup',
+            queryParameters: {
+              'token': token,
+              'provider': provider,
+              'is_new_user': 'true',
+            },
+          );
+          context.go(signupUri.toString(), extra: prefillData);
         } else {
           throw Exception('OAuth token 缺失');
         }
@@ -456,16 +583,106 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  // 新增：儲存 Google 資料到註冊頁面
-  Future<void> _saveGoogleDataForSignup(Map<String, dynamic> userData) async {
+  String? _extractOAuthTempToken(Map<String, dynamic> data) {
+    final dynamic tempToken = data['temp_token'] ?? data['oauth_token'];
+    if (tempToken is String && tempToken.isNotEmpty) {
+      return tempToken;
+    }
+    return null;
+  }
+
+  Future<void> _saveOAuthDataForSignup(
+      Map<String, dynamic> userData, String provider) async {
     final prefs = await SharedPreferences.getInstance();
+    await SignupDraftService.clearWithPrefs(prefs, includeOAuth: true);
     await prefs.setString('signup_full_name', userData['name'] ?? '');
     await prefs.setString('signup_nickname', userData['name'] ?? '');
     await prefs.setString('signup_email', userData['email'] ?? '');
     await prefs.setString('signup_avatar_url', userData['avatar_url'] ?? '');
-    await prefs.setString('signup_provider', 'google');
-    await prefs.setString(
-        'signup_provider_user_id', userData['provider_user_id'] ?? '');
+    await prefs.setString('signup_provider', provider);
+
+    final providerUserId = userData['provider_user_id'] ?? userData['id'];
+    if (providerUserId != null) {
+      await prefs.setString('signup_provider_user_id', '$providerUserId');
+    } else {
+      await prefs.remove('signup_provider_user_id');
+    }
+
+    final tempToken = _extractOAuthTempToken(userData);
+    if (tempToken != null) {
+      await prefs.setString('signup_oauth_token', tempToken);
+    } else {
+      await prefs.remove('signup_oauth_token');
+    }
+
+    final expiresAt = userData['temp_expires_at'];
+    if (expiresAt is String && expiresAt.isNotEmpty) {
+      await prefs.setString('signup_oauth_token_expires_at', expiresAt);
+    } else {
+      await prefs.remove('signup_oauth_token_expires_at');
+    }
+  }
+
+  // 新增：儲存 Google 資料到註冊頁面
+  Future<void> _saveGoogleDataForSignup(Map<String, dynamic> userData) async {
+    await _saveOAuthDataForSignup(userData, 'google');
+  }
+
+  Future<void> _handleEmailSignupNavigation() async {
+    await SignupDraftService.clear(includeOAuth: true);
+    if (!mounted) return;
+    context.go('/signup');
+  }
+
+  Map<String, dynamic> _buildSignupPrefillData(
+    Map<String, dynamic> raw,
+    String provider,
+    String token,
+  ) {
+    final sanitized = <String, dynamic>{
+      'provider': provider,
+      'is_new_user': true,
+      'oauth_token': token,
+      'token': token,
+    };
+
+    void addString(String key, [String? alias]) {
+      final value = raw[key];
+      if (value is String) {
+        final trimmed = value.trim();
+        if (trimmed.isNotEmpty) {
+          sanitized[alias ?? key] = trimmed;
+        }
+      }
+    }
+
+    void addIfPresent(String key) {
+      final value = raw[key];
+      if (value != null && value.toString().isNotEmpty) {
+        sanitized[key] = value;
+      }
+    }
+
+    addString('name');
+    addString('full_name');
+    addString('nickname');
+    addString('email');
+    addString('avatar_url');
+    addString('phone');
+    addString('country');
+    addString('gender');
+    addString('address');
+    addString('primary_language');
+    addString('language');
+    addString('date_of_birth', 'birthday');
+    addString('birthday');
+
+    addIfPresent('provider_user_id');
+    addIfPresent('existing_user_id');
+    addIfPresent('email_verified');
+    addIfPresent('temp_expires_at');
+
+    return sanitized;
   }
 
   // 跨平台 Facebook 登入處理
@@ -530,9 +747,32 @@ class _LoginPageState extends State<LoginPage> {
       if (userData != null) {
         // 檢查是否為新用戶，如果是則導向註冊頁面
         if (userData['is_new_user'] == true) {
-          // 將 Facebook 資料傳遞到註冊頁面
+          final tempToken = _extractOAuthTempToken(userData);
+          if (tempToken == null) {
+            debugPrint('❌ 缺少 Facebook OAuth 暫存 token，無法導向註冊流程');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('暫存登入資料缺失，請重新嘗試 Facebook 登入'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+
+          final provider = (userData['provider'] ?? 'facebook').toString();
           await _saveFacebookDataForSignup(userData);
-          context.go('/signup/oauth');
+          final prefillData =
+              _buildSignupPrefillData(userData, provider, tempToken);
+          final uri = Uri(
+            path: '/signup',
+            queryParameters: {
+              'token': tempToken,
+              'provider': provider,
+              'is_new_user': 'true',
+            },
+          );
+          context.go(uri.toString(), extra: prefillData);
+          return;
         } else {
           // 現有用戶，使用 AuthService 正確儲存登入資訊
           debugPrint('✅ Facebook 登入成功，儲存用戶資料...');
@@ -605,14 +845,7 @@ class _LoginPageState extends State<LoginPage> {
 
   // 新增：儲存 Facebook 資料到註冊頁面
   Future<void> _saveFacebookDataForSignup(Map<String, dynamic> userData) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('signup_full_name', userData['name'] ?? '');
-    await prefs.setString('signup_nickname', userData['name'] ?? '');
-    await prefs.setString('signup_email', userData['email'] ?? '');
-    await prefs.setString('signup_avatar_url', userData['avatar_url'] ?? '');
-    await prefs.setString('signup_provider', 'facebook');
-    await prefs.setString(
-        'signup_provider_user_id', userData['provider_user_id'] ?? '');
+    await _saveOAuthDataForSignup(userData, 'facebook');
   }
 
   // 跨平台 Apple 登入處理
@@ -676,9 +909,32 @@ class _LoginPageState extends State<LoginPage> {
       if (userData != null) {
         // 檢查是否為新用戶，如果是則導向註冊頁面
         if (userData['is_new_user'] == true) {
-          // 將 Apple 資料傳遞到註冊頁面
+          final tempToken = _extractOAuthTempToken(userData);
+          if (tempToken == null) {
+            debugPrint('❌ 缺少 Apple OAuth 暫存 token，無法導向註冊流程');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('暫存登入資料缺失，請重新嘗試 Apple 登入'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+
+          final provider = (userData['provider'] ?? 'apple').toString();
           await _saveAppleDataForSignup(userData);
-          context.go('/signup/oauth');
+          final prefillData =
+              _buildSignupPrefillData(userData, provider, tempToken);
+          final uri = Uri(
+            path: '/signup',
+            queryParameters: {
+              'token': tempToken,
+              'provider': provider,
+              'is_new_user': 'true',
+            },
+          );
+          context.go(uri.toString(), extra: prefillData);
+          return;
         } else {
           // 現有用戶，使用 AuthService 正確儲存登入資訊
           debugPrint('✅ Apple 登入成功，儲存用戶資料...');
@@ -750,14 +1006,7 @@ class _LoginPageState extends State<LoginPage> {
 
   // 新增：儲存 Apple 資料到註冊頁面
   Future<void> _saveAppleDataForSignup(Map<String, dynamic> userData) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('signup_full_name', userData['name'] ?? '');
-    await prefs.setString('signup_nickname', userData['name'] ?? '');
-    await prefs.setString('signup_email', userData['email'] ?? '');
-    await prefs.setString('signup_avatar_url', userData['avatar_url'] ?? '');
-    await prefs.setString('signup_provider', 'apple');
-    await prefs.setString(
-        'signup_provider_user_id', userData['provider_user_id'] ?? '');
+    await _saveOAuthDataForSignup(userData, 'apple');
   }
 
   @override
@@ -878,26 +1127,19 @@ class _LoginPageState extends State<LoginPage> {
                             const SizedBox(height: 24),
                             const Divider(thickness: 1),
                             const SizedBox(height: 12),
-                            const Text(
-                              'SIGN UP WITH',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 12),
                             // 跨平台第三方登入按鈕
                             Column(
                               children: [
-                                _buildSocialButton(Icons.g_mobiledata, 'Google',
-                                    _handleGoogleLogin),
-                                _buildSocialButton(Icons.facebook, 'Facebook',
-                                    _handleFacebookLogin),
-                                _buildSocialButton(Icons.email, 'Email', () {
-                                  context.go('/signup');
-                                }),
-                                // 只在 iOS 和 Web 顯示 Apple 登入
+                                _buildGoogleButton(),
+                                const SizedBox(height: 8),
+                                _buildFacebookButton(),
+                                const SizedBox(height: 8),
                                 if (_platformAuthService.isIOS ||
-                                    _platformAuthService.isWeb)
-                                  _buildSocialButton(
-                                      Icons.apple, 'Apple', _handleAppleLogin),
+                                    _platformAuthService.isWeb) ...[
+                                  _buildAppleButton(),
+                                  const SizedBox(height: 8),
+                                ],
+                                _buildEmailButton(),
                               ],
                             ),
                           ],

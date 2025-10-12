@@ -3,7 +3,7 @@ description: NCCU Social Task Posting APP  - Here4help.
 
 publish_to: 'none'
 
-version: 1.9.1+20250927
+version: 1.9.3+202510083
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -53,6 +53,7 @@ dependencies:
   flutter_image_compress: ^2.4.0
   uuid: ^4.3.3
   flutter_dotenv: ^6.0.0
+  flutter_svg: ^2.0.9
 
 dev_dependencies:
   flutter_test:
@@ -71,4 +72,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon/
+    - assets/third-party-login-icon/
     # 注意：不要將 .env 檔案打包進 assets，改用 --dart-define 方式

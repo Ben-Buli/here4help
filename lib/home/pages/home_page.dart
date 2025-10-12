@@ -35,6 +35,18 @@ class _HomePageState extends State<HomePage> {
   Map<String, dynamic>? _studentVerificationData;
   bool _isCheckingStudentVerification = false;
 
+  Future<void> _handleRefresh() async {
+    try {
+      await Future.wait([
+        context.read<RatingProvider>().loadUserRatingStats(),
+        context.read<AchievementProvider>().loadUserAchievements(),
+        _checkStudentVerificationStatus(),
+      ]);
+    } catch (e) {
+      debugPrint('Home page refresh failed: $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -160,384 +172,407 @@ class _HomePageState extends State<HomePage> {
               constraints: BoxConstraints(
                 maxWidth: isWide ? 800 : double.infinity,
               ),
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, // 水平方向靠左對齊
-                  mainAxisAlignment: MainAxisAlignment.start, // 垂直方向靠上對齊
-                  children: [
-                    Row(
+              child: RefreshIndicator(
+                onRefresh: _handleRefresh,
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start, // 水平方向靠左對齊
+                      mainAxisAlignment: MainAxisAlignment.start, // 垂直方向靠上對齊
                       children: [
-                        user?.avatar_url != null && user!.avatar_url.isNotEmpty
-                            ? CircleAvatar(
-                                radius: 30,
-                                backgroundImage:
-                                    ImageHelper.getAvatarImage(user.avatar_url),
-                                onBackgroundImageError:
-                                    (exception, stackTrace) {
-                                  debugPrint('頭像載入錯誤: $exception');
-                                },
-                              )
-                            : const CircleAvatar(
-                                radius: 30,
-                                child: Icon(Icons.person),
-                              ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        Row(
                           children: [
-                            Row(
+                            user?.avatar_url != null &&
+                                    user!.avatar_url.isNotEmpty
+                                ? CircleAvatar(
+                                    radius: 30,
+                                    backgroundImage: ImageHelper.getAvatarImage(
+                                        user.avatar_url),
+                                    onBackgroundImageError:
+                                        (exception, stackTrace) {
+                                      debugPrint('頭像載入錯誤: $exception');
+                                    },
+                                  )
+                                : const CircleAvatar(
+                                    radius: 30,
+                                    child: Icon(Icons.person),
+                                  ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Builder(
-                                  // 使用 Builder 來確保 user 顯示名稱(顯示順序: nickname -> name -> User)
-                                  builder: (context) {
-                                    final displayName = [
-                                      user?.nickname,
-                                      user?.name,
-                                      'User'
-                                    ]
-                                        .firstWhere(
-                                            (v) => v != null && v.isNotEmpty)
-                                        .toString();
-                                    return Text(displayName,
-                                        style: const TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black));
-                                  },
-                                ),
-                                Builder(
-                                  builder: (context) {
-                                    String? getPermissionStatus(int? level) {
-                                      if (level == -1 || level == -3) {
-                                        return 'Suspended';
-                                      } else if (level == 0) {
-                                        return 'Unverified';
-                                      }
-                                      return null;
-                                    }
+                                Row(
+                                  children: [
+                                    Builder(
+                                      // 使用 Builder 來確保 user 顯示名稱(顯示順序: nickname -> name -> User)
+                                      builder: (context) {
+                                        final displayName = [
+                                          user?.nickname,
+                                          user?.name,
+                                          'User'
+                                        ]
+                                            .firstWhere((v) =>
+                                                v != null && v.isNotEmpty)
+                                            .toString();
+                                        return Text(displayName,
+                                            style: const TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.black));
+                                      },
+                                    ),
+                                    Builder(
+                                      builder: (context) {
+                                        String? getPermissionStatus(
+                                            int? level) {
+                                          if (level == -1 || level == -3) {
+                                            return 'Suspended';
+                                          } else if (level == 0) {
+                                            return 'Unverified';
+                                          }
+                                          return null;
+                                        }
 
-                                    final status =
-                                        getPermissionStatus(user?.permission);
-                                    if (status != null) {
-                                      return Row(
+                                        final status = getPermissionStatus(
+                                            user?.permission);
+                                        if (status != null) {
+                                          return Row(
+                                            children: [
+                                              const SizedBox(width: 12),
+                                              Align(
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  child: Text(
+                                                    '($status)',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .secondary,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontStyle:
+                                                          FontStyle.italic,
+                                                    ),
+                                                  )),
+                                            ],
+                                          );
+                                        }
+                                        return const SizedBox.shrink();
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                    '${NumberFormat.decimalPattern().format(user?.points ?? 0)} points',
+                                    style: const TextStyle(fontSize: 16)),
+                                Consumer<RatingProvider>(
+                                  builder: (context, ratingProvider, child) {
+                                    final stats =
+                                        ratingProvider.userRatingStats;
+
+                                    if (ratingProvider.isLoading) {
+                                      return const Row(
                                         children: [
-                                          const SizedBox(width: 12),
-                                          Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: Text(
-                                                '($status)',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  color: Theme.of(context)
-                                                      .colorScheme
-                                                      .secondary,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontStyle: FontStyle.italic,
-                                                ),
-                                              )),
+                                          SizedBox(
+                                            width: 12,
+                                            height: 12,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2),
+                                          ),
+                                          SizedBox(width: 8),
+                                          Text('Loading ratings...',
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey))
                                         ],
                                       );
                                     }
-                                    return const SizedBox.shrink();
+
+                                    if (stats == null ||
+                                        stats.totalReviews == 0) {
+                                      return const Row(
+                                        children: [
+                                          Icon(Icons.star_border,
+                                              color: Colors.grey, size: 16),
+                                          SizedBox(width: 4),
+                                          Text('No ratings yet',
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey))
+                                        ],
+                                      );
+                                    }
+
+                                    return Row(
+                                      children: [
+                                        ...RatingService.buildStarRating(
+                                            stats.avgRating,
+                                            size: 16),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                            RatingService.formatRatingText(
+                                                stats),
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey))
+                                      ],
+                                    );
                                   },
-                                ),
+                                )
                               ],
                             ),
-                            Text(
-                                '${NumberFormat.decimalPattern().format(user?.points ?? 0)} points',
-                                style: const TextStyle(fontSize: 16)),
-                            Consumer<RatingProvider>(
-                              builder: (context, ratingProvider, child) {
-                                final stats = ratingProvider.userRatingStats;
-
-                                if (ratingProvider.isLoading) {
-                                  return const Row(
-                                    children: [
-                                      SizedBox(
-                                        width: 12,
-                                        height: 12,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2),
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text('Loading ratings...',
-                                          style: TextStyle(
-                                              fontSize: 12, color: Colors.grey))
-                                    ],
-                                  );
-                                }
-
-                                if (stats == null || stats.totalReviews == 0) {
-                                  return const Row(
-                                    children: [
-                                      Icon(Icons.star_border,
-                                          color: Colors.grey, size: 16),
-                                      SizedBox(width: 4),
-                                      Text('No ratings yet',
-                                          style: TextStyle(
-                                              fontSize: 12, color: Colors.grey))
-                                    ],
-                                  );
-                                }
-
-                                return Row(
-                                  children: [
-                                    ...RatingService.buildStarRating(
-                                        stats.avgRating,
-                                        size: 16),
-                                    const SizedBox(width: 4),
-                                    Text(RatingService.formatRatingText(stats),
-                                        style: const TextStyle(
-                                            fontSize: 12, color: Colors.grey))
-                                  ],
-                                );
-                              },
-                            )
                           ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
-                    // 學生證審核失敗通知按鈕
-                    if (_studentVerificationData != null) ...[
-                      Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border:
-                              Border.all(color: Colors.orange.withOpacity(0.3)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                        // 學生證審核失敗通知按鈕
+                        if (_studentVerificationData != null) ...[
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                  color: Colors.orange.withOpacity(0.3)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(
-                                  Icons.warning_amber_outlined,
-                                  color: Colors.orange,
-                                  size: 24,
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.warning_amber_outlined,
+                                      color: Colors.orange,
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Student ID Verification Failed',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.orange[800],
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed:
+                                          _hideStudentVerificationNotification,
+                                      icon: Icon(
+                                        Icons.close,
+                                        color: Colors.grey[600],
+                                        size: 20,
+                                      ),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 32,
+                                        minHeight: 32,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Student ID Verification Failed',
+                                const SizedBox(height: 8),
+                                if (_studentVerificationData![
+                                        'verification_notes'] !=
+                                    null) ...[
+                                  Text(
+                                    'Reason: ${_studentVerificationData!['verification_notes']}',
                                     style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.orange[800],
+                                      fontSize: 14,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: _navigateToStudentIdUpdate,
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('Re-upload Student ID'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.orange,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 24,
+                                        vertical: 12,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
                                     ),
                                   ),
                                 ),
-                                IconButton(
-                                  onPressed:
-                                      _hideStudentVerificationNotification,
-                                  icon: Icon(
-                                    Icons.close,
-                                    color: Colors.grey[600],
-                                    size: 20,
-                                  ),
-                                  constraints: const BoxConstraints(
-                                    minWidth: 32,
-                                    minHeight: 32,
-                                  ),
-                                ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            if (_studentVerificationData![
-                                    'verification_notes'] !=
-                                null) ...[
-                              Text(
-                                'Reason: ${_studentVerificationData!['verification_notes']}',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                            ],
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: _navigateToStudentIdUpdate,
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Re-upload Student ID'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.orange,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                    vertical: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('ACHIEVEMENTS',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                          SizedBox(height: 4),
-                          Text(
-                              'Congratulations on completing 4 tasks this week'),
-                          Text(
-                              'Complete just three more tasks to reach the Busy Bee Level and earn 70 coins')
+                          ),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text('Your Achievements',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 18)),
-                    const SizedBox(height: 12),
-                    Consumer<AchievementProvider>(
-                      builder: (context, achievementProvider, child) {
-                        if (achievementProvider.isLoading) {
-                          return const Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _AchievementBox(
-                                  label: 'Total Coins', value: '...'),
-                              _AchievementBox(
-                                  label: 'Task Completed', value: '...'),
-                              _AchievementBox(
-                                  label: 'Five-Star Ratings', value: '...'),
-                              _AchievementBox(
-                                  label: 'Avg Rating', value: '...'),
+                              Text('ACHIEVEMENTS',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold)),
+                              SizedBox(height: 4),
+                              Text(
+                                  'Congratulations on completing 4 tasks this week'),
+                              Text(
+                                  'Complete just three more tasks to reach the Busy Bee Level and earn 70 coins')
                             ],
-                          );
-                        }
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text('Your Achievements',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 18)),
+                        const SizedBox(height: 12),
+                        Consumer<AchievementProvider>(
+                          builder: (context, achievementProvider, child) {
+                            if (achievementProvider.isLoading) {
+                              return const Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
+                                children: [
+                                  _AchievementBox(
+                                      label: 'Total Coins', value: '...'),
+                                  _AchievementBox(
+                                      label: 'Task Completed', value: '...'),
+                                  _AchievementBox(
+                                      label: 'Five-Star Ratings', value: '...'),
+                                  _AchievementBox(
+                                      label: 'Avg Rating', value: '...'),
+                                ],
+                              );
+                            }
 
-                        final formatted =
-                            achievementProvider.getFormattedAchievements();
+                            final formatted =
+                                achievementProvider.getFormattedAchievements();
 
-                        return Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _AchievementBox(
-                                label: 'Total Coins',
-                                value: formatted['total_coins']!),
-                            _AchievementBox(
-                                label: 'Task Completed',
-                                value: formatted['tasks_completed']!),
-                            _AchievementBox(
-                                label: 'Five-Star Ratings',
-                                value: formatted['five_star_ratings']!),
-                            _AchievementBox(
-                                label: 'Avg Rating',
-                                value: formatted['avg_rating']! == 'N/A'
-                                    ? '0.0'
-                                    : formatted['avg_rating']!),
-                          ],
-                        );
-                      },
+                            return Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                _AchievementBox(
+                                    label: 'Total Coins',
+                                    value: formatted['total_coins']!),
+                                _AchievementBox(
+                                    label: 'Task Completed',
+                                    value: formatted['tasks_completed']!),
+                                _AchievementBox(
+                                    label: 'Five-Star Ratings',
+                                    value: formatted['five_star_ratings']!),
+                                _AchievementBox(
+                                    label: 'Avg Rating',
+                                    value: formatted['avg_rating']! == 'N/A'
+                                        ? '0.0'
+                                        : formatted['avg_rating']!),
+                              ],
+                            );
+                          },
+                        ),
+
+                        /// 以下成就系統先隱藏不做
+                        // const SizedBox(height: 24),
+                        // const Text('Ongoing Challenges',
+                        //     style: TextStyle(
+                        //         fontWeight: FontWeight.bold, fontSize: 18)),
+                        // const SizedBox(height: 12),
+                        // SizedBox(
+                        //   height: 160,
+                        //   child: ListView(
+                        //     scrollDirection: Axis.horizontal,
+                        //     children: const [
+                        //       _ChallengeCard(
+                        //           title: 'Complete 3 lifestyle tasks',
+                        //           progress: '1/3'),
+                        //       _ChallengeCard(
+                        //           title: 'Finish 5 tasks this week',
+                        //           progress: '2/5'),
+                        //       _ChallengeCard(
+                        //           title: 'Try multilingual tasks', progress: ''),
+                        //       _ChallengeCard(
+                        //           title: 'Collect 10 five-star ratings',
+                        //           progress: '7/10'),
+                        //     ],
+                        //   ),
+                        // ),
+                        // const SizedBox(height: 24),
+                        // const Text('Unlockable Achievements',
+                        //     style: TextStyle(
+                        //         fontWeight: FontWeight.bold, fontSize: 18)),
+                        // const SizedBox(height: 12),
+                        // const Wrap(
+                        //   spacing: 12,
+                        //   children: [
+                        //     Chip(
+                        //       label: Column(
+                        //         mainAxisSize: MainAxisSize.min,
+                        //         mainAxisAlignment: MainAxisAlignment.center,
+                        //         crossAxisAlignment: CrossAxisAlignment.center,
+                        //         children: [
+                        //           Text('🧭'),
+                        //           Text('Explorer'),
+                        //         ],
+                        //       ),
+                        //     ),
+                        //     Chip(
+                        //       label: Column(
+                        //         mainAxisSize: MainAxisSize.min,
+                        //         mainAxisAlignment: MainAxisAlignment.center,
+                        //         crossAxisAlignment: CrossAxisAlignment.center,
+                        //         children: [
+                        //           Text('🐝'),
+                        //           Text('Busy Bee'),
+                        //         ],
+                        //       ),
+                        //     ),
+                        //     Chip(
+                        //       label: Column(
+                        //         mainAxisSize: MainAxisSize.min,
+                        //         mainAxisAlignment: MainAxisAlignment.center,
+                        //         crossAxisAlignment: CrossAxisAlignment.center,
+                        //         children: [
+                        //           Text('💬'),
+                        //           Text('Social Star'),
+                        //         ],
+                        //       ),
+                        //     ),
+                        //     Chip(
+                        //       label: Column(
+                        //         mainAxisSize: MainAxisSize.min,
+                        //         mainAxisAlignment: MainAxisAlignment.center,
+                        //         crossAxisAlignment: CrossAxisAlignment.center,
+                        //         children: [
+                        //           Text('⭐'),
+                        //           Text('5 Star Warrior'),
+                        //         ],
+                        //       ),
+                        //     ),
+                        //   ],
+                        // ),
+                        // const SizedBox(height: 8),
+                        // const Text(
+                        //     '• Unlock Conditions: Tap to view requirements and progress\n• Rewards Upon Unlock: +10 Coins / Priority Matching / Exclusive Titles',
+                        //     style: TextStyle(fontSize: 12, color: Colors.grey))
+                        /// 以上，成就系統先隱藏不做
+                      ],
                     ),
-
-                    /// 以下成就系統先隱藏不做
-                    // const SizedBox(height: 24),
-                    // const Text('Ongoing Challenges',
-                    //     style: TextStyle(
-                    //         fontWeight: FontWeight.bold, fontSize: 18)),
-                    // const SizedBox(height: 12),
-                    // SizedBox(
-                    //   height: 160,
-                    //   child: ListView(
-                    //     scrollDirection: Axis.horizontal,
-                    //     children: const [
-                    //       _ChallengeCard(
-                    //           title: 'Complete 3 lifestyle tasks',
-                    //           progress: '1/3'),
-                    //       _ChallengeCard(
-                    //           title: 'Finish 5 tasks this week',
-                    //           progress: '2/5'),
-                    //       _ChallengeCard(
-                    //           title: 'Try multilingual tasks', progress: ''),
-                    //       _ChallengeCard(
-                    //           title: 'Collect 10 five-star ratings',
-                    //           progress: '7/10'),
-                    //     ],
-                    //   ),
-                    // ),
-                    // const SizedBox(height: 24),
-                    // const Text('Unlockable Achievements',
-                    //     style: TextStyle(
-                    //         fontWeight: FontWeight.bold, fontSize: 18)),
-                    // const SizedBox(height: 12),
-                    // const Wrap(
-                    //   spacing: 12,
-                    //   children: [
-                    //     Chip(
-                    //       label: Column(
-                    //         mainAxisSize: MainAxisSize.min,
-                    //         mainAxisAlignment: MainAxisAlignment.center,
-                    //         crossAxisAlignment: CrossAxisAlignment.center,
-                    //         children: [
-                    //           Text('🧭'),
-                    //           Text('Explorer'),
-                    //         ],
-                    //       ),
-                    //     ),
-                    //     Chip(
-                    //       label: Column(
-                    //         mainAxisSize: MainAxisSize.min,
-                    //         mainAxisAlignment: MainAxisAlignment.center,
-                    //         crossAxisAlignment: CrossAxisAlignment.center,
-                    //         children: [
-                    //           Text('🐝'),
-                    //           Text('Busy Bee'),
-                    //         ],
-                    //       ),
-                    //     ),
-                    //     Chip(
-                    //       label: Column(
-                    //         mainAxisSize: MainAxisSize.min,
-                    //         mainAxisAlignment: MainAxisAlignment.center,
-                    //         crossAxisAlignment: CrossAxisAlignment.center,
-                    //         children: [
-                    //           Text('💬'),
-                    //           Text('Social Star'),
-                    //         ],
-                    //       ),
-                    //     ),
-                    //     Chip(
-                    //       label: Column(
-                    //         mainAxisSize: MainAxisSize.min,
-                    //         mainAxisAlignment: MainAxisAlignment.center,
-                    //         crossAxisAlignment: CrossAxisAlignment.center,
-                    //         children: [
-                    //           Text('⭐'),
-                    //           Text('5 Star Warrior'),
-                    //         ],
-                    //       ),
-                    //     ),
-                    //   ],
-                    // ),
-                    // const SizedBox(height: 8),
-                    // const Text(
-                    //     '• Unlock Conditions: Tap to view requirements and progress\n• Rewards Upon Unlock: +10 Coins / Priority Matching / Exclusive Titles',
-                    //     style: TextStyle(fontSize: 12, color: Colors.grey))
-                    /// 以上，成就系統先隱藏不做
-                  ],
+                  ),
                 ),
               ),
             ),

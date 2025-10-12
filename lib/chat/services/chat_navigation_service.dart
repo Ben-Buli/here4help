@@ -22,33 +22,44 @@ class ChatNavigationService {
     int? creatorId,
     int? participantId,
     String? type = 'application',
+    String? sourceTab,
+    String? returnPath,
   }) async {
     try {
       debugPrint('🚀 [ChatNavigationService] 開始導航到聊天詳情');
       debugPrint('  - roomId: $roomId');
 
       // 檢查是否有預載入的數據
-      final preloadedData = ChatPreloadService.getPreloadedData(roomId);
-      debugPrint('  - 是否有預載入數據: ${preloadedData != null}');
-      if (preloadedData != null && preloadedData.isNotEmpty) {
+      final preloaded = ChatPreloadService.getPreloadedData(roomId);
+      debugPrint('  - 是否有預載入數據: ${preloaded != null}');
+      if (preloaded != null && preloaded.isNotEmpty) {
         debugPrint('✅ [ChatNavigationService] 使用預載入數據');
+
+        final resolvedSourceTab =
+            sourceTab ?? preloaded['source_tab'] ?? preloaded['sourceTab'];
+        final resolvedReturnPath =
+            returnPath ?? preloaded['return_path'] ?? preloaded['returnPath'];
 
         // 保存到本地儲存
         await ChatStorageService.savechatRoomData(
           roomId: roomId,
-          room: preloadedData['room'] ?? {},
-          task: preloadedData['task'] ?? {},
-          userRole: preloadedData['user_role'] ?? 'participant',
-          chatPartnerInfo: preloadedData['chat_partner_info'],
+          room: preloaded['room'] ?? {},
+          task: preloaded['task'] ?? {},
+          userRole: preloaded['user_role'] ?? 'participant',
+          chatPartnerInfo: preloaded['chat_partner_info'],
+          sourceTab: resolvedSourceTab?.toString(),
+          returnPath: resolvedReturnPath?.toString(),
         );
 
         // 設置為當前會話
         await ChatSessionManager.setCurrentChatSession(
           roomId: roomId,
-          room: preloadedData['room'] ?? {},
-          task: preloadedData['task'] ?? {},
-          userRole: preloadedData['user_role'] ?? 'participant',
-          chatPartnerInfo: preloadedData['chat_partner_info'] ?? {},
+          room: preloaded['room'] ?? {},
+          task: preloaded['task'] ?? {},
+          userRole: preloaded['user_role'] ?? 'participant',
+          chatPartnerInfo: preloaded['chat_partner_info'] ?? {},
+          sourceTab: resolvedSourceTab?.toString(),
+          returnPath: resolvedReturnPath?.toString(),
         );
 
         // 導航
@@ -75,6 +86,11 @@ class ChatNavigationService {
         return false;
       }
 
+      final resolvedSourceTab =
+          sourceTab ?? chatData['source_tab'] ?? chatData['sourceTab'];
+      final resolvedReturnPath =
+          returnPath ?? chatData['return_path'] ?? chatData['returnPath'];
+
       // 保存到本地儲存
       await ChatStorageService.savechatRoomData(
         roomId: roomId,
@@ -82,6 +98,8 @@ class ChatNavigationService {
         task: chatData['task'] ?? {},
         userRole: chatData['user_role'] ?? 'participant',
         chatPartnerInfo: chatData['chat_partner_info'],
+        sourceTab: resolvedSourceTab?.toString(),
+        returnPath: resolvedReturnPath?.toString(),
       );
 
       // 設置為當前會話
@@ -91,6 +109,8 @@ class ChatNavigationService {
         task: chatData['task'] ?? {},
         userRole: chatData['user_role'] ?? 'participant',
         chatPartnerInfo: chatData['chat_partner_info'] ?? {},
+        sourceTab: resolvedSourceTab?.toString(),
+        returnPath: resolvedReturnPath?.toString(),
       );
 
       // 導航
@@ -113,6 +133,8 @@ class ChatNavigationService {
     required int participantId,
     String? existingRoomId,
     String type = 'application',
+    String? sourceTab,
+    String? returnPath,
   }) async {
     try {
       debugPrint('🚀 [ChatNavigationService] 確保聊天室存在並導航');
@@ -160,6 +182,8 @@ class ChatNavigationService {
       return await navigateToChatDetail(
         context: context,
         roomId: realRoomId,
+        sourceTab: sourceTab,
+        returnPath: returnPath,
       );
     } catch (e) {
       debugPrint('❌ [ChatNavigationService] 確保聊天室失敗: $e');

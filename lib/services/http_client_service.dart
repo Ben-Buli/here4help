@@ -4,6 +4,16 @@ import 'package:flutter/foundation.dart';
 import 'package:here4help/auth/services/auth_service.dart';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/config/environment_config_legacy.dart';
+import 'package:here4help/services/auth_error_handler.dart';
+
+/// Token 過期異常
+class TokenExpiredException implements Exception {
+  final String message;
+  TokenExpiredException(this.message);
+
+  @override
+  String toString() => 'TokenExpiredException: $message';
+}
 
 /// 全域 HTTP Client 服務
 /// 統一管理所有 HTTP 請求，自動添加 Authorization 頭
@@ -133,6 +143,35 @@ class HttpClientService {
 
       if (kDebugMode) {
         debugPrint('🔍 [HTTP] Response: ${response.statusCode}');
+      }
+
+      // 自動處理 401 錯誤（Token 過期）
+      if (response.statusCode == 401) {
+        debugPrint('🚨 [HTTP] 檢測到 401 錯誤，觸發 Token 過期處理');
+
+        // 解析錯誤訊息
+        String? errorMessage;
+        try {
+          final errorData = jsonDecode(response.body);
+          errorMessage =
+              errorData['message'] ?? errorData['error'] ?? 'Token expired';
+        } catch (_) {
+          errorMessage = 'Authentication failed';
+        }
+
+        // 觸發 Token 過期處理（異步執行，不阻塞當前請求）
+        Future.microtask(() async {
+          try {
+            await AuthErrorHandler.handleTokenExpiry(
+              reason: 'HTTP 401: $errorMessage (URL: $finalUrl)',
+            );
+          } catch (e) {
+            debugPrint('⚠️ [HTTP] Token 過期處理失敗: $e');
+          }
+        });
+
+        // 拋出異常，讓調用方知道請求失敗
+        throw TokenExpiredException(errorMessage ?? 'Authentication failed');
       }
 
       return response;

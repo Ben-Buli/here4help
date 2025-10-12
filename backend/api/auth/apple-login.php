@@ -39,9 +39,21 @@ try {
     $identityToken = $input['identity_token'] ?? '';
     $authorizationCode = $input['authorization_code'] ?? '';
     
-    // 驗證輸入
-    if (empty($appleId) || empty($name)) {
-        throw new Exception('Apple ID and name are required');
+    // 驗證輸入（只強制要求 apple_id；name 可能在第二次後不再提供）
+    if (empty($appleId)) {
+        throw new Exception('Apple ID is required');
+    }
+
+    // 為缺失的 name 準備安全後備值
+    $safeName = $name;
+    if (empty($safeName)) {
+        if (!empty($email)) {
+            $parts = explode('@', $email);
+            $safeName = trim($parts[0]);
+        }
+        if (empty($safeName)) {
+            $safeName = 'Apple User';
+        }
     }
     
     error_log("Apple Login - 開始處理用戶: $email, Apple ID: $appleId");
@@ -59,190 +71,154 @@ try {
     );
     
     $existingIdentity = $stmt->fetch();
-    
+
+    $user = null;
+
     if ($existingIdentity) {
         error_log("Apple Login - 找到現有用戶，用戶 ID: {$existingIdentity['user_id']}");
-        
-        // 現有用戶，更新最後登入時間
+
         $db->query(
             "UPDATE users SET updated_at = NOW() WHERE id = ?",
             [$existingIdentity['user_id']]
         );
-        
-        // 更新 user_identity 的 identity_token 和最後更新時間
-        $db->query(
-            "UPDATE user_identities SET 
-             access_token = ?, 
-             updated_at = NOW() 
-             WHERE id = ?",
-            [$identityToken, $existingIdentity['id']]
-        );
-        
+
+        if (!empty($identityToken)) {
+            $db->query(
+                "UPDATE user_identities SET 
+                 access_token = ?, 
+                 updated_at = NOW() 
+                 WHERE id = ?",
+                [$identityToken, $existingIdentity['id']]
+            );
+        }
+
         $user = $existingIdentity;
-        $isNewUser = false;
-        
         error_log("Apple Login - 現有用戶登入成功");
     } else {
-        error_log("Apple Login - 新用戶，檢查 email 是否已存在...");
-        
-        // 檢查 email 是否已存在於 users 表
+        error_log("Apple Login - 無現有身份，檢查 email 是否已存在...");
+
         if (!empty($email)) {
             $stmt = $db->query(
                 "SELECT * FROM users WHERE email = ?",
                 [$email]
             );
-            
+
             $existingUser = $stmt->fetch();
-            
+
             if ($existingUser) {
-                error_log("Apple Login - Email 已存在，需要綁定到現有帳號，用戶 ID: {$existingUser['id']}");
-                
-                // Email 已存在，需要綁定到現有帳號
-                // 建立 user_identity 記錄，綁定到現有帳號
+                error_log("Apple Login - Email 已存在，綁定至用戶 ID: {$existingUser['id']}");
+
                 $db->query(
                     "INSERT INTO user_identities (
                         user_id, provider, provider_user_id, email, name, avatar_url, 
                         access_token, raw_profile, created_at, updated_at
                     ) VALUES (?, 'apple', ?, ?, ?, ?, ?, ?, NOW(), NOW())",
                     [
-                        $existingUser['id'], 
-                        $appleId, 
-                        $email, 
-                        $name, 
-                        $avatarUrl, 
+                        $existingUser['id'],
+                        $appleId,
+                        $email,
+                        $safeName,
+                        $avatarUrl,
                         $identityToken,
-                        json_encode($input) // 儲存原始資料
+                        json_encode($input, JSON_UNESCAPED_UNICODE)
                     ]
                 );
-                
+
                 $user = $existingUser;
-                $isNewUser = false;
-                
                 error_log("Apple Login - 成功綁定 Apple 帳號到現有用戶");
-            } else {
-                error_log("Apple Login - 完全新用戶，建立新帳號...");
-                
-                // 完全新用戶，建立 users 記錄
-                $db->query(
-                    "INSERT INTO users (
-                        name, email, avatar_url, status, created_at, updated_at
-                    ) VALUES (?, ?, ?, 'active', NOW(), NOW())",
-                    [$name, $email, $avatarUrl]
-                );
-                
-                $userId = $db->lastInsertId();
-                error_log("Apple Login - 新用戶建立成功，用戶 ID: $userId");
-                
-                // 建立 user_identity 記錄
-                $db->query(
-                    "INSERT INTO user_identities (
-                        user_id, provider, provider_user_id, email, name, avatar_url, 
-                        access_token, raw_profile, created_at, updated_at
-                    ) VALUES (?, 'apple', ?, ?, ?, ?, ?, ?, NOW(), NOW())",
-                    [
-                        $userId, 
-                        $appleId, 
-                        $email, 
-                        $name, 
-                        $avatarUrl, 
-                        $identityToken,
-                        json_encode($input) // 儲存原始資料
-                    ]
-                );
-                
-                // 重新查詢用戶資料
-                $stmt = $db->query("SELECT * FROM users WHERE id = ?", [$userId]);
-                $user = $stmt->fetch();
-                $isNewUser = true;
-                
-                error_log("Apple Login - 新用戶和 user_identity 建立完成");
             }
-        } else {
-            error_log("Apple Login - 無 email 的新用戶，建立新帳號...");
-            
-            // 無 email 的新用戶，建立 users 記錄
+        }
+
+        if ($user === null) {
+            error_log("Apple Login - 建立 OAuth 暫存資料供新用戶註冊");
+
+            $tempToken = bin2hex(openssl_random_pseudo_bytes(24));
+            $expiresAt = date('Y-m-d H:i:s', time() + 3600);
+
             $db->query(
-                "INSERT INTO users (
-                    name, avatar_url, status, created_at, updated_at
-                ) VALUES (?, ?, 'active', NOW(), NOW())",
-                [$name, $avatarUrl]
-            );
-            
-            $userId = $db->lastInsertId();
-            error_log("Apple Login - 無 email 新用戶建立成功，用戶 ID: $userId");
-            
-            // 建立 user_identity 記錄
-            $db->query(
-                "INSERT INTO user_identities (
-                    user_id, provider, provider_user_id, name, avatar_url, 
-                    access_token, raw_profile, created_at, updated_at
-                ) VALUES (?, 'apple', ?, ?, ?, ?, ?, NOW(), NOW())",
+                "INSERT INTO oauth_temp_users (provider, provider_user_id, email, name, avatar_url, raw_data, token, expired_at, created_at)
+                 VALUES ('apple', ?, ?, ?, ?, ?, ?, ?, NOW())
+                 ON DUPLICATE KEY UPDATE
+                   email = VALUES(email),
+                   name = VALUES(name),
+                   avatar_url = VALUES(avatar_url),
+                   raw_data = VALUES(raw_data),
+                   token = VALUES(token),
+                   expired_at = VALUES(expired_at)",
                 [
-                    $userId, 
-                    $appleId, 
-                    $name, 
-                    $avatarUrl, 
-                    $identityToken,
-                    json_encode($input) // 儲存原始資料
+                    $appleId,
+                    $email ?: null,
+                    $safeName ?: null,
+                    $avatarUrl ?: null,
+                    json_encode([
+                        'raw_input' => $input,
+                        'provider' => 'apple',
+                    ], JSON_UNESCAPED_UNICODE),
+                    $tempToken,
+                    $expiresAt
                 ]
             );
-            
-            // 重新查詢用戶資料
-            $stmt = $db->query("SELECT * FROM users WHERE id = ?", [$userId]);
-            $user = $stmt->fetch();
-            $isNewUser = true;
-            
-            error_log("Apple Login - 無 email 新用戶和 user_identity 建立完成");
+
+            $responseData = [
+                'is_new_user' => true,
+                'provider' => 'apple',
+                'provider_user_id' => $appleId,
+                'email' => $email,
+                'name' => $safeName,
+                'avatar_url' => $avatarUrl,
+                'temp_token' => $tempToken,
+                'temp_expires_at' => $expiresAt,
+            ];
+
+            Response::success($responseData, 'Signup required');
+            return;
         }
     }
     
     // 生成 JWT Token
+    $resolvedUserId = isset($user['id']) ? (int)$user['id'] : (int)($user['user_id'] ?? 0);
     $payload = [
-        'user_id' => $user['id'],
-        'email' => $user['email'] ?? '',
-        'name' => $user['name'],
+        'user_id' => $resolvedUserId,
+        'email' => $user['email'] ?? $email,
+        'name' => $user['name'] ?? $safeName,
         'iat' => time(),
         'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
     ];
-    
+
     try {
         $token = JWTManager::generateToken($payload);
-        error_log("JWT token generated successfully for user: " . $user['id']);
+        error_log("JWT token generated successfully for user: " . $resolvedUserId);
     } catch (Exception $e) {
         error_log("JWT token generation failed: " . $e->getMessage());
         throw new Exception('Token generation failed: ' . $e->getMessage());
     }
-    
+
     // 準備回應資料
     $userData = [
-        'id' => $user['id'],
-        'name' => $user['name'] ?? '',
-        'email' => $user['email'] ?? '',
+        'id' => $resolvedUserId,
+        'name' => $user['name'] ?? $safeName,
+        'email' => $user['email'] ?? $email,
         'phone' => $user['phone'] ?? '',
-        'nickname' => $user['nickname'] ?? '',
-        'avatar_url' => $user['avatar_url'] ?? '',
+        'nickname' => $user['nickname'] ?? ($user['name'] ?? $safeName),
+        'avatar_url' => $user['avatar_url'] ?? $avatarUrl,
         'points' => (int)($user['points'] ?? 0),
-        'status' => $user['status'],
+        'status' => $user['status'] ?? 'active',
         'provider' => 'apple',
-        'created_at' => $user['created_at'],
-        'updated_at' => $user['updated_at'],
+        'created_at' => $user['created_at'] ?? '',
+        'updated_at' => $user['updated_at'] ?? '',
         'referral_code' => $user['referral_code'] ?? '',
         'primary_language' => $user['primary_language'] ?? 'English',
         'permission' => (int)($user['permission'] ?? 0),
-        'is_new_user' => $isNewUser,
-        'provider_user_id' => $appleId
+        'is_new_user' => false,
+        'provider_user_id' => $appleId,
+        'apple_id' => $appleId,
+        'token' => $token,
     ];
-    
-    error_log("Apple Login - 登入成功，用戶 ID: {$user['id']}, 新用戶: " . ($isNewUser ? '是' : '否'));
-    
-    echo json_encode([
-        'success' => true,
-        'message' => 'Apple login successful',
-        'data' => [
-            'token' => $token,
-            'user' => $userData
-        ]
-    ]);
+
+    error_log("Apple Login - 登入成功，用戶 ID: {$resolvedUserId}, 新用戶: 否");
+
+    Response::success($userData, 'Apple login successful');
+    return;
     
 } catch (Exception $e) {
     error_log("Apple Login Error: " . $e->getMessage());

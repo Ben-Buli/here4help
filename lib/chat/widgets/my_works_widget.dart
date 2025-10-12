@@ -14,6 +14,7 @@ import 'package:here4help/chat/utils/application_status_utils.dart';
 import 'package:here4help/chat/widgets/highlighted_text.dart';
 import 'package:here4help/chat/widgets/cached_avatar_widget.dart';
 import 'package:here4help/chat/utils/avatar_cache_manager.dart';
+import 'package:go_router/go_router.dart';
 
 /// My Works 分頁組件
 /// 從原 ChatListPage 中抽取的 My Works 相關功能
@@ -566,9 +567,8 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
 
       final processedData = _processApplicationsFromService(page.items);
 
-      // 更新 ChatListProvider 的 My Works 快取
-      chatProvider.myWorksApplications.clear();
-      chatProvider.myWorksApplications.addAll(processedData);
+      // 更新 ChatListProvider 的 My Works 快取並標記載入完成
+      chatProvider.replaceMyWorksApplications(processedData, markLoaded: true);
 
       // 預載入頭像
       _preloadAvatars(processedData);
@@ -629,8 +629,25 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
                 }
               },
               child: filteredWorks.isEmpty
-                  ? _buildEmptyState()
+                  ? LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minHeight: constraints.maxHeight,
+                            ),
+                            child: _buildEmptyState(
+                              isDataError: chatProvider.getTabError(
+                                      ChatListProvider.tabMyWorks) !=
+                                  null,
+                            ),
+                          ),
+                        );
+                      },
+                    )
                   : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.only(
                         left: 12,
                         right: 12,
@@ -646,8 +663,8 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
             );
           },
         ),
-        // Scroll to top button
-        _buildScrollToTopButton(),
+        // 棄用 Scroll to top button
+        // _buildScrollToTopButton(),
       ],
     );
   }
@@ -719,6 +736,8 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
               }
 
               // 使用統一的導航服務
+              final currentLocation = GoRouterState.of(context).uri.toString();
+
               final success = await ChatNavigationService.ensureRoomAndNavigate(
                 context: context,
                 taskId: taskId,
@@ -726,6 +745,8 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
                 participantId: participantId,
                 existingRoomId: task['chat_room_id']?.toString(),
                 type: 'application',
+                sourceTab: 'my-works',
+                returnPath: currentLocation,
               );
 
               if (!success && mounted) {
@@ -1049,40 +1070,47 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
   }
 
   /// 建構空狀態
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState({bool isDataError = false}) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.work_outline,
+            isDataError ? Icons.error_outline : Icons.work_outline,
             size: 64,
-            color:
-                Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+            color: isDataError
+                ? Colors.red[300]
+                : Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.3),
           ),
           const SizedBox(height: 16),
           Text(
-            'No applications found',
+            isDataError
+                ? 'No applications found'
+                : 'You haven\'t applied to any tasks yet',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w500,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.6),
+              color: isDataError
+                  ? Colors.red[600]
+                  : Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'You haven\'t applied to any tasks yet',
-            style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(context)
-                  .colorScheme
-                  .onSurface
-                  .withValues(alpha: 0.4),
+          if (isDataError) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Please check your connection and try again',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.red[500],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -1159,27 +1187,27 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
     );
   }
 
-  /// 建構 Scroll to Top 按鈕
-  Widget _buildScrollToTopButton() {
-    return Positioned(
-      right: 16,
-      bottom: 16,
-      child: FloatingActionButton(
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-        onPressed: () {
-          // 滾動到頂部
-          final scrollController = PrimaryScrollController.of(context);
-          scrollController.animateTo(
-            0,
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
-          );
-        },
-        child: const Icon(Icons.keyboard_arrow_up, size: 24),
-      ),
-    );
-  }
+  /// 棄用：建構 Scroll to Top 按鈕
+  // Widget _buildScrollToTopButton() {
+  //   return Positioned(
+  //     right: 16,
+  //     bottom: 16,
+  //     child: FloatingActionButton(
+  //       backgroundColor: Theme.of(context).colorScheme.primary,
+  //       foregroundColor: Theme.of(context).colorScheme.onPrimary,
+  //       onPressed: () {
+  //         // 滾動到頂部
+  //         final scrollController = PrimaryScrollController.of(context);
+  //         scrollController.animateTo(
+  //           0,
+  //           duration: const Duration(milliseconds: 500),
+  //           curve: Curves.easeInOut,
+  //         );
+  //       },
+  //       child: const Icon(Icons.keyboard_arrow_up, size: 24),
+  //     ),
+  //   );
+  // }
 
   /// 執行自動完成任務（倒數計時結束時觸發）
   void _executeAutoCompleteTask(Map<String, dynamic> task) async {

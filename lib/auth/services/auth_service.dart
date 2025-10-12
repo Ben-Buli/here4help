@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/utils/debug_helper.dart';
 import 'package:here4help/chat/services/socket_service.dart';
+import 'package:here4help/services/http_client_service.dart';
 
 class AuthService {
   static const String _tokenKey = 'auth_token';
@@ -133,43 +134,17 @@ class AuthService {
       }
 
       debugPrint('🔍 調用 getProfile API...');
-      if (token.length > 10) {
-        debugPrint('🔍 Token: ${token.substring(0, 10)}...');
-      } else {
-        debugPrint('🔍 Token: $token');
-      }
       debugPrint('🔍 API URL: ${AppConfig.profileUrl}');
 
-      final headers = {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      };
-
-      debugPrint('🔍 Headers: $headers');
-
-      final response = await http.get(
-        Uri.parse(AppConfig.profileUrl),
-        headers: headers,
+      // 使用 HttpClientService 統一請求，非 production 會自動附上 query token 備援
+      final data = await HttpClientService.getJson(
+        AppConfig.profileUrl,
+        useQueryParamToken: true,
       );
 
-      debugPrint('🔍 API 回應狀態碼: ${response.statusCode}');
-
-      Map<String, dynamic> data;
-      try {
-        data = jsonDecode(response.body);
-      } catch (e) {
-        debugPrint('❌ JSON 解析錯誤: $e');
-        throw Exception('Invalid JSON response');
-      }
-
-      if (response.statusCode == 200 && data['success']) {
-        if (data.containsKey('data') && data['data'] != null) {
-          debugPrint('✅ getProfile 成功: ${data['data']['id']}');
-          return data['data'];
-        } else {
-          debugPrint('❌ getProfile 失敗: 回傳資料缺少 data 欄位');
-          throw Exception('Response missing data field');
-        }
+      if (data['success'] == true && data['data'] != null) {
+        debugPrint('✅ getProfile 成功: ${data['data']['id']}');
+        return Map<String, dynamic>.from(data['data']);
       } else {
         debugPrint('❌ getProfile 失敗: ${data['message']}');
         throw Exception(data['message'] ?? 'Failed to get profile');

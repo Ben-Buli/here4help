@@ -1,0 +1,24 @@
+{
+  "environment": "development",
+  "public": {
+    "api_base_url": "http://192.168.1.101:8888/here4help/backend",
+    "socket_url": "http://192.168.1.101:3000",
+    "image_base_url": "http://192.168.1.101:8888/here4help",
+    "google_client_id": "102744926949-bhrnm2970bgt3dfm2nmdbqt03mrvdh3i.apps.googleusercontent.com",
+    "google_redirect_uri": "http://192.168.1.101:8888/here4help/backend/api/auth/google-callback.php",
+    "facebook_app_id": "1037019294991326",
+    "facebook_redirect_uri": "http://192.168.1.101:8888/here4help/backend/api/auth/facebook-callback.php",
+    "apple_service_id": "com.nccu.here4help.login",
+    "apple_redirect_uri": "http://192.168.1.101:8888/here4help/backend/api/auth/apple-callback.php"
+  },
+  "app": {
+    "debug_mode": true,
+    "log_level": "debug",
+    "features": {
+      "chat": true,
+      "tasks": true,
+      "wallet": true,
+      "ratings": true
+    }
+  }
+}

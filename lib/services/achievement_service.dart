@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/auth/services/auth_service.dart';
+import 'package:here4help/services/http_client_service.dart';
 
 class UserAchievements {
   final UserInfo userInfo;
@@ -126,37 +128,25 @@ class AchievementService {
         return null;
       }
 
-      print('🔍 AchievementService: Token found, length: ${token.length}');
+      final path = '/account/achievements.php';
+      final queryPath = userId != null ? '$path?user_id=$userId' : path;
 
-      final uri = Uri.parse(
-          '$achievementsUrl${userId != null ? '?user_id=$userId' : ''}');
+      if (kDebugMode) {
+        print('🔍 AchievementService: API PATH: $queryPath');
+      }
 
-      print('🔍 AchievementService: API URL: $uri');
-
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
+      // 使用 ApiClient 統一請求，非 production 會自動附上 query token 備援
+      final data = await HttpClientService.getJson(
+        AppConfig.api(queryPath),
+        useQueryParamToken: true,
       );
 
-      print('🔍 AchievementService: Response status: ${response.statusCode}');
-      // print('🔍 AchievementService: Response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          print('✅ AchievementService: Successfully got achievements');
-          return UserAchievements.fromJson(data['data']);
-        } else {
-          print('❌ AchievementService: API returned error: ${data['message']}');
-          throw Exception(data['message'] ?? 'Failed to get achievements');
-        }
+      if (data['success'] == true) {
+        print('✅ AchievementService: Successfully got achievements');
+        return UserAchievements.fromJson(data['data']);
       } else {
-        print(
-            '❌ AchievementService: HTTP error ${response.statusCode}: ${response.body}');
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        print('❌ AchievementService: API returned error: ${data['message']}');
+        throw Exception(data['message'] ?? 'Failed to get achievements');
       }
     } catch (e) {
       print('❌ AchievementService: Error getting achievements: $e');

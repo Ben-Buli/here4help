@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:here4help/chat/pages/chat_detail_page.dart';
 import 'package:here4help/chat/services/chat_storage_service.dart';
 import 'package:here4help/chat/services/chat_session_manager.dart';
+import 'package:here4help/layout/app_scaffold.dart';
 
 /// 聊天詳細頁面包裝器，處理數據恢復邏輯
 class ChatDetailWrapper extends StatefulWidget {
@@ -84,12 +85,15 @@ class _ChatDetailWrapperState extends State<ChatDetailWrapper> {
         debugPrint('✅ 使用傳入的數據');
         // 如果有傳入數據，也設置為當前會話
         final roomId = chatData['room']?['id']?.toString() ?? 'unknown';
+        final previousRoute = AppScaffold.getPreviousValidRoute();
         await ChatSessionManager.setCurrentChatSession(
           roomId: roomId,
           room: chatData['room'] ?? {},
           task: chatData['task'] ?? {},
           userRole: chatData['userRole'] ?? '',
           chatPartnerInfo: chatData['chatPartnerInfo'] ?? {},
+          sourceTab: chatData['sourceTab']?.toString(),
+          returnPath: (chatData['returnPath'] ?? previousRoute)?.toString(),
         );
         debugPrint('✅ 已將傳入數據設置為當前會話');
       }

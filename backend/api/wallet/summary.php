@@ -1,6 +1,6 @@
 <?php
 // 載入 PHP 8.4 相容性配置
- require_once dirname(__DIR__, 2). '/../../config/php84_compatibility.php';
+require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * GET /api/wallet/summary.php
@@ -8,8 +8,9 @@
  */
 
  require_once dirname(__DIR__, 2) . '/config/database.php'; // 因為 database.php 在 /backend/config/，要從 /backend/api/wallet 回到 /backend，需要往上兩層，再拼 /config/database.php 
- require_once dirname(__DIR__, 2) . '/utils/response.php';
+require_once dirname(__DIR__, 2) . '/utils/Response.php';
  require_once dirname(__DIR__, 2) . '/utils/JWTManager.php';
+require_once dirname(__DIR__, 2) . '/auth_helper.php';
 
 
 header('Content-Type: application/json');
@@ -27,27 +28,12 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 try {
-    // 驗證 JWT
-    $token = $_GET['token'] ?? null;
-    if (!$token) {
-        $headers = getallheaders();
-        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-        if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
-            $token = $matches[1];
-        }
+    // 驗證 JWT（支援 Authorization header 與 query token）
+    $auth = JWTManager::validateRequest();
+    if (!$auth['valid']) {
+        Response::unauthorized($auth['message'] ?? 'Unauthorized');
     }
-    
-    if (!$token) {
-        Response::unauthorized('No token provided');
-    }
-    
-    $userData = JWTManager::validateToken($token);
-    
-    if (!$userData) {
-        Response::unauthorized('Invalid token');
-    }
-    
-    $userId = $userData['user_id'];
+    $userId = $auth['payload']['user_id'];
     
     $db = Database::getInstance();
     
@@ -101,7 +87,7 @@ try {
         ];
     }, $activeTasks);
     
-    Response::success([
+    $responseData = [
         'user_info' => [
             'id' => (int)$user['id'],
             'name' => $user['name'],
@@ -115,9 +101,12 @@ try {
         'active_tasks' => $formattedTasks,
         'active_tasks_count' => count($formattedTasks),
         'calculation_note' => 'Available points = Total points - Occupied points (tasks with status_id IN 1,2,3,4,5)'
-    ], 'Wallet summary retrieved successfully');
+    ];
+    
+    Response::success($responseData, 'Wallet summary retrieved successfully');
     
 } catch (Exception $e) {
+    error_log("[wallet/summary.php] Error: " . $e->getMessage());
     Response::serverError('Failed to retrieve wallet summary: ' . $e->getMessage());
 }
 ?>

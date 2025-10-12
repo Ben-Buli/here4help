@@ -429,150 +429,189 @@ class _WalletPageState extends State<WalletPage> {
         String? errorText;
 
         return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Add Points'),
-                  if (errorText != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6.0),
-                      child: Text(
-                        errorText!,
-                        style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (bankAccountInfo != null &&
-                      bankAccountInfo!.hasValidAccount)
-                    _buildBankInfoContainer()
-                  else
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 8.0),
-                      child: Text(
-                        'Bank info unavailable. Please try again later.',
-                        style: TextStyle(fontSize: 12, color: Colors.redAccent),
-                      ),
-                    ),
-                  TextField(
-                    controller: accountController,
-                    decoration: const InputDecoration(
-                      labelText: 'Your Payment Account Last 5 Digits',
-                      border: OutlineInputBorder(),
-                      hintText: '12345',
-                      counterText: '',
-                    ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(5),
+          builder: (context, setDialogState) {
+            // 在對話框內部也監聽銀行資訊的變更
+            return StreamBuilder<List<Object?>>(
+              stream: Stream.value([bankAccountInfo, isLoading, errorMessage]),
+              builder: (context, snapshot) {
+                return AlertDialog(
+                  title: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Add Points'),
+                      if (errorText != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6.0),
+                          child: Text(
+                            errorText!,
+                            style: const TextStyle(
+                                color: Colors.red,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600),
+                          ),
+                        ),
                     ],
-                    maxLength: 5,
-                    onChanged: (_) {
-                      if (errorText != null) setState(() => errorText = null);
-                    },
                   ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: amountController,
-                    decoration: const InputDecoration(
-                      labelText: 'Transferred Amount (NTD)',
-                      border: OutlineInputBorder(),
-                      hintText: '12345', // < 100,000
-                      counterText: '',
-                    ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(5),
-                    ],
-                    onChanged: (_) {
-                      if (errorText != null) setState(() => errorText = null);
-                    },
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: isSubmitting ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: isSubmitting ||
-                          bankAccountInfo == null ||
-                          !bankAccountInfo!.hasValidAccount
-                      ? null
-                      : () async {
-                          final acc = accountController.text.trim();
-                          final amtStr = amountController.text.trim();
-                          if (acc.length != 5) {
-                            setState(() => errorText =
-                                'Please enter the last 5 digits of your account (numbers only).');
-                            return;
-                          }
-                          if (amtStr.isEmpty) {
-                            setState(() => errorText =
-                                'Please enter the transferred amount.');
-                            return;
-                          }
-                          if (amtStr.length > 5) {
-                            setState(() => errorText =
-                                'Amount too large. Maximum 5 digits.');
-                            return;
-                          }
-                          final amountVal = int.tryParse(amtStr);
-                          if (amountVal == null || amountVal <= 0) {
-                            setState(() => errorText =
-                                'Amount must be a positive number.');
-                            return;
-                          }
-
-                          setState(() => isSubmitting = true);
-
-                          try {
-                            await _submitTopupRequest(acc, amountVal);
-
-                            if (mounted) {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Topup request submitted, waiting for admin approval'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              String msg = 'Submission failed: $e';
-                              if (e.toString().contains('409')) {
-                                msg =
-                                    'You already have a pending topup request. Please wait for admin approval or check Points History.';
-                              }
-                              setState(() => errorText = msg);
-                            }
-                          } finally {
-                            if (mounted) setState(() => isSubmitting = false);
-                          }
-                        },
-                  child: isSubmitting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (bankAccountInfo != null &&
+                          bankAccountInfo!.hasValidAccount)
+                        _buildBankInfoContainer()
+                      else if (isLoading)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 8.0),
+                          child: Text(
+                            'Loading bank information...',
+                            style: TextStyle(fontSize: 12, color: Colors.blue),
+                          ),
                         )
-                      : const Text('Submit Request'),
-                ),
-              ],
+                      else
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: Column(
+                            children: [
+                              const Text(
+                                'Bank info unavailable. Please try again later.',
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.redAccent),
+                              ),
+                              const SizedBox(height: 8),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  // 重新載入銀行資訊
+                                  await _loadWalletData();
+                                  // 觸發對話框重新構建
+                                  setDialogState(() {});
+                                },
+                                icon: const Icon(Icons.refresh, size: 16),
+                                label: const Text('Retry',
+                                    style: TextStyle(fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 4),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      TextField(
+                        controller: accountController,
+                        decoration: const InputDecoration(
+                          labelText: 'Your Payment Account Last 5 Digits',
+                          border: OutlineInputBorder(),
+                          hintText: '12345',
+                          counterText: '',
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(5),
+                        ],
+                        maxLength: 5,
+                        onChanged: (_) {
+                          if (errorText != null)
+                            setDialogState(() => errorText = null);
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: amountController,
+                        decoration: const InputDecoration(
+                          labelText: 'Transferred Amount (NTD)',
+                          border: OutlineInputBorder(),
+                          hintText: '12345', // < 100,000
+                          counterText: '',
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(5),
+                        ],
+                        onChanged: (_) {
+                          if (errorText != null)
+                            setDialogState(() => errorText = null);
+                        },
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed:
+                          isSubmitting ? null : () => Navigator.pop(context),
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: isSubmitting ||
+                              bankAccountInfo == null ||
+                              !bankAccountInfo!.hasValidAccount
+                          ? null
+                          : () async {
+                              final acc = accountController.text.trim();
+                              final amtStr = amountController.text.trim();
+                              if (acc.length != 5) {
+                                setDialogState(() => errorText =
+                                    'Please enter the last 5 digits of your account (numbers only).');
+                                return;
+                              }
+                              if (amtStr.isEmpty) {
+                                setDialogState(() => errorText =
+                                    'Please enter the transferred amount.');
+                                return;
+                              }
+                              if (amtStr.length > 5) {
+                                setDialogState(() => errorText =
+                                    'Amount too large. Maximum 5 digits.');
+                                return;
+                              }
+                              final amountVal = int.tryParse(amtStr);
+                              if (amountVal == null || amountVal <= 0) {
+                                setDialogState(() => errorText =
+                                    'Amount must be a positive number.');
+                                return;
+                              }
+
+                              setDialogState(() => isSubmitting = true);
+
+                              try {
+                                await _submitTopupRequest(acc, amountVal);
+
+                                if (mounted) {
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          'Topup request submitted, waiting for admin approval'),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  String msg = 'Submission failed: $e';
+                                  if (e.toString().contains('409')) {
+                                    msg =
+                                        'You already have a pending topup request. Please wait for admin approval or check Points History.';
+                                  }
+                                  setDialogState(() => errorText = msg);
+                                }
+                              } finally {
+                                if (mounted)
+                                  setDialogState(() => isSubmitting = false);
+                              }
+                            },
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Submit Request'),
+                    ),
+                  ],
+                );
+              },
             );
           },
         );
@@ -588,14 +627,16 @@ class _WalletPageState extends State<WalletPage> {
       throw Exception('用戶未登入');
     }
 
+    final requestBody = {
+      'user_id': currentUser.id,
+      'amount': amount,
+      'bank_account_last5': bankAccountLast5,
+    };
+
     final response = await HttpClientService.post(
       AppConfig.api('/points/request_topup.php'),
       useQueryParamToken: true, // MAMP 兼容性
-      body: {
-        'user_id': currentUser.id,
-        'amount': amount,
-        'bank_account_last5': bankAccountLast5,
-      },
+      body: requestBody,
     );
 
     final responseData = json.decode(response.body);
