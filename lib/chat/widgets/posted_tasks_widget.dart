@@ -1651,27 +1651,27 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // Pin 按鈕（非 Open 狀態也顯示）
-                SizedBox(
-                  width: 40,
-                  child: OutlinedButton(
-                    onPressed: () => _togglePinTask(task),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: colorScheme.primary),
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      minimumSize: const Size(40, 32),
-                    ),
-                    child: Icon(
-                      _isTaskPinned(task['id'].toString())
-                          ? Icons.push_pin
-                          : Icons.push_pin_outlined,
-                      size: 16,
-                      color: _isTaskPinned(task['id'].toString())
-                          ? colorScheme.primary
-                          : colorScheme.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
+                // SizedBox(
+                //   width: 40,
+                //   child: OutlinedButton(
+                //     onPressed: () => _togglePinTask(task),
+                //     style: OutlinedButton.styleFrom(
+                //       side: BorderSide(color: colorScheme.primary),
+                //       padding: const EdgeInsets.symmetric(vertical: 4),
+                //       minimumSize: const Size(40, 32),
+                //     ),
+                //     child: Icon(
+                //       _isTaskPinned(task['id'].toString())
+                //           ? Icons.push_pin
+                //           : Icons.push_pin_outlined,
+                //       size: 16,
+                //       color: _isTaskPinned(task['id'].toString())
+                //           ? colorScheme.primary
+                //           : colorScheme.primary,
+                //     ),
+                //   ),
+                // ),
+                // const SizedBox(width: 16),
                 // Timeup 按鈕（僅限管理員且 pending_confirmation 狀態）
                 if (isAdmin && isPendingConfirmation) ...[
                   SizedBox(

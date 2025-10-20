@@ -2582,7 +2582,15 @@ class _TaskCreatePageState extends State<TaskCreatePage> {
 
         return StatefulBuilder(
           builder: (context, setState) {
+            final mediaQuery = MediaQuery.of(context);
+            final bottomInset = mediaQuery.viewInsets.bottom;
+
             return AlertDialog(
+              scrollable: true,
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+              contentPadding:
+                  const EdgeInsets.fromLTRB(24, 20, 24, 12),
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -2601,59 +2609,72 @@ class _TaskCreatePageState extends State<TaskCreatePage> {
                     ),
                 ],
               ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 銀行帳戶資訊顯示
-                  if (_bankAccountInfo != null &&
-                      _bankAccountInfo!.hasValidAccount)
-                    _buildBankInfoContainer()
-                  else
-                    const Padding(
-                      padding: EdgeInsets.only(bottom: 8.0),
-                      child: Text(
-                        'Bank info unavailable. Please try again later.',
-                        style: TextStyle(fontSize: 12, color: Colors.redAccent),
+              content: AnimatedPadding(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                padding: EdgeInsets.only(
+                  bottom: bottomInset > 0 ? bottomInset : 0,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 銀行帳戶資訊顯示
+                      if (_bankAccountInfo != null &&
+                          _bankAccountInfo!.hasValidAccount)
+                        _buildBankInfoContainer()
+                      else
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 8.0),
+                          child: Text(
+                            'Bank info unavailable. Please try again later.',
+                            style:
+                                TextStyle(fontSize: 12, color: Colors.redAccent),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: accountController,
+                        decoration: const InputDecoration(
+                          labelText: 'Your Payment Account Last 5 Digits',
+                          border: OutlineInputBorder(),
+                          hintText: '12345',
+                          counterText: '',
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(5),
+                        ],
+                        textInputAction: TextInputAction.next,
+                        maxLength: 5,
+                        onChanged: (_) {
+                          if (errorText != null) setState(() => errorText = null);
+                        },
                       ),
-                    ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: accountController,
-                    decoration: const InputDecoration(
-                      labelText: 'Your Payment Account Last 5 Digits',
-                      border: OutlineInputBorder(),
-                      hintText: '12345',
-                      counterText: '',
-                    ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(5),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: amountController,
+                        decoration: const InputDecoration(
+                          labelText: 'Transferred Amount (NTD)',
+                          border: OutlineInputBorder(),
+                          hintText: '12345', // < 100,000
+                          counterText: '',
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(5),
+                        ],
+                        textInputAction: TextInputAction.done,
+                        onChanged: (_) {
+                          if (errorText != null) setState(() => errorText = null);
+                        },
+                      ),
+                      const SizedBox(height: 12),
                     ],
-                    maxLength: 5,
-                    onChanged: (_) {
-                      if (errorText != null) setState(() => errorText = null);
-                    },
                   ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: amountController,
-                    decoration: const InputDecoration(
-                      labelText: 'Transferred Amount (NTD)',
-                      border: OutlineInputBorder(),
-                      hintText: '12345', // < 100,000
-                      counterText: '',
-                    ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(5),
-                    ],
-                    onChanged: (_) {
-                      if (errorText != null) setState(() => errorText = null);
-                    },
-                  ),
-                ],
+                ),
               ),
               actions: [
                 TextButton(

@@ -252,11 +252,6 @@ class _AppScaffoldState extends State<AppScaffold> {
   }
 
   Widget _buildSwipeBackWrapper(BuildContext context, Widget child) {
-    // iOS 原生提供左滑返回手勢，直接使用系統動畫
-    if (Theme.of(context).platform == TargetPlatform.iOS) {
-      return child;
-    }
-
     if (!_canGoBack()) {
       return child;
     }
@@ -265,6 +260,8 @@ class _AppScaffoldState extends State<AppScaffold> {
 
     final double dragPercent =
         (_dragOffset / deviceWidth).clamp(0.0, 1.0).toDouble();
+
+    bool dragActive = false;
 
     return Stack(
       children: [
@@ -276,10 +273,18 @@ class _AppScaffoldState extends State<AppScaffold> {
         ),
         GestureDetector(
           behavior: HitTestBehavior.translucent,
+          onPanDown: (details) {
+            dragActive = details.globalPosition.dx <= 40 && _canGoBack();
+            if (dragActive) {
+              setState(() => _dragOffset = 0.0);
+            }
+          },
           onHorizontalDragStart: (_) {
+            if (!dragActive) return;
             setState(() => _dragOffset = 0.0);
           },
           onHorizontalDragUpdate: (details) {
+            if (!dragActive) return;
             final delta = details.primaryDelta ?? details.delta.dx;
             if (delta == 0) return;
 
@@ -288,14 +293,20 @@ class _AppScaffoldState extends State<AppScaffold> {
             });
           },
           onHorizontalDragEnd: (_) {
+            if (!dragActive) {
+              _dragOffset = 0.0;
+              return;
+            }
             final shouldPop = (_dragOffset / deviceWidth).clamp(0.0, 1.0) > 0.3;
             if (shouldPop) {
               _handleBack();
             }
             setState(() => _dragOffset = 0.0);
+            dragActive = false;
           },
           onHorizontalDragCancel: () {
             setState(() => _dragOffset = 0.0);
+            dragActive = false;
           },
           child: Transform.translate(
             offset: Offset(_dragOffset, 0),
