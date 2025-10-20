@@ -13,7 +13,7 @@ class ThemeSettingsPage extends StatefulWidget {
 }
 
 class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
-  bool _isThemePreviewExpanded = false; // 主題預覽展開狀態
+  final bool _isThemePreviewExpanded = false; // 主題預覽展開狀態
 
   @override
   Widget build(BuildContext context) {

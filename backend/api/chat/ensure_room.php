@@ -10,8 +10,9 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/TokenValidator.php';
+require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../auth_helper.php';
 
 
 try {
@@ -19,13 +20,16 @@ try {
     Response::error('Method not allowed', 405);
   }
 
-  // Auth
-  $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
-  if (empty($auth_header) || !preg_match('/Bearer\s+(.*)$/i', $auth_header, $m)) {
-    throw new Exception('Authorization header required');
+  // JWT 認證 - 使用統一的 validateRequest 方法
+  $auth = JWTManager::validateRequest();
+  
+  if (!$auth['valid']) {
+    error_log("❌ [ensure_room.php] JWT 驗證失敗: " . ($auth['message'] ?? 'Unauthorized'));
+    Response::error($auth['message'] ?? 'Unauthorized', 401);
   }
-  $user_id = TokenValidator::validateAuthHeader($auth_header);
-  if (!$user_id) { throw new Exception('Invalid or expired token'); }
+  
+  $user_id = (int)$auth['payload']['user_id'];
+  error_log("✅ [ensure_room.php] JWT 驗證成功，用戶ID: $user_id");
 
   $db = Database::getInstance();
   $input = json_decode(file_get_contents('php://input'), true) ?? [];

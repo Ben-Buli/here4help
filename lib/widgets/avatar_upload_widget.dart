@@ -167,7 +167,7 @@ class _AvatarUploadWidgetState extends State<AvatarUploadWidget> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('頭像上傳成功'),
+              content: Text('Avatar uploaded successfully'),
               backgroundColor: Colors.green,
             ),
           );
@@ -179,7 +179,7 @@ class _AvatarUploadWidgetState extends State<AvatarUploadWidget> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('頭像上傳失敗: $e'),
+            content: Text('Avatar upload failed: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -218,13 +218,13 @@ class _AvatarUploadWidgetState extends State<AvatarUploadWidget> {
           );
         }
       } else {
-        throw Exception(result['message'] ?? 'Delete failed');
+        throw Exception(result['message'] ?? 'Delete avatar failed');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to delete avatar: $e'),
+            content: Text('Delete avatar failed: $e'),
             backgroundColor: Colors.red,
           ),
         );

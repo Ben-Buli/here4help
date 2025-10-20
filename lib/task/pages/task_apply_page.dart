@@ -78,278 +78,251 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
             _questionControllers.add(TextEditingController());
           }
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      currentUser.avatar_url.isNotEmpty
-                          ? CircleAvatar(
-                              radius: 30,
-                              backgroundImage: ImageHelper.getAvatarImage(
-                                  currentUser.avatar_url),
-                              onBackgroundImageError: (exception, stackTrace) {
-                                debugPrint('頭像載入錯誤: $exception');
-                              },
-                            )
-                          : const CircleAvatar(
-                              radius: 30,
-                              child: Icon(Icons.person, size: 40),
+          return GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            behavior: HitTestBehavior.opaque,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        currentUser.avatar_url.isNotEmpty
+                            ? CircleAvatar(
+                                radius: 30,
+                                backgroundImage: ImageHelper.getAvatarImage(
+                                    currentUser.avatar_url),
+                                onBackgroundImageError:
+                                    (exception, stackTrace) {
+                                  debugPrint('頭像載入錯誤: $exception');
+                                },
+                              )
+                            : const CircleAvatar(
+                                radius: 30,
+                                child: Icon(Icons.person, size: 40),
+                              ),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              currentUser.name,
+                              style: const TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
                             ),
-                      const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            currentUser.name,
-                            style: const TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          Row(
-                            children: [
-                              Row(
-                                children: List.generate(
-                                  5,
-                                  (index) => const Icon(Icons.star,
-                                      color: Colors.amber, size: 20),
+                            Row(
+                              children: [
+                                Row(
+                                  children: List.generate(
+                                    5,
+                                    (index) => const Icon(Icons.star,
+                                        color: Colors.amber, size: 20),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Text('5 (16 comments)'),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  GestureDetector(
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          title: Text(taskTitle,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold)),
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Task Description',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              Text(task['description'] ??
-                                  'No description available'),
-                              const SizedBox(height: 12),
-                              const Text('Reward:',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)),
-                              Text(
-                                  '💰 ${task['reward_point'] ?? task['salary']}'),
-                              const SizedBox(height: 8),
-                              const Text('Request Language:',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)),
-                              Text(task['language_requirement'] != '' &&
-                                      task['language_requirement']
-                                  ? task['language_requirement']
-                                  : 'No language requirement'),
-                              const SizedBox(height: 8),
-                              const Text('Location:',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)),
-                              Text(task['location'] ?? '-'),
-                              const SizedBox(height: 8),
-                              const Text('Task Date:',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)),
-                              Text(task['task_date'] ?? '-'),
-                              const SizedBox(height: 8),
-                              const Text('Posted by:',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)),
-                              Text('UserName: ${task['creator_name'] ?? ''}'),
-                              Row(
-                                children: [
-                                  const Icon(Icons.star,
-                                      color: Colors.amber, size: 16),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                      '${task['creator_rating'] ?? 0.0} (${task['creator_reviews_count'] ?? 0} reviews)'),
-                                ],
-                              ),
-                            ],
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Text('CLOSE'),
+                                const SizedBox(width: 4),
+                                const Text('5 (16 comments)'),
+                              ],
                             ),
                           ],
                         ),
-                      );
-                    },
-                    child: Consumer<ThemeConfigManager>(
-                      builder: (context, themeManager, child) {
-                        return Text(
-                          taskTitle,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 20,
-                            decoration: TextDecoration.underline,
-                            color: themeManager.currentTheme.primary,
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    GestureDetector(
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            title: Text(taskTitle,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold)),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Task Description',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                Text(task['description'] ??
+                                    'No description available'),
+                                const SizedBox(height: 12),
+                                const Text('Reward:',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                Text(
+                                    '💰 ${task['reward_point'] ?? task['salary']}'),
+                                const SizedBox(height: 8),
+                                const Text('Request Language:',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                Builder(
+                                  builder: (_) {
+                                    final languageRequirement =
+                                        task['language_requirement'];
+                                    if (languageRequirement is String &&
+                                        languageRequirement.trim().isNotEmpty) {
+                                      return Text(languageRequirement);
+                                    }
+                                    return const Text(
+                                        'No language requirement');
+                                  },
+                                ),
+                                const SizedBox(height: 8),
+                                const Text('Location:',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                Text(task['location'] ?? '-'),
+                                const SizedBox(height: 8),
+                                const Text('Task Date:',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                Text(task['task_date'] ?? '-'),
+                                const SizedBox(height: 8),
+                                const Text('Posted by:',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
+                                Text('UserName: ${task['creator_name'] ?? ''}'),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.star,
+                                        color: Colors.amber, size: 16),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                        '${task['creator_rating'] ?? 0.0} (${task['creator_reviews_count'] ?? 0} reviews)'),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('CLOSE'),
+                              ),
+                            ],
                           ),
                         );
                       },
+                      child: Consumer<ThemeConfigManager>(
+                        builder: (context, themeManager, child) {
+                          return Text(
+                            taskTitle,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              decoration: TextDecoration.underline,
+                              color: themeManager.currentTheme.primary,
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Self-recommendation (required)',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const Text(
-                    'Write down your work-related experience,\nlanguage proficiency to improve your admission rate',
-                    style: TextStyle(color: Colors.black54),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _selfIntroController,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      hintText: 'Tell us about yourself.',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Self-recommendation (required)',
+                      style: TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Self-recommendation is required';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
+                    const Text(
+                      'Write down your work-related experience,\nlanguage proficiency to improve your admission rate',
+                      style: TextStyle(color: Colors.black54),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _selfIntroController,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: 'Tell us about yourself.',
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Self-recommendation is required';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
 
-                  // 動態生成所有 application_questions
-                  ...applicationQuestions.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final question = entry.value;
-                    final questionText = question['application_question'] ?? '';
+                    // 動態生成所有 application_questions
+                    ...applicationQuestions.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final question = entry.value;
+                      final questionText =
+                          question['application_question'] ?? '';
 
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          questionText,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: _questionControllers[index],
-                          maxLines: 3,
-                          decoration: InputDecoration(
-                            hintText: 'Write your answer to the poster',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            questionText,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
                           ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'This field is required';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                    );
-                  }).toList(),
-                  const SizedBox(height: 16),
-                  Consumer<ThemeConfigManager>(
-                    builder: (context, themeManager, child) {
-                      return Text(
-                        'After applying, please wait patiently for the employer\'s reply.\nPolite inquiries can increase favorability.',
-                        style:
-                            TextStyle(color: themeManager.currentTheme.primary),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      ElevatedButton(
-                        onPressed: () async {
-                          if (!_formKey.currentState!.validate()) return;
-                          try {
-                            final userService = context.read<UserService>();
-                            await userService.ensureUserLoaded();
-                            final currentUser = userService.currentUser;
-                            if (currentUser == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Please login first')),
-                              );
-                              return;
-                            }
-
-                            final taskService = TaskService();
-                            final intro = _selfIntroController.text.trim();
-
-                            // 組裝新格式 answers：以「問題原文」為鍵
-                            final Map<String, String> answers = {};
-                            for (int i = 0;
-                                i < applicationQuestions.length;
-                                i++) {
-                              final question = applicationQuestions[i];
-                              final questionText =
-                                  question['application_question'] ?? '';
-                              final answer =
-                                  _questionControllers[i].text.trim();
-
-                              if (questionText.isNotEmpty &&
-                                  answer.isNotEmpty) {
-                                answers[questionText] = answer;
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _questionControllers[index],
+                            maxLines: 3,
+                            decoration: InputDecoration(
+                              hintText: 'Write your answer to the poster',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'This field is required';
                               }
-                            }
-
-                            await taskService.applyForTask(
-                              taskId: taskId,
-                              userId: currentUser.id,
-                              coverLetter: intro,
-                              answers: answers.isEmpty ? null : answers,
-                            );
-
-                            // 取得任務資料，用於組合聊天室 payload
-                            final task = taskService.getTaskById(taskId) ?? {};
-                            final posterId = task['creator_id'] ?? 0;
-                            final applicantId = currentUser.id;
-
-                            // 使用 ChatService 創建實際的聊天室
-                            final chatService = ChatService();
-                            final roomResult = await chatService.ensureRoom(
-                              taskId: taskId,
-                              creatorId: posterId,
-                              participantId: applicantId,
-                            );
-                            final roomData = roomResult['room'];
-                            final roomId = roomData['id'].toString();
-
-                            // 應徵成功後，發送結構化的 Resume 訊息
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      );
+                    }).toList(),
+                    const SizedBox(height: 16),
+                    Consumer<ThemeConfigManager>(
+                      builder: (context, themeManager, child) {
+                        return Text(
+                          'After applying, please wait patiently for the employer\'s reply.\nPolite inquiries can increase favorability.',
+                          style: TextStyle(
+                              color: themeManager.currentTheme.primary),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () async {
+                            if (!_formKey.currentState!.validate()) return;
                             try {
-                              // 建立 Resume 資料結構
-                              final List<ApplyResponse> applyResponses = [];
+                              final userService = context.read<UserService>();
+                              await userService.ensureUserLoaded();
+                              final currentUser = userService.currentUser;
+                              if (currentUser == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('Please login first')),
+                                );
+                                return;
+                              }
+
+                              final taskService = TaskService();
+                              final intro = _selfIntroController.text.trim();
+
+                              // 組裝新格式 answers：以「問題原文」為鍵
+                              final Map<String, String> answers = {};
                               for (int i = 0;
                                   i < applicationQuestions.length;
                                   i++) {
@@ -361,90 +334,138 @@ class _TaskApplyPageState extends State<TaskApplyPage> {
 
                                 if (questionText.isNotEmpty &&
                                     answer.isNotEmpty) {
-                                  applyResponses.add(ApplyResponse(
-                                    applyQuestion: questionText,
-                                    applyReply: answer,
-                                  ));
+                                  answers[questionText] = answer;
                                 }
                               }
 
-                              final resumeData = ResumeData(
-                                applyIntroduction: intro,
-                                applyResponses: applyResponses,
+                              await taskService.applyForTask(
+                                taskId: taskId,
+                                userId: currentUser.id,
+                                coverLetter: intro,
+                                answers: answers.isEmpty ? null : answers,
                               );
 
-                              // 只有在有內容時才發送 Resume 訊息
-                              if (!resumeData.isEmpty) {
-                                final resumeJsonString =
-                                    resumeData.toJsonString();
+                              // 取得任務資料，用於組合聊天室 payload
+                              final task =
+                                  taskService.getTaskById(taskId) ?? {};
+                              final posterIdValue = task['creator_id'];
+                              final posterId = (posterIdValue is int)
+                                  ? posterIdValue
+                                  : int.tryParse('${posterIdValue ?? 0}') ?? 0;
+                              final applicantId = currentUser.id;
 
-                                final sendRes = await chatService.sendMessage(
-                                  roomId: roomId,
-                                  message: resumeJsonString,
-                                  taskId: taskId,
-                                  kind: 'resume', // 指定為 resume 類型
+                              // 使用 ChatService 創建實際的聊天室
+                              final chatService = ChatService();
+                              final roomResult = await chatService.ensureRoom(
+                                taskId: taskId,
+                                creatorId: posterId,
+                                participantId: applicantId,
+                              );
+                              final roomData = roomResult['room'];
+                              final roomId = roomData['id'].toString();
+
+                              // 應徵成功後，發送結構化的 Resume 訊息
+                              try {
+                                // 建立 Resume 資料結構
+                                final List<ApplyResponse> applyResponses = [];
+                                for (int i = 0;
+                                    i < applicationQuestions.length;
+                                    i++) {
+                                  final question = applicationQuestions[i];
+                                  final questionText =
+                                      question['application_question'] ?? '';
+                                  final answer =
+                                      _questionControllers[i].text.trim();
+
+                                  if (questionText.isNotEmpty &&
+                                      answer.isNotEmpty) {
+                                    applyResponses.add(ApplyResponse(
+                                      applyQuestion: questionText,
+                                      applyReply: answer,
+                                    ));
+                                  }
+                                }
+
+                                final resumeData = ResumeData(
+                                  applyIntroduction: intro,
+                                  applyResponses: applyResponses,
                                 );
 
-                                // 透過 Socket.IO 同步推播（若可用）
-                                try {
-                                  final socket = SocketService();
-                                  await socket.connect();
-                                  socket.sendMessage(
+                                // 只有在有內容時才發送 Resume 訊息
+                                if (!resumeData.isEmpty) {
+                                  final resumeJsonString =
+                                      resumeData.toJsonString();
+
+                                  final sendRes = await chatService.sendMessage(
                                     roomId: roomId,
-                                    text: resumeJsonString,
-                                    messageId:
-                                        sendRes['message_id']?.toString(),
+                                    message: resumeJsonString,
+                                    taskId: taskId,
+                                    kind: 'resume', // 指定為 resume 類型
                                   );
-                                } catch (_) {}
+
+                                  // 透過 Socket.IO 同步推播（若可用）
+                                  try {
+                                    final socket = SocketService();
+                                    await socket.connect();
+                                    socket.sendMessage(
+                                      roomId: roomId,
+                                      text: resumeJsonString,
+                                      messageId:
+                                          sendRes['message_id']?.toString(),
+                                    );
+                                  } catch (_) {}
+                                }
+                              } catch (e) {
+                                // Resume 訊息失敗不阻擋流程
+                                debugPrint('❌ 發送 Resume 訊息失敗: $e');
+                              }
+
+                              if (mounted) {
+                                // 使用真實的聊天室ID跳轉到聊天詳情頁面
+                                context.go('/chat/detail', extra: {
+                                  'task': task,
+                                  'room': {
+                                    'id': roomData['id'], // 使用資料庫生成的真實 room_id
+                                    'roomId': roomId, // 保持字串版本以兼容現有代碼
+                                    'taskId': taskId,
+                                    'task_id': taskId,
+                                    'creator_id': posterId,
+                                    'participant_id': applicantId,
+                                    'questionReply': intro,
+                                    'sentMessages': <dynamic>[],
+                                    // 添加當前用戶（應徵者）的資訊
+                                    'user_id': currentUser.id,
+                                    'user': {
+                                      'id': currentUser.id,
+                                      'name': currentUser.name,
+                                      'avatar_url': currentUser.avatar_url,
+                                    },
+                                    // 參與者頭像後備（供對方視角顯示）
+                                    'participant_avatar':
+                                        currentUser.avatar_url,
+                                    // 聊天夥伴（任務發布者）資訊
+                                    'chat_partner': {
+                                      'id': task['creator_id'],
+                                      'name': task['creator_name'] ??
+                                          'Task Creator',
+                                      'avatar_url':
+                                          task['creator_avatar'] ?? '',
+                                    },
+                                  },
+                                });
                               }
                             } catch (e) {
-                              // Resume 訊息失敗不阻擋流程
-                              debugPrint('❌ 發送 Resume 訊息失敗: $e');
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Apply failed: $e')),
+                              );
                             }
-
-                            if (mounted) {
-                              // 使用真實的聊天室ID跳轉到聊天詳情頁面
-                              context.go('/chat/detail', extra: {
-                                'task': task,
-                                'room': {
-                                  'id': roomData['id'], // 使用資料庫生成的真實 room_id
-                                  'roomId': roomId, // 保持字串版本以兼容現有代碼
-                                  'taskId': taskId,
-                                  'task_id': taskId,
-                                  'creator_id': posterId,
-                                  'participant_id': applicantId,
-                                  'questionReply': intro,
-                                  'sentMessages': <dynamic>[],
-                                  // 添加當前用戶（應徵者）的資訊
-                                  'user_id': currentUser.id,
-                                  'user': {
-                                    'id': currentUser.id,
-                                    'name': currentUser.name,
-                                    'avatar_url': currentUser.avatar_url,
-                                  },
-                                  // 參與者頭像後備（供對方視角顯示）
-                                  'participant_avatar': currentUser.avatar_url,
-                                  // 聊天夥伴（任務發布者）資訊
-                                  'chat_partner': {
-                                    'id': task['creator_id'],
-                                    'name':
-                                        task['creator_name'] ?? 'Task Creator',
-                                    'avatar_url': task['creator_avatar'] ?? '',
-                                  },
-                                },
-                              });
-                            }
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Apply failed: $e')),
-                            );
-                          }
-                        },
-                        child: const Text('Confirm Submission'),
-                      ),
-                    ],
-                  ),
-                ],
+                          },
+                          child: const Text('Confirm Submission'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           );

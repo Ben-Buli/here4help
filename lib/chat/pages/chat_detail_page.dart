@@ -1405,7 +1405,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         debugPrint('❌ widget.data 中沒有 room_id');
         setState(() {
           _hasError = true;
-          _errorMessage = '無法獲取聊天室 ID，請返回聊天列表重新選擇';
+          _errorMessage =
+              'Unable to retrieve chat room ID. Please go back to the chat list and reselect.';
         });
         return;
       }
@@ -1423,7 +1424,8 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         debugPrint('❌ ChatService.getChatDetailData 返回空數據');
         setState(() {
           _hasError = true;
-          _errorMessage = '無法載入聊天室數據，請稍後重試';
+          _errorMessage =
+              'Unable to load chat room data. Please try again later.';
         });
         return;
       }
@@ -2786,7 +2788,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
     if (_hasError) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('聊天室'),
+          title: const Text('Chat Room'),
           backgroundColor: Colors.transparent,
           elevation: 0,
         ),
@@ -4541,7 +4543,7 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   void _openReportSheet() async {
     if (_currentRoomId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('無法獲取聊天室ID')),
+        const SnackBar(content: Text('Unable to get chat room ID')),
       );
       return;
     }

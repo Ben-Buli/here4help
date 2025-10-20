@@ -128,7 +128,7 @@ class AchievementService {
         return null;
       }
 
-      final path = '/account/achievements.php';
+      const path = '/account/achievements.php';
       final queryPath = userId != null ? '$path?user_id=$userId' : path;
 
       if (kDebugMode) {

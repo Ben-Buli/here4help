@@ -1224,6 +1224,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               // 主要任務卡片
               InkWell(
                 onTap: () {
+                  // 點擊任務卡片時關閉鍵盤
+                  FocusScope.of(context).unfocus();
+
                   if (mounted) {
                     setState(() {
                       if (isExpanded) {
@@ -1842,6 +1845,9 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               },
             ),
             onTap: () async {
+              // 點擊應徵者卡片時關閉鍵盤
+              FocusScope.of(context).unfocus();
+
               final chatRoomId = applier['chat_room_id']?.toString();
               if (chatRoomId != null && chatRoomId.isNotEmpty) {
                 // 使用統一的導航服務
@@ -2314,48 +2320,40 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     }
   }
 
-  /// 通過 ID 移除任務（本地狀態更新）
+  /// 通過 ID 移除任務（更新 ChatListProvider 快取）
   void _removeTaskById(String taskId) {
     if (!mounted) return;
 
-    setState(() {
-      // 從 _allTasks 中移除
-      _allTasks.removeWhere((task) => task['id'].toString() == taskId);
+    try {
+      // 安全地獲取 ChatListProvider
+      final chatProvider = _getChatProvider();
+      if (chatProvider == null) {
+        debugPrint('⚠️ [Posted Tasks] 無法獲取 ChatListProvider，無法移除任務');
+        return;
+      }
 
-      // 從 _filteredTasks 中移除
-      _filteredTasks.removeWhere((task) => task['id'].toString() == taskId);
+      // 從 ChatListProvider 的快取中移除任務
+      final postedTasksCache = chatProvider.cacheManager.postedTasksCache;
+      final originalLength = postedTasksCache.length;
 
-      // 從 _sortedTasks 中移除
-      _sortedTasks.removeWhere((task) => task['id'].toString() == taskId);
+      postedTasksCache.removeWhere((task) => task['id'].toString() == taskId);
+
+      debugPrint('🗑️ [Posted Tasks] 已從 ChatListProvider 快取中移除任務: $taskId');
+      debugPrint('  - 原始快取數量: $originalLength');
+      debugPrint('  - 移除後快取數量: ${postedTasksCache.length}');
 
       // 從應徵者數據中移除
       _applicationsByTask.remove(taskId);
 
       // 從展開狀態中移除
       _expandedTaskIds.remove(taskId);
-    });
 
-    // 更新分頁控制器的狀態
-    try {
-      // 從分頁控制器的項目列表中移除該任務
-      final currentItems = _pagingController.itemList ?? [];
-      final updatedItems = currentItems
-          .where((task) => task['id'].toString() != taskId)
-          .toList();
-
-      // 重新設置分頁控制器的項目列表
-      _pagingController.itemList = updatedItems;
-
-      debugPrint('🗑️ [Posted Tasks] 已從分頁控制器中移除任務: $taskId');
-      debugPrint('  - 分頁控制器項目數量: ${updatedItems.length}');
+      // 由於我們直接修改了快取數據，Consumer 會自動檢測到變化並重新渲染
+      // 但為了確保更新，我們可以觸發一個輕量級的刷新
+      debugPrint('✅ [Posted Tasks] 任務移除完成，UI 將自動更新');
     } catch (e) {
-      debugPrint('⚠️ [Posted Tasks] 更新分頁控制器失敗: $e');
+      debugPrint('❌ [Posted Tasks] 移除任務失敗: $e');
     }
-
-    debugPrint('🗑️ [Posted Tasks] 已從本地狀態中移除任務: $taskId');
-    debugPrint('  - _allTasks 剩餘數量: ${_allTasks.length}');
-    debugPrint('  - _filteredTasks 剩餘數量: ${_filteredTasks.length}');
-    debugPrint('  - _sortedTasks 剩餘數量: ${_sortedTasks.length}');
   }
 
   /// 確認 Timeup 任務（管理員強制完成）

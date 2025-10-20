@@ -29,6 +29,13 @@ class _SearchFilterWidgetState extends State<SearchFilterWidget> {
     });
   }
 
+  /// 滑動時關閉鍵盤
+  void _dismissKeyboardOnScroll() {
+    if (_searchFocusNode.hasFocus) {
+      FocusScope.of(context).unfocus();
+    }
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -38,194 +45,208 @@ class _SearchFilterWidgetState extends State<SearchFilterWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<ChatListProvider, ThemeConfigManager>(
-      builder: (context, chatProvider, themeManager, child) {
-        final theme = themeManager.effectiveTheme;
+    return NotificationListener<ScrollStartNotification>(
+      onNotification: (notification) {
+        // 當開始滑動時，關閉鍵盤
+        _dismissKeyboardOnScroll();
+        return false;
+      },
+      child: Consumer2<ChatListProvider, ThemeConfigManager>(
+        builder: (context, chatProvider, themeManager, child) {
+          final theme = themeManager.effectiveTheme;
 
-        // 當分頁切換時，同步搜尋欄內容
-        if (_searchController.text != chatProvider.searchQuery) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _searchController.text = chatProvider.searchQuery;
-          });
-        }
+          // 當分頁切換時，同步搜尋欄內容
+          if (_searchController.text != chatProvider.searchQuery) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _searchController.text = chatProvider.searchQuery;
+            });
+          }
 
-        return Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            children: [
-              // 搜尋欄
-              TextField(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                textCapitalization: TextCapitalization.sentences, // 允許大寫輸入
-                keyboardType: TextInputType.text, // 確保使用文字鍵盤
-                onChanged: (value) {
-                  // 保持原始大小寫，讓搜尋邏輯處理大小寫不敏感匹配
-                  chatProvider.updateSearchQuery(value);
-                },
-                onEditingComplete: () {
-                  _searchFocusNode.unfocus();
-                },
-                decoration: InputDecoration(
-                  hintText: 'Search task titles...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (chatProvider.searchQuery.isNotEmpty)
+          return Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              children: [
+                // 搜尋欄
+                TextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  textCapitalization: TextCapitalization.sentences, // 允許大寫輸入
+                  keyboardType: TextInputType.text, // 確保使用文字鍵盤
+                  onChanged: (value) {
+                    // 保持原始大小寫，讓搜尋邏輯處理大小寫不敏感匹配
+                    chatProvider.updateSearchQuery(value);
+                  },
+                  onEditingComplete: () {
+                    _searchFocusNode.unfocus();
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Search task titles...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (chatProvider.searchQuery.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              chatProvider.updateSearchQuery('');
+                              _searchFocusNode.unfocus();
+                            },
+                            tooltip: 'Clear',
+                          ),
                         IconButton(
-                          icon: const Icon(Icons.clear),
+                          icon: Icon(
+                            Icons.filter_list,
+                            color: chatProvider.hasActiveFilters
+                                ? theme.primary
+                                : null,
+                          ),
+                          tooltip: 'Filter options',
                           onPressed: () {
-                            _searchController.clear();
-                            chatProvider.updateSearchQuery('');
-                            _searchFocusNode.unfocus();
+                            // 關閉鍵盤後再顯示篩選選項
+                            if (_searchFocusNode.hasFocus) {
+                              FocusScope.of(context).unfocus();
+                            }
+                            _showFilterOptions(context, chatProvider, theme);
                           },
-                          tooltip: 'Clear',
                         ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.filter_list,
-                          color: chatProvider.hasActiveFilters
-                              ? theme.primary
-                              : null,
+                        IconButton(
+                          icon: Icon(Icons.refresh, color: theme.primary),
+                          tooltip: 'Reset',
+                          onPressed: () {
+                            // 關閉鍵盤後再重置篩選
+                            if (_searchFocusNode.hasFocus) {
+                              FocusScope.of(context).unfocus();
+                            }
+                            _searchController.clear();
+                            chatProvider.resetFilters();
+                            // 滾動到頂部
+                            _scrollToTop();
+                          },
                         ),
-                        tooltip: 'Filter options',
-                        onPressed: () {
-                          _showFilterOptions(context, chatProvider, theme);
-                        },
+                      ],
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // 排序狀態提示
+                if (chatProvider.searchQuery.isNotEmpty)
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: theme.primary.withValues(alpha: 0.7),
                       ),
-                      IconButton(
-                        icon: Icon(Icons.refresh, color: theme.primary),
-                        tooltip: 'Reset',
-                        onPressed: () {
-                          _searchController.clear();
-                          _searchFocusNode.unfocus();
-                          chatProvider.resetFilters();
-                          // 滾動到頂部
-                          _scrollToTop();
-                        },
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          chatProvider.currentSortBy == 'relevance'
+                              ? 'Sorting by relevance (recommended for search)'
+                              : 'Sorting by ${chatProvider.currentSortBy.replaceAll('_', ' ')} (overridden)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.primary.withValues(alpha: 0.7),
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // 排序狀態提示
-              if (chatProvider.searchQuery.isNotEmpty)
+                const SizedBox(height: 8),
+                // 排序選項
                 Row(
                   children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 16,
-                      color: theme.primary.withValues(alpha: 0.7),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        chatProvider.currentSortBy == 'relevance'
-                            ? 'Sorting by relevance (recommended for search)'
-                            : 'Sorting by ${chatProvider.currentSortBy.replaceAll('_', ' ')} (overridden)',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: theme.primary.withValues(alpha: 0.7),
-                          fontStyle: FontStyle.italic,
-                        ),
+                    Text(
+                      'Order by: ',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
-                  ],
-                ),
-              const SizedBox(height: 8),
-              // 排序選項
-              Row(
-                children: [
-                  Text(
-                    'Order by: ',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // 相關性排序（只有有搜尋時才顯示）
-                  Expanded(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          if (chatProvider.searchQuery.isNotEmpty)
+                    const SizedBox(width: 8),
+                    // 相關性排序（只有有搜尋時才顯示）
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            if (chatProvider.searchQuery.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: _buildCompactSortChip(
+                                  context: context,
+                                  chatProvider: chatProvider,
+                                  theme: theme,
+                                  label: 'Relevance',
+                                  sortBy: 'relevance',
+                                  icon: Icons.search,
+                                ),
+                              ),
+                            // 時間排序
                             Padding(
                               padding: const EdgeInsets.only(right: 8.0),
                               child: _buildCompactSortChip(
                                 context: context,
                                 chatProvider: chatProvider,
                                 theme: theme,
-                                label: 'Relevance',
-                                sortBy: 'relevance',
-                                icon: Icons.search,
+                                label: 'Updated Time',
+                                sortBy: 'updated_time',
+                                icon: Icons.access_time,
                               ),
                             ),
-                          // 時間排序
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: _buildCompactSortChip(
-                              context: context,
-                              chatProvider: chatProvider,
-                              theme: theme,
-                              label: 'Updated Time',
-                              sortBy: 'updated_time',
-                              icon: Icons.access_time,
+                            // 狀態排序
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _buildCompactSortChip(
+                                context: context,
+                                chatProvider: chatProvider,
+                                theme: theme,
+                                label: 'Status Order',
+                                sortBy: 'status_order',
+                                icon: Icons.sort_by_alpha,
+                              ),
                             ),
-                          ),
-                          // 狀態排序
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: _buildCompactSortChip(
-                              context: context,
-                              chatProvider: chatProvider,
-                              theme: theme,
-                              label: 'Status Order',
-                              sortBy: 'status_order',
-                              icon: Icons.sort_by_alpha,
+                            // 熱門度(應徵者數量）排序
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _buildCompactSortChip(
+                                context: context,
+                                chatProvider: chatProvider,
+                                theme: theme,
+                                label: 'Popularity',
+                                sortBy: 'applicant_count',
+                                icon: Icons.people,
+                              ),
                             ),
-                          ),
-                          // 熱門度(應徵者數量）排序
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: _buildCompactSortChip(
-                              context: context,
-                              chatProvider: chatProvider,
-                              theme: theme,
-                              label: 'Popularity',
-                              sortBy: 'applicant_count',
-                              icon: Icons.people,
+                            // 狀態ID排序
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _buildCompactSortChip(
+                                context: context,
+                                chatProvider: chatProvider,
+                                theme: theme,
+                                label: 'Status ID',
+                                sortBy: 'status_id',
+                                icon: Icons.sort,
+                              ),
                             ),
-                          ),
-                          // 狀態ID排序
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: _buildCompactSortChip(
-                              context: context,
-                              chatProvider: chatProvider,
-                              theme: theme,
-                              label: 'Status ID',
-                              sortBy: 'status_id',
-                              icon: Icons.sort,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              // ),
-            ],
-          ),
-        );
-      },
+                  ],
+                ),
+                // ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 

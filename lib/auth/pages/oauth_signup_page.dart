@@ -91,7 +91,7 @@ class _OAuthSignupPageState extends State<OAuthSignupPage> {
       debugPrint('  🆔 提供者用戶ID: $providerUserId');
       debugPrint('  🖼️ 頭像: $avatarUrl');
       debugPrint(
-          '  🔑 OAuth Token: ${oauthToken != null ? oauthToken!.substring(0, oauthToken!.length > 8 ? 8 : oauthToken!.length) + '...' : '無'}');
+          '  🔑 OAuth Token: ${oauthToken != null ? '${oauthToken!.substring(0, oauthToken!.length > 8 ? 8 : oauthToken!.length)}...' : '無'}');
 
       if (resolvedToken != null && resolvedToken.isNotEmpty) {
         await _fetchTempUserData(resolvedToken);

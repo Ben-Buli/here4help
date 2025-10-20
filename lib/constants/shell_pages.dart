@@ -395,9 +395,6 @@ final List<Map<String, dynamic>> shellPages = [
     'showBackArrow': true,
     'icon': Icons.chat,
     'permission': 0, // 新用戶可訪問客服聊天室
-    // 'titleWidgetBuilder': (context, data) {
-    //   return ChatTitleWidget(data: data as Map<String, dynamic>?);
-    // },
   },
   {
     'path': '/account/support/faq',

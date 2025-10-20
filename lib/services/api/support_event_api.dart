@@ -35,7 +35,13 @@ class SupportEventApi {
             debugPrint(
                 'SupportEventApi: create issue success: ${data['data']}');
           }
-          return Map<String, dynamic>.from(data['data']);
+          // 安全處理 data['data']，避免 null check 錯誤
+          final resultData = data['data'];
+          if (resultData != null && resultData is Map) {
+            return Map<String, dynamic>.from(resultData);
+          } else {
+            return <String, dynamic>{};
+          }
         } else {
           throw Exception(data['message'] ?? 'Create issue failed');
         }
@@ -199,7 +205,13 @@ class SupportEventApi {
             debugPrint(
                 'SupportEventApi: create event success: ${data['data']}');
           }
-          return Map<String, dynamic>.from(data['data']);
+          // 安全處理 data['data']，避免 null check 錯誤
+          final resultData = data['data'];
+          if (resultData != null && resultData is Map) {
+            return Map<String, dynamic>.from(resultData);
+          } else {
+            return <String, dynamic>{};
+          }
         } else {
           throw Exception(data['message'] ?? 'Create event failed');
         }
@@ -246,7 +258,13 @@ class SupportEventApi {
             debugPrint(
                 'SupportEventApi: update event status success: ${data['data']}');
           }
-          return Map<String, dynamic>.from(data['data']);
+          // 安全處理 data['data']，避免 null check 錯誤
+          final resultData = data['data'];
+          if (resultData != null && resultData is Map) {
+            return Map<String, dynamic>.from(resultData);
+          } else {
+            return <String, dynamic>{};
+          }
         } else {
           throw Exception(data['message'] ?? 'Update event status failed');
         }
@@ -294,7 +312,14 @@ class SupportEventApi {
           if (kDebugMode) {
             debugPrint('SupportEventApi: close event success: ${data['data']}');
           }
-          return Map<String, dynamic>.from(data['data']);
+          // 安全處理 data['data']，避免 null check 錯誤
+          final resultData = data['data'];
+          if (resultData != null && resultData is Map) {
+            return Map<String, dynamic>.from(resultData);
+          } else {
+            // 如果 data 為 null 或不是 Map，返回空 Map（表示成功但無數據）
+            return <String, dynamic>{};
+          }
         } else {
           throw Exception(data['message'] ?? 'Close event failed');
         }
@@ -343,7 +368,13 @@ class SupportEventApi {
             debugPrint(
                 'SupportEventApi: submit rating success: ${data['data']}');
           }
-          return Map<String, dynamic>.from(data['data']);
+          // 安全處理 data['data']，避免 null check 錯誤
+          final resultData = data['data'];
+          if (resultData != null && resultData is Map) {
+            return Map<String, dynamic>.from(resultData);
+          } else {
+            return <String, dynamic>{};
+          }
         } else {
           throw Exception(data['message'] ?? 'Submit rating failed');
         }

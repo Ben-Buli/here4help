@@ -214,13 +214,6 @@ class AuthErrorHandler {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
-            action: SnackBarAction(
-              label: 'Go to Login',
-              textColor: Colors.white,
-              onPressed: () {
-                ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              },
-            ),
           ),
         );
         debugPrint('✅ [AuthErrorHandler] Token 過期提示已顯示');

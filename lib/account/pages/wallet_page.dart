@@ -434,7 +434,15 @@ class _WalletPageState extends State<WalletPage> {
             return StreamBuilder<List<Object?>>(
               stream: Stream.value([bankAccountInfo, isLoading, errorMessage]),
               builder: (context, snapshot) {
+                final mediaQuery = MediaQuery.of(context);
+                final bottomInset = mediaQuery.viewInsets.bottom;
+
                 return AlertDialog(
+                  scrollable: true,
+                  insetPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                  contentPadding:
+                      const EdgeInsets.fromLTRB(24, 20, 24, 12),
                   title: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -453,88 +461,98 @@ class _WalletPageState extends State<WalletPage> {
                         ),
                     ],
                   ),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (bankAccountInfo != null &&
-                          bankAccountInfo!.hasValidAccount)
-                        _buildBankInfoContainer()
-                      else if (isLoading)
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 8.0),
-                          child: Text(
-                            'Loading bank information...',
-                            style: TextStyle(fontSize: 12, color: Colors.blue),
-                          ),
-                        )
-                      else
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8.0),
-                          child: Column(
-                            children: [
-                              const Text(
-                                'Bank info unavailable. Please try again later.',
-                                style: TextStyle(
-                                    fontSize: 12, color: Colors.redAccent),
-                              ),
-                              const SizedBox(height: 8),
-                              ElevatedButton.icon(
-                                onPressed: () async {
-                                  // 重新載入銀行資訊
-                                  await _loadWalletData();
-                                  // 觸發對話框重新構建
-                                  setDialogState(() {});
-                                },
-                                icon: const Icon(Icons.refresh, size: 16),
-                                label: const Text('Retry',
-                                    style: TextStyle(fontSize: 12)),
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 4),
+                  content: Padding(
+                    padding: EdgeInsets.only(
+                      bottom: bottomInset > 0 ? bottomInset : 0,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (bankAccountInfo != null &&
+                            bankAccountInfo!.hasValidAccount)
+                          _buildBankInfoContainer()
+                        else if (isLoading)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 8.0),
+                            child: Text(
+                              'Loading bank information...',
+                              style: TextStyle(fontSize: 12, color: Colors.blue),
+                            ),
+                          )
+                        else
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Column(
+                              children: [
+                                const Text(
+                                  'Bank info unavailable. Please try again later.',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.redAccent),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 8),
+                                ElevatedButton.icon(
+                                  onPressed: () async {
+                                    // 重新載入銀行資訊
+                                    await _loadWalletData();
+                                    // 觸發對話框重新構建
+                                    setDialogState(() {});
+                                  },
+                                  icon: const Icon(Icons.refresh, size: 16),
+                                  label: const Text('Retry',
+                                      style: TextStyle(fontSize: 12)),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 4),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                        TextField(
+                          controller: accountController,
+                          decoration: const InputDecoration(
+                            labelText: 'Your Payment Account Last 5 Digits',
+                            border: OutlineInputBorder(),
+                            hintText: '12345',
+                            counterText: '',
+                          ),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(5),
+                          ],
+                          textInputAction: TextInputAction.next,
+                          maxLength: 5,
+                          onChanged: (_) {
+                            if (errorText != null) {
+                              setDialogState(() => errorText = null);
+                            }
+                          },
                         ),
-                      TextField(
-                        controller: accountController,
-                        decoration: const InputDecoration(
-                          labelText: 'Your Payment Account Last 5 Digits',
-                          border: OutlineInputBorder(),
-                          hintText: '12345',
-                          counterText: '',
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: amountController,
+                          decoration: const InputDecoration(
+                            labelText: 'Transferred Amount (NTD)',
+                            border: OutlineInputBorder(),
+                            hintText: '12345', // < 100,000
+                            counterText: '',
+                          ),
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(5),
+                          ],
+                          textInputAction: TextInputAction.done,
+                          onChanged: (_) {
+                            if (errorText != null) {
+                              setDialogState(() => errorText = null);
+                            }
+                          },
                         ),
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(5),
-                        ],
-                        maxLength: 5,
-                        onChanged: (_) {
-                          if (errorText != null)
-                            setDialogState(() => errorText = null);
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: amountController,
-                        decoration: const InputDecoration(
-                          labelText: 'Transferred Amount (NTD)',
-                          border: OutlineInputBorder(),
-                          hintText: '12345', // < 100,000
-                          counterText: '',
-                        ),
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(5),
-                        ],
-                        onChanged: (_) {
-                          if (errorText != null)
-                            setDialogState(() => errorText = null);
-                        },
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                      ],
+                    ),
                   ),
                   actions: [
                     TextButton(
@@ -597,8 +615,9 @@ class _WalletPageState extends State<WalletPage> {
                                   setDialogState(() => errorText = msg);
                                 }
                               } finally {
-                                if (mounted)
+                                if (mounted) {
                                   setDialogState(() => isSubmitting = false);
+                                }
                               }
                             },
                       child: isSubmitting

@@ -143,7 +143,7 @@ class ChatListProvider extends ChangeNotifier {
       ..addAll(tasks);
 
     // 重新收斂每個任務的應徵者列表
-    _applicationsByTask..clear();
+    _applicationsByTask.clear();
 
     for (final task in tasks) {
       final taskId = task['id']?.toString();

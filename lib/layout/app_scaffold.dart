@@ -184,6 +184,22 @@ class _AppScaffoldState extends State<AppScaffold> {
 
   void _handleBack() async {
     try {
+      final currentUri = GoRouterState.of(context).uri;
+      final currentPath = currentUri.path;
+
+      // 單獨處理客服聊天室，返回 Contact Support 首頁
+      if (currentPath == '/account/support/contact/chat') {
+        await ChatSessionManager.clearCurrentChatSession();
+        if (!mounted) return;
+        context.go('/account/support');
+        return;
+      } else if (currentPath == '/account/support') {
+        if (!mounted) return;
+        _routeHistory.clear();
+        context.go('/account');
+        return;
+      }
+
       // 檢查是否在聊天室中，如果是，使用會話管理器的返回路徑
       if (await ChatSessionManager.isInChatRoom()) {
         final returnPath = await ChatSessionManager.getReturnPath();

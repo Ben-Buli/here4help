@@ -164,7 +164,7 @@ class TaskService extends ChangeNotifier {
         query.addAll(filters);
       }
 
-      final path = '/tasks/applications/posted_task_applications.php';
+      const path = '/tasks/applications/posted_task_applications.php';
       final apiUrl = Uri.parse(AppConfig.api(path))
           .replace(queryParameters: query)
           .toString();
@@ -730,29 +730,51 @@ class TaskService extends ChangeNotifier {
     String? coverLetter,
     Map<String, String>? answers,
   }) async {
-    final body = <String, dynamic>{
-      'task_id': taskId,
-      'user_id': userId,
-    };
-    if (coverLetter != null) body['cover_letter'] = coverLetter;
-    if (answers != null && answers.isNotEmpty) body['answers'] = answers;
+    try {
+      debugPrint('🔍 [TaskService] 開始應徵任務: taskId=$taskId, userId=$userId');
 
-    final resp = await http
-        .post(
-          Uri.parse(AppConfig.applicationApplyUrl),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 30));
+      final body = <String, dynamic>{
+        'task_id': taskId,
+        'user_id': userId,
+      };
+      if (coverLetter != null) body['cover_letter'] = coverLetter;
+      if (answers != null && answers.isNotEmpty) body['answers'] = answers;
 
-    if (resp.statusCode == 200) {
-      final data = jsonDecode(resp.body);
-      if (data['success'] == true) {
-        return Map<String, dynamic>.from(data['data'] ?? {});
+      debugPrint('🔍 [TaskService] 應徵請求內容: $body');
+
+      final resp = await HttpClientService.post(
+        AppConfig.applicationApplyUrl,
+        body: body,
+        useQueryParamToken: true,
+      );
+
+      debugPrint('🔍 [TaskService] 應徵回應狀態碼: ${resp.statusCode}');
+      debugPrint('🔍 [TaskService] 應徵回應內容: ${resp.body}');
+
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body);
+        if (data['success'] == true) {
+          debugPrint('✅ [TaskService] 應徵成功');
+          return Map<String, dynamic>.from(data['data'] ?? {});
+        }
+        throw Exception(data['message'] ?? 'Apply failed');
+      } else {
+        // 檢查是否返回 HTML 錯誤頁面
+        final responseBody = resp.body;
+        if (responseBody.contains('<html>') ||
+            responseBody.contains('<br />') ||
+            responseBody.contains('<!DOCTYPE')) {
+          debugPrint('❌ [TaskService] 後端返回 HTML 錯誤頁面');
+          debugPrint(
+              '❌ 回應內容: ${responseBody.length > 500 ? responseBody.substring(0, 500) : responseBody}...');
+          throw Exception(
+              'Backend server error: PHP error occurred. Please check server logs.');
+        }
+        throw Exception('HTTP ${resp.statusCode}: Apply failed');
       }
-      throw Exception(data['message'] ?? 'Apply failed');
-    } else {
-      throw Exception('HTTP ${resp.statusCode}: Apply failed');
+    } catch (e) {
+      debugPrint('❌ [TaskService] 應徵失敗: $e');
+      rethrow;
     }
   }
 

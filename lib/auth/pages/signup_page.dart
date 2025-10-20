@@ -277,7 +277,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       List<String> resolvedLanguages = ['en'];
       String? resolvedAvatarUrl;
 
-      String? _stringValue(dynamic value) {
+      String? stringValue(dynamic value) {
         if (value is String) {
           final trimmed = value.trim();
           return trimmed.isNotEmpty ? trimmed : null;
@@ -286,7 +286,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       }
 
       void assignController(TextEditingController controller, dynamic value) {
-        final text = _stringValue(value);
+        final text = stringValue(value);
         if (text != null) {
           controller.text = text;
         }
@@ -302,19 +302,19 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         assignController(dateOfBirthController, oauthData['birthday']);
       }
 
-      final nickname = _stringValue(oauthData['nickname']) ??
-          _stringValue(oauthData['name']);
+      final nickname =
+          stringValue(oauthData['nickname']) ?? stringValue(oauthData['name']);
       if (nickname != null) {
         nicknameController.text = nickname;
       }
 
-      final avatarUrl = _stringValue(oauthData['avatar_url']);
+      final avatarUrl = stringValue(oauthData['avatar_url']);
       if (avatarUrl != null) {
         resolvedAvatarUrl = avatarUrl;
         debugPrint('🖼️ 第三方登入頭像: $avatarUrl');
       }
 
-      final gender = _stringValue(oauthData['gender']);
+      final gender = stringValue(oauthData['gender']);
       if (gender != null && genderParams.containsKey(gender)) {
         resolvedGender = gender;
         debugPrint('✅ 預填性別: $gender');
@@ -336,7 +336,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       if (resolvedLanguages.length == 1 &&
           resolvedLanguages.first == 'en' &&
           oauthData['language'] != null) {
-        final singleLanguage = _stringValue(oauthData['language']);
+        final singleLanguage = stringValue(oauthData['language']);
         if (singleLanguage != null) {
           resolvedLanguages = [singleLanguage];
           debugPrint('✅ 預填語言: $singleLanguage');
@@ -346,7 +346,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       if (resolvedLanguages.length == 1 &&
           resolvedLanguages.first == 'en' &&
           oauthData['primary_language'] != null) {
-        final primaryLanguage = _stringValue(oauthData['primary_language']);
+        final primaryLanguage = stringValue(oauthData['primary_language']);
         if (primaryLanguage != null) {
           resolvedLanguages = [primaryLanguage];
           debugPrint('✅ 預填主要語言: $primaryLanguage');

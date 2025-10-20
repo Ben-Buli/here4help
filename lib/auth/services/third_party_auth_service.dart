@@ -375,8 +375,7 @@ class ThirdPartyAuthService {
           if (fullName.isNotEmpty) 'name': fullName,
           if (credential.identityToken != null)
             'identity_token': credential.identityToken,
-          if (credential.authorizationCode != null)
-            'authorization_code': credential.authorizationCode,
+          'authorization_code': credential.authorizationCode,
         };
 
         final backendResponse = await _sendAppleLoginRequest(payload);

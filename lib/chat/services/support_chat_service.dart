@@ -142,8 +142,9 @@ class ChatService {
         throw Exception('未登入');
       }
 
-      // 使用跨平台圖片服務上傳
+      // 使用跨平台圖片服務上傳（啟用 query token 支援 MAMP/FastCGI）
       final imageService = CrossPlatformImageService();
+      debugPrint('🔍 [SupportChatService] 開始上傳附件，roomId: $roomId');
       return await imageService.uploadImage(
         image: image,
         uploadUrl: AppConfig.chatUploadAttachmentUrl,
@@ -152,6 +153,7 @@ class ChatService {
         additionalFields: {
           'room_id': roomId,
         },
+        useQueryParamToken: true, // 明確啟用 query token（MAMP/FastCGI 兼容）
       );
     } catch (e) {
       throw Exception('上傳失敗: $e');
@@ -207,6 +209,7 @@ class ChatService {
           'participant_id': participantId,
           'type': type,
         },
+        useQueryParamToken: true, // 添加 query token 支援（MAMP/FastCGI 兼容）
       );
 
       if (response.statusCode == 200) {

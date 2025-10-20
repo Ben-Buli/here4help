@@ -90,6 +90,7 @@ class TaskReportsApi {
 
       final response = await HttpClientService.get(
         '$_baseUrl/reports.php?task_id=$taskId&check_status=1',
+        useQueryParamToken: true,
       );
 
       if (kDebugMode) {
@@ -139,6 +140,7 @@ class TaskReportsApi {
           'reason': reason,
           'description': description,
         },
+        useQueryParamToken: true,
       );
 
       if (kDebugMode) {

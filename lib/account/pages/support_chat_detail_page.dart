@@ -685,8 +685,7 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
           (messageId is int) ? messageId : int.tryParse('$messageId') ?? 0;
 
       // 只有對方發送的訊息才算未讀
-      final isFromMe =
-          _currentUserId != null && message['from_user_id'] == _currentUserId;
+      final isFromMe = _isMessageFromCurrentUser(message);
 
       if (msgId > (_myLastReadMessageId ?? 0) && !isFromMe) {
         // 返回分隔線的索引（在第一個未讀訊息之前）
@@ -710,8 +709,7 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
           (messageId is int) ? messageId : int.tryParse('$messageId') ?? 0;
 
       // 只有對方發送的訊息才算未讀
-      final isFromMe =
-          _currentUserId != null && message['from_user_id'] == _currentUserId;
+      final isFromMe = _isMessageFromCurrentUser(message);
 
       return msgId > (_myLastReadMessageId ?? 0) && !isFromMe;
     });
@@ -1307,7 +1305,7 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('已移除失敗的圖片'),
+          content: Text('Failed image removed'),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 2),
         ),
@@ -1330,7 +1328,7 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('發送失敗: $e'),
+            content: Text('Send message failed: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1420,10 +1418,23 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
       }
 
       if (roomId == null || roomId.isEmpty) {
+        try {
+          final location = GoRouterState.of(context).uri.toString();
+          debugPrint(
+              '🔍 [_initializeChat] 從當前路由嘗試提取 room_id, location=$location');
+          roomId = ChatStorageService.extractRoomIdFromUrl(location);
+          debugPrint('🔍 [_initializeChat] 解析路由後取得 room_id: $roomId');
+        } catch (e) {
+          debugPrint('❌ [_initializeChat] 解析路由取得 room_id 失敗: $e');
+        }
+      }
+
+      if (roomId == null || roomId.isEmpty) {
         debugPrint('❌ [_initializeChat] widget.data 中沒有 room_id');
         setState(() {
           _hasError = true;
-          _errorMessage = '無法獲取聊天室 ID，請返回聊天列表重新選擇';
+          _errorMessage =
+              'Unable to retrieve chat room ID. Please go back to the chat list and reselect.';
         });
         return;
       }
@@ -2930,7 +2941,7 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
     if (_hasError) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('聊天室'),
+          // title: const Text('Support Chat'),
           backgroundColor: Colors.transparent,
           elevation: 0,
         ),
@@ -3235,8 +3246,7 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
                     //     '🔍 [Chat Detail] 訊息來源: messageFromUserId=${messageData['from_user_id']}, currentUserId=$_currentUserId');
 
                     // 檢查是否為我發送的訊息
-                    final isFromMe = _currentUserId != null &&
-                        messageData['from_user_id'] == _currentUserId;
+                    final isFromMe = _isMessageFromCurrentUser(messageData);
                     // debugPrint('🔍 [Chat Detail] 是否為我的訊息: $isFromMe');
 
                     // 使用新的統一訊息渲染方法
@@ -5483,8 +5493,7 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
   Widget _buildResumeBubble(Map<String, dynamic> message) {
     final resumeJsonString = message['content'] ?? message['message'] ?? '{}';
     final resumeData = ResumeData.fromJsonString(resumeJsonString);
-    final isFromMe =
-        _currentUserId != null && message['from_user_id'] == _currentUserId;
+    final isFromMe = _isMessageFromCurrentUser(message);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3.0),
@@ -5659,8 +5668,7 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
 
   // 渲染新的圖片訊息氣泡（基於 kind='image'）
   Widget _buildImageBubble(Map<String, dynamic> message) {
-    final isFromMe =
-        _currentUserId != null && message['from_user_id'] == _currentUserId;
+    final isFromMe = _isMessageFromCurrentUser(message);
 
     // 優先從 content 獲取圖片 URL（圖片上傳後 URL 存儲在 content 中）
     String finalImageUrl = '';
@@ -5775,7 +5783,7 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
 
   // 渲染舊的圖片訊息（向後兼容）
   Widget _buildImageMessage(Map<String, dynamic> message, String imageUrl) {
-    final isFromMe = message['from_user_id'] == _currentUserId;
+    final isFromMe = _isMessageFromCurrentUser(message);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3.0),
@@ -5820,8 +5828,7 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
 
   // 渲染文字訊息
   Widget _buildTextMessage(Map<String, dynamic> message) {
-    final isFromMe =
-        _currentUserId != null && message['from_user_id'] == _currentUserId;
+    final isFromMe = _isMessageFromCurrentUser(message);
     final content = message['content'] ?? message['message'] ?? '';
     final messageTime = message['created_at']?.toString() ?? '';
 
@@ -6003,8 +6010,7 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
 
 // #region 渲染系統訊息
   Widget _buildSystemMessage(Map<String, dynamic> message) {
-    final isFromMe =
-        _currentUserId != null && message['from_user_id'] == _currentUserId;
+    final isFromMe = _isMessageFromCurrentUser(message);
     final content = message['content'] ?? message['message'] ?? '';
     final messageTime = message['created_at']?.toString() ?? '';
 
@@ -6256,6 +6262,23 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
         ),
       );
     }
+  }
+
+  int? _parseId(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return null;
+      return int.tryParse(trimmed);
+    }
+    return null;
+  }
+
+  bool _isMessageFromCurrentUser(Map<String, dynamic> message) {
+    if (_currentUserId == null) return false;
+    final fromId = _parseId(message['from_user_id']);
+    return fromId != null && fromId == _currentUserId;
   }
 
 // #endregion

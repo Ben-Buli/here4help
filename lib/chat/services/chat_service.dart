@@ -142,8 +142,9 @@ class ChatService {
         throw Exception('未登入');
       }
 
-      // 使用跨平台圖片服務上傳
+      // 使用跨平台圖片服務上傳（啟用 query token 支援 MAMP/FastCGI）
       final imageService = CrossPlatformImageService();
+      debugPrint('🔍 [ChatService] 開始上傳附件，roomId: $roomId');
       return await imageService.uploadImage(
         image: image,
         uploadUrl: AppConfig.chatUploadAttachmentUrl,
@@ -152,6 +153,7 @@ class ChatService {
         additionalFields: {
           'room_id': roomId,
         },
+        useQueryParamToken: true, // 明確啟用 query token（MAMP/FastCGI 兼容）
       );
     } catch (e) {
       throw Exception('上傳失敗: $e');
@@ -207,6 +209,7 @@ class ChatService {
           'participant_id': participantId,
           'type': type,
         },
+        useQueryParamToken: true, // 添加 query token 支援（MAMP/FastCGI 兼容）
       );
 
       if (response.statusCode == 200) {
@@ -214,13 +217,13 @@ class ChatService {
         if (data['success'] == true) {
           return data['data'];
         } else {
-          throw Exception(data['message'] ?? '創建聊天房間失敗');
+          throw Exception(data['message'] ?? 'Failed to create chat room');
         }
       } else {
-        throw Exception('網路錯誤: ${response.statusCode}');
+        throw Exception('Network error: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('創建聊天房間失敗: $e');
+      throw Exception('Failed to create chat room: $e');
     }
   }
 
@@ -231,7 +234,7 @@ class ChatService {
     try {
       final token = await AuthService.getToken();
       if (token == null) {
-        throw Exception('未登入');
+        throw Exception('Not logged in');
       }
 
       final response = await HttpClientService.post(
@@ -246,13 +249,13 @@ class ChatService {
         if (data['success'] == true) {
           return data['data'];
         } else {
-          throw Exception(data['message'] ?? '標記已讀失敗');
+          throw Exception(data['message'] ?? 'Failed to mark room as read');
         }
       } else {
-        throw Exception('網路錯誤: ${response.statusCode}');
+        throw Exception('Network error: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('標記已讀失敗: $e');
+      throw Exception('Failed to mark room as read: $e');
     }
   }
 
@@ -273,13 +276,13 @@ class ChatService {
         if (data['success'] == true) {
           return data['data'];
         } else {
-          throw Exception(data['message'] ?? '獲取未讀訊息失敗');
+          throw Exception(data['message'] ?? 'Failed to get unread messages');
         }
       } else {
-        throw Exception('網路錯誤: ${response.statusCode}');
+        throw Exception('Network error: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('獲取未讀訊息失敗: $e');
+      throw Exception('Failed to get unread messages: $e');
     }
   }
 
@@ -291,13 +294,13 @@ class ChatService {
       final difference = now.difference(dateTime);
 
       if (difference.inDays > 0) {
-        return '${difference.inDays}天前';
+        return '${difference.inDays} days ago';
       } else if (difference.inHours > 0) {
-        return '${difference.inHours}小時前';
+        return '${difference.inHours} hours ago';
       } else if (difference.inMinutes > 0) {
-        return '${difference.inMinutes}分鐘前';
+        return '${difference.inMinutes} minutes ago';
       } else {
-        return '剛剛';
+        return 'just now';
       }
     } catch (e) {
       return timeString;
@@ -441,12 +444,12 @@ class ChatService {
         if (data['success'] == true) {
           return Map<String, dynamic>.from(data['data'] ?? {});
         }
-        throw Exception(data['message'] ?? '封鎖操作失敗');
+        throw Exception(data['message'] ?? 'Failed to block user');
       } else {
-        throw Exception('HTTP ${response.statusCode}: 封鎖操作失敗');
+        throw Exception('HTTP ${response.statusCode}: Failed to block user');
       }
     } catch (e) {
-      throw Exception('封鎖操作失敗: $e');
+      throw Exception('Failed to block user: $e');
     }
   }
 
@@ -455,18 +458,18 @@ class ChatService {
     required String roomId,
   }) async {
     try {
-      debugPrint('🔍 [ChatService] 開始獲取聊天室詳細數據');
+      debugPrint('🔍 [ChatService] start getting chat room detail data');
       debugPrint('  - roomId: $roomId');
 
       final token = await AuthService.getToken();
       if (token == null) {
-        debugPrint('❌ [ChatService] 沒有找到 token，用戶未登入');
-        throw Exception('未登入');
+        debugPrint('❌ [ChatService] no token found, user not logged in');
+        throw Exception('Not logged in');
       }
 
       final tokenPreviewShort =
           token.length > 10 ? token.substring(0, 10) : token;
-      debugPrint('✅ [ChatService] 找到 token: $tokenPreviewShort...');
+      debugPrint('✅ [ChatService] found token: $tokenPreviewShort...');
 
       final queryParams = <String, String>{
         'room_id': roomId,
@@ -486,34 +489,36 @@ class ChatService {
 
       final response = await HttpClientService.get(uri.toString());
 
-      debugPrint('📥 [ChatService] 回應狀態碼: ${response.statusCode}');
+      debugPrint(
+          '📥 [ChatService] response status code: ${response.statusCode}');
       // debugPrint('📥 [ChatService] 回應內容: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
-          debugPrint('✅ [ChatService] 成功獲取聊天室數據');
+          debugPrint('✅ [ChatService] successfully got chat room data');
           return data['data'];
         } else {
           debugPrint('❌ [ChatService] API 返回錯誤: ${data['message']}');
-          throw Exception(data['message'] ?? '獲取聊天室詳細數據失敗');
+          throw Exception(
+              data['message'] ?? 'Failed to get chat room detail data');
         }
       } else if (response.statusCode == 401) {
         debugPrint('❌ [ChatService] 授權失敗，可能需要重新登入');
-        throw Exception('授權失敗，請重新登入');
+        throw Exception('Authorization failed, please login again');
       } else if (response.statusCode == 403) {
         debugPrint('❌ [ChatService] 沒有權限訪問此聊天室');
-        throw Exception('您沒有權限訪問此聊天室');
+        throw Exception('You do not have permission to access this chat room');
       } else if (response.statusCode == 404) {
         debugPrint('❌ [ChatService] 聊天室不存在');
-        throw Exception('聊天室不存在');
+        throw Exception('Chat room not found');
       } else {
         debugPrint('❌ [ChatService] 網路錯誤: ${response.statusCode}');
-        throw Exception('網路錯誤: ${response.statusCode}');
+        throw Exception('Network error: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('💥 [ChatService] 獲取聊天室詳細數據失敗: $e');
-      throw Exception('獲取聊天室詳細數據失敗: $e');
+      throw Exception('Failed to get chat room detail data: $e');
     }
   }
 
@@ -526,7 +531,7 @@ class ChatService {
     try {
       final token = await AuthService.getToken();
       if (token == null) {
-        throw Exception('未登入');
+        throw Exception('Not logged in');
       }
 
       final queryParams = <String, String>{
@@ -550,13 +555,14 @@ class ChatService {
           if (data['message']?.contains('not found') == true) {
             return null;
           }
-          throw Exception(data['message'] ?? '獲取應徵狀態失敗');
+          throw Exception(
+              data['message'] ?? 'Failed to get application status');
         }
       } else if (response.statusCode == 404) {
         // 沒有找到應徵記錄
         return null;
       } else {
-        throw Exception('網路錯誤: ${response.statusCode}');
+        throw Exception('Network error: ${response.statusCode}');
       }
     } catch (e) {
       // 如果發生錯誤，返回 null 讓 Accept 按鈕正常顯示
@@ -572,7 +578,7 @@ class ChatService {
     try {
       final token = await AuthService.getToken();
       if (token == null) {
-        throw Exception('未登入');
+        throw Exception('Not logged in');
       }
 
       // 獲取當前用戶信息
@@ -683,12 +689,12 @@ class ChatService {
           debugPrint('✅ [withdrawApplication] 撤回成功');
           return Map<String, dynamic>.from(data['data'] ?? {});
         }
-        throw Exception(data['message'] ?? '撤銷應徵申請失敗');
+        throw Exception(data['message'] ?? 'Failed to withdraw application');
       } else {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      throw Exception('撤銷應徵申請失敗: $e');
+      throw Exception('Failed to withdraw application: $e');
     }
   }
 }

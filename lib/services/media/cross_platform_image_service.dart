@@ -157,9 +157,18 @@ class CrossPlatformImageService {
     required String token,
     required String fieldName,
     Map<String, String>? additionalFields,
+    bool useQueryParamToken = true, // 預設啟用 query token 支援（MAMP/FastCGI 兼容）
   }) async {
     try {
-      final uri = Uri.parse(uploadUrl);
+      // 解析 URL 並添加 query token（如果啟用）
+      var uri = Uri.parse(uploadUrl);
+      if (useQueryParamToken) {
+        final queryParams = Map<String, String>.from(uri.queryParameters);
+        queryParams['token'] = token;
+        uri = uri.replace(queryParameters: queryParams);
+        debugPrint('🔍 [CrossPlatformImageService] 添加 query token 到 URL');
+      }
+
       final request = http.MultipartRequest('POST', uri);
 
       // 添加認證 header

@@ -29,22 +29,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 try {
-    // JWT 認證
-    $authHeader = getAuthorizationHeader();
+    // JWT 認證 - 使用統一的 validateRequest 方法
+    $auth = JWTManager::validateRequest();
     
-    if (!$authHeader || !preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
-        Response::error('Missing or invalid authorization header', 401);
+    if (!$auth['valid']) {
+        error_log("❌ [reports.php] JWT 驗證失敗: " . ($auth['message'] ?? 'Unauthorized'));
+        Response::error($auth['message'] ?? 'Unauthorized', 401);
     }
     
-    $token = $matches[1];
-    $jwtManager = new JWTManager();
-    $payload = $jwtManager->validateToken($token);
+    $userId = (int)$auth['payload']['user_id'];
+    error_log("✅ [reports.php] JWT 驗證成功，用戶ID: $userId");
     
-    if (!$payload) {
-        Response::error('Invalid or expired token', 401);
-    }
-    
-    $userId = $payload['user_id'];
     $db = Database::getInstance()->getConnection();
     
     // 根據 HTTP 方法分發處理

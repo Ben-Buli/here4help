@@ -19,7 +19,6 @@ class SupportChatDetailWrapper extends StatefulWidget {
 class _SupportChatDetailWrapperState extends State<SupportChatDetailWrapper> {
   Map<String, dynamic>? _chatData;
   bool _isLoading = true;
-  bool _hasError = false;
 
   @override
   void initState() {
@@ -139,14 +138,12 @@ class _SupportChatDetailWrapperState extends State<SupportChatDetailWrapper> {
           _chatData = chatData;
           _isLoading = false;
           // 即使沒有數據也不設置為錯誤，讓 ChatDetailPage 自己處理
-          _hasError = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _hasError = true;
         });
 
         // 發生錯誤，2秒後重定向

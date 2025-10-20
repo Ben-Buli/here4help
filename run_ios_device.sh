@@ -5,7 +5,7 @@
 # 
 # 用法：
 #   ./run_ios_device.sh                      # 預設: 真機=Mook，模式=profile
-#   ./run_ios_device.sh "iPhone Name"        # 指定真機，模式=profile
+#   ./run_ios_device.sh "Mook"        # 指定真機，模式=profile
 #   ./run_ios_device.sh "iPhone 16" debug   # 指定真機，模式=debug
 #   ./run_ios_device.sh "iPhone 16" profile # 指定真機，模式=profile
 #   ./run_ios_device.sh "iPhone 16" release # 指定真機，模式=release

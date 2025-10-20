@@ -1,6 +1,6 @@
 <?php
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
+require_once __DIR__ . '/../../../config/php84_compatibility.php';
 
 /**
  * 任務應徵 API
@@ -20,11 +20,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../utils/Response.php';
+require_once __DIR__ . '/../../../utils/JWTManager.php';
+require_once __DIR__ . '/../../../auth_helper.php';
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         Response::error('Method not allowed', 405);
     }
+
+    // JWT 認證 - 使用統一的 validateRequest 方法
+    $auth = JWTManager::validateRequest();
+    
+    if (!$auth['valid']) {
+        error_log("❌ [apply.php] JWT 驗證失敗: " . ($auth['message'] ?? 'Unauthorized'));
+        Response::error($auth['message'] ?? 'Unauthorized', 401);
+    }
+    
+    $currentUserId = (int)$auth['payload']['user_id'];
+    error_log("✅ [apply.php] JWT 驗證成功，當前用戶ID: $currentUserId");
 
     // 解析請求資料
     $input = json_decode(file_get_contents('php://input'), true);
@@ -43,6 +56,12 @@ try {
 
     if (empty($userId) || !is_numeric($userId)) {
         Response::validationError(['user_id' => 'user_id is required and must be numeric']);
+    }
+
+    // 安全檢查：確保當前用戶只能為自己應徵
+    if ((int)$userId !== $currentUserId) {
+        error_log("❌ [apply.php] 用戶嘗試為他人應徵: 當前用戶=$currentUserId, 請求用戶=$userId");
+        Response::error('You can only apply for yourself', 403);
     }
 
     if (empty($coverLetter)) {
@@ -99,14 +118,17 @@ try {
         
         $applicationId = $existingApplication['id'];
     } else {
-        // 創建新應徵
+        // 創建新應徵（配合資料庫使用 UUID_SHORT() 生成唯一 ID）
+        $uuidRow = $db->fetch("SELECT UUID_SHORT() AS id");
+        $applicationId = (int)($uuidRow['id'] ?? 0);
+        if ($applicationId <= 0) {
+            throw new Exception('Failed to generate application ID');
+        }
         $db->query(
-            "INSERT INTO task_applications (task_id, user_id, status, cover_letter, answers_json, created_at, updated_at) 
-             VALUES (?, ?, 'applied', ?, ?, NOW(), NOW())",
-            [$taskId, $userId, $coverLetter, $answersJson]
+            "INSERT INTO task_applications (id, task_id, user_id, status, cover_letter, answers_json, created_at, updated_at)
+             VALUES (?, ?, ?, 'applied', ?, ?, NOW(), NOW())",
+            [$applicationId, $taskId, $userId, $coverLetter, $answersJson]
         );
-        
-        $applicationId = $db->lastInsertId();
     }
 
     // 獲取完整的應徵資料

@@ -705,6 +705,9 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
         children: [
           InkWell(
             onTap: () async {
+              // 點擊任務卡片時關閉鍵盤
+              FocusScope.of(context).unfocus();
+
               // 實現導航到聊天室
               final userService = context.read<UserService>();
               final currentUserId = userService.currentUser?.id;

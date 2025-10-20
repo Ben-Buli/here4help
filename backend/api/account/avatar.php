@@ -138,6 +138,9 @@ try {
             $tid = $_SERVER['HTTP_X_TRACE_ID'] ?? null;
             
             // new version
+            $safeRequestId = $rid ? mb_substr($rid, 0, 64) : null;
+            $safeTraceId = $tid ? mb_substr($tid, 0, 64) : null;
+
             UserActiveLogger::logAction(
                 $pdo,
                 $userId,
@@ -148,12 +151,14 @@ try {
                 'User uploaded new avatar',
                 'user',
                 $userId,
-                json_encode([
+                $safeRequestId,
+                $safeTraceId,
+                [
                     'file_name'   => $fileName,
                     'file_size'   => $file['size'],
                     'mime_type'   => $mimeType,
                     'uploaded_at' => date('Y-m-d H:i:s'),
-                ])
+                ]
             );
 
             
