@@ -39,18 +39,12 @@ class _StudentIdPageState extends State<StudentIdPage> {
 
     final hasPaymentCode = prefs.getString('signup_payment_code') != null;
 
-    // 🔧 新增：檢查是否有 user_id（註冊成功後才會有）
-    final hasUserId = prefs.getString('signup_user_id') != null;
-
     setState(() {
-      hasAllData = hasBasicInfo && hasPaymentCode && hasUserId;
+      hasAllData = hasBasicInfo && hasPaymentCode;
     });
 
     if (!hasAllData) {
       String errorMessage = 'Please complete the registration form first';
-      if (hasBasicInfo && hasPaymentCode && !hasUserId) {
-        errorMessage = 'Registration incomplete. Please register again.';
-      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -62,8 +56,7 @@ class _StudentIdPageState extends State<StudentIdPage> {
     } else {
       // 🔧 新增：顯示用戶資訊確認
       final email = prefs.getString('signup_email');
-      final userId = prefs.getString('signup_user_id');
-      debugPrint('✅ 學生證頁面載入成功 - Email: $email, User ID: $userId');
+      debugPrint('✅ 學生證頁面載入成功 - Email: $email');
     }
   }
 
@@ -360,30 +353,63 @@ class _StudentIdPageState extends State<StudentIdPage> {
     });
 
     try {
-      // 🔧 修復：使用 user_id 而不是 email 來關聯用戶
-      final userId = prefs.getString('signup_user_id');
+      final fullName = prefs.getString('signup_full_name');
+      final nickname = prefs.getString('signup_nickname') ?? '';
+      final gender = prefs.getString('signup_gender');
       final email = prefs.getString('signup_email');
+      final phone = prefs.getString('signup_phone') ?? '';
+      final country = prefs.getString('signup_country') ?? '';
+      final address = prefs.getString('signup_address') ?? '';
+      final password = prefs.getString('signup_password');
+      final dateOfBirth = prefs.getString('signup_date_of_birth');
+      final primaryLanguages =
+          prefs.getStringList('signup_languages') ?? <String>['en'];
+      final referralCode = prefs.getString('signup_referral_code') ?? '';
 
-      if (userId == null || userId.isEmpty) {
-        throw Exception('User ID not found. Please register again.');
+      final missingFields = <String>[];
+      if (fullName == null || fullName.isEmpty) {
+        missingFields.add('name');
+      }
+      if (gender == null || gender.isEmpty) {
+        missingFields.add('gender');
+      }
+      if (email == null || email.isEmpty) {
+        missingFields.add('email');
+      }
+      if (password == null || password.isEmpty) {
+        missingFields.add('password');
+      }
+      if (dateOfBirth == null || dateOfBirth.isEmpty) {
+        missingFields.add('date_of_birth');
       }
 
-      // 🔧 新增：驗證 user_id 的有效性
-      debugPrint('🔍 驗證用戶 ID: $userId, Email: $email');
+      if (missingFields.isNotEmpty) {
+        throw Exception(
+            'Missing required registration data: ${missingFields.join(', ')}. Please restart the signup process.');
+      }
 
-      // Get student ID data
-      final studentIdData = {
-        'user_id': userId,
-        'email': email ?? '', // 保留 email 作為備用驗證
+      final studentIdData = <String, String>{
+        'name': fullName!,
+        'nickname': nickname,
+        'gender': gender!,
+        'email': email!,
+        'phone': phone,
+        'country': country,
+        'address': address,
+        'password': password!,
+        'date_of_birth': dateOfBirth!,
+        'payment_password': paymentCode,
+        'is_permanent_address':
+            (prefs.getBool('signup_is_permanent_address') ?? false) ? '1' : '0',
+        'primary_language': primaryLanguages.join(','),
+        'intro_referral_code': referralCode,
         'school_name': schoolNameController.text,
         'student_name': studentNameController.text,
         'student_id': studentIdController.text,
-        'is_update': 'false', // 明確標識這是新建操作
       };
 
-      debugPrint('📤 準備上傳學生證資料 - User ID: $userId, Email: $email');
+      debugPrint('📤 準備上傳學生證資料 - Email: $email');
 
-      // Upload student ID image
       final success = await _uploadStudentIdImage(studentIdData);
 
       if (success) {
@@ -424,14 +450,19 @@ class _StudentIdPageState extends State<StudentIdPage> {
       // 使用跨平台圖片服務上傳
       final result = await _imageService.uploadImage(
         image: _selectedImage!,
-        uploadUrl: AppConfig.uploadStudentIdUrl,
-        token: '', // 學生證上傳不需要 token
+        uploadUrl: AppConfig.registerWithStudentIdUrl,
+        token: '', // 公開端點，不需要 token
         fieldName: 'student_id_image',
         additionalFields:
             studentIdData.map((key, value) => MapEntry(key, value.toString())),
+        useQueryParamToken: false,
       );
 
-      return result['success'] == true;
+      if (result['success'] == true) {
+        return true;
+      }
+      final message = result['message'] ?? 'Registration failed';
+      throw Exception(message);
     } catch (e) {
       throw Exception('Network error: $e');
     }
@@ -453,7 +484,7 @@ class _StudentIdPageState extends State<StudentIdPage> {
     await prefs.remove('signup_payment_code');
     await prefs.remove('signup_is_permanent_address');
     await prefs.remove('signup_languages');
-    await prefs.remove('signup_user_id'); // 🔧 新增：清理 user_id
+    await prefs.remove('signup_referral_code');
 
     debugPrint('🧹 已清理所有註冊暫存資料');
   }

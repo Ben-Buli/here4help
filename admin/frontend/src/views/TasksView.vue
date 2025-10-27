@@ -325,10 +325,12 @@ const filters = reactive({
 const loadTasks = async (page = 1) => {
   try {
     isLoading.value = true
+    const targetPage = Number(page) || 1
+    const perPage = Number(pagination.value.per_page) || 15
 
     const params = {
-      page,
-      per_page: pagination.value.per_page,
+      page: targetPage,
+      per_page: perPage,
       search: filters.search || undefined,
       status_id: filters.status_id ? parseInt(filters.status_id) : undefined,
       creator_id: filters.creator_id ? parseInt(filters.creator_id) : undefined,
@@ -348,7 +350,13 @@ const loadTasks = async (page = 1) => {
 
       // 使用後端返回的分頁信息
       if (data.pagination) {
-        pagination.value = data.pagination
+        const pg = data.pagination
+        pagination.value = {
+          current_page: Number(pg.current_page) || targetPage,
+          per_page: Number(pg.per_page) || perPage,
+          total: Number(pg.total) || 0,
+          last_page: Number(pg.last_page) || 1,
+        }
       }
       
       // 使用後端返回的統計信息
@@ -368,8 +376,11 @@ const refreshData = () => {
 }
 
 const changePage = (page: number) => {
-  if (page >= 1 && page <= pagination.value.last_page) {
-    loadTasks(page)
+  const nextPage = Number(page)
+  const lastPage = Number(pagination.value.last_page) || 1
+  if (nextPage >= 1 && nextPage <= lastPage) {
+    pagination.value.current_page = nextPage
+    loadTasks(nextPage)
   }
 }
 

@@ -57,6 +57,11 @@ Route::prefix('admintest')->group(function () {
 */
 Route::prefix('admin')->group(function () {
     Route::get('/{any?}', function () {
-        return view('app'); // 確認 resources/views/app.blade.php 存在並載入 Vue
+        // 直接回傳打包後的 SPA 入口檔，避免找不到 app.blade.php
+        $indexPath = public_path('index.html');
+        if (!file_exists($indexPath)) {
+            abort(500, 'SPA index.html not found. Please run build_admin_frontend.sh first.');
+        }
+        return response()->file($indexPath);
     })->where('any', '.*');
 });

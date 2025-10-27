@@ -162,7 +162,7 @@ class CrossPlatformImageService {
     try {
       // 解析 URL 並添加 query token（如果啟用）
       var uri = Uri.parse(uploadUrl);
-      if (useQueryParamToken) {
+      if (useQueryParamToken && token.isNotEmpty) {
         final queryParams = Map<String, String>.from(uri.queryParameters);
         queryParams['token'] = token;
         uri = uri.replace(queryParameters: queryParams);
@@ -172,7 +172,9 @@ class CrossPlatformImageService {
       final request = http.MultipartRequest('POST', uri);
 
       // 添加認證 header
-      request.headers['Authorization'] = 'Bearer $token';
+      if (token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
 
       // 添加額外欄位
       if (additionalFields != null) {

@@ -174,7 +174,7 @@
   <!-- Issue Detail Modal -->
   <div v-if="showIssueModal" class="fixed inset-0 z-50 flex items-center justify-center">
     <div class="fixed inset-0 bg-black/20 backdrop-blur-sm" @click="closeIssue"></div>
-    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 z-10">
+    <div class="relative bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 z-10">
       <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <h3 class="text-lg font-medium text-gray-900">Issue Detail</h3>
         <button @click="closeIssue" class="text-gray-400 hover:text-gray-600 focus:outline-none">
@@ -186,11 +186,11 @@
       <div class="px-6 py-5 space-y-4">
         <div>
           <div class="text-sm text-gray-500">Title</div>
-          <div class="text-sm text-gray-900">{{ currentIssue?.title || '-' }}</div>
+          <div class="text-sm text-gray-900 break-words break-all overflow-hidden">{{ currentIssue?.title || '-' }}</div>
         </div>
         <div>
           <div class="text-sm text-gray-500">Description</div>
-          <div class="text-sm text-gray-900 whitespace-pre-wrap">{{ currentIssue?.description || '-' }}</div>
+          <div class="text-sm text-gray-900 whitespace-pre-wrap break-words break-all overflow-hidden">{{ currentIssue?.description || '-' }}</div>
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
@@ -307,16 +307,16 @@ const claimIssue = async (it: any) => {
     const response = await adminSupportApi.claimIssue(String(it.room_id))
     
     if (response.data.success) {
-      // 顯示成功訊息
       console.log('Issue claimed successfully:', response.data.data?.message)
-      
-      // 如果有重定向 URL，自動跳轉到聊天室列表
-      if (response.data.data?.redirect_url) {
-        window.location.href = response.data.data.redirect_url
-      } else {
-        // 重新載入列表以更新狀態
-        await refreshData()
+
+      // 無論後端提供什麼 redirect，都統一導向管理員的 Support Chat List 頁面
+      const roomId = it.room_id
+      if (roomId) {
+        window.location.href = `/admin/support-chat-list?room_id=${roomId}`
+        return
       }
+
+      await refreshData()
     } else {
       throw new Error(response.data.message || 'Failed to claim issue')
     }
@@ -411,5 +411,4 @@ onMounted(() => {
   loadIssues()
 })
 </script>
-
 

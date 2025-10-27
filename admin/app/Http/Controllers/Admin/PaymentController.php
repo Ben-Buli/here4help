@@ -205,8 +205,30 @@ class PaymentController extends Controller
 
         DB::beginTransaction();
         try {
-            // 全部設為 inactive
-            DB::table('official_bank_accounts')->update(['is_active' => 0]);
+            // 先將既有的非活動紀錄標記為 NULL，避免 UNIQUE KEY 衝突
+            // DB::table('official_bank_accounts')
+            //     ->where('is_active', 0)
+            //     ->update([
+            //         'is_active' => 0,
+            //         'updated_at' => now(),
+            //     ]);
+
+            // 將目前的 active 帳戶關閉
+            // DB::table('official_bank_accounts')
+            //     ->where('is_active', 1)
+            //     ->update([
+            //         'is_active' => 0,
+            //         'updated_at' => now(),
+            //     ]);
+
+            // 將所有的銀行帳戶資料設定為非活躍帳號
+             DB::table('official_bank_accounts')
+                ->whereIn('is_active', [1, null])
+                ->update([
+                    'is_active' => null,
+                    'updated_at' => now(),
+                ]);
+
             // 新增一筆 active 帳戶
             DB::table('official_bank_accounts')->insert([
                 'bank_name' => $request->get('bank_name'),
@@ -243,5 +265,4 @@ class PaymentController extends Controller
         }
     }
 }
-
 

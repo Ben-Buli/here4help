@@ -148,7 +148,7 @@ class _ChatListTaskWidgetState extends State<ChatListTaskWidget>
             ),
             tabs: [
               Tab(child: buildTabLabel('Post')),
-              Tab(child: buildTabLabel('Expolore')),
+              Tab(child: buildTabLabel('Explore')),
             ],
           ),
         );

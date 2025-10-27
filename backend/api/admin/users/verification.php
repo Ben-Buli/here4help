@@ -86,10 +86,14 @@ try {
     if ($verification) {
         // 構建完整的圖片 URL
         $imageUrl = null;
+        $normalizedImagePath = null;
         if ($verification['student_id_image_path']) {
-            $imagePath = $verification['student_id_image_path'];
+            $normalizedImagePath = ltrim($verification['student_id_image_path'], '/');
+            if (strpos($normalizedImagePath, 'uploads/') === 0) {
+                $normalizedImagePath = substr($normalizedImagePath, strlen('uploads/'));
+            }
             // 直接使用 /uploads 路徑，讓 Vite 代理處理
-            $imageUrl = '/uploads/' . ltrim($imagePath, '/');
+            $imageUrl = '/uploads/' . $normalizedImagePath;
         }
         
         $responseData['verification'] = [

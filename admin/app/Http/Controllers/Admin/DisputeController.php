@@ -418,8 +418,12 @@ class DisputeController extends Controller
 
             // 獲取聊天室資訊
             $chatRoom = DB::table('chat_rooms as cr')
-                ->leftJoin('users as creator', 'cr.creator_id', '=', 'creator.id')
-                ->leftJoin('users as participant', 'cr.participant_id', '=', 'participant.id')
+                ->leftJoin('users as creator', function($join) {
+                    $join->on('cr.creator_id', '=', 'creator.id');
+                })
+                ->leftJoin('users as participant', function($join) {
+                    $join->on('cr.participant_id', '=', 'participant.id');
+                })
                 ->select([
                     'cr.id', 'cr.type', 'cr.task_id', 'cr.creator_id', 'cr.participant_id', 'cr.created_at',
                     'creator.name as creator_name', 'creator.avatar_url as creator_avatar',
@@ -622,5 +626,138 @@ class DisputeController extends Controller
                 'message' => 'Server error occurred'
             ], 500);
         }
+    }
+
+    /**
+     * GET /admin/disputes/{disputeId}/chat-messages
+     * 獲取爭議聊天記錄
+     */
+    public function getChatMessages(Request $request, $disputeId)
+    {
+        $admin = $request->user();
+        
+        // 獲取爭議資訊
+        $dispute = DB::table('task_disputes')
+            ->leftJoin('tasks', 'task_disputes.task_id', '=', 'tasks.id')
+            ->leftJoin('users as creator', 'tasks.creator_id', '=', 'creator.id')
+            ->leftJoin('users as participant', 'tasks.participant_id', '=', 'participant.id')
+            ->leftJoin('users as submitter', 'task_disputes.user_id', '=', 'submitter.id')
+            ->select([
+                'task_disputes.id as dispute_id',
+                'task_disputes.title as dispute_title',
+                'task_disputes.description as dispute_description',
+                'task_disputes.status as dispute_status',
+                'task_disputes.created_at as dispute_created_at',
+                'task_disputes.updated_at as dispute_updated_at',
+                'tasks.id as task_id',
+                'tasks.title as task_title',
+                'tasks.reward_point',
+                'creator.name as creator_name',
+                'creator.avatar_url as creator_avatar',
+                'participant.name as participant_name',
+                'participant.avatar_url as participant_avatar',
+                'submitter.name as submitter_name',
+                'submitter.email as submitter_email'
+            ])
+            ->where('task_disputes.id', $disputeId)
+            ->first();
+
+        if (!$dispute) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dispute not found'
+            ], 404);
+        }
+
+        // 獲取聊天室資訊
+        $chatRoom = DB::table('chat_rooms')
+            ->where('task_id', $dispute->task_id)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$chatRoom) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Chat room not found for this dispute'
+            ], 404);
+        }
+
+        // 獲取聊天訊息
+        $messages = DB::table('chat_messages as cm')
+            ->leftJoin('users as u', 'cm.from_user_id', '=', 'u.id')
+            ->select([
+                'cm.id', 'cm.room_id', 'cm.from_user_id', 'cm.content', 'cm.kind',
+                'cm.media_url', 'cm.mime_type', 'cm.created_at',
+                'u.name as sender_name', 'u.avatar_url as sender_avatar'
+            ])
+            ->where('cm.room_id', $chatRoom->id)
+            ->orderBy('cm.created_at', 'asc')
+            ->get();
+
+        // 處理訊息格式，添加發送者角色
+        $processedMessages = $messages->map(function($message) use ($dispute) {
+            $senderRole = 'unknown';
+            if ($message->from_user_id) {
+                if ($message->from_user_id == $dispute->creator_id) {
+                    $senderRole = 'creator';
+                } elseif ($message->from_user_id == $dispute->participant_id) {
+                    $senderRole = 'participant';
+                }
+            }
+            
+            return [
+                'id' => (int)$message->id,
+                'room_id' => $message->room_id,
+                'from_user_id' => $message->from_user_id ? (int)$message->from_user_id : null,
+                'content' => $message->content,
+                'kind' => $message->kind,
+                'created_at' => $message->created_at,
+                'sender_name' => $message->sender_name ?? 'System',
+                'sender_avatar' => $message->sender_avatar,
+                'sender_role' => $senderRole,
+                'media_url' => $message->media_url,
+                'mime_type' => $message->mime_type,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'dispute' => [
+                    'id' => (int)$dispute->dispute_id,
+                    'dispute_title' => $dispute->dispute_title,
+                    'dispute_description' => $dispute->dispute_description,
+                    'status' => $dispute->dispute_status,
+                    'created_at' => $dispute->dispute_created_at,
+                    'updated_at' => $dispute->dispute_updated_at,
+                    'task' => [
+                        'id' => $dispute->task_id,
+                        'title' => $dispute->task_title,
+                        'reward_point' => (int)$dispute->reward_point,
+                        'creator_name' => $dispute->creator_name,
+                        'participant_name' => $dispute->participant_name,
+                    ],
+                    'creator' => [
+                        'name' => $dispute->creator_name,
+                        'avatar_url' => $dispute->creator_avatar,
+                    ],
+                    'participant' => [
+                        'name' => $dispute->participant_name,
+                        'avatar_url' => $dispute->participant_avatar,
+                    ],
+                    'submitter' => [
+                        'name' => $dispute->submitter_name,
+                        'email' => $dispute->submitter_email,
+                    ],
+                ],
+                'messages' => $processedMessages->toArray(),
+                'meta' => [
+                    'total_messages' => count($messages),
+                    'viewed_by_admin' => $admin->username ?? $admin->full_name,
+                    'admin_id' => (int)$admin->id,
+                    'viewed_at' => now()->toDateTimeString()
+                ]
+            ]
+        ]);
     }
 }

@@ -30,6 +30,8 @@ class AppConfig {
   static String get loginUrl => api('/auth/login.php');
 
   static String get registerUrl => api('/auth/register.php');
+  static String get registerWithStudentIdUrl =>
+      api('/auth/register-with-student-id.php');
 
   static String get profileUrl => api('/account/profile.php');
 

@@ -477,9 +477,9 @@ export const disputeApi = {
   getChatRoomByTask: (taskId: string) => 
     api.get<ApiResponse<any>>(`/api/admin/task-disputes/${taskId}/chat-room`),
 
-  // 管理員查看爭議聊天記錄 - 暫時保留但可能需要調整
+  // 管理員查看爭議聊天記錄 - 使用正確的端點
   getChatMessages: (disputeId: number) =>
-    api.get<ApiResponse<any>>(`/api/admin/dispute-chat-messages`, { params: { dispute_id: disputeId } }),
+    api.get<ApiResponse<any>>(`/api/admin/disputes/${disputeId}/chat-messages`),
 
   // 解決爭議
   resolve: (disputeId: string, decision: string, note: string) =>

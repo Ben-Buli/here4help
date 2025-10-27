@@ -31,8 +31,11 @@ try {
     $images = [];
     
     foreach ($verifications as $verification) {
-        $imagePath = $verification['student_id_image_path'];
-        $fullPath = __DIR__ . '/../../../' . $imagePath;
+        $imagePath = ltrim($verification['student_id_image_path'], '/');
+        if (strpos($imagePath, 'uploads/') === 0) {
+            $imagePath = substr($imagePath, strlen('uploads/'));
+        }
+        $fullPath = __DIR__ . '/../../../uploads/' . $imagePath;
         
         $fileSize = 0;
         if (file_exists($fullPath)) {

@@ -26,7 +26,7 @@
         </div>
       </div>
       <div class="mt-4">
-        <button @click="showConfirmDialog = true" class="admin-button-primary" :disabled="loading || !valid">Save as Active</button>
+        <button @click="showConfirmDialog = true" class="admin-button-primary" :disabled="loading || !valid">Set new official bank account</button>
       </div>
     </div>
 
@@ -52,7 +52,7 @@
               <td>{{ it.account_holder }}</td>
               <td>
                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full" :class="it.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'">
-                  {{ it.is_active ? 'Active' : 'Inactive' }}
+                  {{ it.is_active == 1 ? 'Active' : 'Inactive' }}
                 </span>
               </td>
               <td>{{ formatDate(it.created_at) }}</td>
@@ -126,6 +126,56 @@
         </div>
       </div>
     </div>
+
+    <!-- 訊息提示 -->
+    <div v-if="showMessage" class="fixed top-4 right-4 z-[10000] max-w-sm">
+      <div 
+        class="rounded-md p-4 shadow-lg"
+        :class="message.type === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'"
+      >
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg 
+              v-if="message.type === 'success'"
+              class="h-5 w-5 text-green-400" 
+              fill="currentColor" 
+              viewBox="0 0 20 20"
+            >
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+            </svg>
+            <svg 
+              v-else
+              class="h-5 w-5 text-red-400" 
+              fill="currentColor" 
+              viewBox="0 0 20 20"
+            >
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="ml-3">
+            <p 
+              class="text-sm font-medium"
+              :class="message.type === 'success' ? 'text-green-800' : 'text-red-800'"
+            >
+              {{ message.text }}
+            </p>
+          </div>
+          <div class="ml-auto pl-3">
+            <div class="-mx-1.5 -my-1.5">
+              <button 
+                @click="showMessage = false"
+                class="inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                :class="message.type === 'success' ? 'text-green-500 hover:bg-green-100 focus:ring-green-600' : 'text-red-500 hover:bg-red-100 focus:ring-red-600'"
+              >
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -137,6 +187,8 @@ const loading = ref(false)
 const items = ref<any[]>([])
 const form = ref({ bank_name: '', account_number: '', account_name: '' })
 const showConfirmDialog = ref(false)
+const message = ref({ type: '', text: '' })
+const showMessage = ref(false)
 
 const valid = computed(() => form.value.bank_name && form.value.account_number && form.value.account_name)
 
@@ -176,12 +228,34 @@ const confirmSave = async () => {
   
   loading.value = true
   try {
-    await paymentApi.setOfficialAccount(form.value)
-    showConfirmDialog.value = false
-    await load()
-  } catch (error) {
+    const response = await paymentApi.setOfficialAccount(form.value)
+    
+    if (response.data.success) {
+      // 成功提示
+      message.value = { type: 'success', text: 'Official bank account updated successfully!' }
+      showMessage.value = true
+      showConfirmDialog.value = false
+      await load()
+      
+      // 3秒後自動隱藏成功訊息
+      setTimeout(() => {
+        showMessage.value = false
+      }, 3000)
+    } else {
+      throw new Error(response.data.message || 'Failed to update official account')
+    }
+  } catch (error: any) {
     console.error('Failed to save official account:', error)
-    // 可以在這裡添加錯誤提示
+    
+    // 錯誤提示
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to save official account'
+    message.value = { type: 'error', text: errorMessage }
+    showMessage.value = true
+    
+    // 5秒後自動隱藏錯誤訊息
+    setTimeout(() => {
+      showMessage.value = false
+    }, 5000)
   } finally {
     loading.value = false
   }

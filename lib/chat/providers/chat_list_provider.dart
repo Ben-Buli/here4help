@@ -341,6 +341,28 @@ class ChatListProvider extends ChangeNotifier {
   int _compareBySortType(Map<String, dynamic> a, Map<String, dynamic> b,
       String sortBy, bool ascending) {
     switch (sortBy) {
+      case 'status_order':
+        final aOrder =
+            int.tryParse(a['sort_order']?.toString() ?? '') ?? (int.tryParse(a['status_id']?.toString() ?? '') ?? 999);
+        final bOrder =
+            int.tryParse(b['sort_order']?.toString() ?? '') ?? (int.tryParse(b['status_id']?.toString() ?? '') ?? 999);
+        final orderComparison = aOrder.compareTo(bOrder);
+        if (orderComparison != 0) {
+          return ascending ? orderComparison : -orderComparison;
+        }
+        final aStatus = int.tryParse(a['status_id']?.toString() ?? '0') ?? 0;
+        final bStatus = int.tryParse(b['status_id']?.toString() ?? '0') ?? 0;
+        final statusComparison = aStatus.compareTo(bStatus);
+        if (statusComparison != 0) {
+          return ascending ? statusComparison : -statusComparison;
+        }
+        final aStatusTime =
+            DateTime.tryParse(a['updated_at'] ?? '') ?? DateTime(1970);
+        final bStatusTime =
+            DateTime.tryParse(b['updated_at'] ?? '') ?? DateTime(1970);
+        final fallback = aStatusTime.compareTo(bStatusTime);
+        return ascending ? fallback : -fallback;
+
       case 'updated_time':
         final aTime =
             DateTime.tryParse(a['updated_at'] ?? '') ?? DateTime(1970);
@@ -355,25 +377,22 @@ class ChatListProvider extends ChangeNotifier {
             ? aStatus.compareTo(bStatus)
             : bStatus.compareTo(aStatus);
 
-      case 'popularity':
-        // Posted Tasks: 根據應徵數量排序
+      case 'applicant_count':
+      case 'popularity': // 兼容舊鍵值
         if (_currentTabIndex == tabPostedTasks) {
           final aCount = _applicationsByTask[a['id']?.toString()]?.length ?? 0;
           final bCount = _applicationsByTask[b['id']?.toString()]?.length ?? 0;
-          return ascending
-              ? aCount.compareTo(bCount)
-              : bCount.compareTo(aCount);
+          final comparison = aCount.compareTo(bCount);
+          return ascending ? comparison : -comparison;
         }
-        // My Works: 不適用，使用預設排序
         return 0;
 
       case 'relevance':
         // 相關性排序（僅在搜尋時使用）
         final aRelevance = a['_relevance'] ?? 0;
         final bRelevance = b['_relevance'] ?? 0;
-        return ascending
-            ? aRelevance.compareTo(bRelevance)
-            : bRelevance.compareTo(aRelevance);
+        final comparison = aRelevance.compareTo(bRelevance);
+        return ascending ? comparison : -comparison;
 
       default:
         // 預設按更新時間排序
@@ -381,7 +400,7 @@ class ChatListProvider extends ChangeNotifier {
             DateTime.tryParse(a['updated_at'] ?? '') ?? DateTime(1970);
         final bTime =
             DateTime.tryParse(b['updated_at'] ?? '') ?? DateTime(1970);
-        return bTime.compareTo(aTime); // 降序
+        return ascending ? aTime.compareTo(bTime) : bTime.compareTo(aTime);
     }
   }
 
@@ -714,6 +733,8 @@ class ChatListProvider extends ChangeNotifier {
   /// 獲取排序方式的預設升序/降序設定
   bool _getDefaultAscending(String sortBy) {
     switch (sortBy) {
+      case 'status_order':
+        return true; // 狀態順序維持預設升序
       case 'status_id':
         return true; // 狀態 ID 升序
       case 'updated_time':
@@ -722,6 +743,8 @@ class ChatListProvider extends ChangeNotifier {
         return false; // 相關性降序（最相關的在前）
       case 'applicant_count':
         return false; // 應徵者數量降序（最多的在前）
+      case 'popularity': // 兼容舊鍵值
+        return false;
       default:
         return false; // 預設降序
     }

@@ -881,10 +881,37 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
   int _compareByUserSortChoice(Map<String, dynamic> a, Map<String, dynamic> b,
       ChatListProvider chatProvider) {
     switch (chatProvider.currentSortBy) {
+      case 'status_order':
+        final aOrder =
+            int.tryParse(a['sort_order']?.toString() ?? '') ?? (int.tryParse(a['status_id']?.toString() ?? '') ?? 999);
+        final bOrder =
+            int.tryParse(b['sort_order']?.toString() ?? '') ?? (int.tryParse(b['status_id']?.toString() ?? '') ?? 999);
+        final orderComparison = aOrder.compareTo(bOrder);
+        if (orderComparison != 0) {
+          return chatProvider.sortAscending
+              ? orderComparison
+              : -orderComparison;
+        }
+        final aStatus = int.tryParse(a['status_id']?.toString() ?? '0') ?? 0;
+        final bStatus = int.tryParse(b['status_id']?.toString() ?? '0') ?? 0;
+        final statusComparison = aStatus.compareTo(bStatus);
+        if (statusComparison != 0) {
+          return chatProvider.sortAscending
+              ? statusComparison
+              : -statusComparison;
+        }
+        final aTime =
+            DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
+        final bTime =
+            DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
+        final timeComparison = aTime.compareTo(bTime);
+        return chatProvider.sortAscending ? timeComparison : -timeComparison;
+
       case 'relevance':
         final aRelevance = a['_relevance'] ?? 0;
         final bRelevance = b['_relevance'] ?? 0;
-        return bRelevance.compareTo(aRelevance); // 相關性降序
+        final comparison = aRelevance.compareTo(bRelevance);
+        return chatProvider.sortAscending ? comparison : -comparison;
 
       case 'updated_time':
         final aTime =
@@ -898,18 +925,23 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       case 'applicant_count':
         final aCount = (_applicationsByTask[a['id']?.toString()] ?? []).length;
         final bCount = (_applicationsByTask[b['id']?.toString()] ?? []).length;
-        return chatProvider.sortAscending
-            ? aCount.compareTo(bCount)
-            : bCount.compareTo(aCount);
+        final comparison = aCount.compareTo(bCount);
+        return chatProvider.sortAscending ? comparison : -comparison;
 
       case 'status_id':
+        final aStatus = int.tryParse(a['status_id']?.toString() ?? '0') ?? 0;
+        final bStatus = int.tryParse(b['status_id']?.toString() ?? '0') ?? 0;
+        final comparison = aStatus.compareTo(bStatus);
+        return chatProvider.sortAscending ? comparison : -comparison;
+
       default:
-        // 預設按更新時間降序
         final aTime =
             DateTime.parse(a['updated_at'] ?? DateTime.now().toString());
         final bTime =
             DateTime.parse(b['updated_at'] ?? DateTime.now().toString());
-        return bTime.compareTo(aTime);
+        return chatProvider.sortAscending
+            ? aTime.compareTo(bTime)
+            : bTime.compareTo(aTime);
     }
   }
 

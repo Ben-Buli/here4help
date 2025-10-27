@@ -257,7 +257,7 @@
                 <div v-if="deposit.status === 'pending'" class="flex flex-col space-y-1">
                   <button
                     @click="approveDeposit(deposit)"
-                    class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     :disabled="processing"
                   >
                     <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -267,7 +267,7 @@
                   </button>
                   <button
                     @click="rejectDeposit(deposit)"
-                    class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     :disabled="processing"
                   >
                     <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -369,6 +369,56 @@
         </div>
       </div>
     </div>
+
+    <!-- 訊息提示 -->
+    <div v-if="showMessage" class="fixed top-4 right-4 z-[10000] max-w-sm">
+      <div 
+        class="rounded-md p-4 shadow-lg"
+        :class="message.type === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'"
+      >
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg 
+              v-if="message.type === 'success'"
+              class="h-5 w-5 text-green-400" 
+              fill="currentColor" 
+              viewBox="0 0 20 20"
+            >
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+            </svg>
+            <svg 
+              v-else
+              class="h-5 w-5 text-red-400" 
+              fill="currentColor" 
+              viewBox="0 0 20 20"
+            >
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+          </div>
+          <div class="ml-3">
+            <p 
+              class="text-sm font-medium"
+              :class="message.type === 'success' ? 'text-green-800' : 'text-red-800'"
+            >
+              {{ message.text }}
+            </p>
+          </div>
+          <div class="ml-auto pl-3">
+            <div class="-mx-1.5 -my-1.5">
+              <button 
+                @click="showMessage = false"
+                class="inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                :class="message.type === 'success' ? 'text-green-500 hover:bg-green-100 focus:ring-green-600' : 'text-red-500 hover:bg-red-100 focus:ring-red-600'"
+              >
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -399,6 +449,8 @@ const showApprovalDialog = ref(false)
 const selectedDeposit = ref<any>(null)
 const approvalAction = ref('')
 const approvalNote = ref('')
+const message = ref({ type: '', text: '' })
+const showMessage = ref(false)
 
 // 載入儲值申請列表
 const loadDeposits = async () => {
@@ -489,17 +541,43 @@ const confirmApproval = async () => {
   try {
     processing.value = true
     
+    let response
     if (approvalAction.value === 'approve') {
-      await paymentApi.approve(selectedDeposit.value.id, approvalNote.value)
+      response = await paymentApi.approve(selectedDeposit.value.id, approvalNote.value)
     } else {
-      await paymentApi.reject(selectedDeposit.value.id, approvalNote.value)
+      response = await paymentApi.reject(selectedDeposit.value.id, approvalNote.value)
     }
     
-    // 關閉對話框並刷新列表
-    closeApprovalDialog()
-    await loadDeposits()
-  } catch (error) {
+    if (response.data.success) {
+      // 成功提示
+      const actionText = approvalAction.value === 'approve' ? 'approved' : 'rejected'
+      message.value = { type: 'success', text: `Deposit request ${actionText} successfully!` }
+      showMessage.value = true
+      
+      // 關閉對話框並刷新列表
+      closeApprovalDialog()
+      await loadDeposits()
+      
+      // 3秒後自動隱藏成功訊息
+      setTimeout(() => {
+        showMessage.value = false
+      }, 3000)
+    } else {
+      throw new Error(response.data.message || `Failed to ${approvalAction.value} deposit request`)
+    }
+  } catch (error: any) {
     console.error('Approval failed:', error)
+    
+    // 錯誤提示
+    const actionText = approvalAction.value === 'approve' ? 'approve' : 'reject'
+    const errorMessage = error.response?.data?.message || error.message || `Failed to ${actionText} deposit request`
+    message.value = { type: 'error', text: errorMessage }
+    showMessage.value = true
+    
+    // 5秒後自動隱藏錯誤訊息
+    setTimeout(() => {
+      showMessage.value = false
+    }, 5000)
   } finally {
     processing.value = false
   }

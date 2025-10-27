@@ -193,7 +193,13 @@ const loadDisputeChatMessages = async (disputeId: number) => {
     const response = await disputeApi.getChatMessages(disputeId)
     
     if (response.data.success && response.data.data) {
-      disputeData.value = response.data.data
+      // 適配後端返回的數據結構
+      const data = response.data.data
+      disputeData.value = {
+        dispute: data.dispute,
+        messages: data.messages || [],
+        meta: data.meta
+      }
     } else {
       throw new Error(response.data.message || 'Failed to load dispute chat messages')
     }

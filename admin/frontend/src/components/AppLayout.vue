@@ -267,7 +267,7 @@
     <div
       v-if="sidebarOpen && !isDesktop"
       @click="sidebarOpen = false"
-      class="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+    class="fixed inset-0 z-40 bg-gray-900 bg-opacity-30 backdrop-blur-sm lg:hidden transition"
     ></div>
   </div>
 </template>

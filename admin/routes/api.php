@@ -35,6 +35,7 @@ Route::prefix('admin')->group(function () {
             Route::get('/', [UserController::class, 'index']);
             Route::get('/{id}', [UserController::class, 'show'])->middleware('admin:users.view');
             Route::patch('/{id}/status', [UserController::class, 'updateStatus'])->middleware('admin:users.edit');
+            Route::post('/{id}/review', [UserController::class, 'review'])->middleware('admin:users.edit');
         });
 
         // 任務管理
@@ -59,10 +60,16 @@ Route::prefix('admin')->group(function () {
             Route::post('/resolve', [DisputeController::class, 'resolveDispute']);
         });
 
+        // 爭議管理
+        Route::prefix('disputes')->group(function () {
+            Route::get('/{disputeId}/chat-messages', [DisputeController::class, 'getChatMessages']);
+        });
+
         // 客服
         Route::prefix('support')->group(function () {
             Route::get('/debug-rooms', [SupportController::class, 'debugRooms']); // 臨時調試端點
             Route::get('/issues', [SupportController::class, 'issues']);
+            Route::post('/issues/{roomId}/accept', [SupportController::class, 'accept']); // 新增 Claim 路由
             Route::get('/chat-rooms', [SupportController::class, 'chatRooms']);
             Route::get('/chat-rooms/{roomId}', [SupportController::class, 'getChatRoom']);
             Route::get('/chat-rooms/{roomId}/messages', [SupportController::class, 'getMessages']);
@@ -74,6 +81,7 @@ Route::prefix('admin')->group(function () {
         Route::prefix('payment')->group(function () {
             Route::get('/requests', [PaymentController::class, 'requests']);
             Route::post('/requests/{id}/approve', [PaymentController::class, 'approve']);
+            Route::post('/requests/{id}/reject', [PaymentController::class, 'reject']); // 新增 reject 路由
             Route::match(['get', 'post'], '/fee-settings', [PaymentController::class, 'feeSettings']);
             Route::match(['get', 'post'], '/official-accounts', [PaymentController::class, 'officialAccounts']);
         });

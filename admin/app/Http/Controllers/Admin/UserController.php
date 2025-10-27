@@ -124,6 +124,15 @@ class UserController extends Controller
             ->orderBy('updated_at', 'desc')
             ->first();
 
+        if ($studentVerification && $studentVerification->student_id_image_path) {
+            $normalizedImagePath = ltrim($studentVerification->student_id_image_path, '/');
+            if (str_starts_with($normalizedImagePath, 'uploads/')) {
+                $normalizedImagePath = substr($normalizedImagePath, strlen('uploads/'));
+            }
+            $studentVerification->student_id_image_path = $normalizedImagePath;
+            $studentVerification->student_id_image_url = '/uploads/' . $normalizedImagePath;
+        }
+        
         // 獲取用戶相關統計
         $userStats = [
             'total_tasks_created' => DB::table('tasks')->where('creator_id', $id)->count(),
@@ -482,10 +491,14 @@ class UserController extends Controller
             if ($verification) {
                 // 構建完整的圖片 URL
                 $imageUrl = null;
+                $normalizedImagePath = null;
                 if ($verification->student_id_image_path) {
-                    $imagePath = $verification->student_id_image_path;
+                    $normalizedImagePath = ltrim($verification->student_id_image_path, '/');
+                    if (str_starts_with($normalizedImagePath, 'uploads/')) {
+                        $normalizedImagePath = substr($normalizedImagePath, strlen('uploads/'));
+                    }
                     // 直接使用 /uploads 路徑，讓 Vite 代理處理
-                    $imageUrl = '/uploads/' . ltrim($imagePath, '/');
+                    $imageUrl = '/uploads/' . $normalizedImagePath;
                 }
 
                 $responseData['verification'] = [
@@ -493,6 +506,7 @@ class UserController extends Controller
                     'school_name' => $verification->school_name,
                     'student_name' => $verification->student_name,
                     'student_id' => $verification->student_id,
+                    'student_id_image_path' => $normalizedImagePath,
                     'student_id_image' => $imageUrl,
                     'verification_status' => $verification->verification_status,
                     'verification_notes' => $verification->verification_notes,

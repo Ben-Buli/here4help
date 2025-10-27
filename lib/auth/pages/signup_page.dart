@@ -2082,31 +2082,34 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         // 使用 OAuth 註冊
         await _handleOAuthRegistration();
       } else {
-        // 使用傳統註冊
-        final success = await _createUserAccount();
+        // 使用傳統註冊：先將資料暫存，待學生證上傳時一次送出
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('signup_full_name', fullNameController.text);
+        await prefs.setString('signup_nickname', nicknameController.text);
+        await prefs.setString('signup_gender', selectedGender);
+        await prefs.setString('signup_email', emailController.text);
+        await prefs.setString('signup_phone', phoneController.text);
+        await prefs.setString('signup_country', countryController.text);
+        await prefs.setString('signup_address', addressController.text);
+        await prefs.setString('signup_password', passwordController.text);
+        await prefs.setString(
+            'signup_date_of_birth', dateOfBirthController.text);
+        await prefs.setString(
+            'signup_payment_code', paymentPasswordController.text);
+        await prefs.setBool(
+            'signup_is_permanent_address', isPermanentAddress);
+        await prefs.setStringList('signup_languages', selectedLanguages);
+        await prefs.setString(
+            'signup_referral_code', referralCodeController.text.trim());
 
-        if (success) {
-          // 儲存表單資料到 SharedPreferences 以便傳遞到下一個頁面
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('signup_full_name', fullNameController.text);
-          await prefs.setString('signup_nickname', nicknameController.text);
-          await prefs.setString('signup_gender', selectedGender);
-          await prefs.setString('signup_email', emailController.text);
-          await prefs.setString('signup_phone', phoneController.text);
-          await prefs.setString('signup_country', countryController.text);
-          await prefs.setString('signup_address', addressController.text);
-          await prefs.setString('signup_password', passwordController.text);
-          await prefs.setString(
-              'signup_date_of_birth', dateOfBirthController.text);
-          await prefs.setString(
-              'signup_payment_code', paymentPasswordController.text);
-          await prefs.setBool(
-              'signup_is_permanent_address', isPermanentAddress);
-          await prefs.setStringList('signup_languages', selectedLanguages);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account details saved. Please upload your student ID to complete registration.'),
+          ),
+        );
 
-          // 導向學生證上傳頁面
-          context.go('/signup/student-id');
-        }
+        // 導向學生證上傳頁面
+        context.go('/signup/student-id');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2116,107 +2119,6 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       setState(() {
         isLoading = false;
       });
-    }
-  }
-
-  Future<bool> _createUserAccount() async {
-    try {
-      final response = await http.post(
-        Uri.parse(AppConfig.registerUrl),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'name': fullNameController.text,
-          'nickname': nicknameController.text,
-          'gender': selectedGender,
-          'email': emailController.text,
-          'phone': phoneController.text,
-          'country': countryController.text,
-          'address': addressController.text,
-          'password': passwordController.text,
-          'date_of_birth': dateOfBirthController.text,
-          'payment_password': paymentPasswordController.text,
-          'is_permanent_address': isPermanentAddress,
-          'primary_language': selectedLanguages.join(','),
-          'school': _getSchoolValue(),
-          'intro_referral_code': referralCodeController.text.trim(),
-        }),
-      );
-
-      // 🔧 修復：檢查回應是否為 HTML 錯誤頁面
-      if (response.body.trim().startsWith('<') ||
-          response.body.contains('<br />') ||
-          response.body.contains('<html>')) {
-        debugPrint('❌ 伺服器回傳 HTML 錯誤頁面: ${response.body.substring(0, 100)}...');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Server error (HTTP ${response.statusCode}): Please try again later'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-        return false;
-      }
-
-      // 🔧 修復：安全的 JSON 解析
-      Map<String, dynamic> responseData;
-      try {
-        responseData = jsonDecode(response.body);
-      } catch (jsonError) {
-        debugPrint('❌ JSON 解析失敗: $jsonError');
-        debugPrint('❌ 回應內容: ${response.body}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                const Text('Invalid server response format. Please try again.'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-        return false;
-      }
-
-      if (response.statusCode == 200 && responseData['success'] == true) {
-        // 🔧 修復：保存 user_id 到 SharedPreferences
-        final userData = responseData['data'] as Map<String, dynamic>?;
-        final userId = userData?['user_id'];
-
-        if (userId != null) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('signup_user_id', userId.toString());
-          debugPrint('✅ 用戶註冊成功，user_id: $userId');
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Account created successfully!'),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-          ),
-        );
-        return true;
-      } else {
-        // 🔑 這裡從 responseData 取出後端的錯誤資訊
-        final errorCode = responseData['code'] ?? 'Unknown Code';
-        final errorMessage = responseData['message'] ?? 'Unknown Error';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed: ${errorCode ?? errorMessage}'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-        return false;
-      }
-    } catch (e) {
-      // 真的連 request 都失敗才會跑到這裡
-      debugPrint('❌ 註冊請求失敗: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-              'Network error: Please check your connection and try again'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-      return false;
     }
   }
 

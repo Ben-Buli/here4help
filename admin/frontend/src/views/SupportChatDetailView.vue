@@ -129,14 +129,24 @@
                      'max-w-xs lg:max-w-md': !message.is_own
                    }">
                 <!-- 頭像 -->
-                <div class="h-8 w-8 rounded-full flex-shrink-0 flex items-center justify-center"
+                <div class="h-8 w-8 rounded-full flex-shrink-0 flex items-center justify-center overflow-hidden"
                      :class="message.kind === 'system' ? 'bg-gray-200' : 'bg-gray-100'">
-                  <img 
-                    v-if="message.kind !== 'system'"
-                    :src="getAvatarUrl(message.sender_avatar)" 
-                    :alt="message.sender_name"
-                    class="h-8 w-8 rounded-full"
-                  />
+                  <template v-if="message.kind !== 'system' && !shouldShowFallbackAvatar(message)">
+                    <img 
+                      :src="getAvatarUrl(message.sender_avatar)" 
+                      :alt="message.sender_name"
+                      class="h-8 w-8 rounded-full object-cover"
+                      @error="handleAvatarError(message)"
+                    />
+                  </template>
+                  <template v-else-if="message.kind !== 'system'">
+                    <div
+                      class="h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+                      :style="{ backgroundColor: getAvatarColor(message.sender_name) }"
+                    >
+                      {{ getAvatarInitial(message.sender_name) }}
+                    </div>
+                  </template>
                   <svg 
                     v-else
                     class="h-4 w-4 text-gray-500" 
@@ -338,7 +348,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminSupportApi } from '@/services/api'
 import { socketService } from '@/services/socket'
@@ -352,6 +362,7 @@ const isLoading = ref(false)
 const chatRoom = ref<any>(null)
 const messages = ref<any[]>([])
 const newMessage = ref('')
+const avatarErrorMap = reactive<Record<string, boolean>>({})
 
 // 圖片上傳相關
 const uploadingImages = ref<any[]>([])
@@ -515,19 +526,80 @@ const goBack = () => {
   router.push('/support-chat-list')
 }
 
+const normalizeAvatarPath = (raw?: string): string | null => {
+  if (!raw) return null
+  let path = raw.trim()
+  if (!path) return null
+
+  if (/^https?:\/\//i.test(path)) {
+    return path
+  }
+
+  path = path.replace(/^https?:\/\/[^/]+/i, '')
+  path = path.replace(/^\/+/, '')
+
+  path = path.replace(/(^|\/)backend\//g, '$1')
+
+  const uploadsMatch = path.match(/uploads\/(.+)$/)
+  if (uploadsMatch) {
+    return uploadsMatch[1]
+  }
+
+  return path
+}
+
 const getAvatarUrl = (avatarUrl?: string) => {
-  if (!avatarUrl) {
-    // 使用管理員預設頭像
+  const normalized = normalizeAvatarPath(avatarUrl)
+  if (!normalized) {
     return getImageUrl('avatars/default.png')
   }
-  
-  // 如果是完整 URL，直接返回
-  if (avatarUrl.startsWith('http')) {
-    return avatarUrl
+
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized
   }
-  
-  // 使用統一的圖片 URL 處理邏輯
-  return getImageUrl(avatarUrl)
+
+  return getImageUrl(normalized)
+}
+
+const handleAvatarError = (message: any) => {
+  const key = message?.sender_id
+    ? String(message.sender_id)
+    : message?.id
+      ? `msg-${message.id}`
+      : 'unknown'
+  avatarErrorMap[key] = true
+}
+
+const shouldShowFallbackAvatar = (message: any) => {
+  const key = message?.sender_id
+    ? String(message.sender_id)
+    : message?.id
+      ? `msg-${message.id}`
+      : 'unknown'
+  return avatarErrorMap[key] === true
+}
+
+const avatarColors = [
+  '#1E40AF', '#9333EA', '#059669', '#DC2626', '#2563EB',
+  '#F59E0B', '#10B981', '#EC4899', '#0EA5E9', '#F97316'
+]
+
+const getAvatarColor = (name?: string) => {
+  const base = name && name.trim() ? name.trim().toLowerCase() : 'user'
+  let hash = 0
+  for (let i = 0; i < base.length; i += 1) {
+    hash = (hash << 5) - hash + base.charCodeAt(i)
+    hash |= 0
+  }
+  const index = Math.abs(hash) % avatarColors.length
+  return avatarColors[index]
+}
+
+const getAvatarInitial = (name?: string) => {
+  if (name && name.trim()) {
+    return name.trim().charAt(0).toUpperCase()
+  }
+  return 'U'
 }
 
 // 圖片相關方法

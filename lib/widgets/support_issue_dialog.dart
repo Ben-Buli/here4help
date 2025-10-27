@@ -13,7 +13,7 @@ class _SupportIssueDialogState extends State<SupportIssueDialog> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _scrollController = ScrollController(); // 添加滾動控制器
-  bool _isSubmitting = false;
+  final bool _isSubmitting = false;
   String? _submitError;
 
   @override
@@ -76,7 +76,7 @@ class _SupportIssueDialogState extends State<SupportIssueDialog> {
         child: AnimatedPadding(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
-          padding: EdgeInsets.only(
+          padding: const EdgeInsets.only(
             left: 24,
             right: 24,
             top: 24,

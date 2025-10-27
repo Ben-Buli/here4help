@@ -1834,7 +1834,7 @@ class _TaskCreatePageState extends State<TaskEditPage> {
                           TileLayer(
                             urlTemplate:
                                 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'com.example.app',
+                            userAgentPackageName: 'com.example.here4help',
                           ),
                           if (_selectedLocation != null)
                             MarkerLayer(
@@ -2548,8 +2548,7 @@ class _TaskCreatePageState extends State<TaskEditPage> {
               scrollable: true,
               insetPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-              contentPadding:
-                  const EdgeInsets.fromLTRB(24, 20, 24, 12),
+              contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -2587,8 +2586,8 @@ class _TaskCreatePageState extends State<TaskEditPage> {
                           padding: EdgeInsets.only(bottom: 8.0),
                           child: Text(
                             'Bank info unavailable. Please try again later.',
-                            style:
-                                TextStyle(fontSize: 12, color: Colors.redAccent),
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.redAccent),
                           ),
                         ),
                       const SizedBox(height: 16),
@@ -2608,7 +2607,8 @@ class _TaskCreatePageState extends State<TaskEditPage> {
                         textInputAction: TextInputAction.next,
                         maxLength: 5,
                         onChanged: (_) {
-                          if (errorText != null) setState(() => errorText = null);
+                          if (errorText != null)
+                            setState(() => errorText = null);
                         },
                       ),
                       const SizedBox(height: 8),
@@ -2627,7 +2627,8 @@ class _TaskCreatePageState extends State<TaskEditPage> {
                         ],
                         textInputAction: TextInputAction.done,
                         onChanged: (_) {
-                          if (errorText != null) setState(() => errorText = null);
+                          if (errorText != null)
+                            setState(() => errorText = null);
                         },
                       ),
                       const SizedBox(height: 12),

@@ -76,11 +76,22 @@
             <div class="flex items-start space-x-4 flex-1">
               <!-- 客戶頭像 -->
               <div class="flex-shrink-0">
-                <img 
-                  :src="getAvatarUrl(room.customer?.avatar_url)" 
-                  :alt="room.customer?.name"
-                  class="h-12 w-12 rounded-full"
-                />
+                <template v-if="!shouldShowFallbackAvatar(room)">
+                  <img 
+                    :src="getAvatarUrl(room.customer?.avatar_url)" 
+                    :alt="room.customer?.name"
+                    class="h-12 w-12 rounded-full object-cover"
+                    @error="handleAvatarError(room)"
+                  />
+                </template>
+                <template v-else>
+                  <div
+                    class="h-12 w-12 rounded-full flex items-center justify-center text-white font-semibold text-lg"
+                    :style="{ backgroundColor: getAvatarColor(room.customer?.name) }"
+                  >
+                    {{ getAvatarInitial(room.customer?.name) }}
+                  </div>
+                </template>
               </div>
               
               <!-- 聊天室資訊 -->
@@ -202,6 +213,7 @@ const hasError = ref(false)
 const chatRooms = ref<ChatRoom[]>([])
 const pagination = ref({ current_page: 1, per_page: 15, total: 0, last_page: 1 })
 const filters = reactive({ status: '', search: '' })
+const avatarErrorMap = reactive<Record<string, boolean>>({})
 
 // 當前管理員 ID
 const currentAdminId = ref<string | null>(null)
@@ -310,19 +322,76 @@ const openChatRoom = (room: ChatRoom) => {
   window.location.href = `/admin/support-chat-list/${room.room_id}`
 }
 
+const normalizeAvatarPath = (raw?: string): string | null => {
+  if (!raw) return null
+  let path = raw.trim()
+  if (!path) return null
+
+  // 已經是完整 URL
+  if (/^https?:\/\//i.test(path)) {
+    return path
+  }
+
+  path = path.replace(/^https?:\/\/[^/]+/i, '')
+  path = path.replace(/^\/+/, '')
+
+  // 移除多餘的 backend/ 片段
+  path = path.replace(/(^|\/)backend\//g, '$1')
+
+  const uploadsMatch = path.match(/uploads\/(.+)$/)
+  if (uploadsMatch) {
+    return uploadsMatch[1]
+  }
+
+  return path
+}
+
 const getAvatarUrl = (avatarUrl?: string) => {
-  if (!avatarUrl) {
-    // 使用管理員預設頭像
+  const normalized = normalizeAvatarPath(avatarUrl)
+  if (!normalized) {
     return getImageUrl('avatars/default.png')
   }
-  
-  // 如果是完整 URL，直接返回
-  if (avatarUrl.startsWith('http')) {
-    return avatarUrl
+
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized
   }
-  
-  // 使用統一的圖片 URL 處理邏輯
-  return getImageUrl(avatarUrl)
+
+  return getImageUrl(normalized)
+}
+
+const handleAvatarError = (room: ChatRoom) => {
+  const key = room.customer?.id || room.room_id
+  if (key) {
+    avatarErrorMap[key] = true
+  }
+}
+
+const shouldShowFallbackAvatar = (room: ChatRoom) => {
+  const key = room.customer?.id || room.room_id
+  return key ? avatarErrorMap[key] === true : true
+}
+
+const avatarColors = [
+  '#1E40AF', '#9333EA', '#059669', '#DC2626', '#2563EB',
+  '#F59E0B', '#10B981', '#EC4899', '#0EA5E9', '#F97316'
+]
+
+const getAvatarColor = (name?: string) => {
+  const base = name && name.trim() ? name.trim().toLowerCase() : 'user'
+  let hash = 0
+  for (let i = 0; i < base.length; i += 1) {
+    hash = (hash << 5) - hash + base.charCodeAt(i)
+    hash |= 0
+  }
+  const index = Math.abs(hash) % avatarColors.length
+  return avatarColors[index]
+}
+
+const getAvatarInitial = (name?: string) => {
+  if (name && name.trim()) {
+    return name.trim().charAt(0).toUpperCase()
+  }
+  return 'U'
 }
 
 const getStatusClass = (status: string) => {

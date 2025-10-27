@@ -93,13 +93,13 @@ try {
                 UPDATE student_verifications 
                 SET school_name = ?, student_name = ?, student_id = ?, student_id_image_path = ?, updated_at = NOW()
                 WHERE user_id = ?
-            ", [$schoolName, $studentName, $studentId, $fileName, $userId]);
+            ", [$schoolName, $studentName, $studentId, 'student_id_images/' . $fileName, $userId]);
         } else {
             // 創建新記錄
             $db->query("
                 INSERT INTO student_verifications (user_id, school_name, student_name, student_id, student_id_image_path, verification_status, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, 'pending', NOW(), NOW())
-            ", [$userId, $schoolName, $studentName, $studentId, $fileName]);
+            ", [$userId, $schoolName, $studentName, $studentId, 'student_id_images/' . $fileName]);
         }
         
         // 🔧 暫時移除用戶狀態更新，避免 ENUM 值錯誤
@@ -111,7 +111,7 @@ try {
         
         Response::success('Student ID uploaded successfully', [
             'user_id' => $userId,
-            'image_path' => $fileName
+            'image_path' => 'student_id_images/' . $fileName
         ]);
         
     } catch (Exception $e) {

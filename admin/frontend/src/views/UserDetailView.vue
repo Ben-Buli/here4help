@@ -96,6 +96,13 @@
           </div>
         </div>
         <div class="mt-4 flex md:mt-0 md:ml-4 space-x-3">
+          <button
+            @click="openStudentReview"
+            class="admin-button-secondary"
+            :disabled="!user.student_verification"
+          >
+            Review Student ID
+          </button>
           <button @click="refreshData" class="admin-button-secondary">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -296,6 +303,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { userApi } from '@/services/api'
 import { getImageUrl } from '@/config/api'
+import UserReviewModal from '@/components/UserReviewModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -319,6 +327,7 @@ const stats = ref<any>({})
 const recentActivities = ref<any[]>([])
 const showImageModal = ref(false)
 const selectedImagePath = ref('')
+const showReviewModal = ref(false)
 
 // Methods
 const loadUser = async () => {
@@ -355,6 +364,17 @@ const loadUser = async () => {
 
 const refreshData = () => {
   loadUser()
+}
+
+const openStudentReview = () => {
+  if (!user.value?.student_verification) return
+  selectedImagePath.value = ''
+  showReviewModal.value = true
+}
+
+const handleStudentReviewed = () => {
+  showReviewModal.value = false
+  refreshData()
 }
 
 
@@ -399,8 +419,8 @@ const getStatusText = (status: string | null) => {
 const getPermissionBadgeClass = (permission: number | null) => {
   if (permission === null || permission === undefined) return 'bg-gray-100 text-gray-800'
   if (permission >= 99) return 'bg-purple-100 text-purple-800'
-  if (permission >= 1) return 'bg-blue-100 text-blue-800'
-  if (permission === 0) return 'bg-green-100 text-green-800'
+  if (permission >= 1) return 'bg-green-100 text-green-800'
+  if (permission === 0) return 'bg-yellow-100 text-yellow-800'
   if (permission >= -1) return 'bg-yellow-100 text-yellow-800'
   if (permission >= -3) return 'bg-red-100 text-red-800'
   return 'bg-gray-100 text-gray-800'
@@ -408,9 +428,9 @@ const getPermissionBadgeClass = (permission: number | null) => {
 
 const getPermissionText = (permission: number | null) => {
   if (permission === null || permission === undefined) return 'Unknown'
-  if (permission >= 99) return 'Super Admin'
-  if (permission >= 1) return 'Admin'
-  if (permission === 0) return 'User'
+  if (permission >= 99) return 'Master User'
+  if (permission >= 1) return 'Verified User'
+  if (permission === 0) return 'Unverified User'
   if (permission === -1) return 'Restricted'
   if (permission === -2) return 'Suspended'
   if (permission === -3) return 'Banned'

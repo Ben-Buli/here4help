@@ -10,7 +10,7 @@ require_once __DIR__ . '/../../utils/Response.php';
 Response::setCorsHeaders();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Method not allowed', 405);
+    Response::methodNotAllowed();
 }
 
 try {
@@ -18,22 +18,53 @@ try {
     
     // 驗證必要欄位
     $requiredFields = [
-        'name', 'gender', 'email', 'phone', 
-         'address', 'password', 'date_of_birth', 
-        'payment_password', 'school_name', 'student_name', 'student_id'
+        'name',
+        'gender',
+        'email',
+        'password',
+        'date_of_birth',
+        'payment_password',
+        'address',
+        'school_name',
+        'student_name',
+        'student_id',
     ];
-    
+
+    $missing = [];
     foreach ($requiredFields as $field) {
-        if (!isset($_POST[$field]) || empty($_POST[$field])) {
-            Response::error("Missing required field: $field");
+        if (!isset($_POST[$field]) || trim((string)$_POST[$field]) === '') {
+            $missing[$field] = 'This field is required';
         }
     }
-    
+
+    if (!empty($missing)) {
+        Response::validationError($missing);
+    }
+
+    // 取得並標準化輸入資料
+    $name = trim($_POST['name']);
+    $nickname = isset($_POST['nickname']) ? trim((string)$_POST['nickname']) : null;
+    $gender = trim($_POST['gender']);
+    $email = trim($_POST['email']);
+    $phone = isset($_POST['phone']) ? trim((string)$_POST['phone']) : '';
+    $country = isset($_POST['country']) ? trim((string)$_POST['country']) : '';
+    $address = trim($_POST['address']);
+    $password = (string)$_POST['password'];
+    $dateOfBirth = trim($_POST['date_of_birth']);
+    $paymentPassword = (string)$_POST['payment_password'];
+    $primaryLanguage = isset($_POST['primary_language']) && $_POST['primary_language'] !== ''
+        ? trim((string)$_POST['primary_language'])
+        : 'English';
+    $isPermanentAddressRaw = $_POST['is_permanent_address'] ?? false;
+    $isPermanentAddress = filter_var($isPermanentAddressRaw, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+    $schoolName = trim($_POST['school_name']);
+    $studentName = trim($_POST['student_name']);
+    $studentId = trim($_POST['student_id']);
+
     // 檢查 email 是否已存在
-    $email = $_POST['email'];
     $existingUser = $db->fetch("SELECT id FROM users WHERE email = ?", [$email]);
     if ($existingUser) {
-        Response::error('Email already exists');
+        Response::error(ErrorCodes::EMAIL_ALREADY_EXISTS);
     }
     
     // 可選：推薦碼驗證（如有輸入）
@@ -42,19 +73,19 @@ try {
     if (!empty($introReferralCode)) {
         $ref = $db->fetch("SELECT id, status, permission FROM users WHERE referral_code = ?", [$introReferralCode]);
         if (!$ref) {
-            Response::error('Invalid referral code');
+            Response::error(ErrorCodes::INVALID_PARAMETER, 'Invalid referral code');
         }
         $isStatusValid = in_array(strtolower($ref['status']), ['active', 'verified'], true);
         $isPermissionValid = (int)($ref['permission'] ?? 0) > 0;
         if (!($isStatusValid && $isPermissionValid)) {
-            Response::error('Referral code owner is not active verified');
+            Response::error(ErrorCodes::INVALID_REQUEST, 'Referral code owner is not active verified');
         }
         $referrerId = $ref['id'];
     }
     
     // 處理圖片上傳
     if (!isset($_FILES['student_id_image']) || $_FILES['student_id_image']['error'] !== UPLOAD_ERR_OK) {
-        Response::error('Student ID image is required');
+        Response::validationError(['student_id_image' => 'Student ID image is required']);
     }
     
     $uploadDir = '../../uploads/student_id_images/';
@@ -69,17 +100,17 @@ try {
     // 驗證檔案類型
     $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
     if (!in_array($file['type'], $allowedTypes)) {
-        Response::error('Invalid file type. Only JPG, PNG, and GIF are allowed.');
+        Response::validationError(['student_id_image' => 'Invalid file type. Only JPG, PNG, and GIF are allowed.']);
     }
     
     // 驗證檔案大小 (最大 5MB)
     if ($file['size'] > 5 * 1024 * 1024) {
-        Response::error('File size too large. Maximum size is 5MB.');
+        Response::validationError(['student_id_image' => 'File size too large. Maximum size is 5MB.']);
     }
     
     // 移動上傳的檔案
     if (!move_uploaded_file($file['tmp_name'], $filePath)) {
-        Response::error('Failed to upload file');
+        Response::error(ErrorCodes::FILE_UPLOAD_FAILED, 'Failed to upload file');
     }
     
     // 開始資料庫交易
@@ -88,29 +119,31 @@ try {
     
     try {
         // 建立用戶帳戶
-        $hashedPassword = password_hash($_POST['password'], PASSWORD_DEFAULT);
-        $hashedPaymentPassword = password_hash($_POST['payment_password'], PASSWORD_DEFAULT);
+        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+        $hashedPaymentPassword = password_hash($paymentPassword, PASSWORD_DEFAULT);
+        $nicknameForInsert = ($nickname !== null && $nickname !== '') ? $nickname : $name;
         
         // 新用戶初始狀態為 permission = 0 (未驗證)
         $userSql = "INSERT INTO users (
-            name, email, password, phone, points, status, permission,
+            name, nickname, email, password, phone, points, status, permission,
             payment_password, date_of_birth, gender, country,
             address, is_permanent_address, primary_language, intro_referral_code,
             created_at, updated_at
-        ) VALUES (?, ?, ?, ?, 0, 'pending_verification', 0, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+        ) VALUES (?, ?, ?, ?, ?, 0, 'pending_verification', 0, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
         
         $db->query($userSql, [
-            $_POST['name'] ,
+            $name,
+            $nicknameForInsert,
             $email,
             $hashedPassword,
-            $_POST['phone'],
+            $phone,
             $hashedPaymentPassword,
-            $_POST['date_of_birth'],
-            $_POST['gender'],
-            $_POST['country'],
-            $_POST['address'],
-            $_POST['is_permanent_address'] ? 1 : 0,
-            $_POST['primary_language'] ?? 'English',
+            $dateOfBirth,
+            $gender,
+            $country,
+            $address,
+            $isPermanentAddress,
+            $primaryLanguage,
             $introReferralCode ?: null
         ]);
         
@@ -129,10 +162,10 @@ try {
         
         $db->query($verificationSql, [
             $userId,
-            $_POST['school_name'],
-            $_POST['student_name'],
-            $_POST['student_id'],
-            'uploads/student_id_images/' . $fileName
+            $schoolName,
+            $studentName,
+            $studentId,
+            'student_id_images/' . $fileName
         ]);
         
         // 提交交易

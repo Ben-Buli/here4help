@@ -581,10 +581,12 @@ const allSelected = computed(() => {
 const loadUsers = async (page = 1) => {
   try {
     isLoading.value = true
+    const targetPage = Number(page) || 1
+    const perPage = Number(filters.per_page) || 15
 
     const params = {
-      page,
-      per_page: filters.per_page,
+      page: targetPage,
+      per_page: perPage,
       search: filters.search || ''  ,
       user_id: filters.user_id ? parseInt(filters.user_id) : undefined,
       status: filters.status || '',
@@ -597,7 +599,15 @@ const loadUsers = async (page = 1) => {
 
     if (response.data.success && response.data.data) {
       users.value = response.data.data.items || []
-      pagination.value = response.data.data.pagination || pagination.value
+      const pg = response.data.data.pagination
+      if (pg) {
+        pagination.value = {
+          current_page: Number(pg.current_page) || targetPage,
+          per_page: Number(pg.per_page) || perPage,
+          total: Number(pg.total) || 0,
+          last_page: Number(pg.last_page) || 1,
+        }
+      }
       stats.value = response.data.data.stats || stats.value
     }
   } catch (error) {
@@ -612,11 +622,12 @@ const refreshData = () => {
 }
 
 const changePage = (page: number) => {
+  const nextPage = Number(page)
   const last = Number(pagination.value.last_page || 1)
-  if (page < 1 || page > last) return
+  if (nextPage < 1 || nextPage > last) return
   // 先更新目前頁，讓 UI 立刻反映
-  pagination.value.current_page = page
-  loadUsers(page)
+  pagination.value.current_page = nextPage
+  loadUsers(nextPage)
 }
 
 const handlePerPageChange = () => {
@@ -731,21 +742,21 @@ const getStatusText = (status: string) => {
 
 const getPermissionBadgeClass = (permission: number) => {
   if (permission >= 99) return 'bg-purple-100 text-purple-800'
-  if (permission >= 1) return 'bg-blue-100 text-blue-800'
-  if (permission === 0) return 'bg-green-100 text-green-800'
+  if (permission >= 1) return 'bg-green-100 text-green-800'
+  if (permission === 0) return 'bg-yellow-100 text-yellow-800'
   if (permission >= -1) return 'bg-yellow-100 text-yellow-800'
   if (permission >= -3) return 'bg-red-100 text-red-800'
   return 'bg-gray-100 text-gray-800'
 }
 
 const getPermissionText = (permission: number) => {
-  if (permission >= 99) return 'SuperUser(99)'
-  if (permission >= 1) return 'Verified(1)'
-  if (permission === 0) return 'Unverified(0)'
-  if (permission === -1) return 'Restricted(-1)'
-  if (permission === -2) return 'Suspended(-2)'
-  if (permission === -3) return 'Banned(-3)'
-  if (permission === -4) return 'Deleted(-4)'
+  if (permission >= 99) return 'Master User'
+  if (permission >= 1) return 'Verified User'
+  if (permission === 0) return 'Unverified User'
+  if (permission === -1) return 'Restricted'
+  if (permission === -2) return 'Suspended'
+  if (permission === -3) return 'Banned'
+  if (permission === -4) return 'Deleted'
   return `Level ${permission}`
 }
 
