@@ -12,8 +12,7 @@ Response::setCorsHeaders();
 
 // 只允許 POST 請求
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    Response::error('Method not allowed', 405);
-    exit;
+    Response::methodNotAllowed('Method not allowed');
 }
 
 try {
@@ -21,8 +20,7 @@ try {
     
     // 檢查是否有上傳的圖片
     if (!isset($_FILES['student_id_image']) || $_FILES['student_id_image']['error'] !== UPLOAD_ERR_OK) {
-        Response::error('No image uploaded or upload error');
-        exit;
+        Response::badRequest('No image uploaded or upload error');
     }
     
     // 獲取表單數據
@@ -34,8 +32,7 @@ try {
     
     // 驗證必填欄位
     if (empty($schoolName) || empty($studentName) || empty($studentId)) {
-        Response::error('Missing required fields: school_name, student_name, student_id');
-        exit;
+        Response::badRequest('Missing required fields: school_name, student_name, student_id');
     }
     
     // 🔧 修復：優先使用 user_id，如果沒有則使用 email 查找
@@ -43,8 +40,7 @@ try {
         // 直接使用 user_id
         $user = $db->fetch("SELECT id, email FROM users WHERE id = ?", [$userId]);
         if (!$user) {
-            Response::error('User not found with provided user_id');
-            exit;
+            Response::notFound('User not found with provided user_id');
         }
         $userId = $user['id'];
         $userEmail = $user['email'];
@@ -53,14 +49,12 @@ try {
         // 使用 email 查找（向後兼容）
         $user = $db->fetch("SELECT id FROM users WHERE email = ?", [$email]);
         if (!$user) {
-            Response::error('User not found with provided email');
-            exit;
+            Response::notFound('User not found with provided email');
         }
         $userId = $user['id'];
         error_log("[upload-student-id] 使用 email 查找到 user_id: $userId");
     } else {
-        Response::error('Either user_id or email is required');
-        exit;
+        Response::badRequest('Either user_id or email is required');
     }
     
     // 處理圖片上傳
@@ -75,44 +69,58 @@ try {
     
     // 移動上傳的檔案
     if (!move_uploaded_file($_FILES['student_id_image']['tmp_name'], $filePath)) {
-        Response::error('Failed to save image');
-        exit;
+        Response::serverError('Failed to save image');
     }
     
+    // 取得上一筆驗證資料（用於判斷是否重新審核）
+    $previousVerification = $db->fetch("
+        SELECT id, verification_status 
+        FROM student_verifications 
+        WHERE user_id = ? 
+        ORDER BY created_at DESC 
+        LIMIT 1
+    ", [$userId]);
+    
+    $requiresReReview = $previousVerification && $previousVerification['verification_status'] === 'rejected';
+
     // 開始事務
     $connection = $db->getConnection();
     $connection->beginTransaction();
     
     try {
-        // 檢查是否已有學生證記錄
-        $existingVerification = $db->fetch("SELECT id FROM student_verifications WHERE user_id = ?", [$userId]);
+        // 建立新的驗證記錄（總是新增，不覆蓋舊資料）
+        $db->query("
+            INSERT INTO student_verifications (
+                user_id, 
+                school_name, 
+                student_name, 
+                student_id, 
+                student_id_image_path, 
+                verification_status, 
+                created_at, 
+                updated_at
+            ) VALUES (?, ?, ?, ?, ?, 'pending', NOW(), NOW())
+        ", [$userId, $schoolName, $studentName, $studentId, 'student_id_images/' . $fileName]);
         
-        if ($existingVerification) {
-            // 更新現有記錄
-            $db->query("
-                UPDATE student_verifications 
-                SET school_name = ?, student_name = ?, student_id = ?, student_id_image_path = ?, updated_at = NOW()
-                WHERE user_id = ?
-            ", [$schoolName, $studentName, $studentId, 'student_id_images/' . $fileName, $userId]);
-        } else {
-            // 創建新記錄
-            $db->query("
-                INSERT INTO student_verifications (user_id, school_name, student_name, student_id, student_id_image_path, verification_status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, 'pending', NOW(), NOW())
-            ", [$userId, $schoolName, $studentName, $studentId, 'student_id_images/' . $fileName]);
-        }
-        
-        // 🔧 暫時移除用戶狀態更新，避免 ENUM 值錯誤
-        // 學生證驗證狀態已在 student_verifications 表中記錄
-        // $db->query("UPDATE users SET status = 'pending' WHERE id = ?", [$userId]);
+        $submissionCountRow = $db->fetch("
+            SELECT COUNT(*) AS total 
+            FROM student_verifications 
+            WHERE user_id = ?
+        ", [$userId]);
+        $submissionCount = (int)($submissionCountRow['total'] ?? 1);
         
         // 提交事務
         $connection->commit();
         
-        Response::success('Student ID uploaded successfully', [
-            'user_id' => $userId,
-            'image_path' => 'student_id_images/' . $fileName
-        ]);
+        Response::success(
+            [
+                'user_id' => $userId,
+                'image_path' => 'student_id_images/' . $fileName,
+                'requires_re_review' => $requiresReReview,
+                'submission_count' => $submissionCount
+            ],
+            'Student ID uploaded successfully'
+        );
         
     } catch (Exception $e) {
         // 回滾事務
@@ -123,10 +131,10 @@ try {
             unlink($filePath);
         }
         
-        Response::error('Database error: ' . $e->getMessage());
+        Response::serverError('Database error: ' . $e->getMessage());
     }
     
 } catch (Exception $e) {
-    Response::error('Server error: ' . $e->getMessage());
+    Response::serverError('Server error: ' . $e->getMessage());
 }
 ?> 

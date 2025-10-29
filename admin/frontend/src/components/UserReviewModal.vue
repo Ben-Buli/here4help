@@ -141,14 +141,31 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label class="block text-sm font-medium text-gray-700">Current Verification Status</label>
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1" 
-                          :class="getVerificationStatusClass(verificationData.verification_status)">
-                      {{ getVerificationStatusText(verificationData.verification_status) }}
+                    <span
+                      class="inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1"
+                      :class="verificationStatusDisplay(verificationData).badgeClass"
+                    >
+                      {{ verificationStatusDisplay(verificationData).label }}
                     </span>
                   </div>
                   <div v-if="verificationData.admin_id">
                     <label class="block text-sm font-medium text-gray-700">Reviewed by Admin</label>
                     <p class="mt-1 text-sm text-gray-900">Admin ID: {{ verificationData.admin_id }}</p>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div v-if="verificationData.submission_count">
+                    <label class="block text-sm font-medium text-gray-700">Submission Attempt</label>
+                    <p class="mt-1 text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-md">
+                      {{ submissionAttemptLabel(verificationData) }}
+                    </p>
+                  </div>
+                  <div v-if="verificationData.previous_status">
+                    <label class="block text-sm font-medium text-gray-700">Previous Status</label>
+                    <p class="mt-1 text-sm text-gray-900 bg-gray-50 px-3 py-2 rounded-md">
+                      {{ formatStatusText(verificationData.previous_status) }}
+                    </p>
                   </div>
                 </div>
 
@@ -313,7 +330,7 @@ const selectedImage = ref('')
 
 // 計算屬性
 const canSubmit = computed(() => {
-  return reviewDecision.value && reviewNotes.value.trim()
+  return !!verificationData.value && reviewDecision.value && reviewNotes.value.trim()
 })
 
 // 載入驗證資料
@@ -353,6 +370,11 @@ const submitReview = async () => {
     showValidationErrors.value = true
     return
   }
+
+  if (!verificationData.value) {
+    alert('Review data is unavailable. Please reload and try again.')
+    return
+  }
   
   if (!props.user?.id) {
     alert('User ID is missing')
@@ -361,44 +383,36 @@ const submitReview = async () => {
   
   submitting.value = true
   try {
-    const response = await fetch(`/api/admin/users/${props.user.id}/review`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        decision: reviewDecision.value,
-        notes: reviewNotes.value.trim(),
-        new_permission: reviewDecision.value === 'approve' ? 1 : -1 // 批准設為1，拒絕設為-1
-      })
+    const response = await userApi.review(props.user.id, {
+      decision: reviewDecision.value,
+      notes: reviewNotes.value.trim(),
+      new_permission: reviewDecision.value === 'approve' ? 1 : 0, // 駁回維持未驗證
     })
     
-    if (response.ok) {
-      const data = await response.json()
-      if (data.success) {
-        let message = `審核${reviewDecision.value === 'approve' ? 'Approve' : 'Reject'}成功！`
-        
-        // 顯示推薦獎勵資訊
-        if (data.data?.referral_reward) {
-          message += `\nReferral reward of ${data.data.referral_reward.reward_points} points awarded to ${data.data.referral_reward.referrer_name}`
-        }
-        if (data.data?.referral_code_generated) {
-          message += `\nReferral code generated for user: ${data.data.referral_code_generated}`
-        }
-        
-        alert(message)
-        emit('reviewed')
-      } else {
-        alert('Review failed: ' + (data.message || 'Unknown error'))
+    if (response.data.success) {
+      const result = response.data
+      let message = `審核${reviewDecision.value === 'approve' ? 'Approve' : 'Reject'}成功！`
+      
+      if (result.data?.referral_reward) {
+        message += `\nReferral reward of ${result.data.referral_reward.reward_points} points awarded to ${result.data.referral_reward.referrer_name}`
       }
+      if (result.data?.referral_code_generated) {
+        message += `\nReferral code generated for user: ${result.data.referral_code_generated}`
+      }
+      
+      alert(message)
+      emit('reviewed')
     } else {
-      const errorData = await response.json().catch(() => null)
-      alert('Review failed: ' + (errorData?.message || `HTTP ${response.status}`))
+      alert('Review failed: ' + (response.data.message || 'Unknown error'))
     }
   } catch (error: any) {
     console.error('Failed to submit review:', error)
-    alert('Review failed: ' + (error.message || 'Network error'))
+    const errorMessage =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      error.message ||
+      'Network error'
+    alert('Review failed: ' + errorMessage)
   } finally {
     submitting.value = false
   }
@@ -421,22 +435,45 @@ const formatDate = (dateString: string | null) => {
   return new Date(dateString).toLocaleString()
 }
 
-const getVerificationStatusClass = (status: string) => {
-  const statusMap: Record<string, string> = {
-    'pending': 'bg-yellow-100 text-yellow-800',
-    'approved': 'bg-green-100 text-green-800',
-    'rejected': 'bg-red-100 text-red-800'
+type StatusDisplay = { label: string; badgeClass: string }
+
+const verificationStatusDisplay = (verification: any): StatusDisplay => {
+  if (!verification) {
+    return { label: 'No data', badgeClass: 'bg-gray-100 text-gray-800' }
   }
-  return statusMap[status] || 'bg-gray-100 text-gray-800'
+
+  const status = verification.verification_status || 'pending'
+  const requiresReReview = verification.requires_re_review === true
+
+  if (status === 'pending' && requiresReReview) {
+    return { label: 'Re-review', badgeClass: 'bg-cyan-100 text-cyan-800' }
+  }
+
+  const statusMap: Record<string, StatusDisplay> = {
+    pending: { label: 'Pending Review', badgeClass: 'bg-yellow-100 text-yellow-800' },
+    approved: { label: 'Approved', badgeClass: 'bg-green-100 text-green-800' },
+    rejected: { label: 'Rejected', badgeClass: 'bg-red-100 text-red-800' },
+  }
+
+  return statusMap[status] || {
+    label: (status as string).replace('_', ' '),
+    badgeClass: 'bg-gray-100 text-gray-800',
+  }
 }
 
-const getVerificationStatusText = (status: string) => {
-  const statusMap: Record<string, string> = {
-    'pending': 'Pending Review',
-    'approved': 'Approved',
-    'rejected': 'Rejected'
-  }
-  return statusMap[status] || status
+const submissionAttemptLabel = (verification: any) => {
+  const count = Number(verification?.submission_count || 0)
+  if (!count) return 'Unknown'
+  if (count === 1) return 'First submission'
+  return `Submission #${count}`
+}
+
+const formatStatusText = (status?: string | null) => {
+  if (!status) return 'Unknown'
+  return status
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
 }
 
 const handleImageError = (event: Event) => {

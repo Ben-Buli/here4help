@@ -97,9 +97,10 @@
         </div>
         <div class="mt-4 flex md:mt-0 md:ml-4 space-x-3">
           <button
+            v-if="user.student_verification && user.student_verification.verification_status === 'pending'"
             @click="openStudentReview"
             class="admin-button-secondary"
-            :disabled="!user.student_verification"
+            :disabled="isLoading"
           >
             Review Student ID
           </button>
@@ -220,11 +221,21 @@
             <div>
               <dt class="text-gray-500">Status</dt>
               <dd>
-                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-                  :class="studentStatusBadge(user.student_verification.verification_status)">
-                  {{ (user.student_verification.verification_status || '').replace('_', ' ') }}
+                <span
+                  class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+                  :class="verificationStatusDisplay(user.student_verification).badgeClass"
+                >
+                  {{ verificationStatusDisplay(user.student_verification).label }}
                 </span>
               </dd>
+            </div>
+            <div v-if="user.student_verification.submission_count">
+              <dt class="text-gray-500">Submission Attempt</dt>
+              <dd class="text-gray-900">{{ submissionAttemptLabel(user.student_verification) }}</dd>
+            </div>
+            <div v-if="user.student_verification.previous_status">
+              <dt class="text-gray-500">Previous Status</dt>
+              <dd class="text-gray-900">{{ formatStatusText(user.student_verification.previous_status) }}</dd>
             </div>
             <div v-if="user.student_verification.verification_notes">
               <dt class="text-gray-500">Notes</dt>
@@ -234,12 +245,23 @@
           <div v-if="user.student_verification && user.student_verification.student_id_image_path">
             <dt class="text-gray-500">Student ID Image</dt>
             <dd>
-              <img
-                :src="getImageUrl(user.student_verification.student_id_image_path)"
-                alt="Student ID"
-                class="h-32 rounded border cursor-pointer"
-                @click="openImage(user.student_verification.student_id_image_path)"
-              />
+              <div class="relative">
+                <div
+                  v-if="studentImageLoadError"
+                  class="flex h-32 w-24 items-center justify-center rounded border border-dashed border-gray-300 bg-gray-50 px-3 text-center text-xs text-gray-500"
+                  aria-live="polite"
+                >
+                  Image unavailable
+                </div>
+                <img
+                  v-else
+                  :src="getImageUrl(user.student_verification.student_id_image_path)"
+                  alt="Student ID"
+                  class="h-32 w-24 rounded border object-cover cursor-pointer"
+                  @click="openImage(user.student_verification.student_id_image_path)"
+                  @error="handleStudentImageError"
+                />
+              </div>
             </dd>
           </div>
         </div>
@@ -294,12 +316,49 @@
         </div>
       </div>
 
+      <UserReviewModal
+        v-if="showReviewModal && user"
+        :user="user"
+        @close="showReviewModal = false"
+        @reviewed="handleStudentReviewed"
+      />
+
+      <div
+        v-if="showImageModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+        @click="closeImageModal"
+      >
+        <div class="relative max-h-screen max-w-3xl p-4" @click.stop>
+          <button
+            @click="closeImageModal"
+            class="absolute top-4 right-4 text-white hover:text-gray-300"
+            aria-label="Close image preview"
+          >
+            <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+          <img
+            v-if="!modalImageError"
+            :src="selectedImagePath"
+            alt="Student ID preview"
+            class="max-h-screen max-w-full rounded object-contain"
+            @error="handleModalImageError"
+          />
+          <div
+            v-else
+            class="rounded bg-white px-6 py-4 text-center text-gray-700 shadow-lg"
+          >
+            Unable to load the student ID image.
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { userApi } from '@/services/api'
 import { getImageUrl } from '@/config/api'
@@ -312,12 +371,20 @@ const router = useRouter()
 const isLoading = ref(false)
 const error = ref('')
 type StudentVerification = {
+  id?: number
   school_name?: string
   student_name?: string
   student_id?: string
   student_id_image_path?: string
+  student_id_image_url?: string | null
   verification_status?: string
-  verification_notes?: string
+  verification_notes?: string | null
+  created_at?: string
+  updated_at?: string
+  admin_id?: number | null
+  submission_count?: number
+  previous_status?: string | null
+  requires_re_review?: boolean
 }
 
 type UserWithStudent = any & { student_verification?: StudentVerification | null }
@@ -328,6 +395,8 @@ const recentActivities = ref<any[]>([])
 const showImageModal = ref(false)
 const selectedImagePath = ref('')
 const showReviewModal = ref(false)
+const studentImageLoadError = ref(false)
+const modalImageError = ref(false)
 
 // Methods
 const loadUser = async () => {
@@ -349,6 +418,7 @@ const loadUser = async () => {
       }
       stats.value = response.data.data.stats || {}
       recentActivities.value = response.data.data.recent_activities || []
+      studentImageLoadError.value = false
     } else {
       throw new Error('User not found')
     }
@@ -377,10 +447,25 @@ const handleStudentReviewed = () => {
   refreshData()
 }
 
-
 const openImage = (path: string) => {
+  if (!path || studentImageLoadError.value) return
+  modalImageError.value = false
   selectedImagePath.value = getImageUrl(path)
   showImageModal.value = true
+}
+
+const closeImageModal = () => {
+  showImageModal.value = false
+  selectedImagePath.value = ''
+  modalImageError.value = false
+}
+
+const handleStudentImageError = () => {
+  studentImageLoadError.value = true
+}
+
+const handleModalImageError = () => {
+  modalImageError.value = true
 }
 
 // Utility functions
@@ -443,17 +528,61 @@ const formatDate = (dateString: string | null) => {
   return new Date(dateString).toLocaleDateString()
 }
 
-const studentStatusBadge = (s?: string) => {
-  const map: Record<string, string> = {
+type StatusDisplay = { label: string; badgeClass: string }
+
+const verificationStatusDisplay = (verification?: StudentVerification | null): StatusDisplay => {
+  if (!verification) {
+    return { label: 'No data', badgeClass: 'bg-gray-100 text-gray-800' }
+  }
+
+  const status = verification.verification_status || 'pending'
+  const requiresReReview = verification.requires_re_review === true
+
+  if (status === 'pending' && requiresReReview) {
+    return { label: 'Re-review', badgeClass: 'bg-cyan-100 text-cyan-800' }
+  }
+
+  const labelMap: Record<string, string> = {
+    pending: 'Pending',
+    approved: 'Approved',
+    rejected: 'Rejected',
+  }
+
+  const badgeMap: Record<string, string> = {
     pending: 'bg-yellow-100 text-yellow-800',
     approved: 'bg-green-100 text-green-800',
     rejected: 'bg-red-100 text-red-800',
   }
-  return s ? (map[s] || 'bg-gray-100 text-gray-800') : 'bg-gray-100 text-gray-800'
+
+  return {
+    label: labelMap[status] || status.replace('_', ' '),
+    badgeClass: badgeMap[status] || 'bg-gray-100 text-gray-800',
+  }
+}
+
+const submissionAttemptLabel = (verification?: StudentVerification | null) => {
+  if (!verification?.submission_count) return 'Unknown'
+  if (verification.submission_count === 1) return 'First submission'
+  return `Submission #${verification.submission_count}`
+}
+
+const formatStatusText = (status?: string | null) => {
+  if (!status) return 'Unknown'
+  return status
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
 }
 
 // Lifecycle
 onMounted(() => {
   loadUser()
 })
+
+watch(
+  () => user.value?.student_verification?.student_id_image_path,
+  () => {
+    studentImageLoadError.value = false
+  }
+)
 </script>

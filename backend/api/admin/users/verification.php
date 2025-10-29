@@ -78,6 +78,24 @@ try {
     $verificationStmt->execute([$userId]);
     $verification = $verificationStmt->fetch(PDO::FETCH_ASSOC);
     
+    $previousStmt = $db->prepare("
+        SELECT verification_status 
+        FROM student_verifications 
+        WHERE user_id = ? 
+        ORDER BY created_at DESC 
+        LIMIT 1 OFFSET 1
+    ");
+    $previousStmt->execute([$userId]);
+    $previousVerification = $previousStmt->fetch(PDO::FETCH_ASSOC);
+
+    $countStmt = $db->prepare("
+        SELECT COUNT(*) AS total 
+        FROM student_verifications 
+        WHERE user_id = ?
+    ");
+    $countStmt->execute([$userId]);
+    $submissionCount = (int)($countStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+
     $responseData = [
         'user' => $user,
         'verification' => null
@@ -95,18 +113,26 @@ try {
             // 直接使用 /uploads 路徑，讓 Vite 代理處理
             $imageUrl = '/uploads/' . $normalizedImagePath;
         }
+
+        $requiresReReview = $previousVerification
+            && $previousVerification['verification_status'] === 'rejected'
+            && $verification['verification_status'] === 'pending';
         
         $responseData['verification'] = [
             'id' => (int)$verification['id'],
             'school_name' => $verification['school_name'],
             'student_name' => $verification['student_name'],
             'student_id' => $verification['student_id'],
+            'student_id_image_path' => $normalizedImagePath,
             'student_id_image' => $imageUrl,
             'verification_status' => $verification['verification_status'],
             'verification_notes' => $verification['verification_notes'],
             'admin_id' => $verification['admin_id'] ? (int)$verification['admin_id'] : null,
             'created_at' => $verification['created_at'],
-            'updated_at' => $verification['updated_at']
+            'updated_at' => $verification['updated_at'],
+            'previous_status' => $previousVerification['verification_status'] ?? null,
+            'submission_count' => $submissionCount,
+            'requires_re_review' => $requiresReReview
         ];
         error_log("User verification data retrieved successfully: " . json_encode($responseData));
     }

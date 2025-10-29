@@ -214,7 +214,7 @@
     </div>
 
     <!-- 最近活動 -->
-    <div class="admin-card">
+    <!-- <div class="admin-card">
       <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
       <div v-if="isLoading" class="flex justify-center py-4">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
@@ -244,7 +244,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </div> -->
   </div>
 </template>
 

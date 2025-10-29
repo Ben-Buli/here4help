@@ -188,23 +188,46 @@ try {
     }
     
     if (!$chatRoom) {
-        // 後備：以 task_id 尋找聊天室（取最新建立的一間）
-        $fallbackRoomQuery = $db->prepare("
-            SELECT 
-                cr.id, cr.type, cr.task_id, cr.creator_id, cr.participant_id, cr.created_at,
-                creator.name as creator_name, creator.avatar_url as creator_avatar,
-                participant.name as participant_name, participant.avatar_url as participant_avatar,
-                ta.status as participant_application_status
-            FROM chat_rooms cr
-            LEFT JOIN users creator ON cr.creator_id = creator.id
-            LEFT JOIN users participant ON cr.participant_id = participant.id
-            LEFT JOIN task_applications ta ON cr.task_id = ta.task_id AND cr.participant_id = ta.user_id
-            WHERE cr.task_id = ?
-            ORDER BY cr.created_at DESC
-            LIMIT 1
-        ");
-        $fallbackRoomQuery->execute([$taskId]);
-        $chatRoom = $fallbackRoomQuery->fetch(PDO::FETCH_ASSOC);
+        // 後備：以 task_id + participant_id 尋找正確的聊天室
+        // 優先使用 tasks.participant_id 來匹配 chat_rooms.participant_id
+        $taskParticipantId = $dispute['participant_id'];
+        
+        if ($taskParticipantId) {
+            // 如果任務有執行者，找到對應的聊天室（任務執行者 = 聊天室的 participant）
+            $fallbackRoomQuery = $db->prepare("
+                SELECT 
+                    cr.id, cr.type, cr.task_id, cr.creator_id, cr.participant_id, cr.created_at,
+                    creator.name as creator_name, creator.avatar_url as creator_avatar,
+                    participant.name as participant_name, participant.avatar_url as participant_avatar,
+                    ta.status as participant_application_status
+                FROM chat_rooms cr
+                LEFT JOIN users creator ON cr.creator_id = creator.id
+                LEFT JOIN users participant ON cr.participant_id = participant.id
+                LEFT JOIN task_applications ta ON cr.task_id = ta.task_id AND cr.participant_id = ta.user_id
+                WHERE cr.task_id = ? AND cr.participant_id = ?
+                LIMIT 1
+            ");
+            $fallbackRoomQuery->execute([$taskId, $taskParticipantId]);
+            $chatRoom = $fallbackRoomQuery->fetch(PDO::FETCH_ASSOC);
+        } else {
+            // 如果任務還沒有執行者（未被接受），則取最新的申請聊天室
+            $fallbackRoomQuery = $db->prepare("
+                SELECT 
+                    cr.id, cr.type, cr.task_id, cr.creator_id, cr.participant_id, cr.created_at,
+                    creator.name as creator_name, creator.avatar_url as creator_avatar,
+                    participant.name as participant_name, participant.avatar_url as participant_avatar,
+                    ta.status as participant_application_status
+                FROM chat_rooms cr
+                LEFT JOIN users creator ON cr.creator_id = creator.id
+                LEFT JOIN users participant ON cr.participant_id = participant.id
+                LEFT JOIN task_applications ta ON cr.task_id = ta.task_id AND cr.participant_id = ta.user_id
+                WHERE cr.task_id = ?
+                ORDER BY cr.created_at DESC
+                LIMIT 1
+            ");
+            $fallbackRoomQuery->execute([$taskId]);
+            $chatRoom = $fallbackRoomQuery->fetch(PDO::FETCH_ASSOC);
+        }
     }
     
     if (!$chatRoom) {
@@ -212,25 +235,28 @@ try {
     }
     
     // 獲取聊天訊息 (完整歷史)
-    $messagesQuery = $db->prepare("
-        SELECT 
-            cm.id,
-            cm.room_id,
-            cm.from_user_id,
-            cm.content,
-            cm.kind,
-            cm.media_url,
-            cm.mime_type,
-            cm.created_at,
-            u.name as user_name,
-            u.avatar_url as user_avatar
-        FROM chat_messages cm
-        LEFT JOIN users u ON cm.from_user_id = u.id
-        WHERE cm.room_id = ?
-        ORDER BY cm.created_at ASC
-    ");
-    $messagesQuery->execute([$chatRoomId]);
-    $messages = $messagesQuery->fetchAll(PDO::FETCH_ASSOC);
+    $messages = [];
+    if ($chatRoom && $chatRoom['id']) {
+        $messagesQuery = $db->prepare("
+            SELECT 
+                cm.id,
+                cm.room_id,
+                cm.from_user_id,
+                cm.content,
+                cm.kind,
+                cm.media_url,
+                cm.mime_type,
+                cm.created_at,
+                u.name as user_name,
+                u.avatar_url as user_avatar
+            FROM chat_messages cm
+            LEFT JOIN users u ON cm.from_user_id = u.id
+            WHERE cm.room_id = ?
+            ORDER BY cm.created_at ASC
+        ");
+        $messagesQuery->execute([$chatRoom['id']]);
+        $messages = $messagesQuery->fetchAll(PDO::FETCH_ASSOC);
+    }
     
     // 獲取參與用戶資訊
     $userIds = array_unique(array_filter([

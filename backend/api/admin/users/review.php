@@ -76,7 +76,7 @@ try {
     }
     
     // 檢查用戶當前是否為未驗證狀態
-    if ((int)$user['permission'] !== 0) {
+    if ((int)$user['permission'] != 0) {
         Response::error('User is not in unverified status (permission must be 0)', 400);
     }
     

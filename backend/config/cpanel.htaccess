@@ -30,6 +30,15 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 </IfModule>
 
 # API 路由重寫
+# 特定 admin users 子路徑必須放在通用規則之前，避免被當作檔案路徑解析失敗
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/admin/users/([0-9]+)/verification$ backend/api/admin/users/verification.php [L,QSA]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^api/admin/users/([0-9]+)/intro-referral-info$ backend/api/admin/users/intro-referral-info.php [L,QSA]
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^api/(.*)$ backend/api/$1 [L,QSA]

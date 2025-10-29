@@ -153,6 +153,15 @@ export const userApi = {
 
   introReferralInfo: (id: number) =>
     api.get<ApiResponse<any>>(API_ENDPOINTS.users.introReferralInfo(id)),
+
+  review: (
+    id: number,
+    payload: {
+      decision: 'approve' | 'reject'
+      notes: string
+      new_permission: number
+    },
+  ) => api.post<ApiResponse<any>>(API_ENDPOINTS.users.review(id), payload),
 }
 
 // 任務管理 API
@@ -170,7 +179,12 @@ export const taskApi = {
     sort_order?: 'asc' | 'desc'
   }) => api.get<PaginatedResponse<any>>('/api/admin/tasks', { params }),
 
-  statuses: () => api.get<ApiResponse<any[]>>('/backend/api/tasks/statuses'),
+  // Note: 任務狀態來自 backend API（非管理員 API），使用完整 URL
+  statuses: () => {
+    const backendUrl = API_CONFIG.backendUrl || 'https://hero4help.demofhs.com/backend'
+    const url = `${backendUrl}/api/tasks/statuses.php`
+    return axios.get<ApiResponse<any[]>>(url)
+  },
 
   show: (id: string) =>
     api.get<

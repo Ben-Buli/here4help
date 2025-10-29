@@ -753,6 +753,7 @@ const getPermissionText = (permission: number) => {
   if (permission >= 99) return 'Master User'
   if (permission >= 1) return 'Verified User'
   if (permission === 0) return 'Unverified User'
+  if (permission == 0) return 'Unverified User'
   if (permission === -1) return 'Restricted'
   if (permission === -2) return 'Suspended'
   if (permission === -3) return 'Banned'

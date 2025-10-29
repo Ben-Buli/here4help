@@ -113,7 +113,7 @@ try {
     // 檢查是否有活躍的聊天室
     $activeChatStmt = $pdo->prepare("
         SELECT COUNT(*) as count FROM chat_rooms cr
-        WHERE (cr.user_id = ? OR cr.participant_id = ?)
+        WHERE (cr.creator_id = ? OR cr.participant_id = ?)
         AND cr.status = 'active'
     ");
     $activeChatStmt->execute([$userId, $userId]);

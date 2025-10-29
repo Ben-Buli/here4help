@@ -82,15 +82,12 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      // 檢查本地是否已經隱藏過通知
       final prefs = await SharedPreferences.getInstance();
+      // 清除舊版隱藏設定（防止用戶在新流程中看不到通知）
+      await prefs.remove('student_verification_rejected_hidden_${user!.id}');
       final hiddenNotificationKey =
-          'student_verification_rejected_hidden_${user!.id}';
-      final isHidden = prefs.getBool(hiddenNotificationKey) ?? false;
-
-      if (isHidden) {
-        return; // 用戶已經隱藏過這個通知，不再顯示
-      }
+          'student_verification_banner_hidden_${user.id}';
+      final hiddenStatus = prefs.getString(hiddenNotificationKey);
 
       // 呼叫API檢查學生證狀態
       final token = await AuthService.getToken();
@@ -109,14 +106,46 @@ class _HomePageState extends State<HomePage> {
         final data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
           final verificationData = data['data'] as Map<String, dynamic>;
+          final status = (verificationData['verification_status'] ?? '')
+              .toString()
+              .toLowerCase();
 
-          // 只有當狀態為 'rejected' 時才顯示按鈕
-          if (verificationData['verification_status'] == 'rejected') {
+          if (status.isEmpty || status == 'pending') {
+            if (mounted) {
+              setState(() {
+                _studentVerificationData = null;
+              });
+            }
+            await prefs.remove(hiddenNotificationKey);
+            return;
+          }
+
+          if (status == hiddenStatus) {
+            // 使用者已隱藏相同狀態的通知
+            return;
+          }
+
+          if (status != 'approved' && hiddenStatus != null) {
+            // 狀態有所改變（例如從已核准變成被拒），重置隱藏設定
+            await prefs.remove(hiddenNotificationKey);
+          }
+
+          if (mounted) {
             setState(() {
-              _studentVerificationData = verificationData;
+              _studentVerificationData = {
+                ...verificationData,
+                'verification_status': status,
+              };
             });
           }
+          return;
         }
+      }
+
+      if (mounted) {
+        setState(() {
+          _studentVerificationData = null;
+        });
       }
     } catch (e) {
       debugPrint('檢查學生證狀態失敗: $e');
@@ -134,22 +163,135 @@ class _HomePageState extends State<HomePage> {
     final userService = context.read<UserService>();
     final user = userService.currentUser;
 
-    if (user?.id != null) {
-      final prefs = await SharedPreferences.getInstance();
-      final hiddenNotificationKey =
-          'student_verification_rejected_hidden_${user!.id}';
-      await prefs.setBool(hiddenNotificationKey, true);
-
-      setState(() {
-        _studentVerificationData = null;
-      });
+    final status =
+        (_studentVerificationData?['verification_status'] ?? '').toString();
+    if (user?.id == null || status.toLowerCase() != 'approved') {
+      return; // 僅允許在核准狀態時關閉通知
     }
+
+    final prefs = await SharedPreferences.getInstance();
+    final hiddenNotificationKey =
+        'student_verification_banner_hidden_${user!.id}';
+    await prefs.setString(hiddenNotificationKey, status.toLowerCase());
+
+    setState(() {
+      _studentVerificationData = null;
+    });
   }
 
   // 導航到學生證更新頁面
   void _navigateToStudentIdUpdate() {
     // TODO: 實現導航到學生證更新頁面，並傳遞被拒絕的資料
     context.go('/signup/student-id/update', extra: _studentVerificationData);
+  }
+
+  Widget? _buildStudentVerificationBanner() {
+    final data = _studentVerificationData;
+    if (data == null) return null;
+
+    final status =
+        (data['verification_status'] ?? '').toString().toLowerCase();
+    if (status.isEmpty) return null;
+
+    final bool isApproved = status == 'approved';
+    final bool isRejected = status == 'rejected';
+
+    final baseColor = isApproved ? Colors.green : Colors.orange;
+    final backgroundColor = baseColor.withOpacity(0.12);
+    final borderColor = baseColor.withOpacity(0.3);
+    final iconData = isApproved
+        ? Icons.check_circle_outline
+        : Icons.warning_amber_outlined;
+    final iconColor =
+        (isApproved ? Colors.green[700] : Colors.orange[700]) ?? baseColor;
+    final title = isApproved
+        ? 'Student ID Verification Approved'
+        : 'Student ID Verification Rejected';
+    final showCloseButton = isApproved;
+    final showReuploadButton = !isApproved;
+    final notes = data['verification_notes']?.toString();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                iconData,
+                color: iconColor,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: iconColor,
+                  ),
+                ),
+              ),
+              if (showCloseButton)
+                IconButton(
+                  onPressed: _hideStudentVerificationNotification,
+                  icon: Icon(
+                    Icons.close,
+                    color: Colors.grey[600],
+                    size: 20,
+                  ),
+                  tooltip: 'Dismiss',
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                ),
+            ],
+          ),
+          if (notes != null && notes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Reason: $notes',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[700],
+              ),
+            ),
+          ],
+          if (showReuploadButton) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _navigateToStudentIdUpdate,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Re-upload Student ID'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: baseColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   @override
@@ -166,6 +308,7 @@ class _HomePageState extends State<HomePage> {
         builder: (context, constraints) {
           bool isWide = constraints.maxWidth > 800;
           final user = context.watch<UserService>().currentUser;
+          final banner = _buildStudentVerificationBanner();
           return Align(
             alignment: Alignment.topCenter, // 將內容靠上對齊
             child: ConstrainedBox(
@@ -333,89 +476,7 @@ class _HomePageState extends State<HomePage> {
                         const SizedBox(height: 24),
 
                         // 學生證審核失敗通知按鈕
-                        if (_studentVerificationData != null) ...[
-                          Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.only(bottom: 16),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color: Colors.orange.withOpacity(0.3)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.warning_amber_outlined,
-                                      color: Colors.orange,
-                                      size: 24,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'Student ID Verification Failed',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.orange[800],
-                                        ),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      onPressed:
-                                          _hideStudentVerificationNotification,
-                                      icon: Icon(
-                                        Icons.close,
-                                        color: Colors.grey[600],
-                                        size: 20,
-                                      ),
-                                      constraints: const BoxConstraints(
-                                        minWidth: 32,
-                                        minHeight: 32,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                if (_studentVerificationData![
-                                        'verification_notes'] !=
-                                    null) ...[
-                                  Text(
-                                    'Reason: ${_studentVerificationData!['verification_notes']}',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[700],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                ],
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: _navigateToStudentIdUpdate,
-                                    icon: const Icon(Icons.refresh),
-                                    label: const Text('Re-upload Student ID'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.orange,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 24,
-                                        vertical: 12,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                        if (banner != null) banner,
 
                         Container(
                           padding: const EdgeInsets.all(12),

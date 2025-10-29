@@ -36,6 +36,8 @@ Route::prefix('admin')->group(function () {
             Route::get('/{id}', [UserController::class, 'show'])->middleware('admin:users.view');
             Route::patch('/{id}/status', [UserController::class, 'updateStatus'])->middleware('admin:users.edit');
             Route::post('/{id}/review', [UserController::class, 'review'])->middleware('admin:users.edit');
+            Route::get('/{id}/verification', [UserController::class, 'verification'])->middleware('admin:users.view');
+            Route::get('/{id}/intro-referral-info', [UserController::class, 'introReferralInfo'])->middleware('admin:users.view');
         });
 
         // 任務管理

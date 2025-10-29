@@ -119,18 +119,51 @@ class UserController extends Controller
         }
 
         // 取得學生證認證資料（若有）
-        $studentVerification = DB::table('student_verifications')
+        $studentVerification = null;
+        $latestVerification = DB::table('student_verifications')
             ->where('user_id', $id)
-            ->orderBy('updated_at', 'desc')
+            ->orderBy('created_at', 'desc')
             ->first();
 
-        if ($studentVerification && $studentVerification->student_id_image_path) {
-            $normalizedImagePath = ltrim($studentVerification->student_id_image_path, '/');
-            if (str_starts_with($normalizedImagePath, 'uploads/')) {
-                $normalizedImagePath = substr($normalizedImagePath, strlen('uploads/'));
+        if ($latestVerification) {
+            $previousVerification = DB::table('student_verifications')
+                ->where('user_id', $id)
+                ->orderBy('created_at', 'desc')
+                ->skip(1)
+                ->first();
+
+            $submissionCount = DB::table('student_verifications')
+                ->where('user_id', $id)
+                ->count();
+
+            $normalizedImagePath = null;
+            if ($latestVerification->student_id_image_path) {
+                $normalizedImagePath = ltrim($latestVerification->student_id_image_path, '/');
+                if (str_starts_with($normalizedImagePath, 'uploads/')) {
+                    $normalizedImagePath = substr($normalizedImagePath, strlen('uploads/'));
+                }
             }
-            $studentVerification->student_id_image_path = $normalizedImagePath;
-            $studentVerification->student_id_image_url = '/uploads/' . $normalizedImagePath;
+
+            $requiresReReview = $previousVerification
+                && $previousVerification->verification_status === 'rejected'
+                && $latestVerification->verification_status === 'pending';
+
+            $studentVerification = (object) [
+                'id' => $latestVerification->id,
+                'school_name' => $latestVerification->school_name,
+                'student_name' => $latestVerification->student_name,
+                'student_id' => $latestVerification->student_id,
+                'student_id_image_path' => $normalizedImagePath,
+                'student_id_image_url' => $normalizedImagePath ? '/uploads/' . $normalizedImagePath : null,
+                'verification_status' => $latestVerification->verification_status,
+                'verification_notes' => $latestVerification->verification_notes,
+                'created_at' => $latestVerification->created_at,
+                'updated_at' => $latestVerification->updated_at,
+                'admin_id' => $latestVerification->admin_id ?? null,
+                'submission_count' => $submissionCount,
+                'previous_status' => $previousVerification->verification_status ?? null,
+                'requires_re_review' => $requiresReReview,
+            ];
         }
         
         // 獲取用戶相關統計
@@ -476,12 +509,33 @@ class UserController extends Controller
 
             // 獲取用戶最新的學生證驗證記錄
             $verification = DB::table('student_verifications')
-                ->select('id', 'user_id', 'school_name', 'student_name', 'student_id', 
-                        'student_id_image_path', 'verification_status', 'verification_notes', 
-                        'created_at', 'updated_at')
+                ->select(
+                    'id',
+                    'user_id',
+                    'school_name',
+                    'student_name',
+                    'student_id',
+                    'student_id_image_path',
+                    'verification_status',
+                    'verification_notes',
+                    'created_at',
+                    'updated_at',
+                    'admin_id'
+                )
                 ->where('user_id', $id)
-                ->orderBy('updated_at', 'desc')
+                ->orderBy('created_at', 'desc')
                 ->first();
+
+            $previousVerification = DB::table('student_verifications')
+                ->select('verification_status')
+                ->where('user_id', $id)
+                ->orderBy('created_at', 'desc')
+                ->skip(1)
+                ->first();
+
+            $submissionCount = DB::table('student_verifications')
+                ->where('user_id', $id)
+                ->count();
 
             $responseData = [
                 'user' => $user,
@@ -497,9 +551,26 @@ class UserController extends Controller
                     if (str_starts_with($normalizedImagePath, 'uploads/')) {
                         $normalizedImagePath = substr($normalizedImagePath, strlen('uploads/'));
                     }
-                    // 直接使用 /uploads 路徑，讓 Vite 代理處理
-                    $imageUrl = '/uploads/' . $normalizedImagePath;
+                    
+                    // 根據環境構建完整的圖片 URL
+                    $appUrl = rtrim(env('APP_URL', ''), '/');
+                    $isLocal = str_contains($appUrl, 'localhost') || str_contains($appUrl, '127.0.0.1');
+                    
+                    if ($isLocal) {
+                        // 本地開發：使用相對路徑，讓 Vite 代理處理
+                        $imageUrl = '/uploads/' . $normalizedImagePath;
+                    } else {
+                        // 生產環境：使用完整 URL，包含 /backend/ 路徑
+                        $backendUrl = env('BACKEND_API_URL', $appUrl . '/backend');
+                        // 移除 /api 後綴（如果有）
+                        $backendUrl = preg_replace('#/api$#', '', $backendUrl);
+                        $imageUrl = $backendUrl . '/uploads/' . $normalizedImagePath;
+                    }
                 }
+
+                $requiresReReview = $previousVerification
+                    && $previousVerification->verification_status === 'rejected'
+                    && $verification->verification_status === 'pending';
 
                 $responseData['verification'] = [
                     'id' => (int)$verification->id,
@@ -510,9 +581,12 @@ class UserController extends Controller
                     'student_id_image' => $imageUrl,
                     'verification_status' => $verification->verification_status,
                     'verification_notes' => $verification->verification_notes,
-                    'admin_id' => null, // admin_id 欄位不存在
+                    'admin_id' => $verification->admin_id ? (int)$verification->admin_id : null,
                     'created_at' => $verification->created_at,
-                    'updated_at' => $verification->updated_at
+                    'updated_at' => $verification->updated_at,
+                    'previous_status' => $previousVerification->verification_status ?? null,
+                    'submission_count' => $submissionCount,
+                    'requires_re_review' => $requiresReReview,
                 ];
             }
 
@@ -659,7 +733,7 @@ class UserController extends Controller
         
         // 檢查用戶是否存在且為未驗證狀態
         $user = DB::table('users')->where('id', $id)->first();
-        if (!$user || $user->permission !== 0) {
+        if (!$user || $user->permission != 0) {
             return response()->json([
                 'success' => false,
                 'message' => 'User not found or not in unverified status'
@@ -694,7 +768,7 @@ class UserController extends Controller
             $verificationStatus = $request->decision === 'approve' ? 'approved' : 'rejected';
             DB::table('student_verifications')
                 ->where('user_id', $id)
-                ->orderBy('updated_at', 'desc')
+                ->orderBy('created_at', 'desc')
                 ->limit(1)
                 ->update([
                     'verification_status' => $verificationStatus,
