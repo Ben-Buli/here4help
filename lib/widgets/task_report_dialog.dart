@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/services/api/task_reports_api.dart';
 
 /// 任務檢舉對話框
@@ -53,9 +55,9 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
         });
         Navigator.of(context).pop(true); // 檢舉成功，返回 true
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Report submitted! We will review it soon.'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Report submitted! We will review it soon.'),
+            backgroundColor: Theme.of(context).colorScheme.secondary,
           ),
         );
       }
@@ -74,7 +76,7 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Report submission failed: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -83,12 +85,30 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final themeManager = context.watch<ThemeConfigManager>();
+    final dialogBackground =
+        theme.dialogTheme.backgroundColor ?? themeManager.dialogBackgroundColor;
+    final primaryColor = themeManager.dialogPrimaryColor;
+    final titleColor = themeManager.dialogTitleColor;
+    final warningColor = theme.colorScheme.error.withOpacity(0.85);
+    final cardBackground =
+        Color.alphaBlend(primaryColor.withOpacity(0.08), Colors.white);
+    final cardBorder = primaryColor.withOpacity(0.2);
+    final infoBackground =
+        Color.alphaBlend(warningColor.withOpacity(0.12), Colors.white);
+    final infoBorder = warningColor.withOpacity(0.25);
+
     return AlertDialog(
-      title: const Row(
+      backgroundColor: dialogBackground,
+      shape: theme.dialogTheme.shape,
+      titleTextStyle: theme.dialogTheme.titleTextStyle,
+      contentTextStyle: theme.dialogTheme.contentTextStyle,
+      title: Row(
         children: [
-          Icon(Icons.report, color: Colors.red),
-          SizedBox(width: 8),
-          Text('Report Task'),
+          Icon(Icons.report, color: warningColor),
+          const SizedBox(width: 8),
+          const Text('Report Task'),
         ],
       ),
       content: SingleChildScrollView(
@@ -98,22 +118,22 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 任務資訊
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: cardBackground,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: cardBorder),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Report Task:',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
-                        color: Colors.grey,
+                        color: titleColor.withOpacity(0.7),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -126,14 +146,12 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 16),
-
-              // 檢舉原因選擇
-              const Text(
+              Text(
                 'Reason *',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
+                  color: titleColor,
                 ),
               ),
               const SizedBox(height: 8),
@@ -161,14 +179,12 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
                   return null;
                 },
               ),
-
               const SizedBox(height: 16),
-
-              // 詳細說明
-              const Text(
+              Text(
                 'Detailed Description *',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
+                  color: titleColor,
                 ),
               ),
               const SizedBox(height: 8),
@@ -190,32 +206,29 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
                   return null;
                 },
               ),
-
               const SizedBox(height: 8),
-
-              // 提示文字
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.amber[50],
+                  color: infoBackground,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber[200]!),
+                  border: Border.all(color: infoBorder),
                 ),
-                child: const Row(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
                       Icons.info_outline,
-                      color: Colors.amber,
+                      color: warningColor,
                       size: 16,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Please ensure the report content is real and valid. False reports may result in account restrictions.',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.amber,
+                          color: warningColor,
                         ),
                       ),
                     ),
@@ -229,12 +242,13 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
       actions: [
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(foregroundColor: primaryColor),
           child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: _isLoading ? null : _submitReport,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
+            backgroundColor: warningColor,
             foregroundColor: Colors.white,
           ),
           child: _isLoading

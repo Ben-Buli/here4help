@@ -13,7 +13,7 @@ import 'package:here4help/constants/theme_schemes.dart';
 /// 使用示例：
 /// ```dart
 /// final themeManager = ThemeConfigManager();
-/// await themeManager.setTheme(ThemeScheme.morandiBlue);
+/// await themeManager.setTheme(ThemeScheme.h4hBrand);
 /// await themeManager.setThemeMode(AppThemeMode.system);
 /// ```
 class ThemeConfigManager extends ChangeNotifier {
@@ -21,7 +21,7 @@ class ThemeConfigManager extends ChangeNotifier {
   static const String _themeModeKey = 'theme_mode';
   static const String _themePresetsKey = 'theme_presets';
 
-  ThemeScheme _currentTheme = ThemeScheme.morandiBlue;
+  ThemeScheme _currentTheme = ThemeScheme.h4hBrand;
   AppThemeMode _themeMode = AppThemeMode.light;
   Map<String, ThemePreset> _themePresets = {};
 
@@ -129,6 +129,7 @@ class ThemeConfigManager extends ChangeNotifier {
         displayName: '商業風格合集',
         description: '專業的商業風格主題集合',
         themes: [
+          ThemeScheme.h4hBrand,
           ThemeScheme.metaBusinessStyle,
           ThemeScheme.minimalistStill,
           ThemeScheme.milkTeaEarth,
@@ -158,7 +159,7 @@ class ThemeConfigManager extends ChangeNotifier {
   ///
   /// 使用示例：
   /// ```dart
-  /// await themeManager.setTheme(ThemeScheme.morandiBlue);
+  /// await themeManager.setTheme(ThemeScheme.h4hBrand);
   /// ```
   Future<void> setTheme(ThemeScheme theme) async {
     if (_currentTheme.name != theme.name) {
@@ -350,7 +351,7 @@ class ThemeConfigManager extends ChangeNotifier {
 
   /// 重置為預設主題
   Future<void> resetToDefault() async {
-    await setTheme(ThemeScheme.morandiBlue);
+    await setTheme(ThemeScheme.h4hBrand);
     await setThemeMode(AppThemeMode.light);
   }
 
@@ -768,6 +769,27 @@ class ThemeConfigManager extends ChangeNotifier {
     }
   }
 
+  /// Dialog 背景色（以主色調和白色混合的淺色）
+  Color get dialogBackgroundColor {
+    final theme = effectiveTheme;
+    return Color.alphaBlend(theme.primary.withOpacity(0.18), Colors.white);
+  }
+
+  /// Dialog 標題顏色（預設沿用 AppBar 文字色）
+  Color get dialogTitleColor {
+    return appBarTextColor;
+  }
+
+  /// Dialog 內容文字顏色
+  Color get dialogContentColor {
+    return effectiveTheme.onSurface.withOpacity(0.9);
+  }
+
+  /// Dialog 主要按鈕顏色
+  Color get dialogPrimaryColor {
+    return effectiveTheme.primary;
+  }
+
   /// 獲取導航欄未選中項目顏色
   Color get navigationBarUnselectedColor {
     final theme = effectiveTheme;
@@ -866,7 +888,7 @@ class ThemeConfigManager extends ChangeNotifier {
 
   /// 檢查主題是否為預設主題
   bool isDefaultTheme(ThemeScheme theme) {
-    return theme.name == ThemeScheme.morandiBlue.name;
+    return theme.name == ThemeScheme.h4hBrand.name;
   }
 
   /// 獲取推薦主題列表

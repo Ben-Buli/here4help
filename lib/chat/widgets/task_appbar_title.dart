@@ -43,8 +43,8 @@ class TaskAppBarTitle extends StatelessWidget {
     return Consumer<ThemeConfigManager>(
       builder: (context, themeManager, child) {
         // 使用主題配色
-        final titleColor = themeManager.effectiveTheme.surface;
-        final subtitleColor = themeManager.effectiveTheme.onSecondary;
+        final titleColor = themeManager.appBarTextColor;
+        final subtitleColor = themeManager.appBarSubtitleColor;
 
         // 根據使用者角色決定顯示的聊天對象名稱
         String displayPartnerName = chatPartnerName ?? 'Chat Partner';
@@ -66,7 +66,12 @@ class TaskAppBarTitle extends StatelessWidget {
                 (task['title'] as String?)?.trim().isNotEmpty == true
                     ? task['title'] as String
                     : 'Untitled Task',
-                style: titleStyle ?? TextStyle(fontSize: 20, color: titleColor),
+                style: titleStyle ??
+                    TextStyle(
+                      fontSize: 20,
+                      color: titleColor,
+                      fontWeight: FontWeight.w600,
+                    ),
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 2),
@@ -77,7 +82,11 @@ class TaskAppBarTitle extends StatelessWidget {
                   Text(
                     displayPartnerName,
                     style: subtitleStyle ??
-                        TextStyle(fontSize: 12, color: subtitleColor),
+                        TextStyle(
+                          fontSize: 12,
+                          color: subtitleColor,
+                          fontWeight: FontWeight.w400,
+                        ),
                     overflow: TextOverflow.ellipsis,
                   ),
                   // if (statusDisplay.isNotEmpty) ...[

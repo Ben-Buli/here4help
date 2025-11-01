@@ -578,7 +578,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         orElse: () => {},
       );
       if (university.isNotEmpty) {
-        return '${university['abbr']} - ${university['en_name']}';
+        return university['abbr']; // 寫入使用者資料只返回學校名稱縮寫
       }
     }
     return '';
@@ -1045,7 +1045,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                   Icons.calendar_month,
                   color: Theme.of(context).colorScheme.primary,
                 ),
-                labelText: 'Birthday',
+                labelText: 'Birthday *',
                 hintText: 'YYYY/MM/DD',
                 border: const OutlineInputBorder(),
               ),
@@ -1086,7 +1086,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                   Icons.location_on,
                   color: Theme.of(context).colorScheme.primary,
                 ),
-                labelText: 'Address',
+                labelText: 'Address *',
                 border: const OutlineInputBorder(),
                 // 將 Permanent 自訂 Switch 放到輸入欄位右邊
                 suffixIcon: Padding(
@@ -1304,6 +1304,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
               const SizedBox(height: 12),
               TextFormField(
                 controller: schoolController,
+                maxLength: 20,
                 decoration: InputDecoration(
                   labelText: 'School Name *',
                   hintText: 'Enter your school name',
@@ -1324,6 +1325,9 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Please enter your school name';
+                  }
+                  if (value.trim().length > 20) {
+                    return 'School name cannot exceed 20 characters';
                   }
                   return null;
                 },
@@ -2096,15 +2100,15 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
             'signup_date_of_birth', dateOfBirthController.text);
         await prefs.setString(
             'signup_payment_code', paymentPasswordController.text);
-        await prefs.setBool(
-            'signup_is_permanent_address', isPermanentAddress);
+        await prefs.setBool('signup_is_permanent_address', isPermanentAddress);
         await prefs.setStringList('signup_languages', selectedLanguages);
         await prefs.setString(
             'signup_referral_code', referralCodeController.text.trim());
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Account details saved. Please upload your student ID to complete registration.'),
+            content: Text(
+                'Account details saved. Please upload your student ID to complete registration.'),
           ),
         );
 

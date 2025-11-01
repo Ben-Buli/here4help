@@ -168,15 +168,21 @@ class DisputeController extends Controller
             }
 
             // 獲取管理員活動日誌（替代 dispute_status_logs）
+            // 注意：因為 task_id 是 UUID 字串，而 record_id 是整數，
+            // 所以需要透過 new_data JSON 欄位來查詢
             $disputeLogs = [];
             try {
                 $disputeLogs = DB::table('admin_activity_logs as aal')
                     ->where('aal.table_name', 'tasks')
-                    ->where('aal.record_id', $id)
+                    ->where(function($query) use ($id) {
+                        $query->where('aal.new_data', 'LIKE', '%"task_id":"' . $id . '"%')
+                              ->orWhere('aal.old_data', 'LIKE', '%"task_id":"' . $id . '"%');
+                    })
                     ->orderBy('aal.created_at', 'desc')
                     ->get();
             } catch (\Exception $e) {
                 // 忽略錯誤
+                Log::warning("Failed to fetch dispute logs for task {$id}: " . $e->getMessage());
             }
 
             return response()->json([
@@ -249,13 +255,15 @@ class DisputeController extends Controller
             // 不使用 dispute_status_logs，改用 admin_activity_logs
 
             // 記錄管理員活動日誌
+            // 注意：因為 task_id 是 UUID，不能直接存入 record_id（INT 類型）
             DB::table('admin_activity_logs')->insert([
                 'admin_id' => $adminId,
                 'action' => "dispute_{$action}",
                 'table_name' => 'tasks',
-                'record_id' => $id,
+                'record_id' => null,  // UUID 不能存入 INT 欄位，設為 NULL
                 'old_data' => json_encode(['status_id' => $task->status_id]),
                 'new_data' => json_encode([
+                    'task_id' => $id,  // UUID 存在 JSON 中
                     'status_id' => $newStatusId,
                     'action' => $action,
                     'notes' => $request->notes,
@@ -342,13 +350,15 @@ class DisputeController extends Controller
                     ]);
 
                 // 記錄管理員活動日誌
+                // 注意：因為 task_id 是 UUID，不能直接存入 record_id（INT 類型）
                 DB::table('admin_activity_logs')->insert([
                     'admin_id' => $adminId,
                     'action' => "dispute_batch_{$action}",
                     'table_name' => 'tasks',
-                    'record_id' => $taskId,
+                    'record_id' => null,  // UUID 不能存入 INT 欄位，設為 NULL
                     'old_data' => json_encode(['status_id' => $oldStatusId]),
                     'new_data' => json_encode([
+                        'task_id' => $taskId,  // UUID 存在 JSON 中
                         'status_id' => $newStatusId,
                         'action' => $action,
                         'notes' => $request->notes,
@@ -392,32 +402,43 @@ class DisputeController extends Controller
     public function chatRoom(Request $request, $taskId)
     {
         try {
-            // 驗證管理員權限
+            // 步驟 1: 驗證管理員權限
+            Log::info("Step 1: Checking admin authentication for task {$taskId}");
             $admin = $request->user();
             if (!$admin) {
+                Log::warning("Admin authentication failed for task {$taskId}");
                 return response()->json([
                     'success' => false,
                     'message' => 'Unauthorized - Admin authentication required'
                 ], 401);
             }
+            Log::info("Admin authenticated: {$admin->id}");
 
-            // 獲取任務基本資訊
+            // 步驟 2: 獲取任務基本資訊
+            Log::info("Step 2: Fetching task {$taskId}");
             $task = DB::table('tasks')->where('id', $taskId)->first();
             if (!$task) {
+                Log::warning("Task not found: {$taskId}");
                 return response()->json([
                     'success' => false,
                     'message' => 'Task not found'
                 ], 404);
             }
+            Log::info("Task found: {$taskId}, creator: {$task->creator_id}, participant: " . ($task->participant_id ?? 'null'));
 
-            // 獲取爭議事件資訊
+            // 步驟 3: 獲取爭議事件資訊
+            Log::info("Step 3: Fetching dispute event for task {$taskId}");
             $dispute = DB::table('task_dispute_events as tde')
                 ->where('task_id', $taskId)
                 ->orderBy('created_at', 'desc')
                 ->first();
+            Log::info("Dispute found: " . ($dispute ? "ID {$dispute->id}" : "none"));
 
-            // 獲取聊天室資訊
-            $chatRoom = DB::table('chat_rooms as cr')
+            // 步驟 4: 獲取聊天室資訊（優先匹配 participant_id）
+            Log::info("Step 4: Fetching chat room for task {$taskId}");
+            
+            // 如果任務有 participant_id，優先查找對應的聊天室
+            $chatRoomQuery = DB::table('chat_rooms as cr')
                 ->leftJoin('users as creator', function($join) {
                     $join->on('cr.creator_id', '=', 'creator.id');
                 })
@@ -429,18 +450,27 @@ class DisputeController extends Controller
                     'creator.name as creator_name', 'creator.avatar_url as creator_avatar',
                     'participant.name as participant_name', 'participant.avatar_url as participant_avatar'
                 ])
-                ->where('cr.task_id', $taskId)
-                ->orderBy('cr.created_at', 'desc')
-                ->first();
+                ->where('cr.task_id', $taskId);
+            
+            // 如果任務有 participant_id，則匹配對應的聊天室
+            if ($task->participant_id) {
+                $chatRoomQuery->where('cr.participant_id', $task->participant_id);
+                Log::info("Filtering chat room by participant_id: {$task->participant_id}");
+            }
+            
+            $chatRoom = $chatRoomQuery->orderBy('cr.created_at', 'desc')->first();
 
             if (!$chatRoom) {
+                Log::warning("Chat room not found for task {$taskId}");
                 return response()->json([
                     'success' => false,
                     'message' => 'Chat room not found'
                 ], 404);
             }
+            Log::info("Chat room found: ID {$chatRoom->id}");
 
-            // 獲取聊天訊息
+            // 步驟 5: 獲取聊天訊息
+            Log::info("Step 5: Fetching messages for chat room {$chatRoom->id}");
             $messages = DB::table('chat_messages as cm')
                 ->leftJoin('users as u', 'cm.from_user_id', '=', 'u.id')
                 ->select([
@@ -451,8 +481,10 @@ class DisputeController extends Controller
                 ->where('cm.room_id', $chatRoom->id)
                 ->orderBy('cm.created_at', 'asc')
                 ->get();
+            Log::info("Messages fetched: " . count($messages));
 
-            // 獲取用戶資訊
+            // 步驟 6: 獲取用戶資訊
+            Log::info("Step 6: Fetching user info");
             $userIds = array_unique(array_filter([$task->creator_id, $task->participant_id]));
             $users = [];
             if (!empty($userIds)) {
@@ -470,18 +502,33 @@ class DisputeController extends Controller
                     ];
                 }
             }
+            Log::info("Users fetched: " . count($users));
 
-            // 記錄管理員查看操作
-            AdminActivityLog::create([
-                'admin_id' => $admin->id,
-                'action' => 'view',
-                'table_name' => 'task_disputes',
-                'record_id' => $taskId,
-                'description' => "Admin viewed dispute chat room for task ID: {$taskId}",
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-            ]);
+            // 步驟 7: 記錄管理員查看操作（修正 record_id 問題）
+            Log::info("Step 7: Logging admin activity");
+            try {
+                AdminActivityLog::create([
+                    'admin_id' => $admin->id,
+                    'action' => 'view',
+                    'table_name' => 'task_disputes',
+                    'record_id' => $dispute ? $dispute->id : null, // 使用 dispute_id（整數）或 NULL，而非 task_id（UUID）
+                    'description' => "Admin viewed dispute chat room for task ID: {$taskId}",
+                    'new_data' => json_encode([
+                        'task_id' => $taskId,
+                        'chat_room_id' => $chatRoom->id,
+                        'dispute_id' => $dispute ? $dispute->id : null
+                    ]),
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ]);
+                Log::info("Admin activity logged successfully");
+            } catch (\Exception $logException) {
+                Log::error("Failed to log admin activity: " . $logException->getMessage());
+                // 繼續執行，不因為日誌失敗而中斷
+            }
 
+            // 步驟 8: 返回響應
+            Log::info("Step 8: Returning response");
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -533,10 +580,22 @@ class DisputeController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Error in dispute chat room view: ' . $e->getMessage());
+            Log::error('Error in dispute chat room view', [
+                'task_id' => $taskId,
+                'error_message' => $e->getMessage(),
+                'error_file' => $e->getFile(),
+                'error_line' => $e->getLine(),
+                'stack_trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'success' => false,
-                'message' => 'Server error occurred'
+                'message' => 'Server error occurred',
+                'debug' => config('app.debug') ? [
+                    'error' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ] : null
             ], 500);
         }
     }
@@ -589,20 +648,26 @@ class DisputeController extends Controller
             }
 
             // 記錄活動日誌
-            AdminActivityLog::create([
-                'admin_id' => $admin->id,
-                'action' => 'resolve',
-                'table_name' => 'task_dispute_events',
-                'record_id' => $disputeId,
-                'description' => "Admin resolved dispute {$disputeId} with decision: {$decision}",
-                'old_data' => null,
-                'new_data' => json_encode([
-                    'decision' => $decision,
-                    'note' => $note
-                ]),
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-            ]);
+            try {
+                AdminActivityLog::create([
+                    'admin_id' => $admin->id,
+                    'action' => 'resolve',
+                    'table_name' => 'task_dispute_events',
+                    'record_id' => is_numeric($disputeId) ? (int)$disputeId : null, // 確保 record_id 是整數
+                    'description' => "Admin resolved dispute {$disputeId} with decision: {$decision}",
+                    'old_data' => null,
+                    'new_data' => json_encode([
+                        'dispute_id' => $disputeId,
+                        'decision' => $decision,
+                        'note' => $note
+                    ]),
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent(),
+                ]);
+            } catch (\Exception $logException) {
+                Log::error("Failed to log admin activity for resolve: " . $logException->getMessage());
+                // 繼續執行，不因為日誌失敗而中斷
+            }
 
             DB::commit();
 
@@ -636,22 +701,24 @@ class DisputeController extends Controller
     {
         $admin = $request->user();
         
-        // 獲取爭議資訊
-        $dispute = DB::table('task_disputes')
-            ->leftJoin('tasks', 'task_disputes.task_id', '=', 'tasks.id')
-            ->leftJoin('users as creator', 'tasks.creator_id', '=', 'creator.id')
-            ->leftJoin('users as participant', 'tasks.participant_id', '=', 'participant.id')
-            ->leftJoin('users as submitter', 'task_disputes.user_id', '=', 'submitter.id')
+        // 獲取爭議資訊（修正表名為 task_dispute_events）
+        $dispute = DB::table('task_dispute_events as tde')
+            ->leftJoin('tasks as t', 'tde.task_id', '=', 't.id')
+            ->leftJoin('users as creator', 't.creator_id', '=', 'creator.id')
+            ->leftJoin('users as participant', 't.participant_id', '=', 'participant.id')
+            ->leftJoin('users as submitter', 'tde.user_id', '=', 'submitter.id')
             ->select([
-                'task_disputes.id as dispute_id',
-                'task_disputes.title as dispute_title',
-                'task_disputes.description as dispute_description',
-                'task_disputes.status as dispute_status',
-                'task_disputes.created_at as dispute_created_at',
-                'task_disputes.updated_at as dispute_updated_at',
-                'tasks.id as task_id',
-                'tasks.title as task_title',
-                'tasks.reward_point',
+                'tde.id as dispute_id',
+                'tde.title as dispute_title',
+                'tde.description as dispute_description',
+                'tde.status as dispute_status',
+                'tde.created_at as dispute_created_at',
+                'tde.updated_at as dispute_updated_at',
+                't.id as task_id',
+                't.title as task_title',
+                't.reward_point',
+                't.creator_id',  // 添加 creator_id
+                't.participant_id',  // 添加 participant_id
                 'creator.name as creator_name',
                 'creator.avatar_url as creator_avatar',
                 'participant.name as participant_name',
@@ -659,7 +726,7 @@ class DisputeController extends Controller
                 'submitter.name as submitter_name',
                 'submitter.email as submitter_email'
             ])
-            ->where('task_disputes.id', $disputeId)
+            ->where('tde.id', $disputeId)
             ->first();
 
         if (!$dispute) {

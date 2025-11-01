@@ -5,6 +5,7 @@ import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/services/wallet_service.dart';
 import 'package:flutter/services.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 
 import 'package:here4help/services/http_client_service.dart';
 import 'dart:convert';
@@ -128,7 +129,7 @@ class _WalletPageState extends State<WalletPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -192,11 +193,7 @@ class _WalletPageState extends State<WalletPage> {
     );
   }
 
-  // --- BEGIN: BankInfoCopyRow widget and state for copied flags ---
-  // This is a reusable widget to show a label, value, copy button, and "Copied!" message.
-  // The state (copied flags) is stored in the _WalletPageState.
-  // We'll use a Map<String, bool> to keep track of which row is copied.
-
+  // --- BEGIN: BankInfo copy-state helpers ---
   final Map<String, bool> _bankInfoCopied = {};
   final Map<String, int> _bankInfoCopyTimers = {};
 
@@ -205,11 +202,9 @@ class _WalletPageState extends State<WalletPage> {
     setState(() {
       _bankInfoCopied[key] = true;
     });
-    // Cancel any previous timer for this key (by incrementing a counter)
     final int currentTimer = (_bankInfoCopyTimers[key] ?? 0) + 1;
     _bankInfoCopyTimers[key] = currentTimer;
     Future.delayed(const Duration(seconds: 3), () {
-      // Only clear if this is the latest timer for this key
       if (_bankInfoCopyTimers[key] == currentTimer) {
         setState(() {
           _bankInfoCopied[key] = false;
@@ -217,65 +212,30 @@ class _WalletPageState extends State<WalletPage> {
       }
     });
   }
-
-  Widget BankInfoCopyRow({
-    required String label,
-    required String value,
-    TextStyle? labelStyle,
-    TextStyle? valueStyle,
-    required String copyKey,
-  }) {
-    final copied = _bankInfoCopied[copyKey] == true;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          '$label: ',
-          style: labelStyle,
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: valueStyle,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.copy, size: 18),
-          tooltip: copied ? "Copied!" : "Copy",
-          onPressed: () => _handleBankInfoCopy(copyKey, value),
-        ),
-        AnimatedOpacity(
-          opacity: copied ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 300),
-          child: copied
-              ? const Padding(
-                  padding: EdgeInsets.only(left: 2.0),
-                  child: Text(
-                    "Copied!",
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                )
-              : const SizedBox.shrink(),
-        ),
-      ],
-    );
-  }
-  // --- END: BankInfoCopyRow widget and copy state ---
+  // --- END: BankInfo copy-state helpers ---
 
   Widget _buildBankInfoContainer() {
+    final theme = Theme.of(context);
+    final themeManager = context.watch<ThemeConfigManager>();
+    final primaryColor = themeManager.dialogPrimaryColor;
+    final subtleColor = themeManager.dialogContentColor.withValues(alpha: 0.7);
+    final titleColor = themeManager.dialogTitleColor;
+    final cardBackground =
+        Color.alphaBlend(primaryColor.withValues(alpha: 0.08), Colors.white);
+    final cardBorder = primaryColor.withValues(alpha: 0.2);
+    final successColor = theme.colorScheme.secondary;
+    final warningColor = theme.colorScheme.error;
+    final bannerBackground = Color.alphaBlend(
+        warningColor.withValues(alpha: 0.12), Colors.white);
+
     if (bankAccountInfo == null || !bankAccountInfo!.hasValidAccount) {
       return Container(
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
+          color: cardBackground,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[300]!),
+          border: Border.all(color: cardBorder),
         ),
         child: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -295,7 +255,6 @@ class _WalletPageState extends State<WalletPage> {
 
     final bankAccount = bankAccountInfo!.displayAccount!;
 
-    // Helper to build each card tile row for bank info
     Widget buildBankInfoTile({
       required String label,
       required String value,
@@ -305,7 +264,7 @@ class _WalletPageState extends State<WalletPage> {
       final copied = _bankInfoCopied[copyKey] == true;
       return ListTile(
         dense: true,
-        leading: icon != null ? Icon(icon, color: Colors.blueGrey[600]) : null,
+        leading: icon != null ? Icon(icon, color: subtleColor) : null,
         title: Text(
           label,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
@@ -319,8 +278,8 @@ class _WalletPageState extends State<WalletPage> {
           icon: AnimatedSwitcher(
             duration: const Duration(milliseconds: 200),
             child: copied
-                ? const Icon(Icons.check,
-                    key: ValueKey('check'), color: Colors.green)
+                ? Icon(Icons.check,
+                    key: const ValueKey('check'), color: successColor)
                 : const Icon(Icons.copy, key: ValueKey('copy')),
           ),
           tooltip: copied ? "Copied!" : "Copy",
@@ -335,18 +294,21 @@ class _WalletPageState extends State<WalletPage> {
       elevation: 1,
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: cardBackground,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.only(left: 16, top: 10, bottom: 2),
-              child: Text(
-                'Bank Transfer Info',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            Text(
+              'Bank Transfer Info',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: titleColor,
               ),
             ),
+            const SizedBox(height: 8),
             buildBankInfoTile(
               label: 'Bank Name',
               value: bankAccount.bankName,
@@ -371,42 +333,46 @@ class _WalletPageState extends State<WalletPage> {
               margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF8E1), // 淺黃色
+                color: bannerBackground,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline, color: Color(0xFFFBC02D), size: 18),
-                  SizedBox(width: 6),
+                  Icon(Icons.info_outline,
+                      color: warningColor.withValues(alpha: 0.85), size: 18),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text.rich(
                       TextSpan(
                         children: [
                           TextSpan(
                             text: 'After completing the transfer, enter ',
-                            style: TextStyle(fontSize: 12, color: Colors.brown),
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: warningColor.withValues(alpha: 0.85)),
                           ),
                           TextSpan(
                             text: 'last 5 digits of your bank account, ',
                             style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.brown,
+                                color: warningColor.withValues(alpha: 0.85),
                                 fontWeight: FontWeight.bold),
                           ),
                           TextSpan(
                             text: 'and the ',
-                            style: TextStyle(fontSize: 12, color: Colors.brown),
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: warningColor.withValues(alpha: 0.85)),
                           ),
                           TextSpan(
                             text: 'amount transferred.',
                             style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.brown,
+                                color: warningColor.withValues(alpha: 0.85),
                                 fontWeight: FontWeight.bold),
                           ),
                         ],
-                        style: TextStyle(fontSize: 12, color: Colors.brown),
                       ),
                     ),
                   ),
@@ -430,7 +396,13 @@ class _WalletPageState extends State<WalletPage> {
 
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            // 在對話框內部也監聽銀行資訊的變更
+            final theme = Theme.of(context);
+            final themeManager = context.watch<ThemeConfigManager>();
+            final dialogBackground = theme.dialogTheme.backgroundColor ??
+                themeManager.dialogBackgroundColor;
+            final primaryColor = themeManager.dialogPrimaryColor;
+            final warningColor = theme.colorScheme.error;
+
             return StreamBuilder<List<Object?>>(
               stream: Stream.value([bankAccountInfo, isLoading, errorMessage]),
               builder: (context, snapshot) {
@@ -438,11 +410,14 @@ class _WalletPageState extends State<WalletPage> {
                 final bottomInset = mediaQuery.viewInsets.bottom;
 
                 return AlertDialog(
+                  backgroundColor: dialogBackground,
+                  shape: theme.dialogTheme.shape,
+                  titleTextStyle: theme.dialogTheme.titleTextStyle,
+                  contentTextStyle: theme.dialogTheme.contentTextStyle,
                   scrollable: true,
                   insetPadding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                  contentPadding:
-                      const EdgeInsets.fromLTRB(24, 20, 24, 12),
+                  contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
                   title: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -453,8 +428,8 @@ class _WalletPageState extends State<WalletPage> {
                           padding: const EdgeInsets.only(top: 6.0),
                           child: Text(
                             errorText!,
-                            style: const TextStyle(
-                                color: Colors.red,
+                            style: TextStyle(
+                                color: warningColor,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600),
                           ),
@@ -472,11 +447,14 @@ class _WalletPageState extends State<WalletPage> {
                             bankAccountInfo!.hasValidAccount)
                           _buildBankInfoContainer()
                         else if (isLoading)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 8.0),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
                             child: Text(
                               'Loading bank information...',
-                              style: TextStyle(fontSize: 12, color: Colors.blue),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: primaryColor,
+                              ),
                             ),
                           )
                         else
@@ -484,23 +462,25 @@ class _WalletPageState extends State<WalletPage> {
                             padding: const EdgeInsets.only(bottom: 8.0),
                             child: Column(
                               children: [
-                                const Text(
+                                Text(
                                   'Bank info unavailable. Please try again later.',
                                   style: TextStyle(
-                                      fontSize: 12, color: Colors.redAccent),
+                                    fontSize: 12,
+                                    color: warningColor,
+                                  ),
                                 ),
                                 const SizedBox(height: 8),
                                 ElevatedButton.icon(
                                   onPressed: () async {
-                                    // 重新載入銀行資訊
                                     await _loadWalletData();
-                                    // 觸發對話框重新構建
                                     setDialogState(() {});
                                   },
                                   icon: const Icon(Icons.refresh, size: 16),
                                   label: const Text('Retry',
                                       style: TextStyle(fontSize: 12)),
                                   style: ElevatedButton.styleFrom(
+                                    backgroundColor: primaryColor,
+                                    foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 12, vertical: 4),
                                   ),
@@ -535,7 +515,7 @@ class _WalletPageState extends State<WalletPage> {
                           decoration: const InputDecoration(
                             labelText: 'Transferred Amount (NTD)',
                             border: OutlineInputBorder(),
-                            hintText: '12345', // < 100,000
+                            hintText: '12345',
                             counterText: '',
                           ),
                           keyboardType: TextInputType.number,
@@ -558,9 +538,14 @@ class _WalletPageState extends State<WalletPage> {
                     TextButton(
                       onPressed:
                           isSubmitting ? null : () => Navigator.pop(context),
+                      style: TextButton.styleFrom(foregroundColor: primaryColor),
                       child: const Text('Cancel'),
                     ),
                     ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        foregroundColor: Colors.white,
+                      ),
                       onPressed: isSubmitting ||
                               bankAccountInfo == null ||
                               !bankAccountInfo!.hasValidAccount
@@ -595,16 +580,20 @@ class _WalletPageState extends State<WalletPage> {
                               try {
                                 await _submitTopupRequest(acc, amountVal);
 
-                                if (mounted) {
-                                  Navigator.pop(context);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                          'Topup request submitted, waiting for admin approval'),
-                                      backgroundColor: Colors.green,
-                                    ),
-                                  );
+                                if (!mounted || !context.mounted) {
+                                  return;
                                 }
+                                Navigator.pop(context);
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text(
+                                        'Topup request submitted, waiting for admin approval'),
+                                    backgroundColor: Theme.of(context)
+                                        .colorScheme
+                                        .secondary,
+                                  ),
+                                );
                               } catch (e) {
                                 if (mounted) {
                                   String msg = 'Submission failed: $e';
@@ -711,9 +700,8 @@ class _WalletPageState extends State<WalletPage> {
                 ListTile(
                   leading: Icon(Icons.info_outline,
                       color: Theme.of(context).colorScheme.primary),
-                  title: const Text('Points Policies'),
+                  title: const Text('Point Policy'),
                   onTap: () {
-                    // TODO: 跳轉到積分政策頁面
                     GoRouter.of(context).go('/account/wallet/point_policy');
                   },
                 ),

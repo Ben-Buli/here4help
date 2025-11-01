@@ -88,7 +88,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
-    'permission': 0, // 新用戶可訪問身份驗證
+    'permission': -10, // 公開頁面：任何狀態都可訪問（包括未登入）
   },
   {
     'path': '/signup/student-id/update',
@@ -289,17 +289,17 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.history,
-    'permission': 1, // 需要已認證用戶才能查看點數歷史
+    'permission': 0, // 需要已認證用戶才能查看點數歷史
   },
   {
     'path': '/account/wallet/point_policy',
     'child': const PointPolicyPage(),
-    'title': 'Pont Policy',
+    'title': 'Point Policy',
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
     'icon': Icons.stars,
-    'permission': 1, // 需要已認證用戶才能查看點數政策
+    'permission': 0, // 新用戶可查看點數政策
   },
   // {
   //   'path': '/account/ratings',
@@ -412,7 +412,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Pay Setting',
     'showBottomNav': false,
     'showBackArrow': true,
-    'permission': 1, // 需要已認證用戶才能設定支付
+    'permission': 0, // 新用戶可設定支付
   },
   // #region 權限不足頁面
   {

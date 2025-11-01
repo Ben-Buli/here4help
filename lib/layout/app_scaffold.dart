@@ -381,97 +381,101 @@ class _AppScaffoldState extends State<AppScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeConfigManager>(
-      builder: (context, themeManager, child) {
-        // 若主題為 taipei_101 或 milk_tea_earth，提供專屬背景
-        final baseThemeName =
-            themeManager.currentTheme.name.replaceAll('_dark', '');
-        final isTaipei101 = baseThemeName == 'taipei_101';
-        final isMilkTea = baseThemeName == 'milk_tea_earth';
-        final backgroundChild = Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
-            child: Scaffold(
-              backgroundColor: Colors.transparent, // 讓 Scaffold 背景透明以顯示漸層
-              appBar: widget.showAppBar
-                  ? _buildGlassmorphismAppBar(themeManager)
-                  : null,
-              body: SafeArea(
-                top: true, // 總是為頂部添加安全區域，避免被瀏海遮住
-                bottom: !widget.showBottomNav,
-                child: _buildSwipeBackWrapper(context, widget.child),
+    return GestureDetector(
+      behavior: HitTestBehavior.deferToChild,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Consumer<ThemeConfigManager>(
+        builder: (context, themeManager, child) {
+          // 若主題為 taipei_101 或 milk_tea_earth，提供專屬背景
+          final baseThemeName =
+              themeManager.currentTheme.name.replaceAll('_dark', '');
+          final isTaipei101 = baseThemeName == 'taipei_101';
+          final isMilkTea = baseThemeName == 'milk_tea_earth';
+          final backgroundChild = Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 500),
+              child: Scaffold(
+                backgroundColor: Colors.transparent, // 讓 Scaffold 背景透明以顯示漸層
+                appBar: widget.showAppBar
+                    ? _buildGlassmorphismAppBar(themeManager)
+                    : null,
+                body: SafeArea(
+                  top: true, // 總是為頂部添加安全區域，避免被瀏海遮住
+                  bottom: !widget.showBottomNav,
+                  child: _buildSwipeBackWrapper(context, widget.child),
+                ),
+                bottomNavigationBar: widget.showBottomNav
+                    ? _buildGlassmorphismBottomNav(themeManager, context)
+                    : null,
               ),
-              bottomNavigationBar: widget.showBottomNav
-                  ? _buildGlassmorphismBottomNav(themeManager, context)
-                  : null,
-            ),
-          ),
-        );
-
-        if (isTaipei101 || baseThemeName == 'pride_s_curve' || isMilkTea) {
-          return Container(
-            color: themeManager.currentTheme.background,
-            child: Stack(
-              children: [
-                // 簡化的點狀燈飾背景：多層次散落的發光點
-                if (isTaipei101) ...[
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _Taipei101LightsPainter(),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _Taipei101TowerPainter(
-                        bodyColor: const Color(0xFF273043).withOpacity(0.55),
-                        edgeColor: Colors.white.withOpacity(0.18),
-                        windowColor: Colors.white.withOpacity(0.16),
-                      ),
-                    ),
-                  ),
-                ],
-                if (baseThemeName == 'pride_s_curve')
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _SCurveRainbowPainter(),
-                    ),
-                  ),
-                if (isMilkTea)
-                  Positioned.fill(
-                    child: CustomPaint(
-                      painter: _BubbleTeaPatternPainter(
-                        cupColor:
-                            themeManager.currentTheme.accent.withOpacity(0.35),
-                        lidColor: themeManager.currentTheme.background
-                            .withOpacity(0.25),
-                        strawColor:
-                            themeManager.currentTheme.primary.withOpacity(0.35),
-                        pearlColor: themeManager.currentTheme.onSurface
-                            .withOpacity(0.35),
-                      ),
-                    ),
-                  ),
-                backgroundChild,
-              ],
             ),
           );
-        }
 
-        // 對特定主題（clownfish、patrick_star）強制水平 0deg 漸層
-        final bool forceHorizontal =
-            baseThemeName == 'clownfish' || baseThemeName == 'patrick_star';
-        final AlignmentGeometry? beginOverride =
-            forceHorizontal ? Alignment.centerLeft : null;
-        final AlignmentGeometry? endOverride =
-            forceHorizontal ? Alignment.centerRight : null;
+          if (isTaipei101 || baseThemeName == 'pride_s_curve' || isMilkTea) {
+            return Container(
+              color: themeManager.currentTheme.background,
+              child: Stack(
+                children: [
+                  // 簡化的點狀燈飾背景：多層次散落的發光點
+                  if (isTaipei101) ...[
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _Taipei101LightsPainter(),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _Taipei101TowerPainter(
+                          bodyColor: const Color(0xFF273043).withOpacity(0.55),
+                          edgeColor: Colors.white.withOpacity(0.18),
+                          windowColor: Colors.white.withOpacity(0.16),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (baseThemeName == 'pride_s_curve')
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _SCurveRainbowPainter(),
+                      ),
+                    ),
+                  if (isMilkTea)
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _BubbleTeaPatternPainter(
+                          cupColor: themeManager.currentTheme.accent
+                              .withOpacity(0.35),
+                          lidColor: themeManager.currentTheme.background
+                              .withOpacity(0.25),
+                          strawColor: themeManager.currentTheme.primary
+                              .withOpacity(0.35),
+                          pearlColor: themeManager.currentTheme.onSurface
+                              .withOpacity(0.35),
+                        ),
+                      ),
+                    ),
+                  backgroundChild,
+                ],
+              ),
+            );
+          }
 
-        return themeManager.effectiveTheme.createGradientBlurredBackground(
-          child: backgroundChild,
-          begin: beginOverride,
-          end: endOverride,
-          blurRadius: 16.0,
-        );
-      },
+          // 對特定主題（clownfish、patrick_star）強制水平 0deg 漸層
+          final bool forceHorizontal =
+              baseThemeName == 'clownfish' || baseThemeName == 'patrick_star';
+          final AlignmentGeometry? beginOverride =
+              forceHorizontal ? Alignment.centerLeft : null;
+          final AlignmentGeometry? endOverride =
+              forceHorizontal ? Alignment.centerRight : null;
+
+          return themeManager.effectiveTheme.createGradientBlurredBackground(
+            child: backgroundChild,
+            begin: beginOverride,
+            end: endOverride,
+            blurRadius: 16.0,
+          );
+        },
+      ),
     );
   }
 

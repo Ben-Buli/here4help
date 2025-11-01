@@ -164,7 +164,7 @@
     </div>
 
     <!-- Charts Section -->
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <!-- <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div class="admin-card">
         <h3 class="text-lg font-medium text-gray-900 mb-4">User Registration Trend</h3>
         <div class="h-64">
@@ -184,10 +184,10 @@
           </div>
         </div>
       </div>
-    </div>
+    </div> -->
 
     <!-- Additional Charts -->
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <!-- <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div class="admin-card">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Daily Activity</h3>
         <div class="h-64">
@@ -211,7 +211,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </div> -->
 
     <!-- 最近活動 -->
     <!-- <div class="admin-card">

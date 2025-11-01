@@ -63,20 +63,19 @@ class TestThemeCategories {
       print('\n3. 測試特定主題的分類...');
 
       // 測試 H4H 主題
-      const h4hTheme = null; // H4H theme has been removed
-      if (h4hTheme != null) {
-        print('   H4H 主題測試:');
-        print('     category: ${h4hTheme.category}');
-        print(
-            '     themeGroup: ${_getThemeGroupFromManager(themeManager, h4hTheme)}');
-        print(
-            '     themeStyle: ${_getThemeStyleFromManager(themeManager, h4hTheme)}');
+      final h4hTheme = ThemeScheme.h4hBrand;
+      print('   H4H 主題測試:');
+      print('     category: ${h4hTheme.category}');
+      print(
+          '     themeGroup: ${_getThemeGroupFromManager(themeManager, h4hTheme)}');
+      print(
+          '     themeStyle: ${_getThemeStyleFromManager(themeManager, h4hTheme)}');
 
-        if (h4hTheme.category == 'Emotions') {
-          print('     ✅ H4H 主題正確分類為 Emotions');
-        } else {
-          print('     ❌ H4H 主題分類錯誤，期望 Emotions，實際 ${h4hTheme.category}');
-        }
+      if (h4hTheme.category.toLowerCase() == 'business' &&
+          _getThemeGroupFromManager(themeManager, h4hTheme) == 'Business') {
+        print('     ✅ H4H 主題正確分類為 Business');
+      } else {
+        print('     ❌ H4H 主題分類錯誤，期望 Business，實際 ${h4hTheme.category}');
       }
 
       // 4. 測試分類的完整性

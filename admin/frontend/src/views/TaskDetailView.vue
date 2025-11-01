@@ -99,7 +99,7 @@
       </div>
 
       <!-- Task Information Cards -->
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 mt-8">
         <!-- Basic Information -->
         <div class="admin-card">
           <h3 class="text-lg font-medium text-gray-900 mb-4">Task Information</h3>

@@ -15,12 +15,12 @@
     </div>
     
     <!-- 圖片訊息 -->
-    <div v-else-if="message.kind === 'image'" class="image-content">
+    <div v-else-if="isImageMessage" class="image-content">
       <div class="space-y-2">
         <p v-if="message.content && message.content !== message.media_url" class="text-sm text-gray-900">{{ message.content }}</p>
-        <div v-if="message.media_url || message.image_url" class="image-container">
+        <div v-if="imageSource" class="image-container">
           <img 
-            :src="getImageUrl(message.media_url || message.image_url)" 
+            :src="imageSource" 
             :alt="message.content || 'Shared image'"
             class="max-w-xs rounded-lg shadow-sm cursor-pointer hover:shadow-md transition-shadow"
             @click="openImageModal"
@@ -132,7 +132,7 @@
         <Icon name="x-mark" class="w-8 h-8" />
       </button>
       <img 
-        :src="getImageUrl(message.media_url || message.image_url)" 
+        :src="imageSource || ''" 
         :alt="message.content || 'Shared image'"
         class="max-w-full max-h-full object-contain rounded-lg"
         @click.stop
@@ -144,6 +144,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import Icon from '@/components/Icon.vue'
+import { getImageUrl } from '@/config/api'
 
 interface ChatMessage {
   id: number
@@ -198,41 +199,64 @@ const resumeData = computed(() => {
   return null
 })
 
-// Methods
-const getImageUrl = (imagePath?: string) => {
-  if (!imagePath) return ''
-  
-  // 如果是完整 URL，直接返回
-  if (imagePath.startsWith('http')) {
-    return imagePath
-  }
-  
-  // 修復常見的拼寫錯誤：backend/ploads/ -> backend/uploads/
-  if (imagePath.startsWith('backend/ploads/')) {
-    imagePath = imagePath.replace('backend/ploads/', 'backend/uploads/')
-  }
-  
-  // 統一處理 uploads/ 路徑
-  if (imagePath.startsWith('uploads/')) {
-    // 確保路徑以 / 開頭，這樣 Vite 代理才能正確處理
-    return `/${imagePath}`
-  }
-  
-  // 處理舊格式：/backend/uploads/
-  if (imagePath.startsWith('/backend/uploads/')) {
-    return imagePath.replace('/backend', '')
-  }
-  
-  // 處理舊格式：backend/uploads/
-  if (imagePath.startsWith('backend/uploads/')) {
-    return `/${imagePath}`
-  }
-  
-  // 其他情況，假設是相對路徑
-  return imagePath
+// Image helpers
+const isImageExtension = (value?: string) => {
+  if (!value) return false
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(value.split('?')[0])
 }
 
+const normalizeMediaPath = (raw?: string): string | null => {
+  if (!raw) return null
+  let path = raw.trim()
+  if (!path) return null
+
+  if (/^https?:\/\//i.test(path)) {
+    return path
+  }
+
+  path = path.replace(/^https?:\/\/[^/]+/i, '')
+  path = path.replace(/^\/+/, '')
+  path = path.replace(/(^|\/)backend\//g, '$1')
+
+  if (path.startsWith('uploads/')) {
+    path = path.replace(/^uploads\//, '')
+  }
+
+  const match = path.match(/uploads\/(.+)$/)
+  if (match) {
+    path = match[1]
+  }
+
+  return path || null
+}
+
+const imageSource = computed(() => {
+  const raw =
+    props.message.media_url ||
+    props.message.image_url ||
+    (isImageExtension(props.message.content) ? props.message.content : '')
+
+  const normalized = normalizeMediaPath(raw)
+  if (!normalized) return null
+
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized
+  }
+
+  return getImageUrl(normalized.replace(/^uploads\//, ''))
+})
+
+const isImageMessage = computed(() => {
+  if (props.message.kind === 'image') return true
+  if (props.message.mime_type && props.message.mime_type.startsWith('image/')) return true
+  if (props.message.media_url && isImageExtension(props.message.media_url)) return true
+  if (props.message.image_url && isImageExtension(props.message.image_url)) return true
+  if (props.message.content && isImageExtension(props.message.content)) return true
+  return false
+})
+
 const openImageModal = () => {
+  if (!imageSource.value) return
   showImageModal.value = true
 }
 
@@ -242,7 +266,11 @@ const closeImageModal = () => {
 
 const handleImageError = (event: Event) => {
   const img = event.target as HTMLImageElement
-  img.src = '/image-placeholder.png' // 圖片載入失敗時的預設圖片
+  img.src =
+    'data:image/svg+xml;utf8,' +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="100%" height="100%" fill="#e5e7eb"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#6b7280" font-family="sans-serif" font-size="16">Image unavailable</text></svg>',
+    )
 }
 </script>
 

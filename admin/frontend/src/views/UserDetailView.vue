@@ -119,7 +119,7 @@
       </div>
 
       <!-- User Information Cards -->
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 mt-8">
         <!-- Basic Information -->
         <div class="admin-card">
           <h3 class="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
@@ -291,7 +291,7 @@
       </div>
 
       <!-- Recent Activities -->
-      <div class="admin-card">
+      <div class="admin-card mt-8">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Activities</h3>
         <div v-if="recentActivities.length === 0" class="text-center py-4 text-gray-500">
           No recent activities
@@ -515,7 +515,7 @@ const getPermissionText = (permission: number | null) => {
   if (permission === null || permission === undefined) return 'Unknown'
   if (permission >= 99) return 'Master User'
   if (permission >= 1) return 'Verified User'
-  if (permission === 0) return 'Unverified User'
+  if (permission === 0) return 'New User in Verification'
   if (permission === -1) return 'Restricted'
   if (permission === -2) return 'Suspended'
   if (permission === -3) return 'Banned'

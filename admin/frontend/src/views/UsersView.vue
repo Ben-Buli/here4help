@@ -58,7 +58,7 @@
             <option value="">All Permissions</option>
             <option value="99">Super User (99)</option> //  管理員使用
             <option value="1">Verified User (1)</option> //  已認證用戶
-            <option value="0">Unverified User (0)</option> //  新用戶未認證
+            <option value="0">New User in Verification (0)</option> //  新用戶未認證
             <option value="-1">Restricted (-1)</option> //  被管理員停權
             <option value="-2">Suspended (-2)</option> //  被管理員軟刪除
             <option value="-3">Banned (-3)</option> //  用戶自行停權
@@ -743,7 +743,7 @@ const getStatusText = (status: string) => {
 const getPermissionBadgeClass = (permission: number) => {
   if (permission >= 99) return 'bg-purple-100 text-purple-800'
   if (permission >= 1) return 'bg-green-100 text-green-800'
-  if (permission === 0) return 'bg-yellow-100 text-yellow-800'
+  if (permission == 0) return 'bg-yellow-100 text-yellow-800'
   if (permission >= -1) return 'bg-yellow-100 text-yellow-800'
   if (permission >= -3) return 'bg-red-100 text-red-800'
   return 'bg-gray-100 text-gray-800'
@@ -752,12 +752,11 @@ const getPermissionBadgeClass = (permission: number) => {
 const getPermissionText = (permission: number) => {
   if (permission >= 99) return 'Master User'
   if (permission >= 1) return 'Verified User'
-  if (permission === 0) return 'Unverified User'
-  if (permission == 0) return 'Unverified User'
-  if (permission === -1) return 'Restricted'
-  if (permission === -2) return 'Suspended'
-  if (permission === -3) return 'Banned'
-  if (permission === -4) return 'Deleted'
+  if (permission == 0) return 'New User in Verification'
+  if (permission == -1) return 'Restricted'
+  if (permission == -2) return 'Suspended'
+  if (permission == -3) return 'Banned'
+  if (permission == -4) return 'Deleted'
   return `Level ${permission}`
 }
 

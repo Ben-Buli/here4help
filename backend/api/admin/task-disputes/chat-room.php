@@ -11,7 +11,6 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../auth_helper.php';
 require_once __DIR__ . '/../../../utils/SanctumTokenValidator.php';
 require_once __DIR__ . '/../../../utils/Response.php';
-require_once __DIR__ . '/../../../utils/UserActiveLogger.php';
 
 header('Content-Type: application/json');
 Response::setCorsHeaders();
@@ -378,24 +377,36 @@ try {
     }, $messages);
     
     // 記錄管理員查看操作
-    UserActiveLogger::logAction(
-        $db, 
-        $adminId, 
-        'dispute_chat_viewed',
-        'dispute_management', 
-        null, 
-        null,
-        "Admin viewed dispute chat room for task ID: {$taskId}",
-        'admin', 
-        $adminId, 
-        null, 
-        null,
-        [
-            'dispute_id' => $dispute['id'] ?? null,
-            'chat_room_id' => $chatRoomId,
-            'task_id' => $taskId
-        ]
-    );
+    try {
+        $logStmt = $db->prepare("
+            INSERT INTO admin_activity_logs (
+                admin_id,
+                action,
+                table_name,
+                record_id,
+                old_data,
+                new_data,
+                ip_address,
+                user_agent,
+                created_at
+            ) VALUES (?, 'view', 'task_dispute_chat_rooms', ?, ?, ?, ?, ?, NOW())
+        ");
+        $logStmt->execute([
+            $adminId,
+            $dispute['id'] ?? null,  // 使用 dispute_id（整數）或 NULL，而非 chat_room_id
+            null,
+            json_encode([
+                'task_id' => $taskId,
+                'dispute_id' => $dispute['id'] ?? null,
+                'chat_room_id' => $chatRoom['id'],  // chat_room_id 放在 JSON 中
+                'viewed_at' => date('c')
+            ]),
+            $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
+        ]);
+    } catch (Exception $logException) {
+        error_log("Failed to write admin activity log (chat-room view): " . $logException->getMessage());
+    }
     
     // 分析成員狀態：比對 tasks 和 chat_rooms 的成員
     $taskCreatorId = (int)$dispute['creator_id'];

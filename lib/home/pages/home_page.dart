@@ -1,5 +1,5 @@
 // home_page.dart
-import 'dart:math';
+// import 'dart:math'; // 已註解 - Achievements 功能暫時停用（HexagonClipper 需要）
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -12,12 +12,12 @@ import 'package:here4help/services/scroll_event_bus.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/auth/services/auth_service.dart';
-import 'package:here4help/constants/app_colors.dart';
-import 'package:here4help/services/theme_config_manager.dart';
+// import 'package:here4help/constants/app_colors.dart'; // 已註解 - Achievements 功能暫時停用
+// import 'package:here4help/services/theme_config_manager.dart'; // 已註解 - Achievements 功能暫時停用
 import 'package:here4help/utils/image_helper.dart';
 import 'package:here4help/providers/rating_provider.dart';
 import 'package:here4help/services/rating_service.dart';
-import 'package:here4help/providers/achievement_provider.dart';
+// import 'package:here4help/providers/achievement_provider.dart'; // 已註解 - Achievements 功能暫時停用
 import 'package:here4help/config/app_config.dart';
 
 class HomePage extends StatefulWidget {
@@ -39,7 +39,7 @@ class _HomePageState extends State<HomePage> {
     try {
       await Future.wait([
         context.read<RatingProvider>().loadUserRatingStats(),
-        context.read<AchievementProvider>().loadUserAchievements(),
+        // context.read<AchievementProvider>().loadUserAchievements(), // 已註解 - Achievements 功能暫時停用
         _checkStudentVerificationStatus(),
       ]);
     } catch (e) {
@@ -61,7 +61,7 @@ class _HomePageState extends State<HomePage> {
     // 載入評分統計和成就數據
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<RatingProvider>().loadUserRatingStats();
-      context.read<AchievementProvider>().loadUserAchievements();
+      // context.read<AchievementProvider>().loadUserAchievements(); // 已註解 - Achievements 功能暫時停用
       _checkStudentVerificationStatus();
     });
   }
@@ -189,19 +189,17 @@ class _HomePageState extends State<HomePage> {
     final data = _studentVerificationData;
     if (data == null) return null;
 
-    final status =
-        (data['verification_status'] ?? '').toString().toLowerCase();
+    final status = (data['verification_status'] ?? '').toString().toLowerCase();
     if (status.isEmpty) return null;
 
     final bool isApproved = status == 'approved';
-    final bool isRejected = status == 'rejected';
+    // final bool isRejected = status == 'rejected'; // 目前未使用
 
     final baseColor = isApproved ? Colors.green : Colors.orange;
     final backgroundColor = baseColor.withOpacity(0.12);
     final borderColor = baseColor.withOpacity(0.3);
-    final iconData = isApproved
-        ? Icons.check_circle_outline
-        : Icons.warning_amber_outlined;
+    final iconData =
+        isApproved ? Icons.check_circle_outline : Icons.warning_amber_outlined;
     final iconColor =
         (isApproved ? Colors.green[700] : Colors.orange[700]) ?? baseColor;
     final title = isApproved
@@ -478,74 +476,76 @@ class _HomePageState extends State<HomePage> {
                         // 學生證審核失敗通知按鈕
                         if (banner != null) banner,
 
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('ACHIEVEMENTS',
-                                  style:
-                                      TextStyle(fontWeight: FontWeight.bold)),
-                              SizedBox(height: 4),
-                              Text(
-                                  'Congratulations on completing 4 tasks this week'),
-                              Text(
-                                  'Complete just three more tasks to reach the Busy Bee Level and earn 70 coins')
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        const Text('Your Achievements',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 18)),
-                        const SizedBox(height: 12),
-                        Consumer<AchievementProvider>(
-                          builder: (context, achievementProvider, child) {
-                            if (achievementProvider.isLoading) {
-                              return const Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceAround,
-                                children: [
-                                  _AchievementBox(
-                                      label: 'Total Coins', value: '...'),
-                                  _AchievementBox(
-                                      label: 'Task Completed', value: '...'),
-                                  _AchievementBox(
-                                      label: 'Five-Star Ratings', value: '...'),
-                                  _AchievementBox(
-                                      label: 'Avg Rating', value: '...'),
-                                ],
-                              );
-                            }
+                        /// ============ Achievements 功能暫時停用 ============
+                        // Container(
+                        //   padding: const EdgeInsets.all(12),
+                        //   decoration: BoxDecoration(
+                        //     color: AppColors.primary.withOpacity(0.1),
+                        //     borderRadius: BorderRadius.circular(10),
+                        //   ),
+                        //   child: const Column(
+                        //     crossAxisAlignment: CrossAxisAlignment.start,
+                        //     children: [
+                        //       Text('ACHIEVEMENTS',
+                        //           style:
+                        //               TextStyle(fontWeight: FontWeight.bold)),
+                        //       SizedBox(height: 4),
+                        //       Text(
+                        //           'Congratulations on completing 4 tasks this week'),
+                        //       Text(
+                        //           'Complete just three more tasks to reach the Busy Bee Level and earn 70 coins')
+                        //     ],
+                        //   ),
+                        // ),
+                        // const SizedBox(height: 24),
+                        // const Text('Your Achievements',
+                        //     style: TextStyle(
+                        //         fontWeight: FontWeight.bold, fontSize: 18)),
+                        // const SizedBox(height: 12),
+                        // Consumer<AchievementProvider>(
+                        //   builder: (context, achievementProvider, child) {
+                        //     if (achievementProvider.isLoading) {
+                        //       return const Row(
+                        //         mainAxisAlignment:
+                        //             MainAxisAlignment.spaceAround,
+                        //         children: [
+                        //           _AchievementBox(
+                        //               label: 'Total Coins', value: '...'),
+                        //           _AchievementBox(
+                        //               label: 'Task Completed', value: '...'),
+                        //           _AchievementBox(
+                        //               label: 'Five-Star Ratings', value: '...'),
+                        //           _AchievementBox(
+                        //               label: 'Avg Rating', value: '...'),
+                        //         ],
+                        //       );
+                        //     }
 
-                            final formatted =
-                                achievementProvider.getFormattedAchievements();
+                        //     final formatted =
+                        //         achievementProvider.getFormattedAchievements();
 
-                            return Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                              children: [
-                                _AchievementBox(
-                                    label: 'Total Coins',
-                                    value: formatted['total_coins']!),
-                                _AchievementBox(
-                                    label: 'Task Completed',
-                                    value: formatted['tasks_completed']!),
-                                _AchievementBox(
-                                    label: 'Five-Star Ratings',
-                                    value: formatted['five_star_ratings']!),
-                                _AchievementBox(
-                                    label: 'Avg Rating',
-                                    value: formatted['avg_rating']! == 'N/A'
-                                        ? '0.0'
-                                        : formatted['avg_rating']!),
-                              ],
-                            );
-                          },
-                        ),
+                        //     return Row(
+                        //       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        //       children: [
+                        //         _AchievementBox(
+                        //             label: 'Total Coins',
+                        //             value: formatted['total_coins']!),
+                        //         _AchievementBox(
+                        //             label: 'Task Completed',
+                        //             value: formatted['tasks_completed']!),
+                        //         _AchievementBox(
+                        //             label: 'Five-Star Ratings',
+                        //             value: formatted['five_star_ratings']!),
+                        //         _AchievementBox(
+                        //             label: 'Avg Rating',
+                        //             value: formatted['avg_rating']! == 'N/A'
+                        //                 ? '0.0'
+                        //                 : formatted['avg_rating']!),
+                        //       ],
+                        //     );
+                        //   },
+                        // ),
+                        /// ============ Achievements 功能暫時停用 (結束) ============
 
                         /// 以下成就系統先隱藏不做
                         // const SizedBox(height: 24),
@@ -644,104 +644,106 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _AchievementBox extends StatelessWidget {
-  final String label;
-  final String value;
-  const _AchievementBox({required this.label, required this.value});
+/// ============ Achievements 相關 Widget 暫時停用 ============
+// class _AchievementBox extends StatelessWidget {
+//   final String label;
+//   final String value;
+//   const _AchievementBox({required this.label, required this.value});
 
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<ThemeConfigManager>(
-      builder: (context, themeManager, child) {
-        return Column(
-          children: [
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                ClipPath(
-                  clipper: HexagonClipper(),
-                  child: Container(
-                    width: 60,
-                    height: 60,
-                    color: themeManager.currentTheme.onSecondary,
-                  ),
-                ),
-                ClipPath(
-                  clipper: HexagonClipper(),
-                  child: Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          themeManager.currentTheme.secondary,
-                          themeManager.currentTheme.primary,
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      value,
-                      style: TextStyle(
-                        fontSize: 14,
-                        foreground: Paint()
-                          ..style = PaintingStyle.stroke
-                          ..strokeWidth = 1.5
-                          ..color = themeManager.currentTheme.primary,
-                      ),
-                    ),
-                  ),
-                ),
-                ClipPath(
-                  clipper: HexagonClipper(),
-                  child: Container(
-                    width: 54,
-                    height: 54,
-                    alignment: Alignment.center,
-                    child: Text(
-                      value,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontSize: 12))
-          ],
-        );
-      },
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Consumer<ThemeConfigManager>(
+//       builder: (context, themeManager, child) {
+//         return Column(
+//           children: [
+//             Stack(
+//               alignment: Alignment.center,
+//               children: [
+//                 ClipPath(
+//                   clipper: HexagonClipper(),
+//                   child: Container(
+//                     width: 60,
+//                     height: 60,
+//                     color: themeManager.currentTheme.onSecondary,
+//                   ),
+//                 ),
+//                 ClipPath(
+//                   clipper: HexagonClipper(),
+//                   child: Container(
+//                     width: 54,
+//                     height: 54,
+//                     decoration: BoxDecoration(
+//                       gradient: LinearGradient(
+//                         colors: [
+//                           themeManager.currentTheme.secondary,
+//                           themeManager.currentTheme.primary,
+//                         ],
+//                         begin: Alignment.topCenter,
+//                         end: Alignment.bottomCenter,
+//                       ),
+//                     ),
+//                     alignment: Alignment.center,
+//                     child: Text(
+//                       value,
+//                       style: TextStyle(
+//                         fontSize: 14,
+//                         foreground: Paint()
+//                           ..style = PaintingStyle.stroke
+//                           ..strokeWidth = 1.5
+//                           ..color = themeManager.currentTheme.primary,
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//                 ClipPath(
+//                   clipper: HexagonClipper(),
+//                   child: Container(
+//                     width: 54,
+//                     height: 54,
+//                     alignment: Alignment.center,
+//                     child: Text(
+//                       value,
+//                       style: const TextStyle(
+//                         fontSize: 14,
+//                         fontWeight: FontWeight.bold,
+//                         color: Colors.white,
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//               ],
+//             ),
+//             const SizedBox(height: 4),
+//             Text(label, style: const TextStyle(fontSize: 12))
+//           ],
+//         );
+//       },
+//     );
+//   }
+// }
 
-// 上下平的六邊形 - 類似圖片中的形狀
-class HexagonClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    final double w = size.width;
+// // 上下平的六邊形 - 類似圖片中的形狀
+// class HexagonClipper extends CustomClipper<Path> {
+//   @override
+//   Path getClip(Size size) {
+//     final double w = size.width;
 
-    // 正六邊形公式：高度 = sqrt(3)/2 * width
-    final double hexHeight = (sqrt(3) / 2) * w;
+//     // 正六邊形公式：高度 = sqrt(3)/2 * width
+//     final double hexHeight = (sqrt(3) / 2) * w;
 
-    final List<Offset> points = [
-      Offset(w * 0.25, 0), // 左上
-      Offset(w * 0.75, 0), // 右上
-      Offset(w, hexHeight / 2), // 右中
-      Offset(w * 0.75, hexHeight), // 右下
-      Offset(w * 0.25, hexHeight), // 左下
-      Offset(0, hexHeight / 2), // 左中
-    ];
+//     final List<Offset> points = [
+//       Offset(w * 0.25, 0), // 左上
+//       Offset(w * 0.75, 0), // 右上
+//       Offset(w, hexHeight / 2), // 右中
+//       Offset(w * 0.75, hexHeight), // 右下
+//       Offset(w * 0.25, hexHeight), // 左下
+//       Offset(0, hexHeight / 2), // 左中
+//     ];
 
-    return Path()..addPolygon(points, true);
-  }
+//     return Path()..addPolygon(points, true);
+//   }
 
-  @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
-}
+//   @override
+//   bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+// }
+/// ============ Achievements 相關 Widget 暫時停用 (結束) ============

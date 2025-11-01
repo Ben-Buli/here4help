@@ -33,6 +33,10 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (p) => `${backendBasePath}${p}`,
         },
+        '/sanctum': {
+          target: adminApiUrl, 
+          changeOrigin: true,
+        },
         '/api/admin/task-disputes': {
           target: backendOrigin,
           changeOrigin: true,

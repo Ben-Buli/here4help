@@ -114,7 +114,11 @@ class _ChatListTaskWidgetState extends State<ChatListTaskWidget>
     return Consumer<ThemeConfigManager>(
       builder: (context, themeManager, child) {
         // 使用主題配色
-        final subtitleColor = themeManager.effectiveTheme.onSecondary;
+        // 依照主題設定 AppBar 標題/箭頭的配色
+        final theme = themeManager.effectiveTheme;
+        final primaryAccent = theme.appBarTitleColor ?? theme.secondary;
+        final inactiveColor =
+            theme.backArrowColorInactive ?? theme.onSurface.withOpacity(0.6);
         // 移除未讀狀態檢查
         // final chatProvider = Provider.of<ChatListProvider?>(context);
         // final bool postedHasUnread = chatProvider?.hasUnreadForTab(0) ?? false;
@@ -133,18 +137,19 @@ class _ChatListTaskWidgetState extends State<ChatListTaskWidget>
             labelPadding: EdgeInsets.zero, // 移除 tab 標籤的 padding
             indicatorPadding: EdgeInsets.zero, // 移除指示器的 padding
             dividerColor: Colors.transparent, // 移除分隔線
-            indicatorColor: themeManager.effectiveTheme.secondary, // 移動的下滑線
+            indicatorColor: primaryAccent, // 移動的下滑線
             indicatorWeight: 2, // 下劃線高度
-            labelColor: themeManager.effectiveTheme.accent, // 選中的 tab 使用亮色主題
-            unselectedLabelColor:
-                subtitleColor.withOpacity(0.6), // 未選中的 tab 保持原樣
-            labelStyle: const TextStyle(
+            labelColor: primaryAccent, // 選中的 tab 與 AppBar 文字一致
+            unselectedLabelColor: inactiveColor, // 未選中的 tab 使用停用色
+            labelStyle: TextStyle(
               fontSize: 16, // 選中的 tab 字體較大
               fontWeight: FontWeight.w400,
+              color: primaryAccent,
             ),
-            unselectedLabelStyle: const TextStyle(
+            unselectedLabelStyle: TextStyle(
               fontSize: 14, // 未選中的 tab 字體較小
               fontWeight: FontWeight.w300,
+              color: inactiveColor,
             ),
             tabs: [
               Tab(child: buildTabLabel('Post')),

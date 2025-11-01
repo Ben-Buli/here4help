@@ -90,6 +90,43 @@ class ThemeScheme {
     this.appBarSubtitleColor,
   });
 
+  /// Here4Help 品牌主題
+  static const ThemeScheme h4hBrand = ThemeScheme(
+    name: 'h4h_brand',
+    displayName: 'H4H',
+    category: 'business',
+    primary: Color(0xFF0C4C7B),
+    secondary: Color(0xFF3B9ACF),
+    accent: Color(0xFFEE752E),
+    background: Color(0xFFF4F8FB),
+    surface: Color(0xFFFFFFFF),
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFFFFFFFF),
+    onBackground: Color(0xFF0F1A24),
+    onSurface: Color(0xFF1F2933),
+    error: Color(0xFFDC2626),
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF16A34A),
+    warning: Color(0xFFF59E0B),
+    shadow: Color(0x1A0C4C7B),
+    outlineVariant: Color(0xFFB5D2E5),
+    backArrowColor: Color(0xFF3B9ACF),
+    backArrowColorInactive: Color(0xFF0C4C7B),
+    cardBackground: Color(0xFFFFFFFF),
+    cardBorder: Color(0xFFE0E7EF),
+    inputBackground: Color(0xFFFFFFFF),
+    inputBorder: Color(0xFFB8D0E0),
+    hintText: Color(0xFF6B7280),
+    disabledText: Color(0xFF94A3B8),
+    divider: Color(0xFFE5EDF5),
+    overlay: Color(0x800C4C7B),
+    successBackground: Color(0xFFD1FAE5),
+    warningBackground: Color(0xFFFFEDD5),
+    errorBackground: Color(0xFFFEE2E2),
+    appBarTitleColor: Color(0xFF3B9ACF),
+    appBarSubtitleColor: Color(0xFF3B9ACF),
+  );
+
   /// 主要風格 - 毛玻璃紫色系 (Main Style)
   static const ThemeScheme mainStyle = ThemeScheme(
     name: 'main_style',
@@ -1054,6 +1091,7 @@ class ThemeScheme {
 
   /// 所有可用主題
   static const List<ThemeScheme> allThemes = [
+    h4hBrand,
     mainStyle,
     metaBusinessStyle,
     businessGradient,
@@ -1087,12 +1125,23 @@ class ThemeScheme {
   static ThemeScheme getByName(String name) {
     return allThemes.firstWhere(
       (theme) => theme.name == name,
-      orElse: () => mainStyle, // 預設使用主要風格
+      orElse: () => h4hBrand,
     );
   }
 
   /// 轉換為 Material ThemeData
   ThemeData toThemeData() {
+    Color blendWithWhite(Color color, [double amount = 0.18]) {
+      return Color.alphaBlend(color.withValues(alpha: amount), Colors.white);
+    }
+
+    final resolvedAppBarTitleColor = appBarTitleColor ?? onPrimary;
+    final resolvedAppBarSubtitleColor =
+        appBarSubtitleColor ??
+        resolvedAppBarTitleColor.withValues(alpha: 0.85);
+    final dialogBackground = blendWithWhite(primary);
+    final dialogBorderColor = primary.withValues(alpha: 0.2);
+
     // 為特定主題（如 taipei_101）提供可選的裝飾背景（此處以無漸層為原則，背景圖樣可由 AppScaffold 另行覆蓋）
     return ThemeData(
       scaffoldBackgroundColor: background,
@@ -1101,19 +1150,30 @@ class ThemeScheme {
       appBarTheme: AppBarTheme(
         backgroundColor: primary,
         elevation: 0,
-        foregroundColor: onPrimary,
+        foregroundColor: resolvedAppBarTitleColor,
         shadowColor: shadow,
         centerTitle: true,
         titleTextStyle: TextStyle(
-          color: appBarTitleColor ?? onPrimary,
+          color: resolvedAppBarTitleColor,
           fontSize: 20,
           fontWeight: FontWeight.w600,
+        ),
+        toolbarTextStyle: TextStyle(
+          color: resolvedAppBarSubtitleColor,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+        iconTheme: IconThemeData(
+          color: resolvedAppBarTitleColor,
+        ),
+        actionsIconTheme: IconThemeData(
+          color: resolvedAppBarTitleColor,
         ),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: surface,
-        selectedItemColor: primary,
-        unselectedItemColor: onSurface.withOpacity(0.6),
+        selectedItemColor: resolvedAppBarTitleColor,
+        unselectedItemColor: primary.withValues(alpha: 0.6),
         type: BottomNavigationBarType.fixed,
         elevation: 8,
       ),
@@ -1146,16 +1206,34 @@ class ThemeScheme {
         ),
         shadowColor: shadow,
       ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: dialogBackground,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: dialogBorderColor, width: 1),
+        ),
+        titleTextStyle: TextStyle(
+          color: resolvedAppBarTitleColor,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+        contentTextStyle: TextStyle(
+          color: onSurface.withValues(alpha: 0.9),
+          fontSize: 14,
+          height: 1.4,
+        ),
+      ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: surface,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: primary.withOpacity(0.3)),
+          borderSide: BorderSide(color: primary.withValues(alpha: 0.3)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: primary.withOpacity(0.3)),
+          borderSide: BorderSide(color: primary.withValues(alpha: 0.3)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1163,7 +1241,7 @@ class ThemeScheme {
         ),
       ),
       popupMenuTheme: PopupMenuThemeData(
-        color: Colors.white.withOpacity(0.9), // 提高透明度到 0.9，讓文字更清晰
+        color: Colors.white.withValues(alpha: 0.9), // 提高透明度到 0.9，讓文字更清晰
         elevation: 8,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -1209,7 +1287,7 @@ class ThemeScheme {
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
       child: Container(
-        color: bgColor.withOpacity(0.8),
+          color: bgColor.withValues(alpha: 0.8),
         child: child,
       ),
     );
@@ -1236,7 +1314,7 @@ class ThemeScheme {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
         child: Container(
-          color: surfaceCol.withOpacity(0.8),
+          color: surfaceCol.withValues(alpha: 0.8),
           child: child,
         ),
       ),
@@ -1313,7 +1391,8 @@ class ThemeScheme {
     Color? backgroundColor,
   }) {
     final double blur = blurRadius ?? 5.0; // 預設 5px 模糊
-    final Color bgColor = backgroundColor ?? Colors.white.withOpacity(0.75);
+    final Color bgColor =
+        backgroundColor ?? Colors.white.withValues(alpha: 0.75);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
@@ -1563,28 +1642,29 @@ class ThemeScheme {
     return {
       'name': name,
       'displayName': displayName,
-      'primary': primary.value,
-      'secondary': secondary.value,
-      'accent': accent.value,
-      'background': background.value,
-      'surface': surface.value,
-      'onPrimary': onPrimary.value,
-      'onSecondary': onSecondary.value,
-      'onBackground': onBackground.value,
-      'onSurface': onSurface.value,
-      'error': error.value,
-      'onError': onError.value,
-      'success': success.value,
-      'warning': warning.value,
-      'shadow': shadow.value,
-      'outlineVariant': outlineVariant.value, // 新增 outlineVariant
+      'primary': primary.toARGB32(),
+      'secondary': secondary.toARGB32(),
+      'accent': accent.toARGB32(),
+      'background': background.toARGB32(),
+      'surface': surface.toARGB32(),
+      'onPrimary': onPrimary.toARGB32(),
+      'onSecondary': onSecondary.toARGB32(),
+      'onBackground': onBackground.toARGB32(),
+      'onSurface': onSurface.toARGB32(),
+      'error': error.toARGB32(),
+      'onError': onError.toARGB32(),
+      'success': success.toARGB32(),
+      'warning': warning.toARGB32(),
+      'shadow': shadow.toARGB32(),
+      'outlineVariant': outlineVariant.toARGB32(), // 新增 outlineVariant
       'backgroundBlur': backgroundBlur,
       'surfaceBlur': surfaceBlur,
-      'backgroundGradient': backgroundGradient?.map((c) => c.value).toList(),
+      'backgroundGradient':
+          backgroundGradient?.map((c) => c.toARGB32()).toList(),
       'gradientBegin': gradientBegin.toString(),
       'gradientEnd': gradientEnd.toString(),
-      'backArrowColor': backArrowColor.value,
-      'backArrowColorInactive': backArrowColorInactive.value,
+      'backArrowColor': backArrowColor.toARGB32(),
+      'backArrowColorInactive': backArrowColorInactive.toARGB32(),
     };
   }
 

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
-import 'package:here4help/services/api/review_api.dart';
 import 'package:here4help/constants/app_colors.dart';
+import 'package:here4help/services/api/review_api.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 
 class ReviewDialog extends StatefulWidget {
   final String taskId;
@@ -53,7 +55,30 @@ class _ReviewDialogState extends State<ReviewDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final themeManager = context.watch<ThemeConfigManager>();
+    final primaryColor = themeManager.dialogPrimaryColor;
+    final titleColor =
+        theme.dialogTheme.titleTextStyle?.color ?? themeManager.dialogTitleColor;
+    final subtitleColor =
+        themeManager.dialogContentColor.withValues(alpha: 0.75);
+    final dialogBackground =
+        theme.dialogTheme.backgroundColor ?? themeManager.dialogBackgroundColor;
+    final cardBackground =
+        Color.alphaBlend(primaryColor.withValues(alpha: 0.08), Colors.white);
+    final capsuleBackground =
+        Color.alphaBlend(primaryColor.withValues(alpha: 0.12), Colors.white);
+    final borderColor = primaryColor.withValues(alpha: 0.18);
+    final errorColor = theme.colorScheme.error;
+    final errorBackground =
+        Color.alphaBlend(errorColor.withValues(alpha: 0.12), Colors.white);
+    final errorBorder = errorColor.withValues(alpha: 0.3);
+
     return AlertDialog(
+      backgroundColor: dialogBackground,
+      shape: theme.dialogTheme.shape,
+      titleTextStyle: theme.dialogTheme.titleTextStyle,
+      contentTextStyle: theme.dialogTheme.contentTextStyle,
       title: Text(widget.readOnlyMode ? 'Review Details' : 'Submit Review'),
       content: SingleChildScrollView(
         child: Column(
@@ -64,24 +89,26 @@ class _ReviewDialogState extends State<ReviewDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey[50],
+                color: cardBackground,
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: borderColor),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Task: ${widget.taskTitle}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
+                      color: titleColor,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Reviewing: ${widget.taskerName}',
                     style: TextStyle(
-                      color: Colors.grey[600],
+                      color: subtitleColor,
                       fontSize: 12,
                     ),
                   ),
@@ -91,11 +118,12 @@ class _ReviewDialogState extends State<ReviewDialog> {
             const SizedBox(height: 16),
 
             // 評分星級 - 簡化為單一排
-            const Text(
+            Text(
               'Rating *',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
+                color: titleColor,
               ),
             ),
             const SizedBox(height: 8),
@@ -126,8 +154,8 @@ class _ReviewDialogState extends State<ReviewDialog> {
             Center(
               child: Text(
                 _getRatingText(_rating.toInt()),
-                style: const TextStyle(
-                  color: AppColors.primary,
+                style: TextStyle(
+                  color: primaryColor,
                   fontWeight: FontWeight.w500,
                   fontSize: 14,
                 ),
@@ -136,11 +164,12 @@ class _ReviewDialogState extends State<ReviewDialog> {
             const SizedBox(height: 16),
 
             // 評論 - 選填
-            const Text(
+            Text(
               'Comment (Optional)',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
+                color: titleColor,
               ),
             ),
             const SizedBox(height: 8),
@@ -162,22 +191,22 @@ class _ReviewDialogState extends State<ReviewDialog> {
                 margin: const EdgeInsets.only(top: 16),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue[50],
+                  color: capsuleBackground,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue[200]!),
+                  border: Border.all(color: borderColor),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       Icons.schedule,
                       size: 16,
-                      color: Colors.blue[600],
+                      color: primaryColor,
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Submitted: ${_formatDateTime(widget.existingReview!['created_at'])}',
                       style: TextStyle(
-                        color: Colors.blue[600],
+                        color: primaryColor,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -192,14 +221,14 @@ class _ReviewDialogState extends State<ReviewDialog> {
                 margin: const EdgeInsets.only(top: 8),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red[50],
+                  color: errorBackground,
                   borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.red[200]!),
+                  border: Border.all(color: errorBorder),
                 ),
                 child: Text(
                   _errorMessage!,
                   style: TextStyle(
-                    color: Colors.red[700],
+                    color: errorColor,
                     fontSize: 12,
                   ),
                 ),
@@ -210,13 +239,16 @@ class _ReviewDialogState extends State<ReviewDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(
+            foregroundColor: primaryColor,
+          ),
           child: Text(widget.readOnlyMode ? 'Close' : 'Cancel'),
         ),
         if (!widget.readOnlyMode)
           ElevatedButton(
             onPressed: _isSubmitting ? null : _submitReview,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: primaryColor,
               foregroundColor: Colors.white,
             ),
             child: _isSubmitting

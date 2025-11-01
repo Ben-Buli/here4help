@@ -5,7 +5,7 @@
       <div class="flex items-center justify-between">
         <div class="min-w-0 flex-1">
           <div class="mt-1 text-sm text-gray-600">
-            <p><span class="font-medium">Task:</span> {{ chatData?.task?.title || 'Loading...' }}</p>
+            <p><span class="font-medium">Task Title:</span> {{ chatData?.task?.title || 'Loading...' }}</p>
             <p><span class="font-medium">Dispute ID:</span> {{ chatData?.task?.id }} | 
                <span class="font-medium">Status:</span> 
                <span :class="getStatusBadgeClass(chatData?.dispute_info?.status || '')" 
@@ -67,12 +67,23 @@
           <!-- Creator -->
           <div class="flex items-center space-x-3">
             <div class="flex-shrink-0">
-              <img 
-                :src="getAvatarUrl(chatData?.member_status?.creator?.avatar_url)" 
-                :alt="chatData?.member_status?.creator?.name"
-                class="h-8 w-8 rounded-full"
+              <template v-if="!shouldShowFallbackAvatar('creator', chatData?.member_status?.creator?.avatar_url)">
+                <img 
+                  :src="resolveAvatarUrl(chatData?.member_status?.creator?.avatar_url) || ''" 
+                  :alt="chatData?.member_status?.creator?.name"
+                  class="h-8 w-8 rounded-full"
+                  :class="{ 'opacity-50': !chatData?.member_status?.creator?.is_active }"
+                  @error="handleAvatarError('creator')"
+                />
+              </template>
+              <div
+                v-else
+                class="h-8 w-8 rounded-full flex items-center justify-center text-white"
+                :style="{ backgroundColor: getAvatarColor(chatData?.member_status?.creator?.name) }"
                 :class="{ 'opacity-50': !chatData?.member_status?.creator?.is_active }"
-              />
+              >
+                <Icon name="user" class="h-4 w-4" />
+              </div>
             </div>
             <div>
               <p class="text-sm font-medium" :class="getMemberTextClass(chatData?.member_status?.creator?.is_active)">
@@ -90,12 +101,23 @@
           <!-- Participant -->
           <div v-if="chatData?.member_status?.participant?.user_id" class="flex items-center space-x-3">
             <div class="flex-shrink-0">
-              <img 
-                :src="getAvatarUrl(chatData?.member_status?.participant?.avatar_url)" 
-                :alt="chatData?.member_status?.participant?.name"
-                class="h-8 w-8 rounded-full"
+              <template v-if="!shouldShowFallbackAvatar('participant', chatData?.member_status?.participant?.avatar_url)">
+                <img 
+                  :src="resolveAvatarUrl(chatData?.member_status?.participant?.avatar_url) || ''" 
+                  :alt="chatData?.member_status?.participant?.name"
+                  class="h-8 w-8 rounded-full"
+                  :class="{ 'opacity-50': !chatData?.member_status?.participant?.is_active }"
+                  @error="handleAvatarError('participant')"
+                />
+              </template>
+              <div
+                v-else
+                class="h-8 w-8 rounded-full flex items-center justify-center text-white"
+                :style="{ backgroundColor: getAvatarColor(chatData?.member_status?.participant?.name) }"
                 :class="{ 'opacity-50': !chatData?.member_status?.participant?.is_active }"
-              />
+              >
+                <Icon name="user" class="h-4 w-4" />
+              </div>
             </div>
             <div>
               <p class="text-sm font-medium" :class="getMemberTextClass(chatData?.member_status?.participant?.is_active)">
@@ -138,8 +160,9 @@
             :message="message"
             :users="chatData.users"
             :task="chatData.task"
+            :chat-room="chatData.chat_room"
             :dispute-submitted-at="chatData.dispute_info?.created_at"
-            :right-side-user-id="chatData.dispute_info?.applicant_user_id"
+            :right-side-user-id="chatData.dispute_info?.applicant_user_id ? Number(chatData.dispute_info?.applicant_user_id) : undefined"
             :admin-id="chatData.meta?.admin_id"
           />
         </div>
@@ -176,12 +199,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, computed } from 'vue'
+import { ref, onMounted, nextTick, computed, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { disputeApi } from '@/services/api'
 import Icon from '@/components/Icon.vue'
 import AdminMessageBubble from '@/components/AdminMessageBubble.vue'
 import DisputeOperationDialog from '@/components/DisputeOperationDialog.vue'
+import { getImageUrl } from '@/config/api'
 
 interface ChatMessage {
   id: number
@@ -348,38 +372,70 @@ const handleDisputeResolved = async () => {
   console.log('Dispute resolved successfully')
 }
 
-const getAvatarUrl = (avatarUrl?: string) => {
-  if (!avatarUrl) {
-    return '/default-avatar.png'
+const avatarFallbackMap = reactive<Record<string, boolean>>({})
+
+const normalizeAvatarPath = (raw?: string): string | null => {
+  if (!raw) return null
+  let path = raw.trim()
+  if (!path) return null
+
+  // 若為完整 URL 直接使用
+  if (/^https?:\/\//i.test(path)) {
+    return path
   }
-  
-  // 如果是完整 URL，直接返回
-  if (avatarUrl.startsWith('http')) {
-    return avatarUrl
+
+  // 去除 domain 或重複的 /backend
+  path = path.replace(/^https?:\/\/[^/]+/i, '')
+  path = path.replace(/^\/+/, '')
+  path = path.replace(/(^|\/)backend\//g, '$1')
+
+  if (path.startsWith('uploads/')) {
+    path = path.replace(/^uploads\//, '')
   }
-  
-  // 處理 /backend/uploads/ 路徑
-  if (avatarUrl.startsWith('/backend/uploads/')) {
-    return avatarUrl.replace('/backend', '')
+
+  const match = path.match(/uploads\/(.+)$/)
+  if (match) {
+    path = match[1]
   }
-  
-  // 處理 backend/uploads/ 路徑（沒有前導斜線）
-  if (avatarUrl.startsWith('backend/uploads/')) {
-    return `/${avatarUrl}`
+
+  return path || null
+}
+
+const resolveAvatarUrl = (avatarUrl?: string): string | null => {
+  const normalized = normalizeAvatarPath(avatarUrl)
+  if (!normalized) return null
+
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized
   }
-  
-  // 處理 uploads/ 路徑
-  if (avatarUrl.startsWith('uploads/')) {
-    return `/${avatarUrl}`
+
+  const cleanPath = normalized.replace(/^uploads\//, '')
+  return getImageUrl(cleanPath)
+}
+
+const handleAvatarError = (key: string) => {
+  avatarFallbackMap[key] = true
+}
+
+const shouldShowFallbackAvatar = (key: string, avatarUrl?: string) => {
+  if (avatarFallbackMap[key]) return true
+  return !resolveAvatarUrl(avatarUrl)
+}
+
+const avatarColors = [
+  '#1E40AF', '#9333EA', '#059669', '#DC2626', '#2563EB',
+  '#F59E0B', '#10B981', '#EC4899', '#0EA5E9', '#F97316'
+]
+
+const getAvatarColor = (name?: string) => {
+  const base = name && name.trim() ? name.trim().toLowerCase() : 'user'
+  let hash = 0
+  for (let i = 0; i < base.length; i += 1) {
+    hash = (hash << 5) - hash + base.charCodeAt(i)
+    hash |= 0
   }
-  
-  // 如果路徑已經以 / 開頭，直接返回
-  if (avatarUrl.startsWith('/')) {
-    return avatarUrl
-  }
-  
-  // 其他情況，添加前導斜線
-  return `/${avatarUrl}`
+  const index = Math.abs(hash) % avatarColors.length
+  return avatarColors[index]
 }
 
 const getStatusBadgeClass = (status: string) => {

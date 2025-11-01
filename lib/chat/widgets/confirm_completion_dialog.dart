@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 
 /// 同意完成二次確認 Dialog
 class ConfirmCompletionDialog extends StatefulWidget {
@@ -54,14 +56,30 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final themeManager = context.watch<ThemeConfigManager>();
+    final dialogBackground =
+        theme.dialogTheme.backgroundColor ?? themeManager.dialogBackgroundColor;
+
     return AlertDialog(
+      backgroundColor: dialogBackground,
+      shape: theme.dialogTheme.shape,
+      titleTextStyle: theme.dialogTheme.titleTextStyle,
+      contentTextStyle: theme.dialogTheme.contentTextStyle,
       title: const Text('Confirm Completion'),
-      content: _buildContent(),
-      actions: _buildActions(),
+      content: _buildContent(themeManager),
+      actions: _buildActions(themeManager.dialogPrimaryColor),
     );
   }
 
-  Widget _buildContent() {
+  Widget _buildContent(ThemeConfigManager themeManager) {
+    final theme = Theme.of(context);
+    final primaryColor = themeManager.dialogPrimaryColor;
+    final infoBackground =
+        Color.alphaBlend(primaryColor.withOpacity(0.12), Colors.white);
+    final infoBorder = primaryColor.withOpacity(0.2);
+    final subduedText = themeManager.dialogContentColor.withOpacity(0.75);
+
     if (_isLoading) {
       return const SizedBox(
         height: 100,
@@ -79,13 +97,14 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
     }
 
     if (_errorMessage != null) {
+      final errorColor = theme.colorScheme.error;
       return SizedBox(
         height: 100,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error, color: Colors.red, size: 32),
+              Icon(Icons.error, color: errorColor, size: 32),
               const SizedBox(height: 8),
               Text(
                 'Failed to load preview',
@@ -95,7 +114,7 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
               Text(
                 _errorMessage!,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.red,
+                      color: errorColor,
                     ),
                 textAlign: TextAlign.center,
               ),
@@ -131,38 +150,49 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
               ),
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           'Please review the completion details:',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: themeManager.dialogTitleColor,
+          ),
         ),
         const SizedBox(height: 12),
-        _buildInfoRow('Task Reward', '\$${amount.toStringAsFixed(2)}'),
+        _buildInfoRow(
+          'Task Reward',
+          '\$${amount.toStringAsFixed(2)}',
+          primaryColor,
+          subduedText,
+        ),
         _buildInfoRow('Service Fee (${(feeRate * 100).toStringAsFixed(1)}%)',
-            '\$${fee.toStringAsFixed(2)}'),
+            '\$${fee.toStringAsFixed(2)}', primaryColor, subduedText),
         const Divider(),
         _buildInfoRow(
           'Net Amount',
           '\$${net.toStringAsFixed(2)}',
+          primaryColor,
+          subduedText,
           isTotal: true,
         ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.blue[50],
+            color: infoBackground,
             borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: Colors.blue[200]!),
+            border: Border.all(color: infoBorder),
           ),
           child: Row(
             children: [
-              Icon(Icons.info_outline, color: Colors.blue[600], size: 16),
+              Icon(Icons.info_outline, color: primaryColor, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'This action will transfer the reward points to the tasker.',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.blue[700],
+                    color: primaryColor,
                   ),
                 ),
               ),
@@ -173,7 +203,9 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value, {bool isTotal = false}) {
+  Widget _buildInfoRow(
+      String label, String value, Color primary, Color secondary,
+      {bool isTotal = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -184,6 +216,7 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: isTotal ? FontWeight.w600 : FontWeight.normal,
+              color: isTotal ? primary : secondary,
             ),
           ),
           Text(
@@ -191,7 +224,7 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: isTotal ? FontWeight.w600 : FontWeight.normal,
-              color: isTotal ? Theme.of(context).colorScheme.primary : null,
+              color: isTotal ? primary : secondary,
             ),
           ),
         ],
@@ -199,11 +232,12 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
     );
   }
 
-  List<Widget> _buildActions() {
+  List<Widget> _buildActions(Color primaryColor) {
     if (_isLoading) {
       return [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(foregroundColor: primaryColor),
           child: const Text('Cancel'),
         ),
       ];
@@ -213,10 +247,15 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
       return [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(foregroundColor: primaryColor),
           child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: _loadPreview,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primaryColor,
+            foregroundColor: Colors.white,
+          ),
           child: const Text('Retry'),
         ),
       ];
@@ -225,12 +264,13 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
     return [
       TextButton(
         onPressed: _isConfirming ? null : () => Navigator.of(context).pop(),
+        style: TextButton.styleFrom(foregroundColor: primaryColor),
         child: const Text('Cancel'),
       ),
       ElevatedButton(
         onPressed: _isConfirming ? null : _handleConfirm,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Theme.of(context).colorScheme.primary,
+          backgroundColor: primaryColor,
           foregroundColor: Colors.white,
         ),
         child: _isConfirming

@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:provider/provider.dart';
 import 'package:here4help/providers/permission_provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
+import 'package:here4help/auth/services/auth_service.dart';
+import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:here4help/config/app_config.dart';
+import 'package:intl/intl.dart';
 
 class PermissionUnverifiedPage extends StatefulWidget {
   final String? message;
@@ -25,6 +30,9 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
   String _buttonText = 'Try Again';
   Color? _buttonBackgroundColor;
   Color? _buttonForegroundColor;
+  Map<String, dynamic>? _verificationData;
+  bool _isLoadingVerification = false;
+  String? _verificationError;
 
   /// 重設按鈕樣式
   void _resetButtonStyle() {
@@ -35,6 +43,477 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
         _buttonForegroundColor = null;
         _isRefreshing = false;
       });
+    }
+  }
+
+  Widget _buildContentByPermission(int permission) {
+    switch (permission) {
+      case 0:
+        return _buildVerificationContent();
+      case -1:
+        return _buildRestrictedContent();
+      case -2:
+        return _buildSelfDeactivatedContent();
+      default:
+        return _buildGenericContent();
+    }
+  }
+
+  Widget _buildVerificationContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.blue.shade200),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue.shade700),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Your registration is almost complete. Our team is reviewing the student ID you submitted. You will gain full access as soon as it is approved.',
+                  style: TextStyle(
+                    color: Colors.blue.shade900,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        _buildVerificationStatusCard(),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _isLoadingVerification ? null : _loadVerificationStatus,
+            icon: _isLoadingVerification
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.refresh),
+            label: Text(_isLoadingVerification ? 'Refreshing...' : 'Refresh Status'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildBackButton(),
+      ],
+    );
+  }
+
+  Widget _buildRestrictedContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildMessageCard(
+          icon: Icons.report_gmailerrorred,
+          color: Colors.red,
+          message:
+              'Your account has been limited by an administrator. To restore access, please contact our support team for assistance.',
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => context.go('/account/support/contact'),
+            icon: const Icon(Icons.support_agent),
+            label: const Text('Contact Support'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildBackButton(),
+      ],
+    );
+  }
+
+  Widget _buildSelfDeactivatedContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildMessageCard(
+          icon: Icons.pause_circle_outline,
+          color: Colors.orange,
+          message:
+              'You have temporarily deactivated your account. Visit Security Settings if you would like to enable your account again.',
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => context.go('/account/security'),
+            icon: const Icon(Icons.security),
+            label: const Text('Open Security Settings'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildBackButton(),
+      ],
+    );
+  }
+
+  Widget _buildGenericContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildMessageCard(
+          icon: Icons.info_outline,
+          color: Colors.blueGrey,
+          message:
+              'Your account does not have sufficient permissions to access this page. Please check your account status or try again later.',
+        ),
+        const SizedBox(height: 12),
+        _buildBackButton(),
+      ],
+    );
+  }
+
+  Widget _buildBackButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => _handleSmartBack(context),
+        icon: const Icon(Icons.arrow_back),
+        label: const Text('Go Back'),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageCard({
+    required IconData icon,
+    required Color color,
+    required String message,
+  }) {
+    Color resolve(Color base, double opacity) {
+      if (base is MaterialColor) {
+        return base.shade100.withOpacity(opacity == 1 ? 1 : opacity);
+      }
+      return base.withOpacity(opacity);
+    }
+
+    Color resolveText(Color base) {
+      if (base is MaterialColor) {
+        return base.shade700;
+      }
+      return base;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: resolve(color, 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: resolve(color, 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: resolveText(color)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: resolveText(color),
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVerificationStatusCard() {
+    if (_isLoadingVerification) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.blue.shade100),
+        ),
+        child: Row(
+          children: const [
+            CircularProgressIndicator(strokeWidth: 2),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text('Checking the latest verification status...'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_verificationError != null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.red.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red.shade200),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline, color: Colors.red.shade600),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _verificationError!,
+                style: TextStyle(color: Colors.red.shade800),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_verificationData == null || _verificationData!.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.grey.shade600),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'We have not received a student ID submission yet. Please return to the onboarding flow to upload your document.',
+                style: TextStyle(color: Colors.grey.shade700),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final status =
+        (_verificationData!['verification_status'] ?? 'pending').toString();
+    final notes = _verificationData!['verification_notes']?.toString();
+    final createdAt = _parseDate(_verificationData!['created_at']);
+    final updatedAt = _parseDate(_verificationData!['updated_at']);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade100),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Verification Progress',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.blue.shade900,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildStatusRow(
+            icon: Icons.verified_user,
+            label: 'Current Status',
+            value: _formatStatus(status),
+          ),
+          if (createdAt != null)
+            _buildStatusRow(
+              icon: Icons.file_upload,
+              label: 'Submitted At',
+              value: DateFormat.yMMMd().add_jm().format(createdAt),
+            ),
+          if (updatedAt != null)
+            _buildStatusRow(
+              icon: Icons.update,
+              label: 'Last Updated',
+              value: DateFormat.yMMMd().add_jm().format(updatedAt),
+            ),
+          if (notes != null && notes.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.sticky_note_2_outlined,
+                    color: Colors.blue.shade700, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    notes,
+                    style: TextStyle(
+                      color: Colors.blue.shade900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusRow(
+      {required IconData icon,
+      required String label,
+      required String value}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.blue.shade600, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.blue.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return 'Approved';
+      case 'rejected':
+        return 'Rejected';
+      case 'pending':
+      default:
+        return 'Pending Review';
+    }
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value);
+    }
+    return null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final permissionProvider =
+          Provider.of<PermissionProvider>(context, listen: false);
+      if (permissionProvider.permission == 0) {
+        _loadVerificationStatus();
+      }
+    });
+  }
+
+  Future<void> _loadVerificationStatus() async {
+    setState(() {
+      _isLoadingVerification = true;
+      _verificationError = null;
+    });
+
+    try {
+      final token = await AuthService.getToken();
+      if (token == null) {
+        throw Exception('Token missing');
+      }
+
+      final response = await http.get(
+        Uri.parse(
+            '${AppConfig.apiBaseUrl}/api/auth/get-student-verification-status.php'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        if (decoded['success'] == true && decoded['data'] != null) {
+          setState(() {
+            _verificationData =
+                Map<String, dynamic>.from(decoded['data'] as Map);
+          });
+        } else {
+          setState(() {
+            _verificationData = null;
+            _verificationError =
+                decoded['message']?.toString() ?? 'No verification record found';
+          });
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Failed to load verification status: $e');
+      if (mounted) {
+        setState(() {
+          _verificationError =
+              'Unable to load verification status. Please try again later.';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingVerification = false;
+        });
+      }
     }
   }
 
@@ -176,10 +655,6 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
         Provider.of<PermissionProvider>(context, listen: false);
     final userPermission = permissionProvider.permission;
 
-    // 使用傳入的訊息或從權限狀態生成
-    const displayMessage = 'After verification, you can access all features.';
-    // widget.message ?? PermissionService.getPermissionStatus(userPermission);
-
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -224,176 +699,7 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
 
               SizedBox(height: MediaQuery.of(context).size.height * 0.03),
 
-              // 錯誤訊息
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: Colors.orange.shade600,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        displayMessage,
-                        style: TextStyle(
-                          color: Colors.orange.shade800,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              SizedBox(height: MediaQuery.of(context).size.height * 0.03),
-
-              // // 被阻擋的路徑資訊
-              // Container(
-              //   padding: const EdgeInsets.all(12),
-              //   decoration: BoxDecoration(
-              //     color: Colors.grey.shade50,
-              //     borderRadius: BorderRadius.circular(8),
-              //   ),
-              //   child: Row(
-              //     children: [
-              //       Icon(
-              //         Icons.location_on_outlined,
-              //         color: Colors.grey.shade600,
-              //         size: 20,
-              //       ),
-              //       const SizedBox(width: 8),
-              //       Expanded(
-              //         child: Text(
-              //           'Blocked path: $fromPath',
-              //           style: TextStyle(
-              //             color: Colors.grey.shade600,
-              //             fontSize: 14,
-              //           ),
-              //         ),
-              //       ),
-              //     ],
-              //   ),
-              // ),
-
-              // const SizedBox(height: 40),
-
-              // 按鈕區域
-
-              Column(
-                children: [
-                  // 手動刷新按鈕
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _isRefreshing ? null : _refreshUserData,
-                      icon: _isRefreshing
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : Icon(_buttonBackgroundColor == Colors.green
-                              ? Icons.check
-                              : _buttonBackgroundColor == Colors.red
-                                  ? Icons.error
-                                  : Icons.refresh),
-                      label: Text(_buttonText),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _buttonBackgroundColor ??
-                            Theme.of(context).colorScheme.tertiaryContainer,
-                        foregroundColor: _buttonForegroundColor ??
-                            Theme.of(context).colorScheme.tertiary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // 智能返回按鈕
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _handleSmartBack(context),
-                      icon: const Icon(Icons.arrow_back),
-                      label: const Text('Go Back'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor:
-                            Theme.of(context).colorScheme.onPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // 返回首頁按鈕
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => context.go('/home'),
-                      icon: const Icon(Icons.home),
-                      label: const Text('Go to Home'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.grey.shade700,
-                        side: BorderSide(color: Colors.grey.shade400),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 聯繫客服按鈕
-                  TextButton.icon(
-                    onPressed: () {
-                      // 前往客服頁面
-                      context.go('/account/support/contact');
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Contact support feature coming soon'),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.support_agent),
-                    label: const Text('Contact Support'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.grey.shade600,
-                    ),
-                  ),
-                  // 用戶安全設置按鈕
-                  TextButton.icon(
-                    onPressed: () {
-                      // 前往用戶安全設置頁面
-                      context.go('/account/security');
-                    },
-                    icon: const Icon(Icons.security),
-                    label: const Text('Security Settings'),
-                  )
-                ],
-              ),
+              _buildContentByPermission(userPermission),
             ],
           ),
         ),

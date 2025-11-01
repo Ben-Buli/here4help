@@ -18,7 +18,7 @@
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select v-model="filters.status" @change="() => loadChatRooms()" class="admin-input">
+          <select v-model="filters.status" @change="() => loadChatRooms()" class="admin-input px-2">
             <option value="">All</option>
             <option value="submitted">Submitted</option>
             <option value="in_progress">In Progress</option>
@@ -69,8 +69,9 @@
           v-for="room in chatRooms" 
           :key="room.room_id"
           :data-room-id="room.room_id"
-          class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+          class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md hover:bg-cyan-50 hover:border-cyan-200 transition-shadow cursor-pointer"
           @click="openChatRoom(room)"
+          title="Click to open chat room"
         >
           <div class="flex items-start justify-between">
             <div class="flex items-start space-x-4 flex-1">
@@ -139,7 +140,7 @@
               <div class="flex flex-col items-end space-y-1">
                 <button 
                   @click.stop="openChatRoom(room)"
-                  class="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                  class="text-blue-600 hover:text-blue-900 text-sm font-medium cursor-pointer"
                 >
                   Open Chat
                 </button>

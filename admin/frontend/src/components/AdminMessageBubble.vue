@@ -22,11 +22,21 @@
         <div class="flex items-start space-x-3">
           <!-- 用戶頭像 -->
           <div class="flex-shrink-0">
-            <img 
-              :src="getAvatarUrl()" 
-              :alt="getUserName()"
-              class="h-8 w-8 rounded-full"
-            />
+            <template v-if="!showFallbackAvatar">
+              <img 
+                :src="resolvedAvatarUrl || ''" 
+                :alt="getUserName()"
+                class="h-8 w-8 rounded-full"
+                @error="handleAvatarError"
+              />
+            </template>
+            <div
+              v-else
+              class="h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+              :style="{ backgroundColor: getAvatarColor() }"
+            >
+              <Icon name="user" class="h-4 w-4" />
+            </div>
           </div>
           
           <!-- 訊息內容 -->
@@ -90,11 +100,21 @@
           
           <!-- 用戶頭像 -->
           <div class="flex-shrink-0">
-            <img 
-              :src="getAvatarUrl()" 
-              :alt="getUserName()"
-              class="h-8 w-8 rounded-full"
-            />
+            <template v-if="!showFallbackAvatar">
+              <img 
+                :src="resolvedAvatarUrl || ''" 
+                :alt="getUserName()"
+                class="h-8 w-8 rounded-full"
+                @error="handleAvatarError"
+              />
+            </template>
+            <div
+              v-else
+              class="h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
+              :style="{ backgroundColor: getAvatarColor() }"
+            >
+              <Icon name="user" class="h-4 w-4" />
+            </div>
           </div>
         </div>
       </template>
@@ -103,9 +123,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref } from 'vue'
 import Icon from '@/components/Icon.vue'
 import MessageContentRenderer from '@/components/MessageContentRenderer.vue'
+import { getImageUrl } from '@/config/api'
 
 interface ChatMessage {
   id: number
@@ -137,10 +158,16 @@ interface TaskInfo {
   reward_point: number
 }
 
+interface ChatRoomInfo {
+  creator_id: number
+  participant_id: number
+}
+
 interface Props {
   message: ChatMessage
   users: Record<number, UserInfo>
   task: TaskInfo
+  chatRoom?: ChatRoomInfo
   disputeSubmittedAt?: string
   rightSideUserId?: number
   adminId?: number
@@ -208,11 +235,19 @@ const getUserRole = () => {
   // 檢查是否為爭議申請人
   const isDisputer = props.message.from_user_id === props.rightSideUserId
   
-  if (props.message.from_user_id === props.task.creator_id) {
+  const messageUserId = Number(props.message.from_user_id)
+  const creatorId = props.chatRoom?.creator_id != null
+      ? Number(props.chatRoom!.creator_id)
+      : Number(props.task.creator_id)
+  const participantId = props.chatRoom?.participant_id != null
+      ? Number(props.chatRoom!.participant_id)
+      : (props.task.participant_id != null ? Number(props.task.participant_id) : undefined)
+
+  if (Number.isFinite(messageUserId) && messageUserId === creatorId) {
     return isDisputer ? 'Creator (Disputer)' : 'Creator'
   }
   
-  if (props.message.from_user_id === props.task.participant_id) {
+  if (participantId !== undefined && Number.isFinite(messageUserId) && messageUserId === participantId) {
     return isDisputer ? 'Tasker (Disputer)' : 'Tasker'
   }
   
@@ -221,13 +256,28 @@ const getUserRole = () => {
 
 const isRightSide = () => {
   // 如果沒有指定右側用戶ID，預設靠左
-  if (!props.rightSideUserId) return false
+  if (props.rightSideUserId === undefined || props.rightSideUserId === null) return false
   
   // 如果訊息沒有發送者ID，預設靠左
   if (!props.message.from_user_id) return false
+
+  const messageUserId = Number(props.message.from_user_id)
+  const rightSideId = Number(props.rightSideUserId)
   
-  // 只要是爭議申請人的訊息，不管 kind 類型都靠右顯示
-  return props.message.from_user_id === props.rightSideUserId
+  if (Number.isFinite(messageUserId) && Number.isFinite(rightSideId) && messageUserId === rightSideId) {
+    return true
+  }
+
+  // 若聊天室資訊提供的 participant_id 不等於申請人，也可讓 participant 靠右
+  const participantId = props.chatRoom?.participant_id != null
+      ? Number(props.chatRoom!.participant_id)
+      : (props.task.participant_id != null ? Number(props.task.participant_id) : undefined)
+
+  if (participantId != null && Number.isFinite(messageUserId) && messageUserId === participantId) {
+    return true
+  }
+
+  return false
 }
 
 const getContainerAlignClass = () => {
@@ -296,54 +346,75 @@ const getUserRoleBadgeClass = () => {
   }
 }
 
-const getAvatarUrl = () => {
-  let avatarUrl = ''
-  
-  if (props.message.from_user_id && props.users[props.message.from_user_id]) {
-    avatarUrl = props.users[props.message.from_user_id].avatar_url || ''
-  } else {
-    avatarUrl = props.message.user_avatar || ''
+const avatarError = ref(false)
+
+const normalizeAvatarPath = (raw?: string): string | null => {
+  if (!raw) return null
+  let path = raw.trim()
+  if (!path) return null
+
+  if (/^https?:\/\//i.test(path)) {
+    return path
   }
-  
-  if (!avatarUrl) {
-    return '/default-avatar.png' // 預設頭像
+
+  path = path.replace(/^https?:\/\/[^/]+/i, '')
+  path = path.replace(/^\/+/, '')
+  path = path.replace(/(^|\/)backend\//g, '$1')
+
+  if (path.startsWith('uploads/')) {
+    return path
   }
-  
-  // 使用與 MessageContentRenderer 相同的圖片處理邏輯
-  return getImageUrl(avatarUrl)
+
+  const match = path.match(/uploads\/(.+)$/)
+  if (match) {
+    return `uploads/${match[1]}`
+  }
+
+  return path || null
 }
 
-const getImageUrl = (imagePath?: string) => {
-  if (!imagePath) return ''
-  
-  // 如果是完整 URL，直接返回
-  if (imagePath.startsWith('http')) {
-    return imagePath
+const resolvedAvatarUrl = computed(() => {
+  let raw = ''
+  const userId = props.message.from_user_id ? Number(props.message.from_user_id) : undefined
+  if (userId && props.users[userId]) {
+    raw = props.users[userId].avatar_url || ''
+  } else {
+    raw = props.message.user_avatar || ''
   }
-  
-  // 修復常見的拼寫錯誤：backend/ploads/ -> backend/uploads/
-  if (imagePath.startsWith('backend/ploads/')) {
-    imagePath = imagePath.replace('backend/ploads/', 'backend/uploads/')
+
+  const normalized = normalizeAvatarPath(raw)
+  if (!normalized) return null
+
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized
   }
-  
-  // 統一處理 uploads/ 路徑
-  if (imagePath.startsWith('uploads/')) {
-    // 確保路徑以 / 開頭，這樣 Vite 代理才能正確處理
-    return `/${imagePath}`
+
+  return getImageUrl(normalized)
+})
+
+const showFallbackAvatar = computed(() => {
+  return avatarError.value || !resolvedAvatarUrl.value
+})
+
+const handleAvatarError = () => {
+  avatarError.value = true
+}
+
+const avatarColors = [
+  '#1E40AF', '#9333EA', '#059669', '#DC2626', '#2563EB',
+  '#F59E0B', '#10B981', '#EC4899', '#0EA5E9', '#F97316'
+]
+
+const getAvatarColor = () => {
+  const name = getUserName()
+  const base = name && name.trim() ? name.trim().toLowerCase() : 'user'
+  let hash = 0
+  for (let i = 0; i < base.length; i += 1) {
+    hash = (hash << 5) - hash + base.charCodeAt(i)
+    hash |= 0
   }
-  
-  // 處理舊格式：/backend/uploads/
-  if (imagePath.startsWith('/backend/uploads/')) {
-    return imagePath.replace('/backend', '')
-  }
-  
-  // 處理舊格式：backend/uploads/
-  if (imagePath.startsWith('backend/uploads/')) {
-    return `/${imagePath}`
-  }
-  
-  // 其他情況，假設是相對路徑
-  return imagePath
+  const index = Math.abs(hash) % avatarColors.length
+  return avatarColors[index]
 }
 
 const formatDateTime = (dateTimeStr: string) => {

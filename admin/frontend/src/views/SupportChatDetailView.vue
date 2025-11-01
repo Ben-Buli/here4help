@@ -1,6 +1,7 @@
 <template>
-  <div class="space-y-6">
-    <div class="md:flex md:items-center md:justify-between">
+  <div class="flex flex-col min-h-screen lg:h-full lg:min-h-0">
+    <!-- 頁面標題區域 - 固定高度 -->
+    <div class="flex-shrink-0 md:flex md:items-center md:justify-between p-6 border-b border-gray-200">
       <div class="flex-1 min-w-0">
         <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
           Support Chat Detail
@@ -23,94 +24,100 @@
       </div>
     </div>
 
-    <div v-if="isLoading" class="flex justify-center py-8">
+    <!-- Loading State -->
+    <div v-if="isLoading" class="flex-1 flex justify-center items-center">
       <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
     </div>
 
-    <div v-else-if="!chatRoom" class="text-center py-8 text-gray-500">
+    <!-- Not Found State -->
+    <div v-else-if="!chatRoom" class="flex-1 flex justify-center items-center text-gray-500">
       Chat room not found
     </div>
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- 聊天室資訊 -->
-      <div class="lg:col-span-1">
-        <div class="admin-card">
-          <h3 class="text-lg font-medium text-gray-900 mb-4">Chat Room Info</h3>
-          
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Room ID</label>
-              <p class="mt-1 text-sm text-gray-900">{{ chatRoom.room_id }}</p>
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Status</label>
-              <span 
-                class="inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1" 
-                :class="getStatusClass(chatRoom.status)"
-              >
-                {{ getStatusDisplay(chatRoom.status) }}
-              </span>
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Customer</label>
-              <div class="mt-1 space-y-1">
-                <div class="flex items-center space-x-2">
-                  <span class="text-xs text-gray-500">ID:</span>
-                  <span class="text-sm font-medium text-gray-900">{{ chatRoom.user_id || '-' }}</span>
-                </div>
-                <div class="flex items-center space-x-2">
-                  <span class="text-xs text-gray-500">Name:</span>
-                  <span class="text-sm font-medium text-gray-900">{{ chatRoom.user_name || '-' }}</span>
-                </div>
-                <div class="flex items-center space-x-2">
-                  <span class="text-xs text-gray-500">Nickname:</span>
-                  <span class="text-sm font-medium text-gray-900">{{ chatRoom.user_nickname || '-' }}</span>
-                </div>
-                <div class="flex items-center space-x-2">
-                  <span class="text-xs text-gray-500">Email:</span>
-                  <span class="text-sm text-gray-500">{{ chatRoom.user_email || 'N/A' }}</span>
+    <!-- 主要內容區域 - 佔用剩餘高度 -->
+    <div v-else class="flex-1 flex flex-col lg:flex-row gap-6 p-6 min-h-0 overflow-y-auto lg:overflow-hidden">
+      <!-- 聊天室資訊 - 固定寬度，填滿高度 -->
+      <div class="flex-shrink-0 w-full lg:w-80 xl:w-96">
+        <div class="admin-card flex flex-col lg:h-full lg:min-h-0 overflow-hidden">
+          <h3 class="text-lg font-medium text-gray-900 mb-4 flex-shrink-0">Chat Room Info</h3>
+          <div class="flex-1 overflow-y-auto min-h-0 pr-1">
+            <div class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Room ID</label>
+                <p class="mt-1 text-sm text-gray-900">{{ chatRoom.room_id }}</p>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Status</label>
+                <span 
+                  class="inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1" 
+                  :class="getStatusClass(chatRoom.status)"
+                >
+                  {{ getStatusDisplay(chatRoom.status) }}
+                </span>
+              </div>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Customer</label>
+                <div class="mt-1 space-y-1">
+                  <div class="flex items-center space-x-2">
+                    <span class="text-xs text-gray-500">ID:</span>
+                    <span class="text-sm font-medium text-gray-900">{{ chatRoom.user_id || '-' }}</span>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <span class="text-xs text-gray-500">Name:</span>
+                    <span class="text-sm font-medium text-gray-900">{{ chatRoom.user_name || '-' }}</span>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <span class="text-xs text-gray-500">Nickname:</span>
+                    <span class="text-sm font-medium text-gray-900">{{ chatRoom.user_nickname || '-' }}</span>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                    <span class="text-xs text-gray-500">Email:</span>
+                    <span class="text-sm text-gray-500">{{ chatRoom.user_email || 'N/A' }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Created</label>
-              <p class="mt-1 text-sm text-gray-900">{{ formatDateTime(chatRoom.created_at) }}</p>
-            </div>
-            
-            <div v-if="chatRoom.last_message_time">
-              <label class="block text-sm font-medium text-gray-700">Last Activity</label>
-              <p class="mt-1 text-sm text-gray-900">{{ formatDateTime(chatRoom.last_message_time) }}</p>
+              
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Created</label>
+                <p class="mt-1 text-sm text-gray-900">{{ formatDateTime(chatRoom.created_at) }}</p>
+              </div>
+              
+              <div v-if="chatRoom.last_message_time">
+                <label class="block text-sm font-medium text-gray-700">Last Activity</label>
+                <p class="mt-1 text-sm text-gray-900">{{ formatDateTime(chatRoom.last_message_time) }}</p>
+              </div>
             </div>
           </div>
-          
+
           <!-- 操作按鈕 -->
-          <div class="mt-6 space-y-3">
+          <div class="mt-6 space-y-3 flex-shrink-0">
             <!-- Mark as Resolved 按鈕已隱藏 - 管理員目前沒有此權限 -->
           </div>
         </div>
       </div>
 
-      <!-- 聊天訊息區域 -->
-      <div class="lg:col-span-2">
-        <div class="admin-card">
-          <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-medium text-gray-900">Chat Messages</h3>
-          <!-- Socket 連接狀態指示器 -->
-          <div class="flex items-center space-x-2">
-            <div 
-              class="w-2 h-2 rounded-full"
-              :class="isSocketConnected ? 'bg-green-500' : 'bg-red-500'"
-            ></div>
-            <span class="text-xs text-gray-500">
-              {{ isSocketConnected ? 'Connected' : 'Disconnected' }}
-            </span>
+      <!-- 聊天訊息區域 - 佔用剩餘寬度，填滿高度 -->
+      <div class="flex-1 min-w-0">
+        <div class="admin-card flex flex-col lg:h-full lg:min-h-0 overflow-hidden">
+          <!-- 標題區域 - 固定在頂部 -->
+          <div class="flex items-center justify-between mb-4 flex-shrink-0">
+            <h3 class="text-lg font-medium text-gray-900">Chat Messages</h3>
+            <!-- Socket 連接狀態指示器 -->
+            <div class="flex items-center space-x-2">
+              <div 
+                class="w-2 h-2 rounded-full"
+                :class="isSocketConnected ? 'bg-green-500' : 'bg-red-500'"
+              ></div>
+              <span class="text-xs text-gray-500">
+                {{ isSocketConnected ? 'Connected' : 'Disconnected' }}
+              </span>
+            </div>
           </div>
-        </div>
           
-          <div class="space-y-4 max-h-96 overflow-y-auto messages-container">
+          <!-- 訊息區域 - 可滾動，佔用剩餘高度 -->
+          <div class="flex-1 min-h-0 overflow-y-auto messages-container space-y-4 pr-1 sm:pr-2">
             <div v-if="messages.length === 0" class="text-center py-8 text-gray-500">
               No messages yet
             </div>
@@ -200,8 +207,8 @@
             </div>
           </div>
           
-          <!-- 發送訊息區域 -->
-          <div class="mt-6 border-t pt-4">
+          <!-- 發送訊息區域 - 固定在底部 -->
+          <div class="mt-6 border-t pt-4 flex-shrink-0">
             <!-- 已解決狀態提示 -->
             <div v-if="chatRoom?.status === 'resolved'" class="mb-4 p-3 bg-gray-100 rounded-lg">
               <div class="flex items-center">

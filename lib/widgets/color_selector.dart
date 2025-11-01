@@ -146,6 +146,8 @@ class ColorSelector extends StatelessWidget {
       shortName = 'Blue Grey';
     } else if (baseName.contains('Meta Business Style')) {
       shortName = 'Meta';
+    } else if (baseName.contains('H4H')) {
+      shortName = 'H4H';
     } else if (baseName.contains('Rainbow')) {
       shortName = 'Rainbow';
     } else if (baseName.contains('Main Style')) {

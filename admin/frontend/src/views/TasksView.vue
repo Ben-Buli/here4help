@@ -46,7 +46,7 @@
             v-model="filters.search"
             type="text"
             placeholder="Task title, creator, participant..."
-            class="admin-input"
+            class="admin-input px-2"
             @input="debouncedSearch"
           />
         </div>
@@ -54,7 +54,7 @@
         <!-- 狀態篩選 -->
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select v-model="filters.status_id" @change="() => loadTasks()" class="admin-input">
+          <select v-model="filters.status_id" @change="() => loadTasks()" class="admin-input px-2">
             <option value="">All Status</option>
             <option v-for="status in taskStatuses" :key="status.id" :value="status.id">
               {{ status.display_name }}
@@ -69,7 +69,7 @@
             v-model="filters.creator_id"
             type="number"
             placeholder="Creator ID"
-            class="admin-input"
+            class="admin-input px-2"
             @input="() => loadTasks()"
           />
         </div>
@@ -81,25 +81,21 @@
             v-model="filters.participant_id"
             type="number"
             placeholder="Participant ID"
-            class="admin-input"
+            class="admin-input px-2"
             @input="() => loadTasks()"
           />
         </div>
 
-        <!-- 排序 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
-          <select v-model="filters.sort_by" @change="() => loadTasks()" class="admin-input">
-            <option value="created_at">Created Date</option>
-            <option value="updated_at">Updated Date</option>
-            <option value="title">Title</option>
-            <option value="reward">Reward</option>
-            <option value="deadline">Deadline</option>
-          </select>
-        </div>
+        <!-- 排序：改為點擊表頭控制，這裡預留佔位 -->
+        <!-- <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Sort</label>
+          <div class="text-sm text-gray-500 bg-gray-50 border rounded px-3 py-2">
+            Click table headers to sort
+          </div>
+        </div> -->
       </div>
 
-      <!-- 日期範圍與排序方向 -->
+      <!-- 日期範圍 -->
       <div class="mt-4 flex items-center justify-between">
         <div class="flex items-center space-x-4">
           <div>
@@ -107,7 +103,7 @@
             <input
               v-model="filters.date_from"
               type="date"
-              class="admin-input"
+              class="admin-input px-2"
               @change="() => loadTasks()"
             />
           </div>
@@ -116,33 +112,15 @@
             <input
               v-model="filters.date_to"
               type="date"
-              class="admin-input"
+              class="admin-input px-2"
               @change="() => loadTasks()"
             />
           </div>
         </div>
-        <div class="flex items-center space-x-4">
-          <label class="flex items-center">
-            <input
-              v-model="filters.sort_order"
-              type="radio"
-              value="desc"
-              @change="() => loadTasks()"
-              class="mr-2"
-            />
-            Newest First
-          </label>
-          <label class="flex items-center">
-            <input
-              v-model="filters.sort_order"
-              type="radio"
-              value="asc"
-              @change="() => loadTasks()"
-              class="mr-2"
-            />
-            Oldest First
-          </label>
-        </div>
+        <!-- <div class="flex items-center space-x-4 text-sm text-gray-500">
+          <span>Current sort:</span>
+          <span class="font-mono">{{ filters.sort_by || 'created_at' }} {{ filters.sort_order.toUpperCase() }}</span>
+        </div> -->
       </div>
     </div>
 
@@ -188,13 +166,43 @@
         <table class="admin-table">
           <thead>
             <tr>
-              <th>Task</th>
+              <th
+                class="cursor-pointer select-none"
+                @click="sortBy('title')"
+              >
+                Task
+                <span v-if="filters.sort_by === 'title'" class="ml-1 text-gray-400">{{ sortArrow }}</span>
+              </th>
               <th>Creator</th>
               <th>Participant</th>
-              <th>Status</th>
-              <th>Reward</th>
-              <th>Deadline</th>
-              <th>Created</th>
+              <th
+                class="cursor-pointer select-none"
+                @click="sortBy('status')"
+              >
+                Status
+                <span v-if="filters.sort_by === 'status'" class="ml-1 text-gray-400">{{ sortArrow }}</span>
+              </th>
+              <th
+                class="cursor-pointer select-none"
+                @click="sortBy('reward')"
+              >
+                Reward
+                <span v-if="filters.sort_by === 'reward'" class="ml-1 text-gray-400">{{ sortArrow }}</span>
+              </th>
+              <th
+                class="cursor-pointer select-none"
+                @click="sortBy('deadline')"
+              >
+                Deadline
+                <span v-if="filters.sort_by === 'deadline'" class="ml-1 text-gray-400">{{ sortArrow }}</span>
+              </th>
+              <th
+                class="cursor-pointer select-none"
+                @click="sortBy('created_at')"
+              >
+                Created
+                <span v-if="!filters.sort_by || filters.sort_by === 'created_at'" class="ml-1 text-gray-400">{{ sortArrow }}</span>
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">
@@ -283,7 +291,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { taskApi } from '@/services/api'
@@ -383,6 +391,20 @@ const changePage = (page: number) => {
     loadTasks(nextPage)
   }
 }
+
+// Sorting via table header
+const sortBy = (field: 'created_at' | 'updated_at' | 'title' | 'reward' | 'deadline' | 'status') => {
+  // Toggle if same field, otherwise set to desc by default
+  if (filters.sort_by === field) {
+    filters.sort_order = filters.sort_order === 'asc' ? 'desc' : 'asc'
+  } else {
+    filters.sort_by = field
+    filters.sort_order = 'desc'
+  }
+  loadTasks(pagination.value.current_page)
+}
+
+const sortArrow = computed(() => (filters.sort_order === 'asc' ? '▲' : '▼'))
 
 const viewTask = (taskId: string | number) => {
   router.push(`/tasks/${taskId}`)

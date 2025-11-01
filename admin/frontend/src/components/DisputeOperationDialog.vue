@@ -89,7 +89,7 @@
                     <div class="ml-3 text-sm">
                       <div class="font-medium text-gray-700">Mark Task as Completed</div>
                       <p class="text-gray-500">
-                        Award points to participant, deduct fees from creator, and mark task as completed.
+                        Award points to  tasker, deduct fees from creator, and mark task as completed.
                       </p>
                     </div>
                   </label>
@@ -123,7 +123,7 @@
                     <div class="ml-3 text-sm">
                       <div class="font-medium text-gray-700">Reset Task</div>
                       <p class="text-gray-500">
-                        Reset task to open status, remove current participant, and allow new applications.
+                        Reset task to open status, remove current tasker, and allow new applications.
                       </p>
                     </div>
                   </label>

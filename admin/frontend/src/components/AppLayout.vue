@@ -208,7 +208,7 @@
 
           <div class="flex items-center space-x-4">
             <!-- 通知按鈕 -->
-            <button
+            <!-- <button
               class="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
             >
               <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -219,7 +219,7 @@
                   d="M15 17h5l-5 5v-5zM11 17H6l5 5v-5z"
                 />
               </svg>
-            </button>
+            </button> -->
 
             <!-- 用戶選單 -->
             <div class="relative user-menu-container">
@@ -273,12 +273,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 // 桌面版預設開啟側邊欄，手機版預設關閉
@@ -335,12 +336,37 @@ const navigation: NavigationItem[] = [
 ]
 
 const toggleSubmenu = (menuName: string) => {
-  const index = openSubmenus.value.indexOf(menuName)
-  if (index > -1) {
-    openSubmenus.value.splice(index, 1)
+  const isCurrentlyOpen = openSubmenus.value.includes(menuName)
+  
+  // 如果點擊的是已經展開的選單，則收合它
+  if (isCurrentlyOpen) {
+    openSubmenus.value = []
   } else {
-    openSubmenus.value.push(menuName)
+    // 否則關閉所有其他選單，只展開當前選單
+    openSubmenus.value = [menuName]
   }
+}
+
+// 根據當前路由自動展開對應的父選單
+const autoExpandSubmenu = () => {
+  const currentPath = route.path
+  
+  // 查找當前路由對應的父選單
+  for (const item of navigation) {
+    if (item.children) {
+      const hasActiveChild = item.children.some(child => 
+        currentPath === child.href || currentPath.startsWith(child.href + '/')
+      )
+      
+      if (hasActiveChild) {
+        openSubmenus.value = [item.name]
+        return
+      }
+    }
+  }
+  
+  // 如果沒有找到匹配的子選單，則收合所有選單
+  openSubmenus.value = []
 }
 
 const handleLogout = async () => {
@@ -377,6 +403,13 @@ const handleClickOutside = (event: Event) => {
 onMounted(() => {
   window.addEventListener('resize', handleResize)
   document.addEventListener('click', handleClickOutside)
+  // 初始化時根據當前路由自動展開對應的選單
+  autoExpandSubmenu()
+})
+
+// 監聽路由變化，自動展開對應的選單
+watch(() => route.path, () => {
+  autoExpandSubmenu()
 })
 
 onUnmounted(() => {

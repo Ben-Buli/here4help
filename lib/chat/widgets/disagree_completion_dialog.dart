@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:here4help/services/theme_config_manager.dart';
 
 /// 駁回完成理由輸入 Dialog
 class DisagreeCompletionDialog extends StatefulWidget {
@@ -30,7 +32,18 @@ class _DisagreeCompletionDialogState extends State<DisagreeCompletionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final themeManager = context.watch<ThemeConfigManager>();
+    final dialogBackground =
+        theme.dialogTheme.backgroundColor ?? themeManager.dialogBackgroundColor;
+    final primaryColor = themeManager.dialogPrimaryColor;
+    final subduedColor = themeManager.dialogContentColor.withOpacity(0.7);
+
     return AlertDialog(
+      backgroundColor: dialogBackground,
+      shape: theme.dialogTheme.shape,
+      titleTextStyle: theme.dialogTheme.titleTextStyle,
+      contentTextStyle: theme.dialogTheme.contentTextStyle,
       title: const Text('Disagree Completion'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -43,9 +56,12 @@ class _DisagreeCompletionDialogState extends State<DisagreeCompletionDialog> {
                 ),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Please provide a reason for disagreeing with the completion:',
-            style: TextStyle(fontSize: 14),
+            style: TextStyle(
+              fontSize: 14,
+              color: themeManager.dialogTitleColor,
+            ),
           ),
           const SizedBox(height: 8),
           TextField(
@@ -62,7 +78,7 @@ class _DisagreeCompletionDialogState extends State<DisagreeCompletionDialog> {
           Text(
             '${_reasonController.text.length}/300',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[600],
+                  color: subduedColor,
                 ),
           ),
         ],
@@ -70,12 +86,13 @@ class _DisagreeCompletionDialogState extends State<DisagreeCompletionDialog> {
       actions: [
         TextButton(
           onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(foregroundColor: primaryColor),
           child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: _isSubmitting ? null : _handleSubmit,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red,
+            backgroundColor: theme.colorScheme.error,
             foregroundColor: Colors.white,
           ),
           child: _isSubmitting
@@ -95,12 +112,13 @@ class _DisagreeCompletionDialogState extends State<DisagreeCompletionDialog> {
 
   Future<void> _handleSubmit() async {
     final reason = _reasonController.text.trim();
+    final theme = Theme.of(context);
 
     if (reason.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please provide a reason for disagreeing.'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('Please provide a reason for disagreeing.'),
+          backgroundColor: theme.colorScheme.error,
         ),
       );
       return;
@@ -120,7 +138,7 @@ class _DisagreeCompletionDialogState extends State<DisagreeCompletionDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to submit disagree: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: theme.colorScheme.error,
           ),
         );
       }

@@ -28,7 +28,7 @@
               id="status-filter"
               v-model="filters.status"
               @change="applyFilters"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm cursor-pointer px-2 px-2"
             >
               <option value="">All Statuses</option>
               <option value="submitted">Submitted</option>
@@ -45,7 +45,7 @@
               v-model="filters.dateFrom"
               type="date"
               @change="applyFilters"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm cursor-pointer px-2 px-2"
             />
           </div>
 
@@ -56,37 +56,33 @@
               v-model="filters.dateTo"
               type="date"
               @change="applyFilters"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm cursor-pointer px-2 px-2"
             />
           </div>
 
-          <!-- 排序 -->
-          <div>
-            <label for="sort-by" class="block text-sm font-medium text-gray-700">Sort By</label>
-            <select
-              id="sort-by"
-              v-model="filters.sortBy"
-              @change="applyFilters"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            >
-              <option value="created_at">Created Date</option>
-              <option value="updated_at">Updated Date</option>
-              <option value="status">Status</option>
-            </select>
-          </div>
+          <!-- 排序（改為表頭點擊控制） -->
+          <!-- <div>
+            <label class="block text-sm font-medium text-gray-700">Sort</label>
+            <div class="mt-1 w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+              Click table headers to sort
+            </div>
+          </div> -->
         </div>
 
-        <div class="mt-4 flex justify-end space-x-3">
+        <div class="mt-4 flex justify-between items-center space-x-3">
+          <!-- <div class="text-sm text-gray-500">
+            Current sort: <span class="font-mono">{{ filters.sortBy }} {{ filters.sortOrder.toUpperCase() }}</span>
+          </div> -->
           <button
             @click="resetFilters"
-            class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer"
           >
             Reset
           </button>
           <button
             @click="refreshData"
             :disabled="loading"
-            class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 cursor-pointer"
           >
             <Icon v-if="loading" name="loading" class="animate-spin -ml-1 mr-2 h-4 w-4" />
             Refresh
@@ -124,28 +120,47 @@
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th
+                scope="col"
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                @click="sortBy('title')"
+              >
                 Dispute Task
+                <span v-if="filters.sortBy === 'title'" class="ml-1 text-gray-400">{{ sortArrow }}</span>
               </th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th
+                scope="col"
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                @click="sortBy('reward_point')"
+              >
                 Reward Point
+                <span v-if="filters.sortBy === 'reward_point'" class="ml-1 text-gray-400">{{ sortArrow }}</span>
               </th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Applied User
               </th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th
+                scope="col"
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                @click="sortBy('status')"
+              >
                 Status
+                <span v-if="filters.sortBy === 'status'" class="ml-1 text-gray-400">{{ sortArrow }}</span>
               </th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th
+                scope="col"
+                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none"
+                @click="sortBy('created_at')"
+              >
                 Created
+                <span v-if="!filters.sortBy || filters.sortBy === 'created_at'" class="ml-1 text-gray-400">{{ sortArrow }}</span>
               </th>
-            
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-for="dispute in disputes" :key="dispute.id" class="hover:bg-gray-50 cursor-pointer" @click="viewChatRoom(dispute)">
               <!-- Dispute Info -->
-              <td class="px-6 py-4 whitespace-nowrap">
+              <td class="px-6 py-4 whitespace-nowrap" title="Click to view dispute details">
                 <div class="flex items-center">
                   <div>
                     <div class="text-sm font-medium text-gray-900">
@@ -305,13 +320,6 @@
       @close="closeDetailDialog"
       @openOperation="handleOpenOperation"
     />
-
-    <!-- Dispute Chat Room Modal -->
-    <DisputeChatRoomModal
-      :show="showChatRoomModal"
-      :dispute-id="selectedDisputeId"
-      @close="closeChatRoomModal"
-    />
   </div>
 </template>
 
@@ -322,7 +330,6 @@ import { disputeApi } from '@/services/api'
 import Icon from '@/components/Icon.vue'
 import DisputeOperationDialog from '@/components/DisputeOperationDialog.vue'
 import DisputeDetailDialog from '@/components/DisputeDetailDialog.vue'
-import DisputeChatRoomModal from '@/components/DisputeChatRoomModal.vue'
 
 interface Dispute {
   id: number
@@ -396,9 +403,7 @@ const filters = reactive({
 // Dialog states
 const showReviewDialog = ref(false)
 const showDetailDialog = ref(false)
-const showChatRoomModal = ref(false)
 const selectedDispute = ref<Dispute | null>(null)
-const selectedDisputeId = ref<number | null>(null)
 
 // Computed
 const resolutionRate = computed(() => {
@@ -500,6 +505,19 @@ const changePage = (page: number) => {
   }
 }
 
+// Sorting via table header
+const sortBy = (field: 'created_at' | 'updated_at' | 'title' | 'reward_point' | 'status') => {
+  if (filters.sortBy === field) {
+    filters.sortOrder = filters.sortOrder === 'asc' ? 'desc' : 'asc'
+  } else {
+    filters.sortBy = field
+    filters.sortOrder = 'desc'
+  }
+  fetchDisputes()
+}
+
+const sortArrow = computed(() => (filters.sortOrder === 'asc' ? '▲' : '▼'))
+
 const getStatusBadgeClass = (status: string) => {
   switch (status) {
     case 'submitted':
@@ -561,12 +579,6 @@ const openReviewDialog = (dispute: Dispute) => {
 const closeReviewDialog = () => {
   showReviewDialog.value = false
   selectedDispute.value = null
-}
-
-const closeChatRoomModal = () => {
-  showChatRoomModal.value = false
-  selectedDispute.value = null
-  selectedDisputeId.value = null
 }
 
 const handleDisputeResolved = () => {
