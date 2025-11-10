@@ -111,10 +111,15 @@ try {
     }
     
     // 檢查是否有活躍的聊天室
+    // 注意：chat_rooms 表沒有 status 欄位，是透過任務狀態檢查聊天室活躍度
     $activeChatStmt = $pdo->prepare("
         SELECT COUNT(*) as count FROM chat_rooms cr
         WHERE (cr.creator_id = ? OR cr.participant_id = ?)
-        AND cr.status = 'active'
+        AND EXISTS (
+            SELECT 1 FROM tasks t
+            WHERE t.id = cr.task_id
+            AND t.status_id NOT IN (1,2,3,4) -- 1: open, 2: in_progress, 3: pending_confirmation, 4: dispute
+        ) -- 如果該聊天室對應的任務status_id 尚未完成，則該聊天室為活躍的聊天室
     ");
     $activeChatStmt->execute([$userId, $userId]);
     $activeChatCount = $activeChatStmt->fetch(PDO::FETCH_ASSOC)['count'];

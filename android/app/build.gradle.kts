@@ -55,4 +55,6 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:20.7.0")
     // Google Credentials API for smart_auth plugin
     implementation("com.google.android.gms:play-services-identity:18.0.1")
+    // Facebook SDK dependency
+    implementation("com.facebook.android:facebook-login:latest.release")
 }

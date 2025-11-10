@@ -76,11 +76,11 @@ class PermissionGuard {
         return const SizedBox.shrink();
       }
 
-      // 權限  -1, -3 訪問需要認證的頁面時，重定向到權限拒絕頁面
+      // 權限 -1, -3 訪問需要認證的頁面時，重定向到權限未驗證頁面（與 permission = 0 相同處理）
       if (permissionSuspended.contains(userPermission)) {
-        // 重定向到權限拒絕頁面，並傳遞被阻擋的路徑和上一頁路徑
+        debugPrint('🚫 權限拒絕重定向: 帳號權限：($userPermission)停權');
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _redirectToPermissionDenied(context, path);
+          context.go('/permission-unverified?blocked=$path&from=$path');
         });
         return const SizedBox.shrink();
       }

@@ -33,6 +33,9 @@ class AppConfig {
   static String get registerWithStudentIdUrl =>
       api('/auth/register-with-student-id.php');
 
+  static String get registerOAuthWithStudentIdUrl =>
+      api('/auth/register-oauth-with-student-id.php');
+
   static String get profileUrl => api('/account/profile.php');
 
   // 任務相關 API
@@ -111,6 +114,9 @@ class AppConfig {
 
   static String get supportClaimUrl => api(
       '/admin/support/issues/{id}/accept'); // 已整合到 Laravel SupportController
+
+  // 靜態內容
+  static String get pointPolicyUrl => api('/content/point_policy.php');
 
   // 大學列表 API
   static String get universitiesListUrl => api('/universities/list.php');

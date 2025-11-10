@@ -99,6 +99,38 @@ build_ios_app() {
   echo ""
 }
 
+# 檢查 Code Signing 證書（Release 模式）
+check_code_signing() {
+  if [ "$MODE" = "release" ]; then
+    echo "🔐 檢查 Code Signing 設定..."
+    
+    # 檢查是否有 Distribution 證書
+    local team_id="Q4C6BSB74K"
+    local certs=$(security find-identity -v -p codesigning 2>/dev/null | grep -i "distribution" | grep "$team_id" || true)
+    
+    if [ -z "$certs" ]; then
+      echo "⚠️  警告：找不到 Team ID $team_id 的 iOS Distribution 證書"
+      echo ""
+      echo "請確認："
+      echo "1. 已在 Apple Developer Portal 同意最新的 Program License Agreement"
+      echo "2. 已在 Xcode 中設定 Signing & Capabilities"
+      echo "3. 已選擇正確的 Team 和 Bundle Identifier"
+      echo ""
+      echo "查看所有證書："
+      echo "  security find-identity -v -p codesigning"
+      echo ""
+      read -p "是否繼續建置？(y/N) " -n 1 -r
+      echo
+      if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "❌ 建置已取消"
+        exit 1
+      fi
+    else
+      echo "✅ 找到 Distribution 證書"
+    fi
+  fi
+}
+
 # 準備 iOS 環境
 prepare_ios_environment() {
   echo "📱 準備 iOS 環境..."
@@ -126,6 +158,11 @@ flutter pub get
 prepare_ios_environment
 
 # ==============================
+# Code Signing 檢查（Release 模式）
+# ==============================
+check_code_signing
+
+# ==============================
 # 建置 iOS (依參數選擇)
 # ==============================
 case "$MODE" in
@@ -149,18 +186,23 @@ case "$MODE" in
     ;;
 esac
 
-echo "📋 部署步驟："
+echo "📋 Archive 部署步驟："
 echo "1. 使用 Xcode 開啟 ios/Runner.xcworkspace"
-echo "2. 選擇正確的 Team 和 Bundle Identifier"
-echo "3. 設定 Code Signing"
-echo "4. 選擇目標設備或模擬器"
-echo "5. 點擊 Run 或 Archive 進行部署"
+echo "2. 確認 Signing & Capabilities 設定："
+echo "   - 勾選 'Automatically manage signing'"
+echo "   - 選擇正確的 Team (Q4C6BSB74K)"
+echo "   - 確認 Bundle Identifier (com.example.here4help)"
+echo "3. 選擇 'Any iOS Device' 或 'Generic iOS Device'"
+echo "4. Product → Archive"
 echo ""
-echo "🔧 注意事項："
-echo "- 確保已安裝 Xcode 和 iOS 開發工具"
-echo "- 需要有效的 Apple Developer 帳號"
-echo "- 檢查 ios/Runner/Info.plist 中的權限設定"
-echo "- 確認 GoogleService-Info.plist 已正確配置"
+echo "🔧 如果 Archive 失敗，請檢查："
+echo "- 已在 Apple Developer Portal 同意最新的 PLA"
+echo "- 有有效的 iOS Distribution 證書"
+echo "- Xcode 中已登入正確的 Apple ID"
+echo "- 查看詳細錯誤訊息：docs/IOS_ARCHIVE_TROUBLESHOOTING.md"
+echo ""
+echo "🔐 Code Signing 檢查："
+echo "  security find-identity -v -p codesigning"
 echo ""
 echo "📝 用法說明："
 echo "  ./build_ios.sh debug     # 僅建置 Debug (使用 .env.development)"

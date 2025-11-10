@@ -428,6 +428,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
+@import "tailwindcss";
+
 .admin-card {
   @apply bg-white shadow rounded-lg p-6;
 }

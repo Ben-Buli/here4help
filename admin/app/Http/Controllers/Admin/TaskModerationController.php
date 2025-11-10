@@ -1,0 +1,194 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+
+class TaskModerationController extends Controller
+{
+    /**
+     * 管理員直接操作任務狀態
+     */
+    public function moderate(Request $request, $taskId)
+    {
+        $validator = Validator::make($request->all(), [
+            'action' => 'required|in:cancel',
+            'reason' => 'required|string|min:10|max:1000'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $admin = $request->user();
+        $action = $request->input('action');
+        $reason = $request->input('reason');
+
+        $hasPendingReports = DB::table('task_reports')
+            ->where('task_id', $taskId)
+            ->where('status', 'pending')
+            ->exists();
+
+        if ($hasPendingReports) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Resolve pending reports before performing this action.'
+            ], 422);
+        }
+
+        return DB::transaction(function () use ($taskId, $action, $reason, $admin, $request) {
+            $task = DB::table('tasks as t')
+                ->leftJoin('task_statuses as ts', 't.status_id', '=', 'ts.id')
+                ->select('t.*', 'ts.code as status_code', 'ts.display_name as status_display')
+                ->lockForUpdate()
+                ->where('t.id', $taskId)
+                ->first();
+
+            if (!$task) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Task not found'
+                ], 404);
+            }
+
+            $statusCode = $task->status_code ?? null;
+            $allowedStatuses = ['open', 'in_progress', 'pending_confirmation'];
+            if (!$statusCode) {
+                // Fallback：使用 status_id 判斷
+                $allowedIds = [1, 2, 3];
+                if (!in_array((int) $task->status_id, $allowedIds, true)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Task status does not allow moderation.'
+                    ], 422);
+                }
+            } elseif (!in_array($statusCode, $allowedStatuses, true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Task status does not allow moderation.'
+                ], 422);
+            }
+
+            // 再次確認是否有 pending report（避免競態）
+            $hasPendingReports = DB::table('task_reports')
+                ->where('task_id', $taskId)
+                ->where('status', 'pending')
+                ->lockForUpdate()
+                ->exists();
+
+            if ($hasPendingReports) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Resolve pending reports before performing this action.'
+                ], 422);
+            }
+
+            $statusMap = DB::table('task_statuses')->pluck('id', 'code');
+            $cancelStatusId = $statusMap['cancelled'] ?? 8;
+            $oldStatusCode = $task->status_code ?? 'unknown';
+            $oldParticipant = $task->participant_id;
+
+            switch ($action) {
+                case 'cancel':
+                    DB::table('tasks')
+                        ->where('id', $task->id)
+                        ->update([
+                            'status_id' => $cancelStatusId,
+                            'participant_id' => null,
+                            'updated_at' => now()
+                        ]);
+
+                    $systemMessage = "This task was found to violate platform policies and has been cancelled by an administrator.";
+                    if (!empty($oldParticipant)) {
+                        $room = DB::table('chat_rooms')
+                            ->select('id')
+                            ->where('task_id', $task->id)
+                            ->orderByDesc('id')
+                            ->first();
+
+                        if ($room) {
+                            DB::table('chat_messages')->insert([
+                                'room_id' => $room->id,
+                                'from_user_id' => $task->creator_id,
+                                'content' => $systemMessage,
+                                'kind' => 'system',
+                                'created_at' => now()
+                            ]);
+                        }
+                    }
+
+                    $eventTitle = 'Admin Task Moderation';
+                    $eventDescription = 'After review, this task was found to be non-compliant with platform policies.';
+
+                    DB::table('task_dispute_events')->insert([
+                        'task_id' => $task->id,
+                        'task_dispute_chat_room_id' => null,
+                        'user_id' => null,
+                        'title' => $eventTitle,
+                        'description' => $eventDescription,
+                        'status' => 'resolved',
+                        'decision_result' => 'admin_task_cancelled',
+                        'decision_note' => $reason,
+                        'admin_id' => $admin->id,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+
+                    DB::table('task_logs')->insert([
+                        'task_id' => $task->id,
+                        'user_id' => null,
+                        'action' => 'admin_task_cancel',
+                        'old_status' => $oldStatusCode,
+                        'new_status' => 'cancelled',
+                        'notes' => "Admin #{$admin->id} cancelled task directly. {$reason}",
+                        'created_at' => now()
+                    ]);
+
+                    DB::table('admin_activity_logs')->insert([
+                        'admin_id' => $admin->id,
+                        'action' => 'moderate_task',
+                        'table_name' => 'tasks',
+                        'record_id' => $task->id,
+                        'old_data' => json_encode([
+                            'status_id' => $task->status_id,
+                            'status_code' => $oldStatusCode,
+                            'participant_id' => $oldParticipant
+                        ]),
+                        'new_data' => json_encode([
+                            'status_id' => $cancelStatusId,
+                            'status_code' => 'cancelled',
+                            'participant_id' => null,
+                            'action' => $action,
+                            'reason' => $reason
+                        ]),
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'created_at' => now()
+                    ]);
+
+                    break;
+                default:
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Unsupported action'
+                    ], 422);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Task updated successfully',
+                'data' => [
+                    'task_id' => (int) $task->id,
+                    'action' => $action
+                ]
+            ]);
+        });
+    }
+}

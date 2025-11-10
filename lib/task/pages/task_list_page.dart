@@ -1533,7 +1533,7 @@ class _TaskListPageState extends State<TaskListPage> {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'You can apply for tasks after account verification is completed.',
+                                      'Your account is under verification. Please wait for the admin approval before you can apply for tasks.',
                                       style: TextStyle(
                                         color: Colors.orange[700],
                                         fontSize: 13,

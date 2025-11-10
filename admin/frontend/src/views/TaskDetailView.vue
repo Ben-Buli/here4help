@@ -84,6 +84,21 @@
           </div>
         </div>
         <div class="mt-4 flex md:mt-0 md:ml-4 space-x-3">
+          <button
+            @click="handleOperationClick"
+            class="admin-button-primary"
+            :class="operationBlocked ? 'opacity-60 cursor-not-allowed' : ''"
+          >
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 6V4m0 16v-2m8-6h2M2 12H4m12.364-5.364l1.414-1.414m-11.314 0l1.414 1.414m0 11.314l-1.414 1.414m11.314 0l-1.414-1.414"
+              />
+            </svg>
+            Operations
+          </button>
           <button @click="refreshData" class="admin-button-secondary">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -99,7 +114,7 @@
       </div>
 
       <!-- Task Information Cards -->
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 mt-8">
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 mt-8">
         <!-- Basic Information -->
         <div class="admin-card">
           <h3 class="text-lg font-medium text-gray-900 mb-4">Task Information</h3>
@@ -197,6 +212,45 @@
         </div>
       </div>
 
+      <div class="admin-card">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-medium text-gray-900">Task Reports</h3>
+          <span
+            v-if="hasPendingReportsState"
+            class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700"
+          >
+            Pending
+          </span>
+        </div>
+        <div v-if="reportsLoading" class="text-sm text-gray-500">Loading reports...</div>
+        <div v-else-if="reportsError" class="text-sm text-red-600">{{ reportsError }}</div>
+        <div v-else-if="reports.length === 0" class="text-sm text-gray-500">No reports for this task.</div>
+        <div v-else class="space-y-3">
+          <div
+            v-for="report in reports"
+            :key="report.id"
+            class="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3"
+          >
+            <div>
+              <p class="text-sm font-semibold text-gray-900">
+                {{ formatReportReason(report.reason) }}
+              </p>
+              <p class="text-xs text-gray-500">
+                {{ formatDateTime(report.updated_at || report.created_at) }}
+                · Status:
+                <span class="font-medium text-gray-900">{{ formatReportStatus(report.status) }}</span>
+              </p>
+            </div>
+            <button
+              class="text-sm font-medium text-primary-600 hover:text-primary-500"
+              @click="openReportModal(report)"
+            >
+              View
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Task Applications -->
       <div v-if="applications && applications.length > 0" class="admin-card">
         <h3 class="text-lg font-medium text-gray-900 mb-4">Applications</h3>
@@ -227,11 +281,191 @@
       </div>
 
     </div>
+    <div
+      v-if="showReportModal && selectedReport"
+      class="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4 py-8"
+    >
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+        <div class="flex items-start justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">Report Detail</h3>
+            <p class="text-sm text-gray-500">
+              {{ formatReportReason(selectedReport.reason) }}
+            </p>
+          </div>
+          <button class="text-gray-400 hover:text-gray-600" @click="closeReportModal">
+            <span class="sr-only">Close</span>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="mt-4 space-y-3 text-sm text-gray-700">
+          <div>
+            <span class="font-medium">Reporter:</span>
+            {{ selectedReport.reporter_name || 'Unknown' }}
+            <span class="text-gray-500">(ID: {{ selectedReport.reporter_id || '-' }})</span>
+          </div>
+          <div>
+            <span class="font-medium">Task Owner:</span>
+            {{ task?.creator_name || 'Unknown' }}
+            <span class="text-gray-500">(ID: {{ task?.creator_id || '-' }})</span>
+          </div>
+          <div>
+            <span class="font-medium">Status:</span>
+            {{ formatReportStatus(selectedReport.status) }}
+          </div>
+          <div>
+            <span class="font-medium">Created:</span> {{ formatDateTime(selectedReport.created_at) }}
+          </div>
+          <div>
+            <span class="font-medium">Updated:</span> {{ formatDateTime(selectedReport.updated_at) }}
+          </div>
+          <div>
+            <span class="font-medium">Description:</span>
+            <p class="mt-1 whitespace-pre-wrap bg-gray-50 rounded-md p-3 text-gray-700">
+              {{ selectedReport.description || 'No description provided.' }}
+            </p>
+          </div>
+        </div>
+
+        <div v-if="isSelectedReportPending" class="mt-6 space-y-4">
+          <div>
+            <label class="text-sm font-medium text-gray-700">Decision</label>
+            <div class="mt-2 space-y-2">
+              <label class="flex items-center space-x-2 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  value="approve_remove"
+                  v-model="reportAction"
+                  class="text-primary-600 focus:ring-primary-500"
+                />
+                <span>Approve and remove this task</span>
+              </label>
+            </div>
+          </div>
+          <div>
+            <label class="text-sm font-medium text-gray-700">Admin Notes *</label>
+            <textarea
+              v-model="reportNotes"
+              rows="4"
+              class="admin-input mt-2 w-full"
+              placeholder="Explain your decision..."
+            ></textarea>
+          </div>
+          <p class="text-xs text-red-600">
+            This action is irreversible. Double check before submitting.
+          </p>
+        </div>
+        <div v-else class="mt-6 text-sm text-gray-500">This report has already been processed.</div>
+
+        <div class="mt-6 flex justify-end space-x-3">
+          <button class="admin-button-secondary" @click="closeReportModal">Close</button>
+          <button
+            v-if="isSelectedReportPending"
+            class="admin-button-primary"
+            :disabled="reportSubmitting"
+            @click="submitReportResolution"
+          >
+            <span v-if="reportSubmitting">Processing...</span>
+            <span v-else>Resolve</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="showOperationModal"
+      class="fixed inset-0 z-30 flex items-center justify-center bg-black/30 px-4 py-8"
+    >
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+        <div class="flex items-start justify-between">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-900">Task Operation</h3>
+            <p class="text-sm text-gray-500">Task ID: {{ task?.id }}</p>
+          </div>
+          <button class="text-gray-400 hover:text-gray-600" @click="closeOperationModal">
+            <span class="sr-only">Close</span>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="mt-4 space-y-4 text-sm text-gray-700">
+          <div>
+            <p class="font-medium text-gray-900">{{ task?.title }}</p>
+            <p class="text-gray-500">
+              Current status: {{ task?.status_display_name || task?.status_name }}
+            </p>
+            <p class="text-gray-500">
+              Participant:
+              <span v-if="task?.participant_id">
+                {{ task?.participant_name || 'Unknown' }} (ID: {{ task?.participant_id }})
+              </span>
+              <span v-else>None</span>
+            </p>
+          </div>
+
+          <div v-if="task?.application_questions?.length" class="space-y-2">
+            <p class="font-medium text-gray-900">Application Questions</p>
+            <ul class="list-disc list-inside text-gray-600 space-y-1">
+              <li v-for="question in task.application_questions" :key="question.id">
+                {{ question.application_question }}
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-gray-700">Action</label>
+            <div class="mt-2 space-y-2">
+              <label class="flex items-center space-x-2 text-sm text-gray-700">
+                <input
+                  type="radio"
+                  value="cancel"
+                  v-model="operationAction"
+                  class="text-primary-600 focus:ring-primary-500"
+                />
+                <div>
+                  <p class="font-medium text-gray-900">Cancel this task</p>
+                  <p class="text-xs text-gray-500">
+                    The assignment will be cancelled immediately and the participant (if any) will be removed.
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-gray-700">Reason *</label>
+            <textarea
+              v-model="operationReason"
+              rows="4"
+              class="admin-input mt-2 w-full"
+              placeholder="Explain why this task should be updated..."
+            ></textarea>
+          </div>
+
+          <p class="text-xs text-red-600">
+            This operation is irreversible. Double check before submitting.
+          </p>
+        </div>
+
+        <div class="mt-6 flex justify-end space-x-3">
+          <button class="admin-button-secondary" @click="closeOperationModal">Cancel</button>
+          <button class="admin-button-primary" :disabled="operationSubmitting" @click="submitOperation">
+            <span v-if="operationSubmitting">Processing...</span>
+            <span v-else>Confirm</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { taskApi } from '@/services/api'
 
@@ -243,6 +477,72 @@ const isLoading = ref(false)
 const error = ref('')
 const task = ref<any>(null)
 const applications = ref<any[]>([])
+
+const reports = ref<any[]>([])
+const reportsLoading = ref(false)
+const reportsError = ref('')
+const hasPendingReportsState = ref(false)
+const showReportModal = ref(false)
+const selectedReport = ref<any | null>(null)
+const reportAction = ref<'approve_remove'>('approve_remove')
+const reportNotes = ref('')
+const reportSubmitting = ref(false)
+
+const showOperationModal = ref(false)
+const operationAction = ref<'cancel'>('cancel')
+const operationReason = ref('')
+const operationSubmitting = ref(false)
+
+const taskHasDispute = computed(() => {
+  if (!task.value) return false
+  return task.value.status_code === 'dispute' || task.value.status_id === 4
+})
+
+const operationBlocked = computed(() => hasPendingReportsState.value || taskHasDispute.value)
+const isSelectedReportPending = computed(() => selectedReport.value?.status === 'pending')
+
+const reportReasonLabels: Record<string, string> = {
+  spam_advertising: 'Spam / Advertising',
+  fraud_scam: 'Fraud / Scam',
+  misleading_false_info: 'Misleading or False Information',
+  illegal_activity: 'Illegal Activity',
+  abusive_offensive_content: 'Abusive / Offensive Content',
+  duplicate_repeated_posting: 'Duplicate Posting',
+  unreasonable_reward_conditions: 'Unreasonable Reward / Conditions',
+  other: 'Other'
+}
+
+const reportStatusLabels: Record<string, string> = {
+  pending: 'Pending',
+  reviewed: 'Reviewed',
+  resolved: 'Resolved',
+  dismissed: 'Dismissed'
+}
+
+const operationGuardMessage =
+  'This task currently has unresolved reports or disputes. Please resolve them first before performing additional operations.'
+
+const formatReportReason = (reason: string) => reportReasonLabels[reason] ?? reason
+const formatReportStatus = (status: string) => reportStatusLabels[status] ?? status
+
+const loadTaskReports = async (taskId: string) => {
+  if (!taskId) return
+  reportsLoading.value = true
+  reportsError.value = ''
+  try {
+    const response = await taskApi.reports(taskId)
+    if (response.data.success && response.data.data) {
+      reports.value = response.data.data.reports ?? []
+      hasPendingReportsState.value = Boolean(response.data.data.has_pending)
+    } else {
+      reportsError.value = response.data.message || 'Failed to load reports'
+    }
+  } catch (err: any) {
+    reportsError.value = err.response?.data?.message || err.message || 'Failed to load reports'
+  } finally {
+    reportsLoading.value = false
+  }
+}
 
 // Methods
 const loadTask = async () => {
@@ -261,6 +561,8 @@ const loadTask = async () => {
       const data = response.data.data as any
       task.value = data.task
       applications.value = data.applications || data.task?.applications || []
+      hasPendingReportsState.value = Boolean(data.task?.has_pending_reports)
+      await loadTaskReports(taskId)
     } else {
       throw new Error('Task not found')
     }
@@ -277,6 +579,92 @@ const loadTask = async () => {
 
 const refreshData = () => {
   loadTask()
+}
+
+const openReportModal = (report: any) => {
+  selectedReport.value = report
+  reportNotes.value = ''
+  reportAction.value = 'approve_remove'
+  showReportModal.value = true
+}
+
+const closeReportModal = () => {
+  showReportModal.value = false
+  selectedReport.value = null
+  reportNotes.value = ''
+  reportAction.value = 'approve_remove'
+}
+
+const submitReportResolution = async () => {
+  if (!selectedReport.value) {
+    return
+  }
+
+  if (!reportNotes.value.trim()) {
+    alert('Please provide an admin note before continuing.')
+    return
+  }
+
+  if (!window.confirm('This action cannot be undone. Are you sure you want to continue?')) {
+    return
+  }
+
+  reportSubmitting.value = true
+  try {
+    await taskApi.resolveReport(selectedReport.value.id, {
+      decision: reportAction.value,
+      notes: reportNotes.value.trim()
+    })
+    alert('Report handled successfully.')
+    closeReportModal()
+    await loadTask()
+  } catch (err: any) {
+    alert(err.response?.data?.message || err.message || 'Failed to resolve report')
+  } finally {
+    reportSubmitting.value = false
+  }
+}
+
+const handleOperationClick = () => {
+  if (operationBlocked.value) {
+    alert(operationGuardMessage)
+    return
+  }
+  operationAction.value = 'cancel'
+  operationReason.value = ''
+  showOperationModal.value = true
+}
+
+const closeOperationModal = () => {
+  showOperationModal.value = false
+}
+
+const submitOperation = async () => {
+  if (!task.value) return
+
+  if (!operationReason.value.trim()) {
+    alert('Please provide a reason for this action.')
+    return
+  }
+
+  if (!window.confirm('This action cannot be undone. Are you sure you want to proceed?')) {
+    return
+  }
+
+  operationSubmitting.value = true
+  try {
+    await taskApi.moderate(String(task.value.id), {
+      action: operationAction.value,
+      reason: operationReason.value.trim()
+    })
+    alert('Task status updated.')
+    closeOperationModal()
+    await loadTask()
+  } catch (err: any) {
+    alert(err.response?.data?.message || err.message || 'Failed to update task')
+  } finally {
+    operationSubmitting.value = false
+  }
 }
 
 

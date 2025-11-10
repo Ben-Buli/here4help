@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 應用程式名稱 -->
+    <string name="app_name">Here4Help</string>
+    
+    <!-- Facebook 配置 -->
+    <string name="facebook_app_id">1037019294991326</string>
+    <string name="fb_login_protocol_scheme">fb1037019294991326</string>
+    <string name="facebook_client_token">0b81d2c8f405ca37d21f12b828c571cf</string>
+    <string name="facebook_display_name">Here4Help</string>
+</resources>
+

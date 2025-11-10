@@ -54,6 +54,8 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
         return _buildRestrictedContent();
       case -2:
         return _buildSelfDeactivatedContent();
+      case -3:
+        return _buildSelfSuspendedContent();
       default:
         return _buildGenericContent();
     }
@@ -104,7 +106,8 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
                     ),
                   )
                 : const Icon(Icons.refresh),
-            label: Text(_isLoadingVerification ? 'Refreshing...' : 'Refresh Status'),
+            label: Text(
+                _isLoadingVerification ? 'Refreshing...' : 'Refresh Status'),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
@@ -127,7 +130,7 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
           icon: Icons.report_gmailerrorred,
           color: Colors.red,
           message:
-              'Your account has been limited by an administrator. To restore access, please contact our support team for assistance.',
+              'Your account has been suspended by an administrator. To restore access, please contact our support team for assistance.',
         ),
         const SizedBox(height: 20),
         SizedBox(
@@ -155,10 +158,41 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildMessageCard(
+          icon: Icons.delete_outline,
+          color: Colors.grey,
+          message:
+              'Your account has been soft deleted by an administrator. This account cannot be used. Please contact support if you believe this is an error.',
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: () => context.go('/account/support/contact'),
+            icon: const Icon(Icons.support_agent),
+            label: const Text('Contact Support'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildBackButton(),
+      ],
+    );
+  }
+
+  Widget _buildSelfSuspendedContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildMessageCard(
           icon: Icons.pause_circle_outline,
           color: Colors.orange,
           message:
-              'You have temporarily deactivated your account. Visit Security Settings if you would like to enable your account again.',
+              'You have temporarily suspended your account. Visit Security Settings if you would like to reactivate your account.',
         ),
         const SizedBox(height: 20),
         SizedBox(
@@ -268,8 +302,8 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.blue.shade100),
         ),
-        child: Row(
-          children: const [
+        child: const Row(
+          children: [
             CircularProgressIndicator(strokeWidth: 2),
             SizedBox(width: 12),
             Expanded(
@@ -394,9 +428,7 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
   }
 
   Widget _buildStatusRow(
-      {required IconData icon,
-      required String label,
-      required String value}) {
+      {required IconData icon, required String label, required String value}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -493,8 +525,8 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
         } else {
           setState(() {
             _verificationData = null;
-            _verificationError =
-                decoded['message']?.toString() ?? 'No verification record found';
+            _verificationError = decoded['message']?.toString() ??
+                'No verification record found';
           });
         }
       } else {

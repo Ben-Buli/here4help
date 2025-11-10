@@ -3722,8 +3722,6 @@ class _ChatDetailPageState extends State<ChatDetailPage>
       // 刷新頁面資料
       await _initializeChat();
 
-      // 這是 Accept 操作的一部分，已在前面修改過
-
       // 調試：檢查任務狀態是否已更新
       debugPrint('🔍 [Accept] 刷新後任務狀態檢查:');
       debugPrint('  - _chatData: ${_chatData != null ? 'not null' : 'null'}');
@@ -3767,9 +3765,6 @@ class _ChatDetailPageState extends State<ChatDetailPage>
 
           // 新增：通知兩個分頁的分頁控制器刷新（若上層有監聽）
           try {
-            // 透過 Provider 的事件機制定義：這裡只呼叫既有方法，
-            // 具體分頁元件會在 build 中使用 RefreshIndicator 與 PagingController.refresh()
-            // 因此這裡不直接持有 controller，避免相依。
             provider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
             provider.checkAndTriggerTabLoad(ChatListProvider.tabMyWorks);
           } catch (_) {}
@@ -3780,10 +3775,10 @@ class _ChatDetailPageState extends State<ChatDetailPage>
         // 重新載入聊天室狀態以更新 Action Bar
         await _initializeChat();
 
-        // 只對 creator 自動收起 Action Bar，participant 保持展開狀態
-        if (mounted && _userRole == 'creator') {
+        // 確保接受後 Action Bar 仍保持可見，讓使用者立即看到新的按鈕
+        if (mounted) {
           setState(() {
-            _showActionBar = false;
+            _showActionBar = true;
           });
         }
       }

@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\TaskController;
+use App\Http\Controllers\Admin\TaskReportController;
+use App\Http\Controllers\Admin\TaskModerationController;
 use App\Http\Controllers\Admin\LogController;
 use App\Http\Controllers\Admin\DisputeController;
 use App\Http\Controllers\Admin\SupportController;
@@ -11,6 +13,7 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\UserActivityController;
 use App\Http\Controllers\Admin\UserTransactionController;
 use App\Http\Controllers\Admin\AdminPingController;
+use App\Http\Controllers\Admin\PointPolicyController;
 
 /*
 |--------------------------------------------------------------------------
@@ -38,11 +41,15 @@ Route::prefix('admin')->group(function () {
             Route::post('/{id}/review', [UserController::class, 'review'])->middleware('admin:users.edit');
             Route::get('/{id}/verification', [UserController::class, 'verification'])->middleware('admin:users.view');
             Route::get('/{id}/intro-referral-info', [UserController::class, 'introReferralInfo'])->middleware('admin:users.view');
+            Route::get('/referral-codes', [UserController::class, 'referralCodes'])->middleware('admin:users.view');
         });
 
         // 任務管理
         Route::prefix('tasks')->group(function () {
             Route::get('/', [TaskController::class, 'index'])->middleware('admin:tasks.list');
+            Route::get('/{taskId}/reports', [TaskReportController::class, 'index'])->middleware('admin:tasks.view');
+            Route::post('/reports/{reportId}/resolve', [TaskReportController::class, 'resolve'])->middleware('admin:tasks.edit');
+            Route::post('/{taskId}/moderate', [TaskModerationController::class, 'moderate'])->middleware('admin:tasks.edit');
             Route::get('/{id}', [TaskController::class, 'show'])->middleware('admin:tasks.view');
             Route::patch('/{id}/status', [TaskController::class, 'updateStatus'])->middleware('admin:tasks.edit');
         });
@@ -91,6 +98,15 @@ Route::prefix('admin')->group(function () {
         // 使用者活動 / 交易
         Route::get('/user-activities', [UserActivityController::class, 'index'])->middleware('admin:logs.view');
         Route::get('/user-transactions', [UserTransactionController::class, 'index'])->middleware('admin:logs.view');
+
+        // Point Policy 內容管理
+        Route::prefix('point-policies')->middleware('admin:points.edit')->group(function () {
+            Route::get('/', [PointPolicyController::class, 'index']);
+            Route::get('/{id}', [PointPolicyController::class, 'show']);
+            Route::post('/', [PointPolicyController::class, 'store']);
+            Route::put('/{id}', [PointPolicyController::class, 'update']);
+            Route::post('/{id}/activate', [PointPolicyController::class, 'activate']);
+        });
 
         // 管理員列表 / 系統資訊
         Route::get('/admins', [AdminPingController::class, 'admins'])->middleware('admin:admins.list');

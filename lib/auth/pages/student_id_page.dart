@@ -22,6 +22,8 @@ class _StudentIdPageState extends State<StudentIdPage> {
   final _imageService = CrossPlatformImageService();
   bool isLoading = false;
   bool hasAllData = false;
+  bool _isOAuthFlow = false;
+  bool _shouldConfirmLeave = true;
 
   @override
   void initState() {
@@ -32,15 +34,30 @@ class _StudentIdPageState extends State<StudentIdPage> {
   Future<void> _checkRegistrationData() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // 檢查是否有完整的註冊資料
-    final hasBasicInfo = prefs.getString('signup_full_name') != null &&
-        prefs.getString('signup_email') != null &&
-        prefs.getString('signup_password') != null;
+    final isOAuth = prefs.getBool('signup_is_oauth') ?? false;
+    bool ready = false;
 
-    final hasPaymentCode = prefs.getString('signup_payment_code') != null;
+    if (isOAuth) {
+      final token = prefs.getString('signup_oauth_token');
+      final name = prefs.getString('signup_full_name');
+      final email = prefs.getString('signup_email');
+      ready = token != null &&
+          token.isNotEmpty &&
+          name != null &&
+          name.isNotEmpty &&
+          email != null &&
+          email.isNotEmpty;
+    } else {
+      final hasBasicInfo = prefs.getString('signup_full_name') != null &&
+          prefs.getString('signup_email') != null &&
+          prefs.getString('signup_password') != null;
+      final hasPaymentCode = prefs.getString('signup_payment_code') != null;
+      ready = hasBasicInfo && hasPaymentCode;
+    }
 
     setState(() {
-      hasAllData = hasBasicInfo && hasPaymentCode;
+      hasAllData = ready;
+      _isOAuthFlow = isOAuth;
     });
 
     if (!hasAllData) {
@@ -52,6 +69,7 @@ class _StudentIdPageState extends State<StudentIdPage> {
           backgroundColor: Colors.orange,
         ),
       );
+      _shouldConfirmLeave = false;
       context.go('/signup');
     } else {
       // 🔧 新增：顯示用戶資訊確認
@@ -62,183 +80,188 @@ class _StudentIdPageState extends State<StudentIdPage> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Please upload your student ID card',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: AppColors.onBackground,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // School Name
-            TextFormField(
-              controller: schoolNameController,
-              decoration: const InputDecoration(
-                labelText: 'School Name',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.school),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your school name';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Student Name
-            TextFormField(
-              controller: studentNameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your name';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Student ID
-            TextFormField(
-              controller: studentIdController,
-              decoration: const InputDecoration(
-                labelText: 'Student ID',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.badge),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your student ID';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // Image Upload Section
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _selectedImage != null
-                      ? AppColors.primary
-                      : AppColors.secondary,
-                  width: 2,
+    return WillPopScope(
+        onWillPop: () async {
+          if (!_shouldConfirmLeave) return true;
+          return await _showLeaveConfirmationDialog();
+        },
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Please upload your student ID card',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.onBackground,
+                  ),
                 ),
-              ),
-              child: Column(
-                children: [
-                  if (_selectedImage != null) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image(
-                        image:
-                            _imageService.createImageProvider(_selectedImage!),
-                        height: 200,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
+                const SizedBox(height: 24),
+
+                // School Name
+                TextFormField(
+                  controller: schoolNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'School Name',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.school),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your school name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Student Name
+                TextFormField(
+                  controller: studentNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Student ID
+                TextFormField(
+                  controller: studentIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Student ID',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.badge),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your student ID';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Image Upload Section
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _selectedImage != null
+                          ? AppColors.primary
+                          : AppColors.secondary,
+                      width: 2,
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: _showImageSourceDialog,
-                          icon: const Icon(Icons.edit),
-                          label: const Text('Change'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.secondary,
-                            foregroundColor: AppColors.onSecondary,
+                  ),
+                  child: Column(
+                    children: [
+                      if (_selectedImage != null) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image(
+                            image: _imageService
+                                .createImageProvider(_selectedImage!),
+                            height: 200,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
                           ),
                         ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: _showImageSourceDialog,
+                              icon: const Icon(Icons.edit),
+                              label: const Text('Change'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.secondary,
+                                foregroundColor: AppColors.onSecondary,
+                              ),
+                            ),
+                            ElevatedButton.icon(
+                              onPressed: _removeImage,
+                              icon: const Icon(Icons.delete),
+                              label: const Text('Remove'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.error,
+                                foregroundColor: AppColors.onError,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        const Icon(
+                          Icons.add_photo_alternate,
+                          size: 80,
+                          color: AppColors.secondary,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Upload Student ID Card',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.onBackground,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Tap to select an image from your gallery',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.onBackground,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         ElevatedButton.icon(
-                          onPressed: _removeImage,
-                          icon: const Icon(Icons.delete),
-                          label: const Text('Remove'),
+                          onPressed: _showImageSourceDialog,
+                          icon: const Icon(Icons.upload),
+                          label: const Text('Select Image'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.error,
-                            foregroundColor: AppColors.onError,
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: AppColors.onPrimary,
                           ),
                         ),
                       ],
-                    ),
-                  ] else ...[
-                    const Icon(
-                      Icons.add_photo_alternate,
-                      size: 80,
-                      color: AppColors.secondary,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Upload Student ID Card',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.onBackground,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Tap to select an image from your gallery',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.onBackground,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _showImageSourceDialog,
-                      icon: const Icon(Icons.upload),
-                      label: const Text('Select Image'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.onPrimary,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Submit Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: isLoading ? null : _handleSubmit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                    ],
+                  ),
                 ),
-                child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Submit', style: TextStyle(fontSize: 18)),
-              ),
+                const SizedBox(height: 32),
+
+                // Submit Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : _handleSubmit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text('Submit', style: TextStyle(fontSize: 18)),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        ));
   }
 
   Future<void> _showImageSourceDialog() async {
@@ -344,6 +367,7 @@ class _StudentIdPageState extends State<StudentIdPage> {
           backgroundColor: AppColors.error,
         ),
       );
+      _shouldConfirmLeave = false;
       context.go('/signup/payment-code');
       return;
     }
@@ -376,7 +400,7 @@ class _StudentIdPageState extends State<StudentIdPage> {
       if (email == null || email.isEmpty) {
         missingFields.add('email');
       }
-      if (password == null || password.isEmpty) {
+      if (!_isOAuthFlow && (password == null || password.isEmpty)) {
         missingFields.add('password');
       }
       if (dateOfBirth == null || dateOfBirth.isEmpty) {
@@ -389,16 +413,14 @@ class _StudentIdPageState extends State<StudentIdPage> {
       }
 
       final studentIdData = <String, String>{
-        'name': fullName!,
+        'name': fullName ?? '',
         'nickname': nickname,
-        'gender': gender!,
-        'email': email!,
+        'gender': gender ?? 'Prefer not to disclose',
+        'email': email ?? '',
         'phone': phone,
         'country': country,
         'address': address,
-        'password': password!,
-        'date_of_birth': dateOfBirth!,
-        'payment_password': paymentCode,
+        'date_of_birth': dateOfBirth ?? '',
         'is_permanent_address':
             (prefs.getBool('signup_is_permanent_address') ?? false) ? '1' : '0',
         'primary_language': primaryLanguages.join(','),
@@ -408,9 +430,43 @@ class _StudentIdPageState extends State<StudentIdPage> {
         'student_id': studentIdController.text,
       };
 
-      debugPrint('📤 準備上傳學生證資料 - Email: $email');
+      if (!_isOAuthFlow) {
+        studentIdData['password'] = password!;
+        studentIdData['payment_password'] = paymentCode;
+      }
 
-      final success = await _uploadStudentIdImage(studentIdData);
+      if (!_isOAuthFlow) {
+        debugPrint('📤 準備上傳學生證資料 - Email: $email');
+      } else {
+        debugPrint('📤 準備透過 OAuth 流程上傳學生證資料 - Email: $email');
+      }
+
+      bool success;
+
+      if (_isOAuthFlow) {
+        final oauthToken = prefs.getString('signup_oauth_token');
+        if (oauthToken == null || oauthToken.isEmpty) {
+          throw Exception(
+              'Missing OAuth token. Please restart the signup process.');
+        }
+        final oauthPayload = {
+          ...studentIdData,
+          'oauth_token': oauthToken,
+          'avatar_url': prefs.getString('signup_avatar_url') ?? '',
+        };
+        if (paymentCode.isNotEmpty) {
+          oauthPayload['payment_password'] = paymentCode;
+        }
+        success = await _uploadStudentIdImage(
+          oauthPayload,
+          uploadUrl: AppConfig.registerOAuthWithStudentIdUrl,
+        );
+      } else {
+        success = await _uploadStudentIdImage(
+          studentIdData,
+          uploadUrl: AppConfig.registerWithStudentIdUrl,
+        );
+      }
 
       if (success) {
         // Clear signup data from SharedPreferences
@@ -425,6 +481,7 @@ class _StudentIdPageState extends State<StudentIdPage> {
         );
 
         // Navigate to login page
+        _shouldConfirmLeave = false;
         context.go('/login');
       }
     } catch (e) {
@@ -441,7 +498,10 @@ class _StudentIdPageState extends State<StudentIdPage> {
     }
   }
 
-  Future<bool> _uploadStudentIdImage(Map<String, dynamic> studentIdData) async {
+  Future<bool> _uploadStudentIdImage(
+    Map<String, dynamic> studentIdData, {
+    required String uploadUrl,
+  }) async {
     try {
       if (_selectedImage == null) {
         throw Exception('No image selected');
@@ -450,7 +510,7 @@ class _StudentIdPageState extends State<StudentIdPage> {
       // 使用跨平台圖片服務上傳
       final result = await _imageService.uploadImage(
         image: _selectedImage!,
-        uploadUrl: AppConfig.registerWithStudentIdUrl,
+        uploadUrl: uploadUrl,
         token: '', // 公開端點，不需要 token
         fieldName: 'student_id_image',
         additionalFields:
@@ -485,7 +545,35 @@ class _StudentIdPageState extends State<StudentIdPage> {
     await prefs.remove('signup_is_permanent_address');
     await prefs.remove('signup_languages');
     await prefs.remove('signup_referral_code');
+    await prefs.remove('signup_is_oauth');
+    await prefs.remove('signup_oauth_token');
+    await prefs.remove('signup_oauth_provider');
+    await prefs.remove('signup_avatar_url');
+    await prefs.remove('signup_provider');
+    await prefs.remove('signup_provider_user_id');
 
     debugPrint('🧹 已清理所有註冊暫存資料');
+  }
+
+  Future<bool> _showLeaveConfirmationDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Leave registration?'),
+        content: const Text(
+            'Your registration is not complete yet. Are you sure you want to leave this page?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Stay'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Leave'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 }

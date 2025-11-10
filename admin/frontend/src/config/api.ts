@@ -98,6 +98,7 @@ export const API_ENDPOINTS = {
     verification: (id: number) => getApiUrl(`/users/${id}/verification`),
     referralInfo: (id: number) => getApiUrl(`/users/${id}/referral-info`),
     introReferralInfo: (id: number) => getApiUrl(`/users/${id}/intro-referral-info`),
+    referralCodes: () => getApiUrl('/users/referral-codes'),
   },
   
   // 任務管理
@@ -135,6 +136,13 @@ export const API_ENDPOINTS = {
   // 推薦管理
   referrals: {
     events: () => getApiUrl('/referral-events'),
+  },
+
+  // Point Policy 內容管理
+  pointPolicy: {
+    list: () => getApiUrl('/point-policies'),
+    detail: (id: number) => getApiUrl(`/point-policies/${id}`),
+    activate: (id: number) => getApiUrl(`/point-policies/${id}/activate`),
   },
   
   // 日誌管理 - 修正為Laravel路由

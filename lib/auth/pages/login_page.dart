@@ -1,6 +1,7 @@
 // login_page.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
@@ -22,11 +23,14 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final _loginEmailKey = GlobalKey<FormFieldState<String>>();
+
   final _formKey = GlobalKey<FormState>();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool isLoading = false;
   bool rememberMe = false;
+  bool showPassword = false;
   Timer? _timeoutTimer;
 
   static const double _socialButtonHeight = 52;
@@ -177,14 +181,52 @@ class _LoginPageState extends State<LoginPage> {
       });
 
       String errorMessage = 'Login Failed';
-      if (e.toString().contains('Invalid email or password')) {
+      String errorType =
+          'general'; // 'general', 'deleted_by_admin', 'self_deleted'
+
+      final errorString = e.toString();
+
+      // 檢查是否為已刪除帳號的錯誤
+      if (errorString.contains('removed by an administrator')) {
+        errorMessage =
+            'This account has been soft deleted by an administrator and cannot be used. Please contact support if you believe this is an error.';
+        errorType = 'deleted_by_admin';
+      } else if (errorString.contains('has been deleted and cannot be used')) {
+        errorMessage =
+            'This account has been soft deleted and cannot be used. If you wish to use our service again, please create a new account.';
+        errorType = 'self_deleted';
+      } else if (errorString.contains('Invalid email or password')) {
         errorMessage = 'Invalid email or password';
-      } else if (e.toString().contains('No token available')) {
+      } else if (errorString.contains('No token available')) {
         errorMessage = 'Authentication failed, please login again';
+      } else {
+        // 顯示後端返回的原始錯誤訊息
+        errorMessage = errorString.replaceAll('Exception: ', '');
       }
 
+      // 顯示錯誤訊息
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage)),
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor:
+              errorType == 'deleted_by_admin' || errorType == 'self_deleted'
+                  ? Colors.red.shade700
+                  : null,
+          duration:
+              errorType == 'deleted_by_admin' || errorType == 'self_deleted'
+                  ? const Duration(seconds: 6)
+                  : const Duration(seconds: 3),
+          action: errorType == 'deleted_by_admin'
+              ? SnackBarAction(
+                  label: 'Contact Support',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    // 可以導向到客服頁面
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                  },
+                )
+              : null,
+        ),
       );
     }
   }
@@ -1060,35 +1102,57 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                             const SizedBox(height: 32),
-                            TextFormField(
-                              controller: emailController,
-                              decoration: const InputDecoration(
-                                labelText: 'Email',
-                                border: OutlineInputBorder(),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Please enter your email';
+                            FocusScope(
+                              onFocusChange: (hasFocus) {
+                                if (!hasFocus) {
+                                  _loginEmailKey.currentState?.validate();
                                 }
-                                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                                    .hasMatch(value)) {
-                                  return 'Please enter a valid email format';
-                                }
-                                return null;
                               },
-                              onFieldSubmitted: (_) => _submitForm(),
+                              child: TextFormField(
+                                key: _loginEmailKey,
+                                controller: emailController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Email',
+                                  hintText: 'name@example.com',
+                                  border: OutlineInputBorder(),
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Please enter your email';
+                                  }
+                                  if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                                      .hasMatch(value.trim())) {
+                                    return 'Please enter a valid email format (e.g. name@example.com)';
+                                  }
+                                  return null;
+                                },
+                                onFieldSubmitted: (_) => _submitForm(),
+                              ),
                             ),
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: passwordController,
-                              obscureText: true,
+                              obscureText: !showPassword,
                               decoration: const InputDecoration(
                                 labelText: 'Password',
+                                hintText:
+                                    'At least 6 characters, letters and numbers only',
                                 border: OutlineInputBorder(),
                               ),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                    RegExp(r'[a-zA-Z0-9]')),
+                              ],
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
                                   return 'Please enter your password';
+                                }
+                                if (value.length < 6) {
+                                  return 'Password must be at least 6 characters';
+                                }
+                                if (!RegExp(r'^[a-zA-Z0-9]+$')
+                                    .hasMatch(value)) {
+                                  return 'Password can only contain letters and numbers';
                                 }
                                 return null;
                               },

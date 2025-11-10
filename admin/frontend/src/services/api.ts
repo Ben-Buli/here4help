@@ -195,6 +195,22 @@ export const taskApi = {
 
   updateStatus: (id: string, status_id: number, reason?: string) =>
     api.patch<ApiResponse>(`/api/admin/tasks/${id}/status`, { status_id, reason }),
+
+  reports: (taskId: string) =>
+    api.get<
+      ApiResponse<{
+        task_id: number
+        task_title: string
+        has_pending: boolean
+        reports: any[]
+      }>
+    >(`/api/admin/tasks/${taskId}/reports`),
+
+  resolveReport: (reportId: string | number, payload: { decision: string; notes: string }) =>
+    api.post<ApiResponse>(`/api/admin/tasks/reports/${reportId}/resolve`, payload),
+
+  moderate: (taskId: string, payload: { action: string; reason: string }) =>
+    api.post<ApiResponse>(`/api/admin/tasks/${taskId}/moderate`, payload),
 }
 
 // 客服(支援) API

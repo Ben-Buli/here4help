@@ -12,6 +12,7 @@ class UserModel {
   final String created_at;
   final String updated_at;
   final String? referral_code;
+  final String? intro_referral_code;
   final String? google_id;
   final String primary_language;
   final int permission;
@@ -38,6 +39,7 @@ class UserModel {
     required this.created_at,
     required this.updated_at,
     this.referral_code,
+    this.intro_referral_code,
     this.google_id,
     required this.primary_language,
     this.date_of_birth,
@@ -64,6 +66,7 @@ class UserModel {
       created_at: json['created_at'] ?? '',
       updated_at: json['updated_at'] ?? '',
       referral_code: json['referral_code'],
+      intro_referral_code: json['intro_referral_code'],
       google_id: json['google_id'],
       primary_language: json['primary_language'] ?? 'English',
       permission: json['permission'] ?? 0,
@@ -94,6 +97,7 @@ class UserModel {
       'created_at': created_at,
       'updated_at': updated_at,
       'referral_code': referral_code,
+      'intro_referral_code': intro_referral_code,
       'google_id': google_id,
       'primary_language': primary_language,
       'permission': permission,
@@ -121,6 +125,7 @@ class UserModel {
     String? created_at,
     String? updated_at,
     String? referral_code,
+    String? intro_referral_code,
     String? google_id,
     String? primary_language,
     int? permission,
@@ -146,6 +151,7 @@ class UserModel {
       created_at: created_at ?? this.created_at,
       updated_at: updated_at ?? this.updated_at,
       referral_code: referral_code ?? this.referral_code,
+      intro_referral_code: intro_referral_code ?? this.intro_referral_code,
       google_id: google_id ?? this.google_id,
       primary_language: primary_language ?? this.primary_language,
       permission: permission ?? this.permission,

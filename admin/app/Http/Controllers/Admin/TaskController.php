@@ -168,6 +168,23 @@ class TaskController extends Controller
             ], 404);
         }
 
+        $applicationQuestions = DB::table('application_questions')
+            ->select([
+                'id',
+                'application_question',
+                DB::raw("'text' as question_type"),
+                'sort_order'
+            ])
+            ->where('task_id', $id)
+            ->orderBy('sort_order')
+            ->get();
+
+        $task->application_questions = $applicationQuestions;
+        $task->has_pending_reports = DB::table('task_reports')
+            ->where('task_id', $id)
+            ->where('status', 'pending')
+            ->exists();
+
         return response()->json([
             'success' => true,
             'data' => [

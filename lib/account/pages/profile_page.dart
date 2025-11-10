@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/auth/models/user_model.dart';
@@ -44,7 +45,6 @@ class _ProfilePageState extends State<ProfilePage> {
     'languageRequirement': TextEditingController(),
     'school': TextEditingController(),
     'aboutMe': TextEditingController(),
-    'referralCode': TextEditingController(),
   };
 
   /// bool 欄位單獨用變數控制
@@ -131,9 +131,7 @@ class _ProfilePageState extends State<ProfilePage> {
     debugPrint('is_permanent_address: ${user!.is_permanent_address}');
     isPermanentAddress = user!.is_permanent_address ?? false;
     controllers['aboutMe']!.text = user!.about_me ?? '';
-    controllers['referralCode']!.text = user!.referral_code ?? '';
     controllers['primaryLanguage']!.text = user!.primary_language;
-    controllers['aboutMe']!.text = user!.about_me ?? '';
 
     selectedSchool = user!.school;
     // Normalize empty school to null to avoid invalid dropdown value
@@ -169,7 +167,6 @@ class _ProfilePageState extends State<ProfilePage> {
       'address': controllers['address']!.text,
       'about_me': controllers['aboutMe']!.text,
       'school': selectedSchool,
-      'referralCode': controllers['referralCode']!.text,
       'primaryLanguage': selectedPrimaryLanguage,
       'languageRequirements': selectedLanguageRequirements,
       'isPermanentAddress': isPermanentAddress,
@@ -224,7 +221,6 @@ class _ProfilePageState extends State<ProfilePage> {
       'address': controllers['address']!.text,
       'aboutMe': controllers['aboutMe']!.text,
       'school': selectedSchool,
-      'referralCode': controllers['referralCode']!.text,
       'primaryLanguage': selectedPrimaryLanguage,
       // 'languageRequirements': selectedLanguageRequirements,
       'about_me': controllers['aboutMe']!.text,
@@ -610,6 +606,214 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  /// 顯示複製成功的浮動提示
+  void _showCopyTooltip(BuildContext context, GlobalKey buttonKey) {
+    final RenderBox? renderBox =
+        buttonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final offset = renderBox.localToGlobal(Offset.zero);
+    final size = renderBox.size;
+
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        left: offset.dx + size.width / 2 - 40,
+        top: offset.dy - 40,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 200),
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value,
+                child: Transform.scale(
+                  scale: value,
+                  child: child,
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.green.shade700,
+                borderRadius: BorderRadius.circular(6),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white, size: 16),
+                  SizedBox(width: 6),
+                  Text(
+                    'Copied!',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+
+    // 1.5秒後自動移除
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      overlayEntry.remove();
+    });
+  }
+
+  /// 建立自己的推薦碼欄位（有複製功能）
+  Widget _buildReferralCodeField() {
+    String displayValue;
+    bool showCopyButton = false;
+    final GlobalKey copyButtonKey = GlobalKey();
+
+    if (user!.permission == 0) {
+      // 驗證中的用戶
+      displayValue =
+          'Pending verification - code will be generated after approval';
+    } else if (user!.referral_code != null && user!.referral_code!.isNotEmpty) {
+      // 已有推薦碼
+      displayValue = user!.referral_code!;
+      showCopyButton = true;
+    } else {
+      displayValue = 'Not generated yet';
+    }
+
+    return Container(
+      constraints: const BoxConstraints(minHeight: 60),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Invite Referral Code',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 20),
+                    child: Text(
+                      displayValue,
+                      style: TextStyle(
+                        color: user!.permission == 0 ? Colors.orange : null,
+                        fontWeight: showCopyButton ? FontWeight.w500 : null,
+                      ),
+                    ),
+                  ),
+                ),
+                if (showCopyButton)
+                  Tooltip(
+                    message: 'Copy referral code',
+                    child: IconButton(
+                      key: copyButtonKey,
+                      icon: const Icon(Icons.copy, size: 18),
+                      onPressed: () async {
+                        await Clipboard.setData(
+                            ClipboardData(text: user!.referral_code!));
+                        if (!mounted) return;
+
+                        // 顯示浮動複製成功提示
+                        _showCopyTooltip(context, copyButtonKey);
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(),
+        ],
+      ),
+    );
+  }
+
+  /// 建立註冊時填寫的推薦碼欄位（純顯示）
+  Widget _buildIntroReferralCodeField() {
+    String displayValue;
+
+    if (user!.intro_referral_code != null &&
+        user!.intro_referral_code!.isNotEmpty) {
+      displayValue = user!.intro_referral_code!;
+    } else {
+      displayValue = 'No referral code used during registration';
+    }
+
+    return Container(
+      constraints: const BoxConstraints(minHeight: 60),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Referral Code',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 8),
+            child: Container(
+              width: double.infinity,
+              constraints: const BoxConstraints(minHeight: 20),
+              child: Text(
+                displayValue,
+                style: TextStyle(
+                  color: (user!.intro_referral_code == null ||
+                          user!.intro_referral_code!.isEmpty)
+                      ? Colors.grey
+                      : null,
+                  fontWeight: (user!.intro_referral_code != null &&
+                          user!.intro_referral_code!.isNotEmpty)
+                      ? FontWeight.w500
+                      : null,
+                ),
+              ),
+            ),
+          ),
+          const Divider(),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     for (final controller in controllers.values) {
@@ -737,18 +941,11 @@ class _ProfilePageState extends State<ProfilePage> {
                   readOnly: true,
                 ),
 
-                // Referral Code (不可編輯)
-                _profileField(
-                  label: 'Referral Code',
-                  value: controllers['referralCode']!.text,
-                  fieldKey: 'referralCode',
-                  isEditing: false,
-                  editWidget: const SizedBox.shrink(),
-                  onEdit: () {},
-                  onCancel: () {},
-                  onDone: () {},
-                  readOnly: true,
-                ),
+                // My Invite Referral Code (自己的推薦碼 - 不可編輯，有複製功能)
+                _buildReferralCodeField(),
+
+                // Intro Referral Code (註冊時填寫的推薦碼 - 不可編輯)
+                _buildIntroReferralCodeField(),
 
                 // Phone
                 _profileField(
@@ -1372,6 +1569,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
             ],
           ),
+          const SizedBox(height: 4),
           if (!isEditing)
             Padding(
               padding: const EdgeInsets.only(left: 8, bottom: 8),

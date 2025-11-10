@@ -59,10 +59,10 @@
             <option value="99">Super User (99)</option> //  管理員使用
             <option value="1">Verified User (1)</option> //  已認證用戶
             <option value="0">New User in Verification (0)</option> //  新用戶未認證
-            <option value="-1">Restricted (-1)</option> //  被管理員停權
-            <option value="-2">Suspended (-2)</option> //  被管理員軟刪除
-            <option value="-3">Banned (-3)</option> //  用戶自行停權
-            <option value="-4">Deleted (-4)</option> //  用戶自行軟刪除
+            <option value="-1">Admin Suspended (-1)</option> //  被管理員停權
+            <option value="-2">Admin Soft Deleted (-2)</option> //  被管理員軟刪除
+            <option value="-3">Self Suspended (-3)</option> //  用戶自行停權
+            <option value="-4">Self Soft Deleted (-4)</option> //  用戶自行軟刪除
           </select>
         </div>
 
@@ -753,10 +753,10 @@ const getPermissionText = (permission: number) => {
   if (permission >= 99) return 'Master User'
   if (permission >= 1) return 'Verified User'
   if (permission == 0) return 'New User in Verification'
-  if (permission == -1) return 'Restricted'
-  if (permission == -2) return 'Suspended'
-  if (permission == -3) return 'Banned'
-  if (permission == -4) return 'Deleted'
+  if (permission == -1) return 'Admin Suspended'
+  if (permission == -2) return 'Admin Soft Deleted'
+  if (permission == -3) return 'Self Suspended'
+  if (permission == -4) return 'Self Soft Deleted'
   return `Level ${permission}`
 }
 

@@ -22,6 +22,8 @@ class SignupPage extends StatefulWidget {
 }
 
 class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
+  final _signupEmailKey = GlobalKey<FormFieldState<String>>();
+
   final _formKey = GlobalKey<FormState>();
   final TextEditingController fullNameController = TextEditingController();
   final TextEditingController nicknameController = TextEditingController();
@@ -72,6 +74,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   bool showPassword = false;
   bool showConfirmPassword = false;
   bool showPaymentPins = false;
+  bool _shouldConfirmLeave = true;
 
   @override
   void initState() {
@@ -398,161 +401,49 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   // }
 
   // 處理 OAuth 註冊
-  Future<void> _handleOAuthRegistration() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    setState(() {
-      isLoading = true;
-    });
-
+  Future<void> _handleOAuthRegistration(String oauthToken) async {
     try {
-      // 獲取 OAuth token（從 URL 參數或 widget 資料）
-      String? oauthToken;
-      try {
-        // 優先從 GoRouter 獲取 query 參數
-        final routerState = GoRouterState.of(context);
-        oauthToken = routerState.uri.queryParameters['token'] ??
-            routerState.uri.queryParameters['oauth_token'];
-      } catch (e) {
-        debugPrint('⚠️ [SignupPage] 無法從 GoRouter 獲取 token: $e');
-        // 備用方案：從 Uri.base 獲取
-        final uri = Uri.base;
-        oauthToken =
-            uri.queryParameters['token'] ?? uri.queryParameters['oauth_token'];
-      }
-
-      // 最後嘗試從 widget 資料獲取
-      oauthToken ??=
-          widget.oauthData?['oauth_token'] ?? widget.oauthData?['token'];
-
-      if (oauthToken == null || oauthToken.isEmpty) {
-        throw Exception(
-            'OAuth token not found. Please restart the login process.');
-      }
-
-      // 送出前：若推薦碼非空且尚未驗證為 valid，阻擋送出
+      final prefs = await SharedPreferences.getInstance();
       final referral = referralCodeController.text.trim();
-      if (referral.isNotEmpty && referralCodeStatus != 'valid') {
-        _showErrorSnackBar('Referral code is invalid or not verified');
+      await prefs.setBool('signup_is_oauth', true);
+      await prefs.setString('signup_oauth_token', oauthToken);
+      await prefs.setString('signup_full_name', fullNameController.text.trim());
+      await prefs.setString('signup_nickname', nicknameController.text.trim());
+      await prefs.setString('signup_gender', selectedGender);
+      await prefs.setString('signup_email', emailController.text.trim());
+      await prefs.setString('signup_phone', phoneController.text.trim());
+      await prefs.setString('signup_country', countryController.text);
+      await prefs.setString('signup_address', addressController.text.trim());
+      await prefs.setString(
+          'signup_date_of_birth', dateOfBirthController.text.trim());
+      await prefs.setBool('signup_is_permanent_address', isPermanentAddress);
+      await prefs.setStringList('signup_languages', selectedLanguages);
+      await prefs.setString('signup_referral_code', referral);
+      await prefs.setString('signup_avatar_url', oauthAvatarUrl ?? '');
+      await prefs.setString('signup_oauth_provider',
+          widget.oauthData?['provider']?.toString() ?? '');
+      await prefs.remove('signup_password');
+      await prefs.remove('signup_payment_code');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Basic information saved. Please upload your student ID to finish registration.'),
+        ),
+      );
+      _shouldConfirmLeave = false;
+      context.go('/signup/student-id');
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('Failed to save registration draft: $e');
+      }
+    } finally {
+      if (mounted) {
         setState(() {
           isLoading = false;
         });
-        return;
       }
-
-      // 準備註冊資料（使用新的 token 化 API）
-      final registrationData = {
-        'oauth_token': oauthToken,
-        'name': fullNameController.text.trim(),
-        'nickname': nicknameController.text.trim(),
-        'phone': phoneController.text.trim(),
-        'date_of_birth': dateOfBirthController.text.isNotEmpty
-            ? dateOfBirthController.text
-            : null,
-        'gender': selectedGender,
-        'country': selectedCountry?.name ?? '',
-        'address': addressController.text.trim(),
-        'is_permanent_address': isPermanentAddress,
-        'primary_language':
-            selectedLanguages.isNotEmpty ? selectedLanguages.first : 'English',
-        'school': _getSchoolValue(),
-        'intro_referral_code': referralCodeController.text.trim(),
-        'payment_password': paymentPasswordController.text.isNotEmpty
-            ? paymentPasswordController.text
-            : null,
-        'avatar_url': oauthAvatarUrl, // 新增：包含 OAuth 頭像 URL
-      };
-
-      debugPrint('🚀 開始 OAuth 註冊...');
-      debugPrint('📝 註冊資料: ${registrationData.keys.toList()}'); // 不記錄敏感資料
-
-      // 調用新的 OAuth 註冊 API
-      final response = await http.post(
-        Uri.parse(AppConfig.api('/auth/register-oauth.php')),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(registrationData),
-      );
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 && data['success'] == true) {
-        debugPrint('✅ OAuth 註冊成功');
-
-        // 保存登入資訊
-        await _saveLoginInfo(data['data']['token'], data['data']['user']);
-
-        // 清理 OAuth 暫存資料
-        await _cleanupOAuthTempData(oauthToken);
-
-        // 導向到學生證上傳頁面
-        _redirectToStudentIdPage();
-      } else {
-        final errorMessage = data['message'] ?? 'Registration failed';
-        debugPrint('❌ OAuth 註冊失敗: $errorMessage');
-        _showErrorSnackBar(errorMessage);
-
-        // 如果是 token 相關錯誤，建議重新登入
-        if (errorMessage.toLowerCase().contains('token')) {
-          _showTokenExpiredDialog();
-        }
-      }
-    } catch (e) {
-      debugPrint('❌ OAuth 註冊錯誤: $e');
-      _showErrorSnackBar('Registration error: ${e.toString()}');
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
-    }
-  }
-
-  // 保存登入資訊
-  Future<void> _saveLoginInfo(
-      String token, Map<String, dynamic> userData) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('auth_token', token);
-      await prefs.setString('user_data', jsonEncode(userData));
-      print('💾 登入資訊已保存');
-    } catch (e) {
-      print('❌ 保存登入資訊失敗: $e');
-    }
-  }
-
-  // 導向到學生證上傳頁面
-  void _redirectToStudentIdPage() {
-    print('🔄 導向到學生證上傳頁面...');
-    if (mounted) {
-      context.go('/signup/student-id');
-    }
-  }
-
-  // 清理 OAuth 暫存資料
-  Future<void> _cleanupOAuthTempData(String oauthToken) async {
-    try {
-      debugPrint('🧹 開始清理 OAuth 暫存資料，token: $oauthToken');
-
-      // 調用後端 API 清理暫存資料
-      final response = await http.post(
-        Uri.parse(AppConfig.api('/auth/cleanup-oauth-temp.php')),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'oauth_token': oauthToken}),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true) {
-          debugPrint('✅ OAuth 暫存資料清理成功');
-        } else {
-          debugPrint('⚠️ OAuth 暫存資料清理失敗: ${data['message']}');
-        }
-      } else {
-        debugPrint('⚠️ OAuth 暫存資料清理請求失敗: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('❌ OAuth 暫存資料清理錯誤: $e');
     }
   }
 
@@ -582,33 +473,6 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       }
     }
     return '';
-  }
-
-  // 顯示 Token 過期對話框
-  void _showTokenExpiredDialog() {
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Session Expired'),
-          content: const Text(
-            'Your login session has expired. Please restart the login process.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                context.go('/login');
-              },
-              child: const Text('Back to Login'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   Future<void> _loadLanguages() async {
@@ -839,983 +703,1025 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   }
 
   void _showLeaveWarning() {
-    showDialog(
+    _showLeaveConfirmationDialog();
+  }
+
+  Future<bool> _showLeaveConfirmationDialog() async {
+    final result = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Warning'),
+          title: const Text('Leave registration?'),
           content: const Text(
-              'Your data will not be saved if you leave this page. Are you sure you want to continue?'),
+              'Your registration is not complete yet. Are you sure you want to leave this page?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(context).pop(false),
               child: const Text('Stay'),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                context.go('/login');
-              },
+              onPressed: () => Navigator.of(context).pop(true),
               child: const Text('Leave'),
             ),
           ],
         );
       },
     );
+    return result ?? false;
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // OAuth Avatar Preview (if available)
-            if (oauthAvatarUrl != null) ...[
-              Center(
-                child: Column(
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Theme.of(context).colorScheme.primary,
-                          width: 2,
-                        ),
-                      ),
-                      child: ClipOval(
-                        child: Image.network(
-                          oauthAvatarUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Icon(
-                              Icons.person,
-                              size: 40,
+    return WillPopScope(
+        onWillPop: () async {
+          if (!_shouldConfirmLeave) {
+            return true;
+          }
+          return await _showLeaveConfirmationDialog();
+        },
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // OAuth Avatar Preview (if available)
+                if (oauthAvatarUrl != null) ...[
+                  Center(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
                               color: Theme.of(context).colorScheme.primary,
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-            ],
-
-            // Full Name
-            TextFormField(
-              controller: fullNameController,
-              decoration: InputDecoration(
-                prefixIcon: Icon(
-                  Icons.person,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                labelText: 'Your Name *',
-                border: const OutlineInputBorder(),
-                helperText:
-                    'Enter your complete name as it appears on your official documents',
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your full name';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Nickname
-            TextFormField(
-              controller: nicknameController,
-              decoration: InputDecoration(
-                prefixIcon: Icon(
-                  Icons.alternate_email,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                labelText: 'Nickname',
-                border: const OutlineInputBorder(),
-                helperText: 'Enter the name you prefer to be called (optional)',
-              ),
-              validator: (value) {
-                // Nickname is optional
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Gender Selection
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: selectedGender,
-              decoration: InputDecoration(
-                labelText: 'Gender *',
-                prefixIcon: Icon(
-                  Icons.star,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                border: const OutlineInputBorder(),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-              items: genderOptions.map((String gender) {
-                return DropdownMenuItem<String>(
-                  value: gender,
-                  child: Text(gender),
-                );
-              }).toList(),
-              onChanged: (String? newValue) {
-                setState(() {
-                  selectedGender = newValue!;
-                });
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please select your gender';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Email
-            TextFormField(
-              controller: emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                prefixIcon: Icon(
-                  Icons.alternate_email,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                labelText: 'Email *',
-                border: const OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your email';
-                }
-                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                    .hasMatch(value)) {
-                  return 'Please enter a valid email';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Phone Number
-            TextFormField(
-              controller: phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                prefixIcon: Icon(
-                  Icons.phone,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                labelText: 'Phone number *',
-                border: const OutlineInputBorder(),
-                hintText: 'Taiwan format: 09xxxxxxxx or +8869xxxxxxxx',
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
-              ],
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your phone number';
-                }
-                if (!RegExp(r'^(09\d{8}|\+8869\d{8})$').hasMatch(value)) {
-                  return 'Invalid Taiwan mobile format';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Date of Birth (moved here, renamed to Birthday)
-            TextFormField(
-              controller: dateOfBirthController,
-              keyboardType: TextInputType.datetime,
-              decoration: InputDecoration(
-                prefixIcon: Icon(
-                  Icons.calendar_month,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                labelText: 'Birthday *',
-                hintText: 'YYYY/MM/DD',
-                border: const OutlineInputBorder(),
-              ),
-              readOnly: true,
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: DateTime.now()
-                      .subtract(const Duration(days: 6570)), // 18 years ago
-                  firstDate: DateTime.now()
-                      .subtract(const Duration(days: 36500)), // 100 years ago
-                  lastDate: DateTime.now(),
-                );
-                if (date != null) {
-                  setState(() {
-                    dateOfBirthController.text =
-                        '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
-                  });
-                }
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please select your date of birth';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 32),
-
-            // Address (moved here)
-            TextFormField(
-              controller: addressController,
-              keyboardType: TextInputType.multiline,
-              minLines: 1,
-              maxLines: 3, // 自動換行且最多三行，不影響實際值
-              decoration: InputDecoration(
-                prefixIcon: Icon(
-                  Icons.location_on,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                labelText: 'Address *',
-                border: const OutlineInputBorder(),
-                // 將 Permanent 自訂 Switch 放到輸入欄位右邊
-                suffixIcon: Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: GestureDetector(
-                    onTap: () => setState(
-                        () => isPermanentAddress = !isPermanentAddress),
-                    child: _PermanentPillSwitch(
-                      value: isPermanentAddress,
-                      label: 'Permanent',
-                    ),
-                  ),
-                ),
-                suffixIconConstraints:
-                    const BoxConstraints(minWidth: 0, minHeight: 0),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your address';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // School Selection - 新增
-            // const Text('School',
-            //     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: selectedUniversityId,
-              decoration: InputDecoration(
-                labelText: 'School *',
-                prefixIcon: Icon(
-                  Icons.school,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12.0, vertical: 12.0),
-              ),
-              hint: Text(
-                'Select your school',
-                style: TextStyle(
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                  fontSize: 16.0,
-                ),
-              ),
-              isExpanded: true,
-              menuMaxHeight: 300.0,
-              dropdownColor: Theme.of(context).colorScheme.surface,
-              icon: Icon(
-                Icons.arrow_drop_down,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              style: TextStyle(
-                fontSize: 13.0,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              selectedItemBuilder: (context) {
-                final widgets = <Widget>[
-                  ...universityOptions
-                      .where((u) =>
-                          u['id'] != null &&
-                          u['abbr'] != null &&
-                          u['en_name'] != null)
-                      .map((u) {
-                    final abbr = u['abbr'] ?? '';
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                      child: Text(
-                        abbr,
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                        style: TextStyle(
-                          fontSize: 12.0,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    child: Text(
-                      'Other School',
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      style: TextStyle(
-                        fontSize: 16.0,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                ];
-                return widgets;
-              },
-              items: [
-                // 大學選項（無 placeholder 項，改由 hint 顯示）
-                ...universityOptions
-                    .where((university) =>
-                        university['id'] != null &&
-                        university['abbr'] != null &&
-                        university['en_name'] != null)
-                    .map((university) {
-                  final displayName = university['abbr'] ?? '';
-                  final enName = university['en_name'] ?? '';
-                  return DropdownMenuItem<String>(
-                    value: university['id'].toString(),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 6.0, horizontal: 12.0),
-                      margin: const EdgeInsets.only(bottom: 3.0),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          left: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                            width: 2.0,
+                              width: 2,
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: Image.network(
+                              oauthAvatarUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  Icons.person,
+                                  size: 40,
+                                  color: Theme.of(context).colorScheme.primary,
+                                );
+                              },
+                            ),
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // Full Name
+                TextFormField(
+                  controller: fullNameController,
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(
+                      Icons.person,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    labelText: 'Your Name *',
+                    border: const OutlineInputBorder(),
+                    helperText:
+                        'Enter your complete name as it appears on your official documents',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your full name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Nickname
+                TextFormField(
+                  controller: nicknameController,
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(
+                      Icons.alternate_email,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    labelText: 'Nickname',
+                    border: const OutlineInputBorder(),
+                    helperText:
+                        'Enter the name you prefer to be called (optional)',
+                  ),
+                  validator: (value) {
+                    // Nickname is optional
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Gender Selection
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedGender,
+                  decoration: InputDecoration(
+                    labelText: 'Gender *',
+                    prefixIcon: Icon(
+                      Icons.star,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    border: const OutlineInputBorder(),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  items: genderOptions.map((String gender) {
+                    return DropdownMenuItem<String>(
+                      value: gender,
+                      child: Text(gender),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      selectedGender = newValue!;
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select your gender';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Email
+                FocusScope(
+                  onFocusChange: (hasFocus) {
+                    if (!hasFocus) {
+                      _signupEmailKey.currentState?.validate();
+                    }
+                  },
+                  child: TextFormField(
+                    key: _signupEmailKey,
+                    controller: emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(
+                        Icons.alternate_email,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
-                      child: Row(
-                        children: [
-                          Text(
-                            displayName,
+                      labelText: 'Email *',
+                      border: const OutlineInputBorder(),
+                      hintText: 'name@example.com',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your email';
+                      }
+                      if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                          .hasMatch(value.trim())) {
+                        return 'Please enter a valid email format (e.g. name@example.com)';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Phone Number
+                TextFormField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(
+                      Icons.phone,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    labelText: 'Phone number *',
+                    border: const OutlineInputBorder(),
+                    hintText: 'Taiwan format: 09xxxxxxxx or +8869xxxxxxxx',
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
+                  ],
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your phone number';
+                    }
+                    if (!RegExp(r'^(09\d{8}|\+8869\d{8})$').hasMatch(value)) {
+                      return 'Invalid Taiwan mobile format';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Date of Birth (moved here, renamed to Birthday)
+                TextFormField(
+                  controller: dateOfBirthController,
+                  keyboardType: TextInputType.datetime,
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(
+                      Icons.calendar_month,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    labelText: 'Birthday *',
+                    hintText: 'YYYY/MM/DD',
+                    border: const OutlineInputBorder(),
+                  ),
+                  readOnly: true,
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now()
+                          .subtract(const Duration(days: 6570)), // 18 years ago
+                      firstDate: DateTime.now().subtract(
+                          const Duration(days: 36500)), // 100 years ago
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null) {
+                      setState(() {
+                        dateOfBirthController.text =
+                            '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+                      });
+                    }
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select your date of birth';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 32),
+
+                // Address (moved here)
+                TextFormField(
+                  controller: addressController,
+                  keyboardType: TextInputType.multiline,
+                  minLines: 1,
+                  maxLines: 3, // 自動換行且最多三行，不影響實際值
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(
+                      Icons.location_on,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    labelText: 'Address *',
+                    border: const OutlineInputBorder(),
+                    // 將 Permanent 自訂 Switch 放到輸入欄位右邊
+                    suffixIcon: Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: GestureDetector(
+                        onTap: () => setState(
+                            () => isPermanentAddress = !isPermanentAddress),
+                        child: _PermanentPillSwitch(
+                          value: isPermanentAddress,
+                          label: 'Permanent',
+                        ),
+                      ),
+                    ),
+                    suffixIconConstraints:
+                        const BoxConstraints(minWidth: 0, minHeight: 0),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your address';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // School Selection - 新增
+                // const Text('School',
+                //     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedUniversityId,
+                  decoration: InputDecoration(
+                    labelText: 'School *',
+                    prefixIcon: Icon(
+                      Icons.school,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12.0, vertical: 12.0),
+                  ),
+                  hint: Text(
+                    'Select your school',
+                    style: TextStyle(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.6),
+                      fontSize: 16.0,
+                    ),
+                  ),
+                  isExpanded: true,
+                  menuMaxHeight: 300.0,
+                  dropdownColor: Theme.of(context).colorScheme.surface,
+                  icon: Icon(
+                    Icons.arrow_drop_down,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  style: TextStyle(
+                    fontSize: 13.0,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  selectedItemBuilder: (context) {
+                    final widgets = <Widget>[
+                      ...universityOptions
+                          .where((u) =>
+                              u['id'] != null &&
+                              u['abbr'] != null &&
+                              u['en_name'] != null)
+                          .map((u) {
+                        final abbr = u['abbr'] ?? '';
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                          child: Text(
+                            abbr,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                             style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14.0,
+                              fontSize: 12.0,
                               color: Theme.of(context).colorScheme.onSurface,
                             ),
                           ),
-                          const SizedBox(width: 8.0),
-                          Text(
-                            '/',
-                            style: TextStyle(
-                              fontSize: 12.0,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withOpacity(0.6),
-                            ),
+                        );
+                      }).toList(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                        child: Text(
+                          'Other School',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontSize: 16.0,
+                            color: Theme.of(context).colorScheme.onSurface,
                           ),
-                          const SizedBox(width: 8.0),
-                          Expanded(
-                            child: Text(
-                              enName,
-                              style: TextStyle(
-                                fontSize: 12.0,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withOpacity(0.6),
-                                fontStyle: FontStyle.italic,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-                // Other School 選項
-                DropdownMenuItem<String>(
-                  value: 'other',
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 8.0, horizontal: 12.0),
-                    margin: const EdgeInsets.only(bottom: 5.0),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        left: BorderSide(
-                          color: Theme.of(context).colorScheme.primary,
-                          width: 2.0,
                         ),
                       ),
-                    ),
-                    child: Text(
-                      'Other School',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16.0,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  ),
-                ),
-              ],
-              onChanged: (value) {
-                setState(() {
-                  selectedUniversityId = value;
-                  if (value != 'other') {
-                    schoolController.clear();
-                  }
-                });
-              },
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please select your school';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // 如果選擇 Other School，顯示輸入欄位
-            if (selectedUniversityId == 'other') ...[
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: schoolController,
-                maxLength: 20,
-                decoration: InputDecoration(
-                  labelText: 'School Name *',
-                  hintText: 'Enter your school name',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.0),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16.0, vertical: 12.0),
-                  prefixIcon: Icon(
-                    Icons.school,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                style: TextStyle(
-                  fontSize: 16.0,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter your school name';
-                  }
-                  if (value.trim().length > 20) {
-                    return 'School name cannot exceed 20 characters';
-                  }
-                  return null;
-                },
-              ),
-            ],
-
-            // Referral Code - 新增（整合 Verify 按鈕至欄位）
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: referralCodeController,
-              decoration: InputDecoration(
-                labelText: 'Referral Code',
-                hintText: 'Enter referral code (optional)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
-                contentPadding: const EdgeInsets.only(
-                    left: 16.0, top: 12.0, bottom: 12.0, right: 0.0),
-                prefixIcon: Icon(
-                  Icons.card_giftcard,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                suffixIcon: SizedBox(
-                  width: 80,
-                  height: 46,
-                  child: _ReferralInlineButton(
-                    fieldRadius: 8.0,
-                    label: 'Verify',
-                    isLoading: isVerifyingReferralCode,
-                    status: referralCodeStatus,
-                    onPressed: _verifyReferralCode,
-                    icon: referralCodeStatus == 'valid'
-                        ? Icons.check_circle
-                        : referralCodeStatus == 'invalid'
-                            ? Icons.error
-                            : null,
-                  ),
-                ),
-                suffixIconConstraints: const BoxConstraints(
-                  minWidth: 80,
-                  maxWidth: 80,
-                  minHeight: 40,
-                  maxHeight: 48,
-                ),
-              ),
-              style: TextStyle(
-                fontSize: 16.0,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
-                LengthLimitingTextInputFormatter(12),
-              ],
-              onChanged: (value) {
-                final upper = value.toUpperCase();
-                if (referralCodeController.text != upper) {
-                  referralCodeController.value =
-                      referralCodeController.value.copyWith(
-                    text: upper,
-                    selection: TextSelection.collapsed(offset: upper.length),
-                  );
-                }
-                // 任何變更都重置狀態（按鈕回到預設樣式）
-                setState(() {
-                  referralCodeStatus = null;
-                });
-              },
-              validator: (value) {
-                // Referral code is optional
-                return null;
-              },
-            ),
-
-            // 推薦碼狀態提示
-            if (referralCodeStatus != null) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    referralCodeStatus == 'valid'
-                        ? Icons.check_circle
-                        : Icons.error,
-                    size: 16.0,
-                    color: _getReferralCodeStatusColor(),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _getReferralCodeStatusText(),
-                      style: TextStyle(
-                        fontSize: 14.0,
-                        color: _getReferralCodeStatusColor(),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 16),
-
-            // Primary Languages
-            Text(
-              'Primary Languages *',
-              style: TextStyle(
-                fontSize: 14.0,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                border: Border.all(
-                  color: languagesError
-                      ? Theme.of(context).colorScheme.error
-                      : Theme.of(context).colorScheme.outline.withOpacity(0.4),
-                  width: 1.0,
-                ),
-                borderRadius: BorderRadius.circular(12.0),
-              ),
-              child: Column(
-                children: [
-                  // 已選擇的語言標籤
-                  if (selectedLanguages.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Wrap(
-                        spacing: 8.0,
-                        runSpacing: 8.0,
-                        children: selectedLanguages.map((langCode) {
-                          final lang = languageOptions.firstWhere(
-                            (lang) => lang['code'] == langCode,
-                            orElse: () =>
-                                {'code': '', 'name': '', 'native': ''},
-                          );
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primary,
-                              borderRadius: BorderRadius.circular(20.0),
-                              border: Border.all(
+                    ];
+                    return widgets;
+                  },
+                  items: [
+                    // 大學選項（無 placeholder 項，改由 hint 顯示）
+                    ...universityOptions
+                        .where((university) =>
+                            university['id'] != null &&
+                            university['abbr'] != null &&
+                            university['en_name'] != null)
+                        .map((university) {
+                      final displayName = university['abbr'] ?? '';
+                      final enName = university['en_name'] ?? '';
+                      return DropdownMenuItem<String>(
+                        value: university['id'].toString(),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 6.0, horizontal: 12.0),
+                          margin: const EdgeInsets.only(bottom: 3.0),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              left: BorderSide(
                                 color: Theme.of(context).colorScheme.primary,
-                                width: 1.0,
+                                width: 2.0,
                               ),
                             ),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(20.0),
-                                onTap: () {
-                                  setState(() {
-                                    selectedLanguages.remove(langCode);
-                                    languagesError = false;
-                                  });
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12.0,
-                                    vertical: 8.0,
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        lang['native'] ??
-                                            lang['name'] ??
-                                            langCode,
-                                        style: TextStyle(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .onPrimary,
-                                          fontSize: 14.0,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6.0),
-                                      Icon(
-                                        Icons.close,
-                                        size: 16.0,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onPrimary,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-
-                  // 語言選擇按鈕
-                  if (selectedLanguages.length < 4)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: GestureDetector(
-                        onTap: _showLanguageSelector,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          ),
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.add_circle_outline,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 24.0,
+                              Text(
+                                displayName,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14.0,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
+                                ),
                               ),
                               const SizedBox(width: 8.0),
                               Text(
-                                'Add Language',
+                                '/',
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 16.0,
+                                  fontSize: 12.0,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface
+                                      .withOpacity(0.6),
                                 ),
                               ),
-                              const Spacer(),
-                              Icon(
-                                Icons.chevron_right,
-                                color: Theme.of(context).colorScheme.primary,
-                                size: 24.0,
+                              const SizedBox(width: 8.0),
+                              Expanded(
+                                child: Text(
+                                  enName,
+                                  style: TextStyle(
+                                    fontSize: 12.0,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withOpacity(0.6),
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
                               ),
                             ],
                           ),
                         ),
+                      );
+                    }).toList(),
+                    // Other School 選項
+                    DropdownMenuItem<String>(
+                      value: 'other',
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 8.0, horizontal: 12.0),
+                        margin: const EdgeInsets.only(bottom: 5.0),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            left: BorderSide(
+                              color: Theme.of(context).colorScheme.primary,
+                              width: 2.0,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          'Other School',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16.0,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
                     ),
-                ],
-              ),
-            ),
-            if (languagesError) ...[
-              const SizedBox(height: 6),
-              Text(
-                'Please select at least one language',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.error,
-                  fontSize: 12,
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      selectedUniversityId = value;
+                      if (value != 'other') {
+                        schoolController.clear();
+                      }
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please select your school';
+                    }
+                    return null;
+                  },
                 ),
-              ),
-              const SizedBox(height: 10),
-            ],
-            const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-            // 分隔線
-            Divider(
-              thickness: 2,
-              color: Theme.of(context).colorScheme.secondary,
-            ),
-            const SizedBox(height: 24),
-            // Account Password Section (wrapped like Payment Security)
-            Container(
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface.withValues(
-                      alpha: 0.5,
+                // 如果選擇 Other School，顯示輸入欄位
+                if (selectedUniversityId == 'other') ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: schoolController,
+                    maxLength: 20,
+                    decoration: InputDecoration(
+                      labelText: 'School Name *',
+                      hintText: 'Enter your school name',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.0),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16.0, vertical: 12.0),
+                      prefixIcon: Icon(
+                        Icons.school,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.primary,
-                  width: 1.5,
+                    style: TextStyle(
+                      fontSize: 16.0,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Please enter your school name';
+                      }
+                      if (value.trim().length > 20) {
+                        return 'School name cannot exceed 20 characters';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+
+                // Referral Code - 新增（整合 Verify 按鈕至欄位）
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: referralCodeController,
+                  decoration: InputDecoration(
+                    labelText: 'Referral Code',
+                    hintText: 'Enter referral code (optional)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    contentPadding: const EdgeInsets.only(
+                        left: 16.0, top: 12.0, bottom: 12.0, right: 0.0),
+                    prefixIcon: Icon(
+                      Icons.card_giftcard,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    suffixIcon: SizedBox(
+                      width: 80,
+                      height: 46,
+                      child: _ReferralInlineButton(
+                        fieldRadius: 8.0,
+                        label: 'Verify',
+                        isLoading: isVerifyingReferralCode,
+                        status: referralCodeStatus,
+                        onPressed: _verifyReferralCode,
+                        icon: referralCodeStatus == 'valid'
+                            ? Icons.check_circle
+                            : referralCodeStatus == 'invalid'
+                                ? Icons.error
+                                : null,
+                      ),
+                    ),
+                    suffixIconConstraints: const BoxConstraints(
+                      minWidth: 80,
+                      maxWidth: 80,
+                      minHeight: 40,
+                      maxHeight: 48,
+                    ),
+                  ),
+                  style: TextStyle(
+                    fontSize: 16.0,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                    LengthLimitingTextInputFormatter(12),
+                  ],
+                  onChanged: (value) {
+                    final upper = value.toUpperCase();
+                    if (referralCodeController.text != upper) {
+                      referralCodeController.value =
+                          referralCodeController.value.copyWith(
+                        text: upper,
+                        selection:
+                            TextSelection.collapsed(offset: upper.length),
+                      );
+                    }
+                    // 任何變更都重置狀態（按鈕回到預設樣式）
+                    setState(() {
+                      referralCodeStatus = null;
+                    });
+                  },
+                  validator: (value) {
+                    // Referral code is optional
+                    return null;
+                  },
                 ),
-                borderRadius: BorderRadius.circular(12.0),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+
+                // 推薦碼狀態提示
+                if (referralCodeStatus != null) ...[
+                  const SizedBox(height: 8),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Account Password *',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
+                      Icon(
+                        referralCodeStatus == 'valid'
+                            ? Icons.check_circle
+                            : Icons.error,
+                        size: 16.0,
+                        color: _getReferralCodeStatusColor(),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _getReferralCodeStatusText(),
+                          style: TextStyle(
+                            fontSize: 14.0,
+                            color: _getReferralCodeStatusColor(),
+                          ),
                         ),
                       ),
-                      IconButton(
-                        tooltip: (showPassword || showConfirmPassword)
-                            ? 'Hide passwords'
-                            : 'Show passwords',
-                        icon: Icon(
-                          (showPassword || showConfirmPassword)
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          color: Theme.of(context).colorScheme.primary,
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 16),
+
+                // Primary Languages
+                Text(
+                  'Primary Languages *',
+                  style: TextStyle(
+                    fontSize: 14.0,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    border: Border.all(
+                      color: languagesError
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context)
+                              .colorScheme
+                              .outline
+                              .withOpacity(0.4),
+                      width: 1.0,
+                    ),
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  child: Column(
+                    children: [
+                      // 已選擇的語言標籤
+                      if (selectedLanguages.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Wrap(
+                            spacing: 8.0,
+                            runSpacing: 8.0,
+                            children: selectedLanguages.map((langCode) {
+                              final lang = languageOptions.firstWhere(
+                                (lang) => lang['code'] == langCode,
+                                orElse: () =>
+                                    {'code': '', 'name': '', 'native': ''},
+                              );
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(20.0),
+                                  border: Border.all(
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                    width: 1.0,
+                                  ),
+                                ),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(20.0),
+                                    onTap: () {
+                                      setState(() {
+                                        selectedLanguages.remove(langCode);
+                                        languagesError = false;
+                                      });
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12.0,
+                                        vertical: 8.0,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            lang['native'] ??
+                                                lang['name'] ??
+                                                langCode,
+                                            style: TextStyle(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onPrimary,
+                                              fontSize: 14.0,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6.0),
+                                          Icon(
+                                            Icons.close,
+                                            size: 16.0,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onPrimary,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ),
-                        onPressed: () {
-                          setState(() {
-                            final next = !(showPassword || showConfirmPassword);
-                            showPassword = next;
-                            showConfirmPassword = next;
-                          });
+
+                      // 語言選擇按鈕
+                      if (selectedLanguages.length < 4)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: GestureDetector(
+                            onTap: _showLanguageSelector,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.add_circle_outline,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                    size: 24.0,
+                                  ),
+                                  const SizedBox(width: 8.0),
+                                  Text(
+                                    'Add Language',
+                                    style: TextStyle(
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 16.0,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Icon(
+                                    Icons.chevron_right,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                    size: 24.0,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (languagesError) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Please select at least one language',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                const SizedBox(height: 16),
+
+                // 分隔線
+                Divider(
+                  thickness: 2,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+                const SizedBox(height: 24),
+                // Account Password Section (wrapped like Payment Security)
+                Container(
+                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface.withValues(
+                          alpha: 0.5,
+                        ),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.primary,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Account Password *',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: (showPassword || showConfirmPassword)
+                                ? 'Hide passwords'
+                                : 'Show passwords',
+                            icon: Icon(
+                              (showPassword || showConfirmPassword)
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                final next =
+                                    !(showPassword || showConfirmPassword);
+                                showPassword = next;
+                                showConfirmPassword = next;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: passwordController,
+                        decoration: InputDecoration(
+                          labelText: 'Password *',
+                          prefixIcon: Icon(
+                            Icons.lock_outline,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(
+                                  alpha: 0.5,
+                                ),
+                          ),
+                          border: const OutlineInputBorder(),
+                          hintText: 'At least 6 characters, a-z, A-Z, 0-9',
+                        ),
+                        obscureText: !showPassword,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'[a-zA-Z0-9]')),
+                        ],
+                        onChanged: (value) {
+                          if (confirmPasswordController.text.isNotEmpty) {
+                            setState(() {});
+                          }
+                        },
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter a password';
+                          }
+                          if (value.length < 6) {
+                            return 'Password must be at least 6 characters';
+                          }
+                          if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(value)) {
+                            return 'Password can only contain letters and numbers';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: confirmPasswordController,
+                        decoration: InputDecoration(
+                          labelText: 'Confirm Password again *',
+                          prefixIcon: Icon(
+                            Icons.lock,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(
+                                  alpha: 0.5,
+                                ),
+                          ),
+                          border: const OutlineInputBorder(),
+                          hintText: 'Confirm your password again',
+                          helperText: confirmPasswordController.text !=
+                                  passwordController.text
+                              ? 'Passwords do not match'
+                              : null,
+                          helperMaxLines: 1,
+                        ),
+                        obscureText: !showConfirmPassword,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'[a-zA-Z0-9]')),
+                        ],
+                        onChanged: (value) {
+                          setState(() {});
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please confirm your password';
+                          }
+                          if (value != passwordController.text) {
+                            return 'Passwords do not match';
+                          }
+                          return null;
                         },
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: passwordController,
-                    decoration: InputDecoration(
-                      labelText: 'Password *',
-                      prefixIcon: Icon(
-                        Icons.lock_outline,
-                        color: Theme.of(context).colorScheme.primary.withValues(
-                              alpha: 0.5,
-                            ),
-                      ),
-                      border: const OutlineInputBorder(),
-                      hintText: 'At least 6 characters, a-z, A-Z, 0-9',
-                    ),
-                    obscureText: !showPassword,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-                    ],
-                    onChanged: (value) {
-                      if (confirmPasswordController.text.isNotEmpty) {
-                        setState(() {});
-                      }
-                    },
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter a password';
-                      }
-                      if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
-                      }
-                      if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(value)) {
-                        return 'Password can only contain letters and numbers';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: confirmPasswordController,
-                    decoration: InputDecoration(
-                      labelText: 'Confirm Password again *',
-                      prefixIcon: Icon(
-                        Icons.lock,
-                        color: Theme.of(context).colorScheme.primary.withValues(
-                              alpha: 0.5,
-                            ),
-                      ),
-                      border: const OutlineInputBorder(),
-                      hintText: 'Confirm your password again',
-                      helperText: confirmPasswordController.text !=
-                              passwordController.text
-                          ? 'Passwords do not match'
-                          : null,
-                      helperMaxLines: 1,
-                    ),
-                    obscureText: !showConfirmPassword,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-                    ],
-                    onChanged: (value) {
-                      setState(() {});
-                    },
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please confirm your password';
-                      }
-                      if (value != passwordController.text) {
-                        return 'Passwords do not match';
-                      }
-                      return null;
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Payment Security Section (wrapped in Container)
-            Container(
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface.withValues(
-                      alpha: 0.5,
-                    ),
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.primary,
-                  width: 1.5,
                 ),
-                borderRadius: BorderRadius.circular(12.0),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Payment Security',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      IconButton(
-                        tooltip: showPaymentPins
-                            ? 'Hide payment code'
-                            : 'Show payment code',
-                        icon: Icon(
-                          showPaymentPins
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          color: Theme.of(context).colorScheme.primary,
+                const SizedBox(height: 16),
+
+                // Payment Security Section (wrapped in Container)
+                Container(
+                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface.withValues(
+                          alpha: 0.5,
                         ),
-                        onPressed: () => setState(() {
-                          showPaymentPins = !showPaymentPins;
-                        }),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.primary,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Payment Security',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          IconButton(
+                            tooltip: showPaymentPins
+                                ? 'Hide payment code'
+                                : 'Show payment code',
+                            icon: Icon(
+                              showPaymentPins
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            onPressed: () => setState(() {
+                              showPaymentPins = !showPaymentPins;
+                            }),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Payment Password (6 boxes)
+                      const Text('Password *'),
+                      const SizedBox(height: 8),
+                      _buildPinputField(
+                        controller: paymentPasswordController,
+                        // helperText: 'This will be used for payment verification',
+                        validator: (v) {
+                          final t = (v ?? '').trim();
+                          if (t.isEmpty) return 'Please enter payment password';
+                          if (t.length != 6) {
+                            return 'Payment password must be 6 digits';
+                          }
+                          if (!RegExp(r'^\d{6}$').hasMatch(t)) {
+                            return 'Digits only';
+                          }
+                          return null;
+                        },
+                        obscure: !showPaymentPins,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Confirm Payment Password (6 boxes)
+                      const Text('Confirm Password *'),
+                      const SizedBox(height: 8),
+                      _buildPinputField(
+                        controller: confirmPaymentPasswordController,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        onChanged: (t) {
+                          // 及時驗證與第一次是否一致（6 碼時才比對）
+                          if (t.length == 6 &&
+                              t != paymentPasswordController.text) {
+                            // 觸發一次重建以顯示 validator 的錯誤（若有包在 Form 中）
+                            if (mounted) setState(() {});
+                          }
+                        },
+                        validator: (v) {
+                          final t = (v ?? '').trim();
+                          if (t.isEmpty) return 'Must be 6 digits';
+                          if (t != paymentPasswordController.text) {
+                            return 'Payment passwords do not match';
+                          }
+                          return null;
+                        },
+                        // helperText: 'Must match the password above',
+                        obscure: !showPaymentPins,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  // Payment Password (6 boxes)
-                  const Text('Password *'),
-                  const SizedBox(height: 8),
-                  _buildPinputField(
-                    controller: paymentPasswordController,
-                    // helperText: 'This will be used for payment verification',
-                    validator: (v) {
-                      final t = (v ?? '').trim();
-                      if (t.isEmpty) return 'Please enter payment password';
-                      if (t.length != 6) {
-                        return 'Payment password must be 6 digits';
-                      }
-                      if (!RegExp(r'^\d{6}$').hasMatch(t)) return 'Digits only';
-                      return null;
-                    },
-                    obscure: !showPaymentPins,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Confirm Payment Password (6 boxes)
-                  const Text('Confirm Password *'),
-                  const SizedBox(height: 8),
-                  _buildPinputField(
-                    controller: confirmPaymentPasswordController,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
-                    onChanged: (t) {
-                      // 及時驗證與第一次是否一致（6 碼時才比對）
-                      if (t.length == 6 &&
-                          t != paymentPasswordController.text) {
-                        // 觸發一次重建以顯示 validator 的錯誤（若有包在 Form 中）
-                        if (mounted) setState(() {});
-                      }
-                    },
-                    validator: (v) {
-                      final t = (v ?? '').trim();
-                      if (t.isEmpty) return 'Must be 6 digits';
-                      if (t != paymentPasswordController.text) {
-                        return 'Payment passwords do not match';
-                      }
-                      return null;
-                    },
-                    // helperText: 'Must match the password above',
-                    obscure: !showPaymentPins,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Submit Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: isLoading ? null : _handleSubmit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Complete Registration',
-                        style: TextStyle(fontSize: 18)),
-              ),
+                const SizedBox(height: 24),
+
+                // Submit Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isLoading ? null : _handleSubmit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text('Complete Registration',
+                            style: TextStyle(fontSize: 18)),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        ));
   }
 
   // 6 位數輸入元件（圓角方格/底線樣式）
@@ -2083,8 +1989,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
           widget.oauthData?['token'];
 
       if (oauthToken != null && oauthToken.isNotEmpty) {
-        // 使用 OAuth 註冊
-        await _handleOAuthRegistration();
+        // 使用 OAuth 註冊草稿，待學生證上傳後送出
+        await _handleOAuthRegistration(oauthToken);
       } else {
         // 使用傳統註冊：先將資料暫存，待學生證上傳時一次送出
         final prefs = await SharedPreferences.getInstance();
@@ -2104,6 +2010,10 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         await prefs.setStringList('signup_languages', selectedLanguages);
         await prefs.setString(
             'signup_referral_code', referralCodeController.text.trim());
+        await prefs.setBool('signup_is_oauth', false);
+        await prefs.remove('signup_oauth_token');
+        await prefs.remove('signup_oauth_provider');
+        await prefs.remove('signup_avatar_url');
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -2113,6 +2023,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         );
 
         // 導向學生證上傳頁面
+        _shouldConfirmLeave = false;
         context.go('/signup/student-id');
       }
     } catch (e) {

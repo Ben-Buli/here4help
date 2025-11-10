@@ -119,7 +119,7 @@
       </div>
 
       <!-- User Information Cards -->
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 mt-8">
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 mt-8">
         <!-- Basic Information -->
         <div class="admin-card">
           <h3 class="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
@@ -316,6 +316,67 @@
         </div>
       </div>
 
+      <!-- Admin Operation Logs -->
+      <div class="admin-card mt-8">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-medium text-gray-900">Operation History</h3>
+          <button
+            @click="() => loadOperationLogs(1)"
+            class="text-sm text-primary-600 hover:text-primary-800"
+            :disabled="isLoadingLogs"
+          >
+            {{ isLoadingLogs ? 'Loading...' : 'Refresh' }}
+          </button>
+        </div>
+        <div v-if="isLoadingLogs" class="flex justify-center py-4">
+          <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+        </div>
+        <div v-else-if="operationLogs.length === 0" class="text-center py-4 text-gray-500">
+          No operation logs found
+        </div>
+        <div v-else class="space-y-3">
+          <div
+            v-for="log in operationLogs"
+            :key="log.id"
+            class="flex items-start justify-between py-3 border-b border-gray-200 last:border-b-0"
+          >
+            <div class="flex-1">
+              <div class="flex items-center space-x-2 mb-1">
+                <span
+                  class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+                  :class="getActionBadgeClass(log.action)"
+                >
+                  {{ getActionText(log.action) }}
+                </span>
+                <span class="text-xs text-gray-500">
+                  by {{ log.actor_type === 'admin' ? (log.admin_full_name || log.admin_username || 'Admin') : 'System' }}
+                </span>
+              </div>
+              <div v-if="log.field" class="text-sm text-gray-700 mt-1">
+                <span class="font-medium">{{ log.field }}:</span>
+                <span v-if="log.old_value" class="text-red-600 line-through mr-2">{{ log.old_value }}</span>
+                <span v-if="log.new_value" class="text-green-600">{{ log.new_value }}</span>
+              </div>
+              <div v-if="log.reason" class="text-sm text-gray-500 mt-1">
+                Reason: {{ log.reason }}
+              </div>
+            </div>
+            <div class="text-sm text-gray-400 ml-4">
+              {{ formatDateTime(log.created_at) }}
+            </div>
+          </div>
+        </div>
+        <div v-if="operationLogsPagination.total > operationLogsPagination.per_page" class="mt-4 flex justify-center">
+          <button
+            @click="loadMoreLogs"
+            class="admin-button-secondary text-sm"
+            :disabled="isLoadingLogs"
+          >
+            Load More
+          </button>
+        </div>
+      </div>
+
       <UserReviewModal
         v-if="showReviewModal && user"
         :user="user"
@@ -360,7 +421,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { userApi } from '@/services/api'
+import { userApi, userActivityApi } from '@/services/api'
 import { getImageUrl } from '@/config/api'
 import UserReviewModal from '@/components/UserReviewModal.vue'
 
@@ -397,6 +458,14 @@ const selectedImagePath = ref('')
 const showReviewModal = ref(false)
 const studentImageLoadError = ref(false)
 const modalImageError = ref(false)
+const operationLogs = ref<any[]>([])
+const isLoadingLogs = ref(false)
+const operationLogsPagination = ref({
+  current_page: 1,
+  per_page: 10,
+  total: 0,
+  last_page: 1,
+})
 
 // Methods
 const loadUser = async () => {
@@ -506,8 +575,10 @@ const getPermissionBadgeClass = (permission: number | null) => {
   if (permission >= 99) return 'bg-purple-100 text-purple-800'
   if (permission >= 1) return 'bg-green-100 text-green-800'
   if (permission === 0) return 'bg-yellow-100 text-yellow-800'
-  if (permission >= -1) return 'bg-yellow-100 text-yellow-800'
-  if (permission >= -3) return 'bg-red-100 text-red-800'
+  if (permission === -1) return 'bg-yellow-100 text-yellow-800'
+  if (permission === -2) return 'bg-orange-100 text-orange-800'
+  if (permission === -3) return 'bg-red-100 text-red-800'
+  if (permission === -4) return 'bg-gray-100 text-gray-500'
   return 'bg-gray-100 text-gray-800'
 }
 
@@ -516,16 +587,98 @@ const getPermissionText = (permission: number | null) => {
   if (permission >= 99) return 'Master User'
   if (permission >= 1) return 'Verified User'
   if (permission === 0) return 'New User in Verification'
-  if (permission === -1) return 'Restricted'
-  if (permission === -2) return 'Suspended'
-  if (permission === -3) return 'Banned'
-  if (permission === -4) return 'Deleted'
+  if (permission === -1) return 'Admin Suspended'
+  if (permission === -2) return 'Admin Soft Deleted'
+  if (permission === -3) return 'Self Suspended'
+  if (permission === -4) return 'Self Soft Deleted'
   return `Level ${permission}`
 }
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return 'Never'
   return new Date(dateString).toLocaleDateString()
+}
+
+const formatDateTime = (dateString: string | null) => {
+  if (!dateString) return 'Never'
+  const date = new Date(dateString)
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+const getActionBadgeClass = (action: string) => {
+  const actionMap: Record<string, string> = {
+    permission_change: 'bg-purple-100 text-purple-800',
+    status_change: 'bg-blue-100 text-blue-800',
+    user_verification_review: 'bg-green-100 text-green-800',
+    batch_action: 'bg-orange-100 text-orange-800',
+  }
+  return actionMap[action] || 'bg-gray-100 text-gray-800'
+}
+
+const getActionText = (action: string) => {
+  const actionMap: Record<string, string> = {
+    permission_change: 'Permission Changed',
+    status_change: 'Status Changed',
+    user_verification_review: 'Verification Reviewed',
+    batch_action: 'Batch Action',
+  }
+  return actionMap[action] || action.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+}
+
+const loadOperationLogs = async (page = 1) => {
+  if (!user.value?.id) return
+  
+  try {
+    isLoadingLogs.value = true
+    // 後端使用 like 查詢，所以我們只傳遞一個主要的 action 類型，或者不傳遞讓後端返回所有
+    const response = await userActivityApi.list({
+      page,
+      per_page: operationLogsPagination.value.per_page,
+      user_id: user.value.id,
+      actor_type: 'admin', // 只顯示管理員操作
+    })
+
+    if (response.data.success && response.data.data) {
+      // 過濾出權限和狀態相關的操作
+      const filteredItems = (response.data.data.items || []).filter((item: any) => 
+        item.action === 'permission_change' || 
+        item.action === 'status_change' || 
+        item.action === 'user_verification_review'
+      )
+      
+      if (page === 1) {
+        operationLogs.value = filteredItems
+      } else {
+        operationLogs.value.push(...filteredItems)
+      }
+      
+      const pg = response.data.data.pagination
+      if (pg) {
+        operationLogsPagination.value = {
+          current_page: Number(pg.current_page) || page,
+          per_page: Number(pg.per_page) || operationLogsPagination.value.per_page,
+          total: Number(pg.total) || 0,
+          last_page: Number(pg.last_page) || 1,
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error('Failed to load operation logs:', err)
+  } finally {
+    isLoadingLogs.value = false
+  }
+}
+
+const loadMoreLogs = () => {
+  if (operationLogsPagination.value.current_page < operationLogsPagination.value.last_page) {
+    loadOperationLogs(operationLogsPagination.value.current_page + 1)
+  }
 }
 
 type StatusDisplay = { label: string; badgeClass: string }
@@ -578,6 +731,15 @@ const formatStatusText = (status?: string | null) => {
 onMounted(() => {
   loadUser()
 })
+
+watch(
+  () => user.value?.id,
+  (userId) => {
+    if (userId) {
+      loadOperationLogs(1)
+    }
+  }
+)
 
 watch(
   () => user.value?.student_verification?.student_id_image_path,

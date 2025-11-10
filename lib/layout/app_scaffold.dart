@@ -106,9 +106,9 @@ class _AppScaffoldState extends State<AppScaffold> {
     // 從倒數第二個開始查找（跳過當前路徑）
     for (int i = history.length - 2; i >= 0; i--) {
       final path = history[i];
-      // 跳過不可返回的路由和權限拒絕頁面
+      // 跳過不可返回的路由和系統頁面
       if (!instance._nonReturnableRoutes.contains(path) &&
-          !path.contains('/permission-denied')) {
+          !instance._isSystemPage(path)) {
         return path;
       }
     }
@@ -170,10 +170,14 @@ class _AppScaffoldState extends State<AppScaffold> {
         }
       }
 
-      if (currentPath.isNotEmpty) {
+      // 只將非系統頁面加入路由歷史，避免系統頁面污染歷史記錄
+      if (currentPath.isNotEmpty && !_isSystemPage(currentPath)) {
         if (_routeHistory.isEmpty || _routeHistory.last != currentPath) {
           _routeHistory.add(currentPath);
+          debugPrint('📝 路由歷史更新: $currentPath (歷史長度: ${_routeHistory.length})');
         }
+      } else if (_isSystemPage(currentPath)) {
+        debugPrint('🚫 系統頁面跳過歷史記錄: $currentPath');
       }
     } catch (e) {
       // 如果無法存取 GoRouterState，忽略這次更新
@@ -211,10 +215,9 @@ class _AppScaffoldState extends State<AppScaffold> {
         }
       }
 
-      // 特殊處理：如果在權限拒絕頁面，需要智能返回
-      final currentState = GoRouterState.of(context);
-      if (currentState.uri.path.contains('/permission-denied')) {
-        _handlePermissionDeniedBack();
+      // 統一處理所有系統頁面的返回邏輯
+      if (_isSystemPage(currentPath)) {
+        _handleSystemPageBack(currentPath);
         return;
       }
 
@@ -317,39 +320,91 @@ class _AppScaffoldState extends State<AppScaffold> {
     );
   }
 
-  /// 處理權限拒絕頁面的返回邏輯
-  void _handlePermissionDeniedBack() {
+  /// 統一處理所有系統頁面的返回邏輯
+  void _handleSystemPageBack(String currentPath) {
     final state = GoRouterState.of(context);
-    final fromPath = state.uri.queryParameters['from']; // 真正的上一頁
-    final blockedPath = state.uri.queryParameters['blocked']; // 被阻擋的頁面
 
-    debugPrint(
-        '🔙 AppScaffold 返回: fromPath=$fromPath, blockedPath=$blockedPath');
+    debugPrint('🔙 處理系統頁面返回: $currentPath');
 
-    if (fromPath != null && fromPath.isNotEmpty) {
-      // 檢查上一頁是否為基本頁面（permission = 0）
-      if (_isBasicPage(fromPath)) {
-        debugPrint('🔙 AppScaffold 返回到基本頁面: $fromPath');
-        context.go(fromPath);
-        return;
+    // 處理登入頁面：已登入用戶不應該返回登入頁面
+    if (currentPath == '/login' || currentPath.startsWith('/login')) {
+      debugPrint('🔙 從登入頁面返回，已登入用戶應返回首頁');
+      // 從路由歷史中找到最後一個非系統頁面
+      final previousPath = getPreviousValidRoute();
+      if (previousPath != null && !_isSystemPage(previousPath)) {
+        debugPrint('🔙 返回到歷史頁面: $previousPath');
+        context.go(previousPath);
+      } else {
+        debugPrint('🔙 沒有有效歷史，返回首頁');
+        context.go('/home');
       }
+      return;
     }
 
-    // 如果沒有有效的上一頁，返回首頁
-    debugPrint('🔙 AppScaffold 返回到首頁');
-    context.go('/home');
-  }
+    // 處理註冊頁面：類似登入頁面
+    if (currentPath == '/signup' || currentPath.startsWith('/signup')) {
+      debugPrint('🔙 從註冊頁面返回');
+      final previousPath = getPreviousValidRoute();
+      if (previousPath != null && !_isSystemPage(previousPath)) {
+        debugPrint('🔙 返回到歷史頁面: $previousPath');
+        context.go(previousPath);
+      } else {
+        debugPrint('🔙 沒有有效歷史，返回登入頁面');
+        context.go('/login');
+      }
+      return;
+    }
 
-  /// 檢查是否為基本頁面（permission = 0）
-  bool _isBasicPage(String path) {
-    final basicPages = [
-      '/home',
-      '/account',
-      '/task',
-      '/account/profile',
-      '/account/security',
-    ];
-    return basicPages.contains(path);
+    // 處理權限相關頁面：使用 query 參數判斷返回路徑
+    if (currentPath == '/permission-unverified' ||
+        currentPath == '/permission-denied') {
+      final fromPath = state.uri.queryParameters['from']; // 真正的上一頁
+      final blockedPath = state.uri.queryParameters['blocked']; // 被阻擋的頁面
+
+      debugPrint('🔙 權限頁面返回: fromPath=$fromPath, blockedPath=$blockedPath');
+
+      // 優先使用 blocked 參數，其次使用 from 參數
+      final targetPath = blockedPath ?? fromPath;
+
+      if (targetPath != null &&
+          targetPath.isNotEmpty &&
+          !_isSystemPage(targetPath)) {
+        debugPrint('🔙 返回到目標頁面: $targetPath');
+        context.go(targetPath);
+        return;
+      }
+
+      // 如果 query 參數無效，嘗試從路由歷史找到上一頁
+      final previousPath = getPreviousValidRoute();
+      if (previousPath != null && !_isSystemPage(previousPath)) {
+        debugPrint('🔙 從歷史返回到: $previousPath');
+        context.go(previousPath);
+        return;
+      }
+
+      // 如果都沒有，返回首頁
+      debugPrint('🔙 沒有有效目標，返回首頁');
+      context.go('/home');
+      return;
+    }
+
+    // 處理 404 頁面：嘗試從路由歷史找到上一頁
+    if (currentPath == '/page-not-found') {
+      debugPrint('🔙 404 頁面返回');
+      final previousPath = getPreviousValidRoute();
+      if (previousPath != null && !_isSystemPage(previousPath)) {
+        debugPrint('🔙 從歷史返回到: $previousPath');
+        context.go(previousPath);
+      } else {
+        debugPrint('🔙 沒有有效歷史，返回首頁');
+        context.go('/home');
+      }
+      return;
+    }
+
+    // 其他系統頁面的備用處理
+    debugPrint('🔙 未知系統頁面，返回首頁');
+    context.go('/home');
   }
 
   /// 檢查是否為系統頁面（不需要 404 檢查）
@@ -381,100 +436,121 @@ class _AppScaffoldState extends State<AppScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.deferToChild,
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Consumer<ThemeConfigManager>(
-        builder: (context, themeManager, child) {
-          // 若主題為 taipei_101 或 milk_tea_earth，提供專屬背景
-          final baseThemeName =
-              themeManager.currentTheme.name.replaceAll('_dark', '');
-          final isTaipei101 = baseThemeName == 'taipei_101';
-          final isMilkTea = baseThemeName == 'milk_tea_earth';
-          final backgroundChild = Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 500),
-              child: Scaffold(
-                backgroundColor: Colors.transparent, // 讓 Scaffold 背景透明以顯示漸層
-                appBar: widget.showAppBar
-                    ? _buildGlassmorphismAppBar(themeManager)
-                    : null,
-                body: SafeArea(
-                  top: true, // 總是為頂部添加安全區域，避免被瀏海遮住
-                  bottom: !widget.showBottomNav,
-                  child: _buildSwipeBackWrapper(context, widget.child),
+    return PopScope(
+      canPop: false, // 阻止默認的 pop 行為，由我們自定義處理
+      onPopInvoked: (didPop) async {
+        // didPop 為 false，因為我們設置了 canPop: false
+        if (didPop) return;
+        // 調用自定義的返回處理邏輯（_handleBack 是 async void，不需要 await）
+        _handleBack();
+      },
+      child: GestureDetector(
+        behavior: HitTestBehavior.deferToChild,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Consumer<ThemeConfigManager>(
+          builder: (context, themeManager, child) {
+            // 若主題為 taipei_101 或 milk_tea_earth，提供專屬背景
+            final baseThemeName =
+                themeManager.currentTheme.name.replaceAll('_dark', '');
+            final isTaipei101 = baseThemeName == 'taipei_101';
+            final isMilkTea = baseThemeName == 'milk_tea_earth';
+            final isHopeful = baseThemeName == 'hopeful';
+            final backgroundChild = Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: Scaffold(
+                  backgroundColor: Colors.transparent, // 讓 Scaffold 背景透明以顯示漸層
+                  appBar: widget.showAppBar
+                      ? _buildGlassmorphismAppBar(themeManager)
+                      : null,
+                  body: SafeArea(
+                    top: true, // 總是為頂部添加安全區域，避免被瀏海遮住
+                    bottom: !widget.showBottomNav,
+                    child: _buildSwipeBackWrapper(context, widget.child),
+                  ),
+                  bottomNavigationBar: widget.showBottomNav
+                      ? _buildGlassmorphismBottomNav(themeManager, context)
+                      : null,
                 ),
-                bottomNavigationBar: widget.showBottomNav
-                    ? _buildGlassmorphismBottomNav(themeManager, context)
-                    : null,
-              ),
-            ),
-          );
-
-          if (isTaipei101 || baseThemeName == 'pride_s_curve' || isMilkTea) {
-            return Container(
-              color: themeManager.currentTheme.background,
-              child: Stack(
-                children: [
-                  // 簡化的點狀燈飾背景：多層次散落的發光點
-                  if (isTaipei101) ...[
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: _Taipei101LightsPainter(),
-                      ),
-                    ),
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: _Taipei101TowerPainter(
-                          bodyColor: const Color(0xFF273043).withOpacity(0.55),
-                          edgeColor: Colors.white.withOpacity(0.18),
-                          windowColor: Colors.white.withOpacity(0.16),
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (baseThemeName == 'pride_s_curve')
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: _SCurveRainbowPainter(),
-                      ),
-                    ),
-                  if (isMilkTea)
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: _BubbleTeaPatternPainter(
-                          cupColor: themeManager.currentTheme.accent
-                              .withOpacity(0.35),
-                          lidColor: themeManager.currentTheme.background
-                              .withOpacity(0.25),
-                          strawColor: themeManager.currentTheme.primary
-                              .withOpacity(0.35),
-                          pearlColor: themeManager.currentTheme.onSurface
-                              .withOpacity(0.35),
-                        ),
-                      ),
-                    ),
-                  backgroundChild,
-                ],
               ),
             );
-          }
 
-          // 對特定主題（clownfish、patrick_star）強制水平 0deg 漸層
-          final bool forceHorizontal =
-              baseThemeName == 'clownfish' || baseThemeName == 'patrick_star';
-          final AlignmentGeometry? beginOverride =
-              forceHorizontal ? Alignment.centerLeft : null;
-          final AlignmentGeometry? endOverride =
-              forceHorizontal ? Alignment.centerRight : null;
+            if (isTaipei101 ||
+                baseThemeName == 'pride_s_curve' ||
+                isMilkTea ||
+                isHopeful) {
+              return Container(
+                color: themeManager.currentTheme.background,
+                child: Stack(
+                  children: [
+                    // 簡化的點狀燈飾背景：多層次散落的發光點
+                    if (isTaipei101) ...[
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _Taipei101LightsPainter(),
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _Taipei101TowerPainter(
+                            bodyColor:
+                                const Color(0xFF273043).withOpacity(0.55),
+                            edgeColor: Colors.white.withOpacity(0.18),
+                            windowColor: Colors.white.withOpacity(0.16),
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (baseThemeName == 'pride_s_curve')
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _SCurveRainbowPainter(),
+                        ),
+                      ),
+                    if (isMilkTea)
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _BubbleTeaPatternPainter(
+                            cupColor: themeManager.currentTheme.accent
+                                .withOpacity(0.35),
+                            lidColor: themeManager.currentTheme.background
+                                .withOpacity(0.25),
+                            strawColor: themeManager.currentTheme.primary
+                                .withOpacity(0.35),
+                            pearlColor: themeManager.currentTheme.onSurface
+                                .withOpacity(0.35),
+                          ),
+                        ),
+                      ),
+                    if (isHopeful)
+                      Positioned.fill(
+                        child: _HopefulPatternWidget(
+                          iconColor: themeManager.currentTheme.primary
+                              .withOpacity(0.25),
+                        ),
+                      ),
+                    backgroundChild,
+                  ],
+                ),
+              );
+            }
 
-          return themeManager.effectiveTheme.createGradientBlurredBackground(
-            child: backgroundChild,
-            begin: beginOverride,
-            end: endOverride,
-            blurRadius: 16.0,
-          );
-        },
+            // 對特定主題（clownfish、patrick_star）強制水平 0deg 漸層
+            final bool forceHorizontal =
+                baseThemeName == 'clownfish' || baseThemeName == 'patrick_star';
+            final AlignmentGeometry? beginOverride =
+                forceHorizontal ? Alignment.centerLeft : null;
+            final AlignmentGeometry? endOverride =
+                forceHorizontal ? Alignment.centerRight : null;
+
+            return themeManager.effectiveTheme.createGradientBlurredBackground(
+              child: backgroundChild,
+              begin: beginOverride,
+              end: endOverride,
+              blurRadius: 16.0,
+            );
+          },
+        ),
       ),
     );
   }
@@ -644,15 +720,27 @@ class _AppScaffoldState extends State<AppScaffold> {
   }
 
   bool _canGoBack() {
+    // 如果當前在系統頁面，總是允許返回（由 _handleSystemPageBack 處理）
+    try {
+      final currentPath = GoRouterState.of(context).uri.path;
+      if (_isSystemPage(currentPath)) {
+        return true;
+      }
+    } catch (e) {
+      // 如果無法獲取當前路徑，繼續檢查歷史記錄
+      debugPrint('⚠️ _canGoBack: 無法獲取當前路徑: $e');
+    }
+
     if (_routeHistory.length <= 1) {
       return false;
     }
 
-    // 檢查是否有可返回的路由
+    // 檢查是否有可返回的路由（排除系統頁面和不可返回的路由）
     for (int i = _routeHistory.length - 2; i >= 0; i--) {
       final previousPath = _routeHistory[i];
 
-      if (!_nonReturnableRoutes.contains(previousPath)) {
+      if (!_nonReturnableRoutes.contains(previousPath) &&
+          !_isSystemPage(previousPath)) {
         return true;
       }
     }
@@ -892,6 +980,52 @@ class _BubbleTeaPatternPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Brand 主題圖案 Widget - 使用 AppIcon-no-bg.png
+class _HopefulPatternWidget extends StatelessWidget {
+  final Color iconColor;
+
+  const _HopefulPatternWidget({
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = constraints.biggest;
+        final rnd = Random(42);
+
+        return Stack(
+          children: List.generate(5, (index) {
+            final scale = 0.6 + rnd.nextDouble() * 0.6;
+            final x = rnd.nextDouble() * size.width;
+            final y = rnd.nextDouble() * size.height;
+            final rotation = rnd.nextDouble() * 2 * 3.14159; // 隨機旋轉角度
+            final iconSize = 60.0 * scale;
+
+            return Positioned(
+              left: x - iconSize / 2,
+              top: y - iconSize / 2,
+              child: Transform.rotate(
+                angle: rotation,
+                child: Opacity(
+                  opacity: 0.25,
+                  child: Image.asset(
+                    'assets/icon/AppIcon-no-bg.png',
+                    width: iconSize,
+                    height: iconSize,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
 }
 
 class _ChatBadgeDotIcon extends StatefulWidget {

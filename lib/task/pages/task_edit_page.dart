@@ -2607,8 +2607,9 @@ class _TaskCreatePageState extends State<TaskEditPage> {
                         textInputAction: TextInputAction.next,
                         maxLength: 5,
                         onChanged: (_) {
-                          if (errorText != null)
+                          if (errorText != null) {
                             setState(() => errorText = null);
+                          }
                         },
                       ),
                       const SizedBox(height: 8),
@@ -2627,8 +2628,9 @@ class _TaskCreatePageState extends State<TaskEditPage> {
                         ],
                         textInputAction: TextInputAction.done,
                         onChanged: (_) {
-                          if (errorText != null)
+                          if (errorText != null) {
                             setState(() => errorText = null);
+                          }
                         },
                       ),
                       const SizedBox(height: 12),

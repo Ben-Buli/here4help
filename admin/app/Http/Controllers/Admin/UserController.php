@@ -194,6 +194,73 @@ class UserController extends Controller
     }
 
     /**
+     * 列出用戶邀請碼／推薦碼資訊
+     */
+    public function referralCodes(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'page' => 'integer|min:1',
+            'per_page' => 'integer|min:1|max:200',
+            'search' => 'nullable|string|max:255',
+            'user_id' => 'nullable|integer',
+            'sort_by' => 'string|in:id,name,email,permission,referral_code,intro_referral_code,updated_at',
+            'sort_order' => 'string|in:asc,desc',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $page = (int)$request->get('page', 1);
+        $perPage = (int)$request->get('per_page', 20);
+        $search = $request->get('search');
+        $userId = $request->get('user_id');
+        $sortBy = $request->get('sort_by', 'updated_at');
+        $sortOrder = $request->get('sort_order', 'desc');
+
+        $query = DB::table('users')
+            ->select('id', 'name', 'email', 'permission', 'referral_code', 'intro_referral_code', 'updated_at');
+
+        if ($userId) {
+            $query->where('id', $userId);
+        }
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                    ->orWhere('email', 'LIKE', "%{$search}%")
+                    ->orWhere('referral_code', 'LIKE', "%{$search}%")
+                    ->orWhere('intro_referral_code', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $total = $query->count();
+
+        $records = $query
+            ->orderBy($sortBy, $sortOrder)
+            ->offset(($page - 1) * $perPage)
+            ->limit($perPage)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'items' => $records,
+                'pagination' => [
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                    'last_page' => ceil($total / $perPage),
+                ],
+            ],
+        ]);
+    }
+
+    /**
      * 更新用戶狀態
      */
     public function updateStatus(Request $request, $id)

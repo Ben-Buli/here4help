@@ -82,13 +82,13 @@ class PermissionService {
       case ADMIN:
         return 'Administrator';
       case SUSPENDED_BY_ADMIN:
-        return 'Account suspended by administrator';
+        return 'Admin Suspended';
       case SOFT_DELETED_BY_ADMIN:
-        return 'Account removed by administrator';
+        return 'Admin Soft Deleted';
       case SELF_SUSPENDED:
-        return 'Account self-suspended';
+        return 'Self Suspended';
       case SELF_SOFT_DELETED:
-        return 'Account self-removed';
+        return 'Self Soft Deleted';
       default:
         return 'Unknown permission status';
     }

@@ -40,6 +40,12 @@ const router = createRouter({
           meta: { title: 'Users' },
         },
         {
+          path: 'referral-codes',
+          name: 'users-referral-codes',
+          component: () => import('../views/ReferralCodesView.vue'),
+          meta: { title: 'Referral Codes' },
+        },
+        {
           path: ':id',
           name: 'user-detail',
           component: () => import('../views/UserDetailView.vue'),
@@ -198,6 +204,32 @@ const router = createRouter({
           name: 'payment-official-account',
           component: () => import('../components/wallet/OfficialBankAccountPage.vue'),
           meta: { title: 'Official Bank Account' },
+        },
+      ],
+    },
+    {
+      path: '/point-policies',
+      component: () => import('../components/AppLayout.vue'),
+      meta: { requiresAuth: true, permission: 'points.edit' },
+      children: [
+        {
+          path: '',
+          name: 'point-policies',
+          component: () => import('../views/PointPolicyView.vue'),
+          meta: { title: 'Point Policy' },
+        },
+      ],
+    },
+    {
+      path: '/faqs',
+      component: () => import('../components/AppLayout.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        {
+          path: '',
+          name: 'faqs',
+          component: () => import('../views/FAQView.vue'),
+          meta: { title: 'FAQ Management' },
         },
       ],
     },

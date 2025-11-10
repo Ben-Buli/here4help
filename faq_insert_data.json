@@ -1,0 +1,27 @@
+[
+  {
+    "question": "How do I reset my password?",
+    "answer": "Go to Security Settings and select \"Change Password\".",
+    "category": "general",
+    "language": "en",
+    "is_active": 1,
+    "sort_order": 1
+  },
+  {
+    "question": "How do I contact support?",
+    "answer": "Use the \"Contact Us\" option in Customer Support.",
+    "category": "general",
+    "language": "en",
+    "is_active": 1,
+    "sort_order": 2
+  },
+  {
+    "question": "How do I check my points?",
+    "answer": "Go to My Wallet to view your points balance.",
+    "category": "general",
+    "language": "en",
+    "is_active": 1,
+    "sort_order": 3
+  }
+]
+

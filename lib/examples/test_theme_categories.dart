@@ -63,7 +63,7 @@ class TestThemeCategories {
       print('\n3. 測試特定主題的分類...');
 
       // 測試 H4H 主題
-      final h4hTheme = ThemeScheme.h4hBrand;
+      const h4hTheme = ThemeScheme.h4hLight;
       print('   H4H 主題測試:');
       print('     category: ${h4hTheme.category}');
       print(

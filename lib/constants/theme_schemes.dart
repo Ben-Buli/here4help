@@ -90,13 +90,13 @@ class ThemeScheme {
     this.appBarSubtitleColor,
   });
 
-  /// Here4Help 品牌主題
-  static const ThemeScheme h4hBrand = ThemeScheme(
-    name: 'h4h_brand',
-    displayName: 'H4H',
-    category: 'business',
-    primary: Color(0xFF0C4C7B),
-    secondary: Color(0xFF3B9ACF),
+  /// Here4Help 淺色主題 - Default
+  static const ThemeScheme h4hLight = ThemeScheme(
+    name: 'h4h_light',
+    displayName: 'Default',
+    category: 'here4help',
+    primary: Color(0xFF3B9ACF), // 較亮的藍色（交換後的顏色）
+    secondary: Color(0xFF5BB3E8), // 更亮的藍色
     accent: Color(0xFFEE752E),
     background: Color(0xFFF4F8FB),
     surface: Color(0xFFFFFFFF),
@@ -110,8 +110,8 @@ class ThemeScheme {
     warning: Color(0xFFF59E0B),
     shadow: Color(0x1A0C4C7B),
     outlineVariant: Color(0xFFB5D2E5),
-    backArrowColor: Color(0xFF3B9ACF),
-    backArrowColorInactive: Color(0xFF0C4C7B),
+    backArrowColor: Color(0xFFFFFFFF), // 與 AppBar 標題顏色相同
+    backArrowColorInactive: Color(0x80FFFFFF), // Disable 狀態：半透明白色 (0.5 opacity)
     cardBackground: Color(0xFFFFFFFF),
     cardBorder: Color(0xFFE0E7EF),
     inputBackground: Color(0xFFFFFFFF),
@@ -123,8 +123,92 @@ class ThemeScheme {
     successBackground: Color(0xFFD1FAE5),
     warningBackground: Color(0xFFFFEDD5),
     errorBackground: Color(0xFFFEE2E2),
-    appBarTitleColor: Color(0xFF3B9ACF),
-    appBarSubtitleColor: Color(0xFF3B9ACF),
+    appBarTitleColor: Color(0xFFFFFFFF), // 白色主要文字
+    appBarSubtitleColor:
+        Color.fromARGB(179, 12, 76, 123), // 深色略微透明 (0.7 opacity)
+  );
+
+  /// Here4Help 深色主題 - H4H Dark Mode（基於 Light 版本的暗色配色）
+  static const ThemeScheme h4hDark = ThemeScheme(
+    name: 'h4h_dark',
+    displayName: 'Dark',
+    category: 'here4help',
+    primary: Color(0xFF0C4C7B), // 深藍色（交換後的顏色，作為 dark 的主要色）
+    secondary: Color(0xFF3B9ACF), // 中等藍色
+    accent: Color(0xFFEE752E), // 保持橙色強調
+    background: Color(0xFF0F1A24), // 深色背景
+    surface: Color(0xFF1A2533), // 深色表面
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFFFFFFFF),
+    onBackground: Color(0xFFE5EDF5), // 淺色文字
+    onSurface: Color(0xFFD1D9E5), // 淺色表面文字
+    error: Color(0xFFEF4444),
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF22C55E),
+    warning: Color(0xFFF59E0B),
+    shadow: Color(0x33000000),
+    outlineVariant: Color(0xFF2A3A4A),
+    backArrowColor: Color(0xFF5BB3E8), // 淺藍色返回箭頭
+    backArrowColorInactive: Color(0xFF3B9ACF), // 中等藍色非活動返回箭頭
+    cardBackground: Color(0xFF1F2933), // 深色卡片背景
+    cardBorder: Color(0xFF2A3A4A), // 深色卡片邊框
+    inputBackground: Color(0xFF1F2933), // 深色輸入框背景
+    inputBorder: Color(0xFF3A4A5A), // 深色輸入框邊框
+    hintText: Color(0xFF6B7280), // 灰色提示文字
+    disabledText: Color(0xFF4A5568), // 深灰色禁用文字
+    divider: Color(0xFF2A3A4A), // 深色分割線
+    overlay: Color(0xCC000000), // 深色遮罩
+    successBackground: Color(0xFF1A3A2A), // 深色成功背景
+    warningBackground: Color(0xFF3A2A1A), // 深色警告背景
+    errorBackground: Color(0xFF3A1A1A), // 深色錯誤背景
+    appBarTitleColor: Color(0xFFFFFFFF), // 白色 AppBar 標題
+    appBarSubtitleColor:
+        Color.fromARGB(204, 229, 237, 245), // 淺色略微透明 AppBar 次標題 (0.8 opacity)
+  );
+
+  /// Brand 主題 - 藍色愛心與伸出援手的視覺概念
+  static const ThemeScheme hopeful = ThemeScheme(
+    name: 'hopeful',
+    displayName: 'Brand',
+    category: 'here4help',
+    primary: Color(0xFF3B9ACF), // 藍色（愛心顏色）
+    secondary: Color(0xFF5BB3E8), // 淺藍色
+    accent: Color(0xFFFFFFFF), // 白色（伸出援手）
+    background: Color(0xFFE8F4F8), // 極淺藍色背景
+    surface: Color(0xFFF0F8FC), // 淺藍色表面
+    onPrimary: Color(0xFFFFFFFF),
+    onSecondary: Color(0xFFFFFFFF),
+    onBackground: Color(0xFF0C4C7B), // 深藍色文字
+    onSurface: Color(0xFF1A4A6B), // 深藍色表面文字
+    error: Color(0xFFDC2626),
+    onError: Color(0xFFFFFFFF),
+    success: Color(0xFF16A34A),
+    warning: Color(0xFFF59E0B),
+    shadow: Color(0x1A3B9ACF),
+    outlineVariant: Color(0xFFB5D2E5),
+    backArrowColor: Color(0xFFFFFFFF), // 與 AppBar 標題顏色相同
+    backArrowColorInactive: Color(0x80FFFFFF), // Disable 狀態：半透明白色 (0.5 opacity)
+    cardBackground: Color(0xFFFFFFFF),
+    cardBorder: Color(0xFFD0E8F0),
+    inputBackground: Color(0xFFFFFFFF),
+    inputBorder: Color(0xFFB5D2E5),
+    hintText: Color(0xFF6B7280),
+    disabledText: Color(0xFF94A3B8),
+    divider: Color(0xFFE0EDF5),
+    overlay: Color(0x803B9ACF),
+    successBackground: Color(0xFFD1FAE5),
+    warningBackground: Color(0xFFFFEDD5),
+    errorBackground: Color(0xFFFEE2E2),
+    appBarTitleColor: Color(0xFFFFFFFF), // 白色 AppBar 標題（確保在藍色背景上有足夠對比度）
+    appBarSubtitleColor: Color(0xFFFFFFFF), // 白色 AppBar 次標題
+    backgroundGradient: [
+      Color(0xFFE8F4F8), // 極淺藍色 (左上角)
+      Color(0xFFD0E8F0), // 淺藍色
+      Color(0xFFB8DCE8), // 中等藍色
+      Color(0xFFA0D0E0), // 深藍色 (右下角)
+    ],
+    gradientBegin: Alignment.topLeft,
+    gradientEnd: Alignment.bottomRight,
   );
 
   /// 主要風格 - 毛玻璃紫色系 (Main Style)
@@ -1091,7 +1175,8 @@ class ThemeScheme {
 
   /// 所有可用主題
   static const List<ThemeScheme> allThemes = [
-    h4hBrand,
+    h4hLight,
+    hopeful,
     mainStyle,
     metaBusinessStyle,
     businessGradient,
@@ -1125,7 +1210,7 @@ class ThemeScheme {
   static ThemeScheme getByName(String name) {
     return allThemes.firstWhere(
       (theme) => theme.name == name,
-      orElse: () => h4hBrand,
+      orElse: () => h4hLight,
     );
   }
 
@@ -1137,8 +1222,7 @@ class ThemeScheme {
 
     final resolvedAppBarTitleColor = appBarTitleColor ?? onPrimary;
     final resolvedAppBarSubtitleColor =
-        appBarSubtitleColor ??
-        resolvedAppBarTitleColor.withValues(alpha: 0.85);
+        appBarSubtitleColor ?? resolvedAppBarTitleColor.withValues(alpha: 0.85);
     final dialogBackground = blendWithWhite(primary);
     final dialogBorderColor = primary.withValues(alpha: 0.2);
 
@@ -1287,7 +1371,7 @@ class ThemeScheme {
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
       child: Container(
-          color: bgColor.withValues(alpha: 0.8),
+        color: bgColor.withValues(alpha: 0.8),
         child: child,
       ),
     );

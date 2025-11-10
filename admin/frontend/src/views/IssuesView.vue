@@ -333,11 +333,19 @@ const claimIssue = async (it: any) => {
 
 // 開啟聊天室（僅接手管理員可用）
 const openChatRoom = (it: any) => {
-  // 跳轉到聊天室詳情頁面
-  console.log('Opening chat room for:', it.room_id)
-  
-  // 跳轉到聊天室詳情頁面
-  window.location.href = `/support-chat-list/${it.room_id}`
+  const roomId = it.room_id
+  const origin = window.location.origin
+
+  // 判斷是否為正式站（hero4help.demofhs.com）
+  const isProd = origin.includes('hero4help.demofhs.com')
+
+  // 根據環境設定不同路徑
+  const basePath = isProd ? '/admin/support-chat-list' : '/support-chat-list'
+
+  const targetUrl = `${origin}${basePath}/${roomId}`
+
+  console.log('Redirecting to:', targetUrl)
+  window.location.href = targetUrl
 }
 
 // 更新事件狀態

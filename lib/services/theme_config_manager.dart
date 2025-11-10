@@ -13,7 +13,7 @@ import 'package:here4help/constants/theme_schemes.dart';
 /// 使用示例：
 /// ```dart
 /// final themeManager = ThemeConfigManager();
-/// await themeManager.setTheme(ThemeScheme.h4hBrand);
+/// await themeManager.setTheme(ThemeScheme.h4hLight);
 /// await themeManager.setThemeMode(AppThemeMode.system);
 /// ```
 class ThemeConfigManager extends ChangeNotifier {
@@ -21,7 +21,7 @@ class ThemeConfigManager extends ChangeNotifier {
   static const String _themeModeKey = 'theme_mode';
   static const String _themePresetsKey = 'theme_presets';
 
-  ThemeScheme _currentTheme = ThemeScheme.h4hBrand;
+  ThemeScheme _currentTheme = ThemeScheme.h4hLight;
   AppThemeMode _themeMode = AppThemeMode.light;
   Map<String, ThemePreset> _themePresets = {};
 
@@ -92,6 +92,7 @@ class ThemeConfigManager extends ChangeNotifier {
   /// 初始化預設主題配置
   ///
   /// 創建預設的主題集合，包括：
+  /// - Here4Help 品牌主題：H4H 品牌主題
   /// - 莫蘭迪色系合集：包含5個莫蘭迪風格主題
   /// - 海洋風格合集：包含3個海洋風格主題
   /// - 商業風格合集：包含3個商業風格主題
@@ -100,6 +101,16 @@ class ThemeConfigManager extends ChangeNotifier {
   /// 這些預設配置用於組織和管理相關的主題。
   void _initializeDefaultPresets() {
     _themePresets = {
+      'here4help_collection': const ThemePreset(
+        name: 'here4help_collection',
+        displayName: 'Here4Help',
+        description: 'Here4Help 品牌主題',
+        themes: [
+          ThemeScheme.h4hLight,
+          ThemeScheme.hopeful,
+        ],
+        icon: Icons.favorite,
+      ),
       'morandi_collection': const ThemePreset(
         name: 'morandi_collection',
         displayName: '莫蘭迪色系合集',
@@ -129,7 +140,6 @@ class ThemeConfigManager extends ChangeNotifier {
         displayName: '商業風格合集',
         description: '專業的商業風格主題集合',
         themes: [
-          ThemeScheme.h4hBrand,
           ThemeScheme.metaBusinessStyle,
           ThemeScheme.minimalistStill,
           ThemeScheme.milkTeaEarth,
@@ -159,7 +169,7 @@ class ThemeConfigManager extends ChangeNotifier {
   ///
   /// 使用示例：
   /// ```dart
-  /// await themeManager.setTheme(ThemeScheme.h4hBrand);
+  /// await themeManager.setTheme(ThemeScheme.h4hLight);
   /// ```
   Future<void> setTheme(ThemeScheme theme) async {
     if (_currentTheme.name != theme.name) {
@@ -255,7 +265,19 @@ class ThemeConfigManager extends ChangeNotifier {
       groups.putIfAbsent(groupName, () => []).add(theme);
     }
 
-    return groups;
+    // 對分組進行排序，確保 'Here4Help' 是第一個
+    final sortedGroups = Map.fromEntries(
+      groups.entries.toList()
+        ..sort((a, b) {
+          // 'Here4Help' 始終排在第一位
+          if (a.key == 'Here4Help') return -1;
+          if (b.key == 'Here4Help') return 1;
+          // 其他按字母順序排序
+          return a.key.compareTo(b.key);
+        }),
+    );
+
+    return sortedGroups;
   }
 
   /// 獲取指定主題類型的顏色選項
@@ -267,6 +289,7 @@ class ThemeConfigManager extends ChangeNotifier {
   /// 根據主題名稱判斷所屬類型
   ///
   /// 根據主題名稱將主題分類到不同的組別：
+  /// - `Here4Help`: Here4Help 品牌主題組
   /// - `Morandi`: 莫蘭迪風格主題組
   /// - `Ocean`: 海洋風格主題組
   /// - `Business`: 商業風格主題組
@@ -280,6 +303,8 @@ class ThemeConfigManager extends ChangeNotifier {
   String _getThemeGroup(ThemeScheme theme) {
     // 直接使用主題的 category 屬性進行分類
     switch (theme.category.toLowerCase()) {
+      case 'here4help':
+        return 'Here4Help';
       case 'morandi':
         return 'Morandi';
       case 'ocean':
@@ -351,7 +376,7 @@ class ThemeConfigManager extends ChangeNotifier {
 
   /// 重置為預設主題
   Future<void> resetToDefault() async {
-    await setTheme(ThemeScheme.h4hBrand);
+    await setTheme(ThemeScheme.h4hLight);
     await setThemeMode(AppThemeMode.light);
   }
 
@@ -388,16 +413,6 @@ class ThemeConfigManager extends ChangeNotifier {
       return ThemeScheme.getByName(lightThemeName);
     }
     return _currentTheme;
-  }
-
-  /// 獲取淺色主題（移除深色模式支援）
-  ///
-  /// 由於已移除深色模式支援，此方法始終返回當前主題的淺色版本。
-  ///
-  /// 返回淺色主題。
-  ThemeScheme _getDarkTheme() {
-    // 已移除深色模式支援，始終返回淺色主題
-    return _getLightTheme();
   }
 
   /// 驗證主題配置
@@ -830,20 +845,6 @@ class ThemeConfigManager extends ChangeNotifier {
     return theme.onSurface.withValues(alpha: 0.7);
   }
 
-  /// 檢查是否為淺色模式主題（移除深色模式支援）
-  ///
-  /// 由於已移除深色模式支援，此方法始終返回 false（表示不是深色模式）。
-  /// 所有主題都將使用淺色模式。
-  ///
-  /// 參數：
-  /// - [theme]: 要檢查的主題
-  ///
-  /// 返回 `false` 表示始終使用淺色模式。
-  bool _isDarkMode(ThemeScheme theme) {
-    // 已移除深色模式支援，始終返回 false
-    return false;
-  }
-
   /// 檢查當前主題是否為指定主題
   bool isCurrentTheme(ThemeScheme theme) {
     return _currentTheme.name == theme.name;
@@ -888,7 +889,7 @@ class ThemeConfigManager extends ChangeNotifier {
 
   /// 檢查主題是否為預設主題
   bool isDefaultTheme(ThemeScheme theme) {
-    return theme.name == ThemeScheme.h4hBrand.name;
+    return theme.name == ThemeScheme.h4hLight.name;
   }
 
   /// 獲取推薦主題列表

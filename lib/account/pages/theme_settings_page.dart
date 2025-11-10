@@ -661,7 +661,13 @@ class _ThemeSettingsPageState extends State<ThemeSettingsPage> {
       }
     }
 
-    // 如果找不到，返回當前主題
+    // 如果找不到，優先返回 Here4Help 主題
+    final here4helpGroup = groupedThemes['Here4Help'];
+    if (here4helpGroup != null && here4helpGroup.isNotEmpty) {
+      return here4helpGroup.first;
+    }
+
+    // 如果都沒有，返回當前主題
     return currentTheme;
   }
 

@@ -12,6 +12,15 @@ cd "$(dirname "$0")/frontend" || exit 1
 if [ ! -d "node_modules" ]; then
   echo "📦 安裝依賴..."
   npm install
+else
+  echo "📦 檢查並更新依賴..."
+  npm install
+fi
+
+# 檢查關鍵依賴是否安裝
+if [ ! -d "node_modules/@tiptap/vue-3" ]; then
+  echo "⚠️  警告：@tiptap/vue-3 未安裝，重新安裝依賴..."
+  npm install @tiptap/vue-3 @tiptap/starter-kit @tiptap/extension-table @tiptap/extension-table-row @tiptap/extension-table-header @tiptap/extension-table-cell @tiptap/extension-underline @tiptap/extension-text-style @tiptap/extension-color
 fi
 
 # 打包生產版本

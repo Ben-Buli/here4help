@@ -67,11 +67,11 @@
                 <select v-model="form.permission" class="admin-input" required>
                   <option :value="99">Super Admin (99)</option>
                   <option :value="1">Admin (1)</option>
-                  <option :value="0">Regular User (0)</option>
-                  <option :value="-1">Restricted (-1)</option>
-                  <option :value="-2">Suspended (-2)</option>
-                  <option :value="-3">Banned (-3)</option>
-                  <option :value="-4">Deleted (-4)</option>
+                  <option :value="0">New User in Verification (0)</option>
+                  <option :value="-1">Admin Suspended (-1)</option>
+                  <option :value="-2">Admin Soft Deleted (-2)</option>
+                  <option :value="-3">Self Suspended (-3)</option>
+                  <option :value="-4">Self Soft Deleted (-4)</option>
                 </select>
               </div>
 
