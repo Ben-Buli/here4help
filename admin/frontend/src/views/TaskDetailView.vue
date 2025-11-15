@@ -143,7 +143,7 @@
               <dt class="text-sm font-medium text-gray-500">Deadline</dt>
               <dd class="text-sm text-gray-900">{{ formatDate(task.deadline) }}</dd>
             </div>
-            <div>
+            <div v-if="task.status_id === 3">
               <dt class="text-sm font-medium text-gray-500">Countdown</dt>
               <dd class="text-sm text-gray-900">
                 <span v-if="task.countdown_seconds && task.countdown_seconds > 0">{{ formatCountdown(task.countdown_seconds) }}</span>
@@ -158,20 +158,20 @@
           <h3 class="text-lg font-medium text-gray-900 mb-4">People Involved</h3>
           <dl class="space-y-3">
             <div>
-              <dt class="text-sm font-medium text-gray-500">Creator</dt>
+              <dt class="text-sm font-medium text-gray-500">Poster</dt>
               <dd class="text-sm text-gray-900">
                 {{ task.creator_name || 'Unknown' }}
                 <span class="text-gray-500">(ID: {{ task.creator_id }})</span>
               </dd>
             </div>
             <div>
-              <dt class="text-sm font-medium text-gray-500">Participant</dt>
+              <dt class="text-sm font-medium text-gray-500">Tasker</dt>
               <dd class="text-sm text-gray-900">
                 <span v-if="task.participant_id">
                   {{ task.participant_name || 'Unknown' }}
                   <span class="text-gray-500">(ID: {{ task.participant_id }})</span>
                 </span>
-                <span v-else class="text-gray-500">No participant assigned</span>
+                <span v-else class="text-gray-500">No tasker assigned yet</span>
               </dd>
             </div>
             <div>
@@ -210,43 +210,42 @@
             </div>
           </dl>
         </div>
-      </div>
-
-      <div class="admin-card">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-medium text-gray-900">Task Reports</h3>
-          <span
-            v-if="hasPendingReportsState"
-            class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700"
-          >
-            Pending
-          </span>
-        </div>
-        <div v-if="reportsLoading" class="text-sm text-gray-500">Loading reports...</div>
-        <div v-else-if="reportsError" class="text-sm text-red-600">{{ reportsError }}</div>
-        <div v-else-if="reports.length === 0" class="text-sm text-gray-500">No reports for this task.</div>
-        <div v-else class="space-y-3">
-          <div
-            v-for="report in reports"
-            :key="report.id"
-            class="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3"
-          >
-            <div>
-              <p class="text-sm font-semibold text-gray-900">
-                {{ formatReportReason(report.reason) }}
-              </p>
-              <p class="text-xs text-gray-500">
-                {{ formatDateTime(report.updated_at || report.created_at) }}
-                · Status:
-                <span class="font-medium text-gray-900">{{ formatReportStatus(report.status) }}</span>
-              </p>
-            </div>
-            <button
-              class="text-sm font-medium text-primary-600 hover:text-primary-500"
-              @click="openReportModal(report)"
+        <div class="admin-card lg:col-span-2">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-medium text-gray-900">Task Reports</h3>
+            <span
+              v-if="hasPendingReportsState"
+              class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700"
             >
-              View
-            </button>
+              Pending
+            </span>
+          </div>
+          <div v-if="reportsLoading" class="text-sm text-gray-500">Loading reports...</div>
+          <div v-else-if="reportsError" class="text-sm text-red-600">{{ reportsError }}</div>
+          <div v-else-if="reports.length === 0" class="text-sm text-gray-500">No reports for this task.</div>
+          <div v-else class="space-y-3">
+            <div
+              v-for="report in reports"
+              :key="report.id"
+              class="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3"
+            >
+              <div>
+                <p class="text-sm font-semibold text-gray-900">
+                  {{ formatReportReason(report.reason) }}
+                </p>
+                <p class="text-xs text-gray-500">
+                  {{ formatDateTime(report.updated_at || report.created_at) }}
+                  · Status:
+                  <span class="font-medium text-gray-900">{{ formatReportStatus(report.status) }}</span>
+                </p>
+              </div>
+              <button
+                class="text-sm font-medium text-primary-600 hover:text-primary-500"
+                @click="openReportModal(report)"
+              >
+                View
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -350,7 +349,7 @@
             <textarea
               v-model="reportNotes"
               rows="4"
-              class="admin-input mt-2 w-full"
+              class="admin-input mt-2 w-full px-2"
               placeholder="Explain your decision..."
             ></textarea>
           </div>
@@ -442,7 +441,7 @@
             <textarea
               v-model="operationReason"
               rows="4"
-              class="admin-input mt-2 w-full"
+              class="admin-input mt-2 w-full px-2"
               placeholder="Explain why this task should be updated..."
             ></textarea>
           </div>

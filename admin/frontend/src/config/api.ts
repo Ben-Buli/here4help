@@ -144,6 +144,16 @@ export const API_ENDPOINTS = {
     detail: (id: number) => getApiUrl(`/point-policies/${id}`),
     activate: (id: number) => getApiUrl(`/point-policies/${id}/activate`),
   },
+
+  // FAQ 管理
+  faq: {
+    list: () => getApiUrl('/faqs'),
+    detail: (id: number) => getApiUrl(`/faqs/${id}`),
+    create: () => getApiUrl('/faqs'),
+    update: (id: number) => getApiUrl(`/faqs/${id}`),
+    destroy: (id: number) => getApiUrl(`/faqs/${id}`),
+    updateOrder: () => getApiUrl('/faqs/update-order'),
+  },
   
   // 日誌管理 - 修正為Laravel路由
   logs: {

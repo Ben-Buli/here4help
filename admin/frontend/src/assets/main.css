@@ -40,17 +40,17 @@
 }
 
 .admin-button {
-  @apply px-4 py-2 rounded-md font-medium transition-colors duration-200;
+  @apply px-4 py-2 rounded-md font-medium transition-colors duration-200 cursor-pointer;
 }
 
 .admin-button-primary {
   @apply px-4 py-2 rounded-md font-medium transition-colors duration-200
-         bg-cyan-600 text-white hover:bg-cyan-700;
+         bg-cyan-600 text-white hover:bg-cyan-700 cursor-pointer;
 }
 
 .admin-button-secondary {
   @apply px-4 py-2 rounded-md font-medium transition-colors duration-200
-         bg-gray-200 text-gray-900 hover:bg-gray-300;
+         bg-gray-200 text-gray-900 hover:bg-gray-300 cursor-pointer;
 }
 
 .admin-input {
@@ -67,4 +67,19 @@
 
 .admin-table td {
   @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+}
+
+/* Ensure all buttons have pointer cursor by default */
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* 新增輸入項目的內距 */
+input, select {
+  padding-left: 8px;
+  padding-right: 8px;
 }

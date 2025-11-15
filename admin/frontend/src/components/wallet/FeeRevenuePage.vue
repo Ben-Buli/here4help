@@ -216,13 +216,10 @@
 
 <script>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useApi } from '@/services/api'
 
 export default {
   name: 'FeeRevenuePage',
   setup() {
-    const api = useApi()
-    
     // 響應式數據
     const loading = ref(false)
     const revenueData = ref(null)

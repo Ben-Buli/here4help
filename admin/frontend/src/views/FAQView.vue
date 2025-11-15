@@ -4,16 +4,16 @@
     <div class="flex justify-between items-center">
       <h1 class="text-2xl font-semibold text-gray-900">FAQ Management</h1>
       <button
-        @click="openCreateModal"
-        class="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 transition-colors duration-200 flex items-center"
+      @click="openCreateModal"
+      class="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 transition-colors duration-200 flex items-center"
       >
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        Add FAQ
-      </button>
-    </div>
-
+      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+      </svg>
+      Add New FAQ
+    </button>
+  </div>
+  
     <!-- Loading -->
     <div v-if="loading" class="text-center py-12">
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-600"></div>
@@ -23,19 +23,50 @@
     <!-- FAQ List -->
     <div v-else class="bg-white shadow rounded-lg overflow-hidden">
       <!-- 編輯排序模式切換 -->
-      <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+      <div
+        class="px-6 py-4 border-b border-gray-200 flex justify-between items-center"
+        :class="isEditMode ? 'bg-cyan-50' : 'bg-gray-50'"
+      >
         <div class="text-sm text-gray-600">
-          Total: <span class="font-semibold">{{ faqs.length }}</span> FAQs
+          Total:
+          <span class="font-semibold">
+            {{ isEditMode ? '[Move to reorder items]' : faqs.length }}
+          </span>
+          <span v-if="!isEditMode"> FAQs</span>
         </div>
         <button
+          type="button"
           @click="toggleEditMode"
           class="px-4 py-2 rounded-md transition-colors duration-200 flex items-center"
-          :class="isEditMode ? 'bg-cyan-600 text-white hover:bg-cyan-700' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
+          :class="isEditMode ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'"
+          :disabled="savingOrder"
         >
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-          </svg>
-          {{ isEditMode ? 'Save Order' : 'Reorder' }}
+        <template v-if="isEditMode">
+            <svg v-if="savingOrder" class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <svg v-else-if="saveOrderSuccess" class="w-4 h-4 mr-2 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            <svg v-else class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+            <span>{{ savingOrder ? 'Saving...' : saveOrderSuccess ? 'Saved!' : 'Save Order' }}</span>
+          </template>
+          <template v-else>
+            <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="6" cy="6" r="1.5" />
+              <circle cx="6" cy="12" r="1.5" />
+              <circle cx="6" cy="18" r="1.5" />
+              <circle cx="12" cy="6" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="12" cy="18" r="1.5" />
+              <circle cx="18" cy="6" r="1.5" />
+              <circle cx="18" cy="12" r="1.5" />
+              <circle cx="18" cy="18" r="1.5" />
+            </svg>
+            <span>Reorder</span>
+          </template>
         </button>
       </div>
 
@@ -44,18 +75,28 @@
         <div
           v-for="(faq, index) in faqs"
           :key="faq.id"
-          class="px-6 py-4 hover:bg-gray-50 transition-colors duration-150"
+          class="px-6 py-4 transition-all duration-200 bg-white"
+          :class="{
+            'hover:bg-gray-50': !isEditMode,
+            'active:bg-cyan-50': isEditMode && draggedIndex === index,
+            'opacity-50': isEditMode && draggedIndex === index,
+            'bg-cyan-50 border-l-4 border-cyan-500': isEditMode && dragOverIndex === index && draggedIndex !== index,
+            'cursor-move': isEditMode
+          }"
           :draggable="isEditMode"
-          @dragstart="handleDragStart(index)"
-          @dragover.prevent
+          @dragstart="handleDragStart(index, $event)"
+          @dragenter.prevent="handleDragEnter(index)"
+          @dragover.prevent="handleDragOver(index)"
+          @dragleave="handleDragLeave(index)"
           @drop="handleDrop(index)"
+          @dragend="handleDragEnd"
         >
           <div class="flex items-start justify-between">
             <!-- FAQ 內容 -->
             <div class="flex-1">
               <div class="flex items-center space-x-3">
                 <!-- 拖曳圖標（編輯模式） -->
-                <div v-if="isEditMode" class="cursor-move text-gray-400">
+                <div v-if="isEditMode" class="cursor-move text-orange-300">
                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
                   </svg>
@@ -74,17 +115,34 @@
                   <span class="font-semibold">Order:</span> 
                   <span class="ml-1 px-2 py-0.5 bg-gray-100 rounded">{{ faq.sort_order }}</span>
                 </span>
-                <span
-                  class="px-2 py-0.5 rounded-full text-xs font-medium"
-                  :class="faq.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'"
-                >
-                  {{ faq.is_active ? 'Active' : 'Inactive' }}
-                </span>
+                <div class="flex items-center space-x-2">
+                  <span
+                    class="px-2 py-0.5 rounded-full text-xs font-medium"
+                    :class="faq.is_active 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-gray-100 text-gray-600 cursor-help'"
+                    :title="faq.is_active ? '' : 'Inactive items will not be displayed in the Here4Help App'"
+                  >
+                    {{ faq.is_active ? 'Active' : 'Inactive' }}
+                  </span>
+                  <!-- Toggle Switch -->
+                  <label v-if="!isEditMode" class="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      :checked="faq.is_active"
+                      @change="toggleActive(faq)"
+                      class="sr-only peer"
+                    />
+                    <div class="relative w-9 h-5 rounded-full transition-colors duration-200" :class="faq.is_active ? 'bg-cyan-600' : 'bg-gray-200'">
+                      <div class="absolute top-[2px] left-[2px] bg-white rounded-full h-4 w-4 transition-all duration-200 shadow-sm" :class="faq.is_active ? 'translate-x-4' : 'translate-x-0'"></div>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
 
             <!-- 操作按鈕 -->
-            <div v-if="!isEditMode" class="flex items-center space-x-2 ml-4">
+            <div v-if="!isEditMode" class="flex items-center space-x-3 ml-4">
               <button
                 @click="openEditModal(faq)"
                 class="p-2 text-cyan-600 hover:bg-cyan-50 rounded-md transition-colors duration-200"
@@ -94,17 +152,7 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
               </button>
-              <button
-                @click="toggleActive(faq)"
-                class="p-2 text-gray-600 hover:bg-gray-100 rounded-md transition-colors duration-200"
-                :title="faq.is_active ? 'Deactivate' : 'Activate'"
-              >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path v-if="faq.is_active" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                  <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path v-if="!faq.is_active" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              </button>
+              
               <button
                 @click="deleteFAQ(faq)"
                 class="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors duration-200"
@@ -143,29 +191,31 @@
 import { ref, onMounted } from 'vue'
 import FAQEditModal from '@/components/FAQEditModal.vue'
 import api from '@/services/api'
+import { API_ENDPOINTS } from '@/config/api'
+import type { FAQ } from '@/types/faq'
 
-interface FAQ {
-  id: number
-  question: string
-  answer: string
-  category?: string
-  language?: string
-  sort_order: number
-  is_active: boolean
-}
+type PersistedFAQ = FAQ & { id: number }
 
-const faqs = ref<FAQ[]>([])
+const faqs = ref<PersistedFAQ[]>([])
 const loading = ref(false)
 const showModal = ref(false)
-const editingFAQ = ref<FAQ | null>(null)
+const editingFAQ = ref<PersistedFAQ | null>(null)
 const isEditMode = ref(false)
 const draggedIndex = ref<number | null>(null)
+const dragOverIndex = ref<number | null>(null)
+const originalDragIndex = ref<number | null>(null) // 保存原始拖曳索引
+const savingOrder = ref(false)
+const saveOrderSuccess = ref(false)
 
 const loadFAQs = async () => {
   loading.value = true
   try {
-    const response = await api.get('/admin/faqs')
-    faqs.value = response.data.data
+    const response = await api.get(API_ENDPOINTS.faq.list())
+    // 確保 items 陣列存在，並驗證每個 FAQ 都有有效的 ID
+    faqs.value = (response.data.data?.items || response.data.data || []).map((faq: any) => ({
+      ...faq,
+      id: faq.id ? Number(faq.id) : undefined
+    })).filter((faq: any) => faq.id !== undefined)
   } catch (error) {
     console.error('Failed to load FAQs:', error)
     alert('Failed to load FAQs')
@@ -179,7 +229,7 @@ const openCreateModal = () => {
   showModal.value = true
 }
 
-const openEditModal = (faq: FAQ) => {
+const openEditModal = (faq: PersistedFAQ) => {
   editingFAQ.value = { ...faq }
   showModal.value = true
 }
@@ -193,10 +243,10 @@ const handleSave = async (faqData: FAQ) => {
   try {
     if (editingFAQ.value?.id) {
       // Update existing FAQ
-      await api.put(`/admin/faqs/${editingFAQ.value.id}`, faqData)
+      await api.put(API_ENDPOINTS.faq.update(editingFAQ.value.id), faqData)
     } else {
       // Create new FAQ
-      await api.post('/admin/faqs', faqData)
+      await api.post(API_ENDPOINTS.faq.create(), faqData)
     }
     await loadFAQs()
     closeModal()
@@ -206,26 +256,57 @@ const handleSave = async (faqData: FAQ) => {
   }
 }
 
-const toggleActive = async (faq: FAQ) => {
+const toggleActive = async (faq: PersistedFAQ) => {
+  if (!faq.id) {
+    console.error('FAQ ID is missing')
+    alert('Invalid FAQ: missing ID')
+    return
+  }
+  
+  // 樂觀更新：立即更新 UI
+  const previousState = faq.is_active
+  const targetIndex = faqs.value.findIndex(f => f.id === faq.id)
+  if (targetIndex !== -1) {
+    faqs.value[targetIndex].is_active = !previousState
+  }
+  
   try {
-    await api.put(`/admin/faqs/${faq.id}`, {
+    const response = await api.put(API_ENDPOINTS.faq.update(faq.id), {
       ...faq,
-      is_active: !faq.is_active
+      is_active: !previousState
     })
-    await loadFAQs()
-  } catch (error) {
+    
+    // 檢查 API 回應是否成功
+    if (!response.data.success) {
+      // 如果失敗，恢復原狀態
+      if (targetIndex !== -1) {
+        faqs.value[targetIndex].is_active = previousState
+      }
+      throw new Error(response.data.message || 'Failed to update FAQ status')
+    }
+  } catch (error: any) {
+    // 恢復原狀態
+    if (targetIndex !== -1) {
+      faqs.value[targetIndex].is_active = previousState
+    }
     console.error('Failed to toggle FAQ status:', error)
-    alert('Failed to update FAQ status')
+    alert(`Failed to update FAQ status: ${error.response?.data?.message || error.message || 'Unknown error'}`)
   }
 }
 
-const deleteFAQ = async (faq: FAQ) => {
-  if (!confirm(`Are you sure you want to delete this FAQ: "${faq.question}"?`)) {
+const deleteFAQ = async (faq: PersistedFAQ) => {
+  if (!faq.id) {
+    console.error('FAQ ID is missing')
+    alert('Invalid FAQ: missing ID')
+    return
+  }
+  
+  if (!confirm(`Are you sure you want to delete this FAQ: "${faq.question}"? \n\n🚫 This action cannot be reverted.🚫`)) {
     return
   }
   
   try {
-    await api.delete(`/admin/faqs/${faq.id}`)
+    await api.delete(API_ENDPOINTS.faq.destroy(faq.id))
     await loadFAQs()
   } catch (error) {
     console.error('Failed to delete FAQ:', error)
@@ -236,37 +317,121 @@ const deleteFAQ = async (faq: FAQ) => {
 const toggleEditMode = async () => {
   if (isEditMode.value) {
     // Save the new order
+    savingOrder.value = true
+    saveOrderSuccess.value = false
+    
     try {
       const faqsWithOrder = faqs.value.map((faq, index) => ({
         id: faq.id,
-        sort_order: index
+        sort_order: index + 1  // 從 1 開始，而不是 0
       }))
-      await api.post('/admin/faqs/update-order', { items: faqsWithOrder })
-      await loadFAQs()
-    } catch (error) {
+      
+      const response = await api.post(API_ENDPOINTS.faq.updateOrder(), { items: faqsWithOrder })
+      
+      // 檢查 API 回應是否成功
+      if (response.data.success) {
+        saveOrderSuccess.value = true
+        await loadFAQs()
+        
+        // 2秒後重置成功狀態並退出編輯模式
+        setTimeout(() => {
+          saveOrderSuccess.value = false
+          isEditMode.value = false
+        }, 2000)
+      } else {
+        throw new Error(response.data.message || 'Failed to save order')
+      }
+    } catch (error: any) {
       console.error('Failed to update FAQ order:', error)
-      alert('Failed to update FAQ order')
+      savingOrder.value = false
+      saveOrderSuccess.value = false
+      alert(`Failed to update FAQ order: ${error.response?.data?.message || error.message || 'Unknown error'}`)
     }
+  } else {
+    isEditMode.value = true
+    saveOrderSuccess.value = false
   }
-  isEditMode.value = !isEditMode.value
 }
 
-const handleDragStart = (index: number) => {
+const handleDragStart = (index: number, event: DragEvent) => {
+  originalDragIndex.value = index
   draggedIndex.value = index
+  dragOverIndex.value = null
+  
+  // 設置拖曳圖像
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+  }
+}
+
+const handleDragEnter = (index: number) => {
+  if (draggedIndex.value === null || draggedIndex.value === index) return
+  dragOverIndex.value = index
+  updateVisualOrder(index)
+}
+
+const handleDragOver = (index: number) => {
+  if (draggedIndex.value === null || draggedIndex.value === index) return
+  
+  if (dragOverIndex.value !== index) {
+    dragOverIndex.value = index
+    updateVisualOrder(index)
+  }
+}
+
+const updateVisualOrder = (targetIndex: number) => {
+  if (draggedIndex.value === null || originalDragIndex.value === null) return
+  
+  // 從當前陣列開始計算（因為順序已經在變化）
+  const newFaqs = [...faqs.value]
+  const currentDragIndex = draggedIndex.value
+  const draggedFAQ = newFaqs[currentDragIndex]
+  
+  // 移除被拖曳的項目
+  newFaqs.splice(currentDragIndex, 1)
+  
+  // 計算插入位置
+  let insertIndex = targetIndex
+  if (currentDragIndex < targetIndex) {
+    // 向下拖曳，目標索引需要減1（因為已經移除了項目）
+    insertIndex = targetIndex
+  } else {
+    // 向上拖曳，直接使用目標索引
+    insertIndex = targetIndex
+  }
+  
+  // 插入到新位置
+  newFaqs.splice(insertIndex, 0, draggedFAQ)
+  faqs.value = newFaqs
+  
+  // 更新被拖曳項目的索引
+  draggedIndex.value = insertIndex
+}
+
+const handleDragLeave = (index: number) => {
+  // 延遲清除，避免快速移動時閃爍
+  setTimeout(() => {
+    if (dragOverIndex.value === index) {
+      dragOverIndex.value = null
+    }
+  }, 50)
 }
 
 const handleDrop = (dropIndex: number) => {
-  if (draggedIndex.value === null || draggedIndex.value === dropIndex) return
-  
-  const draggedFAQ = faqs.value[draggedIndex.value]
-  faqs.value.splice(draggedIndex.value, 1)
-  faqs.value.splice(dropIndex, 0, draggedFAQ)
-  
+  // 順序已經在 updateVisualOrder 中更新了，這裡只需要清理狀態
   draggedIndex.value = null
+  dragOverIndex.value = null
+  originalDragIndex.value = null
+}
+
+const handleDragEnd = () => {
+  // 清理所有拖曳相關狀態
+  draggedIndex.value = null
+  dragOverIndex.value = null
+  originalDragIndex.value = null
 }
 
 onMounted(() => {
   loadFAQs()
 })
 </script>
-

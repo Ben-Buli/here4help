@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\UserActivityController;
 use App\Http\Controllers\Admin\UserTransactionController;
 use App\Http\Controllers\Admin\AdminPingController;
 use App\Http\Controllers\Admin\PointPolicyController;
+use App\Http\Controllers\Admin\FAQController;
 
 /*
 |--------------------------------------------------------------------------
@@ -35,13 +36,13 @@ Route::prefix('admin')->group(function () {
 
         // 用戶管理
         Route::prefix('users')->group(function () {
+            Route::get('/referral-codes', [UserController::class, 'referralCodes'])->middleware('admin:users.view');
             Route::get('/', [UserController::class, 'index']);
             Route::get('/{id}', [UserController::class, 'show'])->middleware('admin:users.view');
             Route::patch('/{id}/status', [UserController::class, 'updateStatus'])->middleware('admin:users.edit');
             Route::post('/{id}/review', [UserController::class, 'review'])->middleware('admin:users.edit');
             Route::get('/{id}/verification', [UserController::class, 'verification'])->middleware('admin:users.view');
             Route::get('/{id}/intro-referral-info', [UserController::class, 'introReferralInfo'])->middleware('admin:users.view');
-            Route::get('/referral-codes', [UserController::class, 'referralCodes'])->middleware('admin:users.view');
         });
 
         // 任務管理
@@ -106,6 +107,16 @@ Route::prefix('admin')->group(function () {
             Route::post('/', [PointPolicyController::class, 'store']);
             Route::put('/{id}', [PointPolicyController::class, 'update']);
             Route::post('/{id}/activate', [PointPolicyController::class, 'activate']);
+        });
+
+        // FAQ 內容管理
+        Route::prefix('faqs')->group(function () {
+            Route::get('/', [FAQController::class, 'index']);
+            Route::post('/', [FAQController::class, 'store']);
+            Route::get('/{id}', [FAQController::class, 'show']);
+            Route::put('/{id}', [FAQController::class, 'update']);
+            Route::delete('/{id}', [FAQController::class, 'destroy']);
+            Route::post('/update-order', [FAQController::class, 'updateOrder']);
         });
 
         // 管理員列表 / 系統資訊

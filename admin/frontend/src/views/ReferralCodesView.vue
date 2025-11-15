@@ -30,28 +30,7 @@
             @input="debouncedSearch"
           />
         </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
-          <select v-model="filters.sort_by" class="admin-input" @change="reload">
-            <option value="updated_at">Updated Time</option>
-            <option value="id">User ID</option>
-            <option value="name">Name</option>
-            <option value="email">Email</option>
-            <option value="permission">Permission</option>
-            <option value="referral_code">Invite Code</option>
-            <option value="intro_referral_code">Intro Code</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
-          <select v-model="filters.sort_order" class="admin-input" @change="reload">
-            <option value="desc">Newest</option>
-            <option value="asc">Oldest</option>
-          </select>
-        </div>
-      </div>
-      <div class="mt-4 flex flex-wrap gap-3">
-        <div>
+      <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Per Page</label>
           <select v-model.number="filters.per_page" class="admin-input" @change="handlePerPageChange">
             <option value="10">10</option>
@@ -60,54 +39,133 @@
             <option value="100">100</option>
           </select>
         </div>
-        <div class="flex items-end">
+        <div>
+        <!-- <div class="flex items-end">
           <button class="admin-button-secondary" @click="resetFilters">Reset</button>
-        </div>
+        </div> -->
+      </div>
       </div>
     </div>
 
     <div class="admin-card overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
+      <table class="min-w-full w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
-            <th class="admin-th cursor-pointer" @click="setSort('id')">ID</th>
-            <th class="admin-th cursor-pointer" @click="setSort('name')">Name</th>
-            <th class="admin-th cursor-pointer" @click="setSort('email')">Email</th>
-            <th class="admin-th cursor-pointer" @click="setSort('permission')">Permission</th>
-            <th class="admin-th cursor-pointer" @click="setSort('referral_code')">Invite Code</th>
-            <th class="admin-th cursor-pointer" @click="setSort('intro_referral_code')">Intro Code</th>
-            <th class="admin-th cursor-pointer" @click="setSort('updated_at')">Updated At</th>
+            <th class="admin-th cursor-pointer" @click="setSort('id')">
+              <span class="flex items-center gap-1">
+                ID
+                <span class="inline-flex flex-col leading-none">
+                  <svg
+                    class="w-3 h-3"
+                    :class="sortIconClass('id', 'desc')"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  <svg
+                    class="w-3 h-3 -mt-1"
+                    :class="sortIconClass('id', 'asc')"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                  </svg>
+                </span>
+              </span>
+            </th>
+            <th class="admin-th cursor-pointer" @click="setSort('name')">
+              <span class="flex items-center gap-1">
+                Name
+                <span class="inline-flex flex-col leading-none">
+                  <svg class="w-3 h-3" :class="sortIconClass('name', 'desc')" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  <svg class="w-3 h-3 -mt-1" :class="sortIconClass('name', 'asc')" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                  </svg>
+                </span>
+              </span>
+            </th>
+            <!-- <th class="admin-th cursor-pointer" @click="setSort('email')">Email</th> -->
+            <th class="admin-th cursor-pointer" @click="setSort('permission')">
+              <span class="flex items-center gap-1">
+                Permission
+                <span class="inline-flex flex-col leading-none">
+                  <svg class="w-3 h-3" :class="sortIconClass('permission', 'desc')" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  <svg class="w-3 h-3 -mt-1" :class="sortIconClass('permission', 'asc')" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                  </svg>
+                </span>
+              </span>
+            </th>
+            <th class="admin-th cursor-pointer" @click="setSort('referral_code')">
+              <span class="flex items-center gap-1">
+                Invite Code
+                <span class="inline-flex flex-col leading-none">
+                  <svg class="w-3 h-3" :class="sortIconClass('referral_code', 'desc')" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  <svg class="w-3 h-3 -mt-1" :class="sortIconClass('referral_code', 'asc')" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                  </svg>
+                </span>
+              </span>
+            </th>
+            <th class="admin-th cursor-pointer" @click="setSort('intro_referral_code')">
+              <span class="flex items-center gap-1">
+                Referral Code
+                <span class="inline-flex flex-col leading-none">
+                  <svg class="w-3 h-3" :class="sortIconClass('intro_referral_code', 'desc')" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  <svg class="w-3 h-3 -mt-1" :class="sortIconClass('intro_referral_code', 'asc')" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                  </svg>
+                </span>
+              </span>
+            </th>
+            <!-- <th class="admin-th cursor-pointer" @click="setSort('updated_at')">Updated At</th> -->
             <th class="admin-th text-right">Actions</th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
           <tr v-if="loading">
-            <td colspan="8" class="px-6 py-6 text-center text-gray-500">Loading...</td>
+            <td colspan="6" class="px-6 py-6 text-center text-gray-500">Loading...</td>
           </tr>
           <tr v-else-if="records.length === 0">
-            <td colspan="8" class="px-6 py-6 text-center text-gray-500">No records</td>
+            <td colspan="6" class="px-6 py-6 text-center text-gray-500">No records</td>
           </tr>
           <tr v-for="record in records" :key="record.id">
-            <td class="admin-td font-medium text-gray-900">#{{ record.id }}</td>
+            <td class="admin-td font-medium text-gray-900">{{ record.id }}</td>
             <td class="admin-td">
               <div class="font-medium text-gray-900">{{ record.name || '—' }}</div>
             </td>
-            <td class="admin-td text-gray-600">{{ record.email }}</td>
+            <!-- <td class="admin-td text-gray-600">{{ record.email }}</td> -->
             <td class="admin-td">
               <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold"
                 :class="getPermissionBadgeClass(record.permission)">
-                {{ getPermissionText(record.permission) }} ({{ record.permission }})
+                <!-- {{ getPermissionText(record.permission) }} ({{ record.permission }}) -->
+                {{ getPermissionText(record.permission) }} 
               </span>
             </td>
             <td class="admin-td font-mono text-sm">
-              <span v-if="record.referral_code">{{ record.referral_code }}</span>
-              <span v-else class="text-gray-400">—</span>
+              <span v-if="record.referral_code"
+                class="inline-flex items-center rounded-full bg-gray-100 px-3 py-0.5 text-xs font-semibold text-gray-700"
+              >{{ record.referral_code }}</span>
+              <span v-else class="inline-flex items-center rounded-full bg-gray-100 px-3 py-0.5 text-xs font-semibold text-gray-400">—</span>
             </td>
             <td class="admin-td font-mono text-sm">
-              <span v-if="record.intro_referral_code">{{ record.intro_referral_code }}</span>
-              <span v-else class="text-gray-400">—</span>
+              <span v-if="record.intro_referral_code"
+                class="inline-flex items-center rounded-full bg-gray-100 px-3 py-0.5 text-xs font-semibold text-gray-700"
+              >{{ record.intro_referral_code }}</span>
+              <span v-else class="inline-flex items-center rounded-full bg-gray-100 px-3 py-0.5 text-xs font-semibold text-gray-400">—</span>
             </td>
-            <td class="admin-td text-sm text-gray-500">{{ formatDate(record.updated_at) }}</td>
+            <!-- <td class="admin-td text-sm text-gray-500">{{ formatDate(record.updated_at) }}</td> -->
             <td class="admin-td text-right">
               <button class="text-cyan-600 hover:text-cyan-900 text-sm font-semibold" @click="goUser(record.id)">
                 View user
@@ -237,7 +295,6 @@ const resetFilters = () => {
   loadRecords(1)
 }
 
-const reload = () => loadRecords(1)
 const changePage = (page: number) => loadRecords(page)
 
 const formatDate = (value: string) => {
@@ -247,6 +304,13 @@ const formatDate = (value: string) => {
 
 const goUser = (id: number) => {
   router.push(`/users/${id}`)
+}
+
+const sortIconClass = (field: string, direction: 'asc' | 'desc') => {
+  const isFieldActive = filters.sort_by === field
+  if (!isFieldActive) return 'text-gray-300'
+  const isDirectionActive = filters.sort_order === direction
+  return isDirectionActive ? 'text-cyan-600' : 'text-gray-400'
 }
 
 const getPermissionBadgeClass = (permission: number) => {

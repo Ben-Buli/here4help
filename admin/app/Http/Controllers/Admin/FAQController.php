@@ -24,60 +24,54 @@ class FAQController extends Controller
             $sortBy = $request->input('sort_by', 'sort_order');
             $sortOrder = $request->input('sort_order', 'asc');
             
-            // 使用 PHP 後端資料庫
-            $db = $this->getBackendDB();
-            
-            // 構建查詢
-            $query = "SELECT 
-                f.*,
-                u1.name as created_by_name,
-                u2.name as updated_by_name
-            FROM faqs f
-            LEFT JOIN admins u1 ON f.created_by = u1.id
-            LEFT JOIN admins u2 ON f.updated_by = u2.id
-            WHERE 1=1";
-            
-            $params = [];
-            
+            $allowedSortFields = [
+                'sort_order',
+                'id',
+                'question',
+                'category',
+                'is_active',
+                'created_at',
+                'updated_at',
+            ];
+
+            if (!in_array($sortBy, $allowedSortFields, true)) {
+                $sortBy = 'sort_order';
+            }
+
+            $sortOrder = strtolower($sortOrder) === 'desc' ? 'desc' : 'asc';
+
+            $baseQuery = DB::table('faqs as f')
+                ->leftJoin('admins as u1', 'f.created_by', '=', 'u1.id')
+                ->leftJoin('admins as u2', 'f.updated_by', '=', 'u2.id')
+                ->select('f.*', 'u1.full_name as created_by_name', 'u2.full_name as updated_by_name');
+
             if (!empty($search)) {
-                $query .= " AND (f.question LIKE ? OR f.answer LIKE ?)";
-                $params[] = "%{$search}%";
-                $params[] = "%{$search}%";
+                $baseQuery->where(function ($query) use ($search) {
+                    $query->where('f.question', 'like', "%{$search}%")
+                        ->orWhere('f.answer', 'like', "%{$search}%");
+                });
             }
-            
+
             if ($category !== '') {
-                $query .= " AND f.category = ?";
-                $params[] = $category;
+                $baseQuery->where('f.category', $category);
             }
-            
+
             if ($isActive !== '') {
-                $query .= " AND f.is_active = ?";
-                $params[] = (int)$isActive;
+                $baseQuery->where('f.is_active', (int) $isActive);
             }
-            
-            // 獲取總數
-            $countQuery = str_replace('SELECT f.*, u1.name as created_by_name, u2.name as updated_by_name', 'SELECT COUNT(*) as total', $query);
-            $stmt = $db->prepare($countQuery);
-            $stmt->execute($params);
-            $total = $stmt->fetch(\PDO::FETCH_ASSOC)['total'];
-            
-            // 添加排序和分頁
-            $query .= " ORDER BY f.{$sortBy} {$sortOrder}";
-            $offset = ($page - 1) * $perPage;
-            $query .= " LIMIT ? OFFSET ?";
-            $params[] = (int)$perPage;
-            $params[] = (int)$offset;
-            
-            $stmt = $db->prepare($query);
-            $stmt->execute($params);
-            $faqs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            
-            // 獲取統計
-            $statsQuery = "SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_count
-            FROM faqs";
-            $stats = $db->query($statsQuery)->fetch(\PDO::FETCH_ASSOC);
+
+            $total = (clone $baseQuery)->count();
+
+            $faqs = (clone $baseQuery)
+                ->orderBy($sortBy, $sortOrder)
+                ->forPage($page, $perPage)
+                ->get()
+                ->toArray();
+
+            $statsRecord = DB::table('faqs')
+                ->selectRaw('COUNT(*) as total, SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_count')
+                ->first();
+            $stats = $statsRecord ? (array) $statsRecord : ['total' => 0, 'active_count' => 0];
             
             return response()->json([
                 'success' => true,
@@ -107,13 +101,17 @@ class FAQController extends Controller
     public function show($id)
     {
         try {
-            $db = $this->getBackendDB();
+            // 驗證 ID 是否為有效數字
+            if (!is_numeric($id) || $id <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid FAQ ID'
+                ], 400);
+            }
             
-            $query = "SELECT f.* FROM faqs f WHERE f.id = ?";
+            $id = (int) $id;
             
-            $stmt = $db->prepare($query);
-            $stmt->execute([$id]);
-            $faq = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $faq = DB::table('faqs')->where('id', $id)->first();
             
             if (!$faq) {
                 return response()->json([
@@ -156,27 +154,19 @@ class FAQController extends Controller
                 ], 422);
             }
             
-            $db = $this->getBackendDB();
-            
-            // 獲取當前最大 sort_order
-            $maxOrder = $db->query("SELECT MAX(sort_order) as max_order FROM faqs")->fetch(\PDO::FETCH_ASSOC)['max_order'] ?? 0;
-            
-            $query = "INSERT INTO faqs (
-                question, answer, category, language, is_active, sort_order, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)";
-            
-            $stmt = $db->prepare($query);
-            $stmt->execute([
-                $request->input('question'),
-                $request->input('answer'),
-                $request->input('category'),
-                $request->input('language', 'en'), // 預設為英語
-                $request->input('is_active', 1),
-                $maxOrder + 1,
-                Auth::id() ?? null
+            $maxOrder = DB::table('faqs')->max('sort_order') ?? 0;
+
+            $faqId = DB::table('faqs')->insertGetId([
+                'question' => $request->input('question'),
+                'answer' => $request->input('answer'),
+                'category' => $request->input('category'),
+                'language' => $request->input('language', 'en'),
+                'is_active' => $request->input('is_active', 1),
+                'sort_order' => $maxOrder + 1,
+                'created_by' => Auth::id(),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
-            
-            $faqId = $db->lastInsertId();
             
             return response()->json([
                 'success' => true,
@@ -198,6 +188,16 @@ class FAQController extends Controller
     public function update(Request $request, $id)
     {
         try {
+            // 驗證 ID 是否為有效數字
+            if (!is_numeric($id) || $id <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid FAQ ID'
+                ], 400);
+            }
+            
+            $id = (int) $id;
+            
             $validator = Validator::make($request->all(), [
                 'question' => 'string|max:500',
                 'answer' => 'string',
@@ -215,32 +215,32 @@ class FAQController extends Controller
                 ], 422);
             }
             
-            $db = $this->getBackendDB();
-            
-            $updates = [];
-            $params = [];
-            
+            $data = [];
+
             foreach (['question', 'answer', 'category', 'is_active', 'language', 'sort_order'] as $field) {
                 if ($request->has($field)) {
-                    $updates[] = "{$field} = ?";
-                    $params[] = $request->input($field);
+                    $data[$field] = $request->input($field);
                 }
             }
-            
-            if (empty($updates)) {
+
+            if (empty($data)) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No fields to update'
                 ], 400);
             }
             
-            $updates[] = "updated_by = ?";
-            $params[] = Auth::id() ?? null;
-            $params[] = $id;
-            
-            $query = "UPDATE faqs SET " . implode(', ', $updates) . " WHERE id = ?";
-            $stmt = $db->prepare($query);
-            $stmt->execute($params);
+            $data['updated_by'] = Auth::id();
+            $data['updated_at'] = now();
+
+            $updated = DB::table('faqs')->where('id', $id)->update($data);
+
+            if (!$updated) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'FAQ not found'
+                ], 404);
+            }
             
             return response()->json([
                 'success' => true,
@@ -261,11 +261,24 @@ class FAQController extends Controller
     public function destroy($id)
     {
         try {
-            $db = $this->getBackendDB();
+            // 驗證 ID 是否為有效數字
+            if (!is_numeric($id) || $id <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid FAQ ID'
+                ], 400);
+            }
             
-            $query = "DELETE FROM faqs WHERE id = ?";
-            $stmt = $db->prepare($query);
-            $stmt->execute([$id]);
+            $id = (int) $id;
+            
+            $deleted = DB::table('faqs')->where('id', $id)->delete();
+
+            if (!$deleted) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'FAQ not found'
+                ], 404);
+            }
             
             return response()->json([
                 'success' => true,
@@ -295,17 +308,17 @@ class FAQController extends Controller
                 ], 400);
             }
             
-            $db = $this->getBackendDB();
-            $db->beginTransaction();
-            
-            $query = "UPDATE faqs SET sort_order = ? WHERE id = ?";
-            $stmt = $db->prepare($query);
-            
-            foreach ($items as $item) {
-                $stmt->execute([$item['sort_order'], $item['id']]);
-            }
-            
-            $db->commit();
+            DB::transaction(function () use ($items) {
+                foreach ($items as $item) {
+                    DB::table('faqs')
+                        ->where('id', $item['id'])
+                        ->update([
+                            'sort_order' => $item['sort_order'],
+                            'updated_by' => Auth::id(),
+                            'updated_at' => now(),
+                        ]);
+                }
+            });
             
             return response()->json([
                 'success' => true,
@@ -313,32 +326,10 @@ class FAQController extends Controller
             ]);
             
         } catch (\Exception $e) {
-            $db->rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update order: ' . $e->getMessage()
             ], 500);
         }
     }
-    
-    /**
-     * 獲取 PHP 後端資料庫連接
-     */
-    private function getBackendDB()
-    {
-        $config = config('database.connections.backend');
-        
-        $dsn = sprintf(
-            'mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
-            $config['host'],
-            $config['port'],
-            $config['database']
-        );
-        
-        return new \PDO($dsn, $config['username'], $config['password'], [
-            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC
-        ]);
-    }
 }
-

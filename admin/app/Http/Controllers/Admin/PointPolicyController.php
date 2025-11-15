@@ -303,6 +303,11 @@ class PointPolicyController extends Controller
     {
         $config = config('database.connections.backend');
 
+        if (!$config) {
+            // 回退至 Laravel 預設的資料庫連線，避免未配置 backend 連線時拋錯
+            return DB::connection()->getPdo();
+        }
+
         $dsn = sprintf(
             'mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
             $config['host'],

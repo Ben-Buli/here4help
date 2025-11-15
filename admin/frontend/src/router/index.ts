@@ -200,6 +200,12 @@ const router = createRouter({
           meta: { title: 'Fee Settings' },
         },
         {
+          path: 'fee-revenue',
+          name: 'payment-fee-revenue',
+          component: () => import('../components/wallet/FeeRevenuePage.vue'),
+          meta: { title: 'Fee Revenue' },
+        },
+        {
           path: 'official-account',
           name: 'payment-official-account',
           component: () => import('../components/wallet/OfficialBankAccountPage.vue'),

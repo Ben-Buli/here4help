@@ -66,12 +66,12 @@
             <span class="font-medium">1,000 Points</span>
           </div>
           <div>
-            <span class="text-blue-700">Fee:</span>
+            <span class="text-blue-700">Fee (Worker Pays):</span>
             <span class="font-medium">{{ calculateFee(1000) }} Points</span>
           </div>
           <div>
-            <span class="text-blue-700">Publisher Pays:</span>
-            <span class="font-medium">{{ 1000 + calculateFee(1000) }} Points</span>
+            <span class="text-blue-700">Worker Receives:</span>
+            <span class="font-medium">{{ 1000 - calculateFee(1000) }} Points</span>
           </div>
         </div>
       </div>
@@ -124,7 +124,7 @@
           <tbody class="divide-y divide-gray-200">
             <tr v-for="item in items" :key="item.id" class="hover:bg-gray-50">
               <td class="text-sm font-medium text-gray-900">
-                {{ item.percentage }}%
+                {{ formatPercentage(item.percentage) }}%
               </td>
               <td>
                 <span
@@ -157,15 +157,32 @@ const loading = ref(false)
 const items = ref<any[]>([])
 const percentage = ref<number | null>(null)
 
+const normalizePercentage = (value: any): number | null => {
+  if (value === null || value === undefined) return null
+  const num = Number(value)
+  return Number.isNaN(num) ? null : num
+}
+
 // 載入手續費設定
 const load = async () => {
   loading.value = true
   try {
     const res = await paymentApi.getFeeSettings()
     if (res.data.success && res.data.data) {
-      items.value = res.data.data.items || []
+      const rows = res.data.data.items || []
+      items.value = rows.map((item: any) => {
+        const percentageValue =
+          normalizePercentage(item.percentage) ??
+          (item.rate !== undefined && item.rate !== null ? Number(item.rate) * 100 : null)
+
+        return {
+          ...item,
+          percentage: percentageValue,
+          rate: item.rate ?? (percentageValue !== null ? percentageValue / 100 : null),
+        }
+      })
       const active = items.value.find((it: any) => it.is_active)
-      percentage.value = active ? Number(active.percentage) : null
+      percentage.value = active ? normalizePercentage(active.percentage) : null
     }
   } catch (error) {
     console.error('Failed to load fee settings:', error)
@@ -193,6 +210,11 @@ const save = async () => {
 const calculateFee = (amount: number) => {
   if (percentage.value === null || percentage.value <= 0) return 0
   return Math.round(amount * (percentage.value / 100))
+}
+
+const formatPercentage = (value?: number | null) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return '-'
+  return Number(value).toFixed(2)
 }
 
 // 格式化日期

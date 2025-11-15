@@ -1,6 +1,6 @@
 <template>
-  <div class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-    <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+  <div class="fixed inset-0 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
       <!-- Header -->
       <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white">
         <h2 class="text-xl font-semibold text-gray-900">
@@ -44,7 +44,8 @@
           ></textarea>
         </div>
 
-        <!-- 語言和分類 -->
+        <!-- 語言和分類 - 未來擴充項目，暫時隱藏 -->
+        <!--
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -72,9 +73,12 @@
             />
           </div>
         </div>
+        -->
 
         <!-- 排序和狀態 -->
-        <div class="grid grid-cols-2 gap-4">
+        <div>
+          <!-- Sort Order - 未來擴充項目，暫時隱藏 -->
+          <!--
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
               Sort Order
@@ -86,21 +90,28 @@
               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
             />
           </div>
+          -->
 
+          <!-- Status Button -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
+            <label class="block text-sm font-medium text-gray-700 mb-3">
               Status
             </label>
-            <div class="flex items-center h-10">
-              <label class="flex items-center cursor-pointer">
-                <input
-                  v-model="formData.is_active"
-                  type="checkbox"
-                  class="w-4 h-4 text-cyan-600 border-gray-300 rounded focus:ring-cyan-500"
-                />
-                <span class="ml-2 text-sm text-gray-700">Active</span>
-              </label>
-            </div>
+            <label class="inline-flex items-center cursor-pointer">
+              <input
+                v-model="formData.is_active"
+                type="checkbox"
+                class="sr-only"
+              />
+              <span
+                class="px-4 py-2 rounded-md text-sm font-medium transition-all duration-200"
+                :class="formData.is_active 
+                  ? 'bg-cyan-600 text-white hover:bg-cyan-700 shadow-sm' 
+                  : 'bg-white text-gray-700 border-2 border-gray-300 hover:bg-gray-50 hover:border-gray-400'"
+              >
+                {{ formData.is_active ? 'Active' : 'DeActive' }}
+              </span>
+            </label>
           </div>
         </div>
       </div>
@@ -127,16 +138,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-
-interface FAQ {
-  id?: number
-  question: string
-  answer: string
-  category?: string
-  language?: string
-  sort_order: number
-  is_active: boolean
-}
+import type { FAQ } from '@/types/faq'
 
 const props = defineProps<{
   faq: FAQ | null
@@ -183,4 +185,3 @@ const handleSave = () => {
   emit('save', formData.value)
 }
 </script>
-

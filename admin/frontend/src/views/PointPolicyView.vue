@@ -54,7 +54,12 @@
                 {{ formatDate(policy.updated_at) }}
               </td>
               <td class="px-6 py-4 text-right text-sm font-medium space-x-2">
-                <button class="text-cyan-600 hover:text-cyan-900" @click="openEditModal(policy)">Edit</button>
+                <button
+                  class="inline-flex items-center rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-teal-700 cursor-pointer"
+                  @click="openEditModal(policy)"
+                >
+                  Edit
+                </button>
                 <button
                   class="text-gray-500 hover:text-gray-800"
                   v-if="!policy.is_active"
@@ -94,7 +99,7 @@
               <input
                 v-model="form.title"
                 type="text"
-                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 px-2"
               />
             </div>
 

@@ -37,8 +37,13 @@ fi
 
 # 生成應用程式金鑰
 echo ""
-echo "4. 生成應用程式金鑰..."
-php artisan key:generate --force
+# 4. 生成應用程式金鑰...
+if ! grep -q "APP_KEY=" .env || grep -q "APP_KEY=$" .env; then
+  php artisan key:generate --force
+else
+  echo "   ✅ APP_KEY already set"
+fi
+
 
 # 清除快取
 echo ""

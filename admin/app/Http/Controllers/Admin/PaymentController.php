@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Schema;
 
 class PaymentController extends Controller
 {
@@ -156,7 +157,15 @@ class PaymentController extends Controller
     public function feeSettings(Request $request)
     {
         if ($request->isMethod('get')) {
-            $items = DB::table('task_completion_points_fee_settings')->orderBy('created_at', 'desc')->get();
+            $items = DB::table('task_completion_points_fee_settings')
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($item) {
+                    $rate = isset($item->rate) ? (float)$item->rate : (isset($item->percentage) ? (float)$item->percentage / 100 : null);
+                    $item->rate = $rate;
+                    $item->percentage = $rate !== null ? round($rate * 100, 4) : null;
+                    return $item;
+                });
             return response()->json(['success' => true, 'data' => ['items' => $items]]);
         }
 
@@ -169,15 +178,27 @@ class PaymentController extends Controller
 
         DB::beginTransaction();
         try {
-            // 全部設為 inactive
-            DB::table('task_completion_points_fee_settings')->update(['is_active' => 0]);
-            // 新增一筆 active 設定
-            DB::table('task_completion_points_fee_settings')->insert([
-                'percentage' => (float)$request->get('percentage'),
-                'is_active' => 1,
-                'created_at' => now(),
+            $percentage = (float)$request->get('percentage');
+            $rate = $percentage / 100;
+
+            DB::table('task_completion_points_fee_settings')->update([
+                'is_active' => 0,
                 'updated_at' => now(),
             ]);
+
+            $insertData = [
+                'rate' => $rate,
+                'is_active' => 1,
+                'description' => $request->get('description', 'Updated via admin panel'),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+
+            if (Schema::hasColumn('task_completion_points_fee_settings', 'percentage')) {
+                $insertData['percentage'] = $percentage;
+            }
+
+            DB::table('task_completion_points_fee_settings')->insert($insertData);
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Fee setting updated']);
         } catch (\Throwable $e) {
@@ -265,4 +286,3 @@ class PaymentController extends Controller
         }
     }
 }
-
