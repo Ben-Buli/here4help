@@ -16,6 +16,7 @@ class SignupDraftService {
     'signup_is_permanent_address',
     'signup_languages',
     'signup_referral_code',
+    'signup_terms_version_id',
   ];
 
   static const List<String> _oauthKeys = [

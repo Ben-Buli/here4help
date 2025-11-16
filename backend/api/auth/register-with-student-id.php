@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/TermsManager.php';
 
 Response::setCorsHeaders();
 
@@ -39,6 +40,26 @@ try {
 
     if (!empty($missing)) {
         Response::validationError($missing);
+    }
+
+    $acceptedTermsVersionId = isset($_POST['accepted_terms_version_id'])
+        ? (int)$_POST['accepted_terms_version_id']
+        : null;
+    $acceptedTermsPlatform = isset($_POST['accepted_terms_platform']) ? trim((string)$_POST['accepted_terms_platform']) : null;
+    $acceptedTermsDeviceInfo = isset($_POST['accepted_terms_device_info']) ? trim((string)$_POST['accepted_terms_device_info']) : null;
+    $acceptedTermsUserAgent = isset($_POST['accepted_terms_user_agent'])
+        ? trim((string)$_POST['accepted_terms_user_agent'])
+        : ($_SERVER['HTTP_USER_AGENT'] ?? null);
+
+    if ($acceptedTermsVersionId !== null) {
+        if ($acceptedTermsVersionId <= 0) {
+            Response::validationError(['accepted_terms_version_id' => 'Invalid terms version']);
+        }
+
+        $terms = TermsManager::getTermsById($acceptedTermsVersionId);
+        if (!$terms || (int)$terms['is_active'] !== 1) {
+            Response::validationError(['accepted_terms_version_id' => 'Terms version is not active or does not exist']);
+        }
     }
 
     // 取得並標準化輸入資料
@@ -168,6 +189,16 @@ try {
             'student_id_images/' . $fileName
         ]);
         
+        // 若提供條款版本，記錄使用者同意
+        if ($acceptedTermsVersionId !== null) {
+            TermsManager::recordAcceptance($userId, $acceptedTermsVersionId, [
+                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? null,
+                'platform' => $acceptedTermsPlatform,
+                'device_info' => $acceptedTermsDeviceInfo,
+                'user_agent' => $acceptedTermsUserAgent,
+            ]);
+        }
+
         // 提交交易
         $connection->commit();
         

@@ -758,6 +758,43 @@ class UserController extends Controller
     }
 
     /**
+     * 使用者條款同意歷史
+     */
+    public function termsHistory($id)
+    {
+        $user = DB::table('users')->where('id', $id)->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found'
+            ], 404);
+        }
+
+        $terms = DB::table('app_terms as at')
+            ->leftJoin('terms_user_acceptance as tua', function ($join) use ($id) {
+                $join->on('tua.accepted_version_id', '=', 'at.id')
+                    ->where('tua.user_id', '=', $id);
+            })
+            ->where('at.created_at', '>=', $user->created_at)
+            ->orderBy('at.created_at', 'asc')
+            ->get([
+                'at.id',
+                'at.title',
+                'at.created_at',
+                'tua.accepted_at',
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'user_registered_at' => $user->created_at,
+                'items' => $terms,
+            ],
+        ]);
+    }
+
+    /**
      * 記錄批量操作
      */
     private function logBatchAction($admin, $action, $userIds, $reason)

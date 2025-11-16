@@ -11,7 +11,7 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../utils/Response.php';
 require_once __DIR__ . '/../../../auth_helper.php';
 require_once __DIR__ . '/../../../utils/SanctumTokenValidator.php';
-require_once __DIR__ . '/../../../utils/PointTransactionLogger.php';
+require_once __DIR__ . '/../../../utils/TaskCompletionProcessor.php';
 
 Response::setCorsHeaders();
 
@@ -125,101 +125,24 @@ try {
         // 記錄舊狀態用於日誌
         $oldStatus = $dispute['status'];
         $oldDecision = $dispute['decision_result'];
+        $completionResult = null;
         
         // 根據決定執行不同的邏輯
-        switch ($decision) {
+            switch ($decision) {
             case 'completed':
-                // 任務判定完成，轉移點數
-                
-                // 1. 更新任務狀態為已完成
-                $updateTaskStmt = $db->prepare("
-                    UPDATE tasks 
-                    SET status_id = ?, updated_at = NOW()
-                    WHERE id = ?
-                ");
-                $updateTaskStmt->execute([$statusIds['completed'], $taskId]);
-                
-                // 2. 更新應徵者狀態為已完成
-                $updateApplicationStmt = $db->prepare("
-                    UPDATE task_applications 
-                    SET status = 'completed', updated_at = NOW()
-                    WHERE task_id = ? AND user_id = ?
-                ");
-                $updateApplicationStmt->execute([$taskId, $participantId]);
-                
-                // 3. 點數轉移邏輯（複製自 confirm_completion.php）
-                if ($participantId && $rewardPoint > 0) {
-                    // 讀取手續費設定
-                    $feeRate = 0.0;
-                    try {
-                        $feeRow = $db->query("SELECT rate FROM task_completion_points_fee_settings WHERE is_active = 1 ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-                        if ($feeRow && isset($feeRow['rate'])) {
-                            $feeRate = (float)$feeRow['rate'];
-                        }
-                    } catch (Exception $e) {
-                        $feeRate = 0.0;
-                    }
-                    
-                    $amount = $rewardPoint;
-                    $feeAmount = round($amount * $feeRate, 2);
-                    // 修正：接案者獲得完整獎勵，手續費只向發布者額外收取
-                    // $netAmount = max(0.0, $amount - $feeAmount); // 錯誤的舊邏輯
-                    
-                    // 創建者支出任務獎勵
-                    $rewardTransactionId = PointTransactionLogger::logTaskSpending(
-                        $creatorId,
-                        (int)$amount,
-                        $taskId,
-                        $taskTitle
-                    );
-                    
-                    // 接案者收入完整任務獎勵（不扣除手續費）
-                    $earningTransactionId = PointTransactionLogger::logTaskEarning(
-                        $participantId,
-                        (int)$amount, // 修正：接案者獲得完整獎勵
-                        $taskId,
-                        $taskTitle
-                    );
-                    
-                    // 創建者支出手續費
-                    if ($feeAmount > 0) {
-                        $feeTransactionId = PointTransactionLogger::logFee(
-                            $creatorId,
-                            (int)$feeAmount,
-                            $taskId,
-                            "Service fee for task: $taskTitle"
-                        );
-                        
-                        // 記錄手續費收入 - 暫時註解，因為 fee_revenue_ledger.task_id 是 bigint 但 tasks.id 是 varchar
-                        // TODO: 需要修改 fee_revenue_ledger 表的 task_id 欄位類型為 varchar(36) 以匹配 tasks.id
-                        /*
-                        $feeRecordSql = "
-                            INSERT INTO fee_revenue_ledger (
-                                fee_type, src_transaction_id, task_id, payer_user_id, 
-                                amount_points, rate, note, created_at
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-                        ";
-                        $db->prepare($feeRecordSql)->execute([
-                            'task_completion',
-                            $feeTransactionId ?? $rewardTransactionId,
-                            $taskId,
-                            $creatorId,
-                            (int)$feeAmount,
-                            $feeRate,
-                            "Task completion fee: $taskTitle"
-                        ]);
-                        */
-                    }
-                    
-                    // 更新用戶點數餘額
-                    $db->prepare("UPDATE users SET points = points - ? WHERE id = ?")->execute([(int)$amount, $creatorId]);
-                    $db->prepare("UPDATE users SET points = points + ? WHERE id = ?")->execute([(int)$amount, $participantId]); // 修正：接案者獲得完整獎勵
-                    
-                    // 創建者額外扣除手續費
-                    if ($feeAmount > 0) {
-                        $db->prepare("UPDATE users SET points = points - ? WHERE id = ?")->execute([(int)$feeAmount, $creatorId]);
-                    }
-                }
+                $taskPayload = [
+                    'id' => $taskId,
+                    'creator_id' => $creatorId,
+                    'participant_id' => $participantId,
+                    'reward_point' => $rewardPoint,
+                    'title' => $taskTitle,
+                    'status_id' => $dispute['current_task_status_id'],
+                    'status_code' => $dispute['current_task_status_code'],
+                ];
+                $completionResult = TaskCompletionProcessor::completeTask($taskPayload, [
+                    'actor_id' => $adminId,
+                    'context' => 'dispute_resolution',
+                ]);
                 break;
                 
             case 'back_to_progress':
@@ -349,6 +272,10 @@ try {
             'resolved_by' => (int)$adminId,
             'message' => $actionMessages[$decision]
         ];
+        
+        if ($completionResult) {
+            $responseData['payout'] = $completionResult;
+        }
         
         if ($messageId) {
             $responseData['system_message_id'] = (int)$messageId;

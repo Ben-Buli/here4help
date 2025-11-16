@@ -118,6 +118,10 @@ class AppConfig {
   // 靜態內容
   static String get pointPolicyUrl => api('/content/point_policy.php');
 
+  static String get appTermsActiveUrl => api('/content/app_terms_active.php');
+  static String get appTermsStatusUrl => api('/content/app_terms_status.php');
+  static String get appTermsAcceptUrl => api('/content/app_terms_accept.php');
+
   // 大學列表 API
   static String get universitiesListUrl => api('/universities/list.php');
 

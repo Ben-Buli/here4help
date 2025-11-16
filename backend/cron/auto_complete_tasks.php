@@ -15,6 +15,7 @@ ini_set('display_errors', 1);
 
 // 載入必要的檔案
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../utils/TaskCompletionProcessor.php';
 
 /**
  * 記錄日誌
@@ -42,7 +43,8 @@ function logMessage($message, $level = 'INFO') {
  */
 function autoCompleteTasks() {
     try {
-        $db = Database::getInstance()->getConnection();
+        $database = Database::getInstance();
+        $db = $database->getConnection();
         
         logMessage("開始執行自動完成任務檢查");
         
@@ -53,6 +55,7 @@ function autoCompleteTasks() {
                 t.title,
                 t.creator_id,
                 t.participant_id,
+                t.reward_point,
                 t.status_id,
                 ts.code as status_code,
                 t.updated_at,
@@ -74,37 +77,22 @@ function autoCompleteTasks() {
         
         logMessage("找到 " . count($pendingTasks) . " 個需要自動完成的任務");
         
-        // 獲取 completed 狀態的 ID
-        $completedStatusSql = "SELECT id FROM task_statuses WHERE code = 'completed' LIMIT 1";
-        $completedStatusStmt = $db->prepare($completedStatusSql);
-        $completedStatusStmt->execute();
-        $completedStatus = $completedStatusStmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$completedStatus) {
-            logMessage("錯誤：找不到 completed 狀態", 'ERROR');
-            return;
-        }
-        
-        $completedStatusId = $completedStatus['id'];
         $completedCount = 0;
-        
-        // 開始資料庫交易
-        $db->beginTransaction();
         
         foreach ($pendingTasks as $task) {
             try {
-                // 更新任務狀態為 completed
-                $updateTaskSql = "
-                    UPDATE tasks 
-                    SET status_id = :status_id, updated_at = NOW() 
-                    WHERE id = :task_id
-                ";
-                $updateTaskStmt = $db->prepare($updateTaskSql);
-                $updateTaskStmt->execute([
-                    ':status_id' => $completedStatusId,
-                    ':task_id' => $task['id']
+                $completionData = TaskCompletionProcessor::completeTask([
+                    'id' => $task['id'],
+                    'creator_id' => $task['creator_id'],
+                    'participant_id' => $task['participant_id'],
+                    'reward_point' => $task['reward_point'],
+                    'title' => $task['title'],
+                    'status_id' => $task['status_id'],
+                    'status_code' => $task['status_code'],
+                ], [
+                    'context' => 'auto_complete',
                 ]);
-                
+
                 // 記錄到 task_logs
                 $logSql = "
                     INSERT INTO task_logs (
@@ -176,7 +164,7 @@ function autoCompleteTasks() {
                 }
                 
                 $completedCount++;
-                logMessage("任務 ID {$task['id']} ('{$task['title']}') 已自動完成 ({$task['days_pending']} 天)");
+                logMessage("任務 ID {$task['id']} ('{$task['title']}') 已自動完成 ({$task['days_pending']} 天)，接案者實領 {$completionData['net']} 點數");
                 
             } catch (Exception $e) {
                 logMessage("處理任務 ID {$task['id']} 時發生錯誤: " . $e->getMessage(), 'ERROR');
@@ -184,17 +172,10 @@ function autoCompleteTasks() {
             }
         }
         
-        // 提交交易
-        $db->commit();
-        
         logMessage("自動完成任務檢查完成，共處理 $completedCount 個任務");
         
     } catch (Exception $e) {
         // 回滾交易
-        if ($db && $db->inTransaction()) {
-            $db->rollback();
-        }
-        
         logMessage("自動完成任務時發生嚴重錯誤: " . $e->getMessage(), 'ERROR');
         throw $e;
     }

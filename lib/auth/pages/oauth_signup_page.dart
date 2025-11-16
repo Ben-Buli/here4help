@@ -1,11 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:here4help/auth/services/auth_service.dart';
-import 'package:here4help/config/app_config.dart';
 import 'package:here4help/services/api/oauth_api.dart';
 import 'package:here4help/utils/image_helper.dart';
 

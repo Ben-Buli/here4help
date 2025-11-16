@@ -35,6 +35,36 @@ if (strpos($path, '/here4help') === 0) {
     $path = substr($path, 10); // 移除 '/here4help'
 }
 
+// 管理後臺 Laravel API & Sanctum
+if (
+    strpos($path, '/api/admin') === 0 ||
+    strpos($path, '/sanctum') === 0 ||
+    strpos($path, '/admintest') === 0
+) {
+    $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/admin/index.php';
+    require $_SERVER['SCRIPT_FILENAME'];
+    exit();
+}
+
+// 管理後臺靜態資源
+if (strpos($path, '/admin/assets/') === 0) {
+    $assetPath = __DIR__ . '/admin/public' . $path;
+    if (file_exists($assetPath)) {
+        header('Content-Type: ' . mime_content_type($assetPath));
+        readfile($assetPath);
+        exit();
+    }
+}
+
+if (preg_match('#^/admin/.*\.(ico|png|jpg|jpeg|svg|json|webmanifest)$#i', $path)) {
+    $staticPath = __DIR__ . '/admin/public' . $path;
+    if (file_exists($staticPath)) {
+        header('Content-Type: ' . mime_content_type($staticPath));
+        readfile($staticPath);
+        exit();
+    }
+}
+
 // Admin API 路由處理
 if (preg_match('/^\/backend\/api\/admin\/users\/(\d+)\/(verification|referral-info|intro-referral-info|review)$/', $path, $matches)) {
     $userId = $matches[1];
@@ -96,9 +126,13 @@ if (strpos($path, '/backend/uploads/') === 0) {
 
 // 管理後台路由 (Vue SPA)
 if (strpos($path, '/admin') === 0) {
-    $adminPath = __DIR__ . '/admin/frontend/dist/index.html';
-    if (file_exists($adminPath)) {
-        include $adminPath;
+    $adminIndex = __DIR__ . '/admin/public/index.html';
+    if (!file_exists($adminIndex)) {
+        // 後備：開發環境尚未 build 時，讀取 frontend/dist
+        $adminIndex = __DIR__ . '/admin/frontend/dist/index.html';
+    }
+    if (file_exists($adminIndex)) {
+        include $adminIndex;
         exit();
     }
 }

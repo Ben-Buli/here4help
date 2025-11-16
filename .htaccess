@@ -71,6 +71,10 @@ RewriteRule ^ admin/index.php [L]
 RewriteCond %{REQUEST_URI} ^/admin/assets/
 RewriteRule ^admin/assets/(.*)$ admin/public/assets/$1 [L]
 
+RewriteCond %{REQUEST_URI} ^/admin/(.*\.(?:ico|png|jpg|jpeg|svg|json|webmanifest))$ [NC]
+RewriteCond %{DOCUMENT_ROOT}/admin/public/%1 -f
+RewriteRule ^admin/.*$ admin/public/%1 [L]
+
 RewriteCond %{REQUEST_URI} ^/admin [NC]
 RewriteCond %{REQUEST_URI} !^/admin/api/ [NC]
 RewriteCond %{REQUEST_URI} !^/admin/(ping|logtest|test-view) [NC]

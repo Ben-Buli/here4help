@@ -154,6 +154,20 @@ export const userApi = {
   introReferralInfo: (id: number) =>
     api.get<ApiResponse<any>>(API_ENDPOINTS.users.introReferralInfo(id)),
 
+  termsHistory: (id: number) =>
+    api.get<
+      ApiResponse<{
+        user_registered_at: string
+        items: Array<{
+          id: number
+          version: string
+          title: string
+          created_at: string
+          accepted_at?: string
+        }>
+      }>
+    >(API_ENDPOINTS.users.termsHistory(id)),
+
   review: (
     id: number,
     payload: {
@@ -393,6 +407,14 @@ export const logApi = {
         login_stats: any
       }>
     >('/api/admin/logs/stats', { params }),
+}
+
+// 條款管理 API
+export const appTermsApi = {
+  list: () => api.get<ApiResponse<any[]>>(API_ENDPOINTS.appTerms.list()),
+  detail: (id: number) => api.get<ApiResponse<any>>(API_ENDPOINTS.appTerms.detail(id)),
+  push: (id: number, payload?: Record<string, any>) =>
+    api.post<ApiResponse>(API_ENDPOINTS.appTerms.push(id), payload),
 }
 
 // 系統資訊 API

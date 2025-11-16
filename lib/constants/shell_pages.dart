@@ -14,6 +14,7 @@ import 'package:here4help/account/pages/profile_page.dart';
 import 'package:here4help/account/pages/ratings_page.dart';
 import 'package:here4help/account/pages/security_page.dart';
 import 'package:here4help/account/pages/support_page.dart';
+import 'package:here4help/account/pages/terms_of_use_page.dart';
 import 'package:here4help/account/pages/theme_settings_page.dart';
 import 'package:here4help/account/pages/wallet_page.dart';
 import 'package:here4help/account/pages/point_history_page.dart';
@@ -405,6 +406,16 @@ final List<Map<String, dynamic>> shellPages = [
     'showBackArrow': true,
     'icon': Icons.help_outline,
     'permission': 0, // 新用戶可查看 FAQ
+  },
+  {
+    'path': '/account/support/terms',
+    'child': const TermsOfUsePage(),
+    'title': 'Terms of Use',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'icon': Icons.description,
+    'permission': 0,
   },
   {
     'path': '/pay/setting',

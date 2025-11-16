@@ -189,7 +189,7 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'This action will transfer the reward points to the tasker.',
+                  'This action will transfer the reward points to the tasker after deducting the ${(feeRate * 100).toStringAsFixed(2)}% platform fee.',
                   style: TextStyle(
                     fontSize: 12,
                     color: primaryColor,

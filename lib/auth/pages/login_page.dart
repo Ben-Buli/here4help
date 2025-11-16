@@ -1,7 +1,9 @@
 // login_page.dart
+// ignore_for_file: use_build_context_synchronously
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +16,8 @@ import 'package:here4help/auth/services/auth_service.dart';
 import 'package:here4help/providers/permission_provider.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:here4help/services/terms_service.dart';
+import 'package:here4help/utils/platform_info_helper.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -104,6 +108,16 @@ class _LoginPageState extends State<LoginPage> {
     _timeoutTimer?.cancel();
   }
 
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
+      ),
+    );
+  }
+
   Future<void> _handleLogin(String email, String password) async {
     // 防止重複點擊
     if (isLoading) return;
@@ -166,6 +180,11 @@ class _LoginPageState extends State<LoginPage> {
       setState(() {
         isLoading = false;
       });
+
+      final termsOk = await _handleTermsAfterLogin();
+      if (!termsOk || !mounted) {
+        return;
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Login Success: $email')),
@@ -231,6 +250,139 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<bool> _handleTermsAfterLogin() async {
+    try {
+      final status = await TermsService.fetchStatus();
+      if (!status.requiresAcceptance || status.terms == null) {
+        return true;
+      }
+
+      final accepted = await _showTermsAcceptanceDialog(status.terms!);
+      if (accepted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Terms accepted')),
+          );
+        }
+        return true;
+      }
+
+      await _handleTermsRejected();
+      return false;
+    } catch (e) {
+      _showErrorSnackBar('Unable to verify terms status: $e');
+      await _handleTermsRejected();
+      return false;
+    }
+  }
+
+  Future<bool> _showTermsAcceptanceDialog(TermsContent terms) async {
+    final platform = PlatformInfoHelper.detectPlatform();
+    final deviceInfo = await PlatformInfoHelper.buildDeviceDescription();
+    final userAgent = await PlatformInfoHelper.userAgent();
+
+    return (await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) {
+            bool isSubmitting = false;
+            String? errorMessage;
+            final dialogHeight = MediaQuery.of(context).size.height * 0.6;
+            return StatefulBuilder(
+              builder: (context, setState) {
+                return AlertDialog(
+                  title: Text(
+                    terms.title.isNotEmpty
+                        ? terms.title
+                        : 'Updated Terms of Use',
+                  ),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    height: dialogHeight,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Version ${terms.version}',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 12),
+                          Html(data: terms.content),
+                          if (errorMessage != null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              errorMessage ?? '',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: isSubmitting
+                          ? null
+                          : () => Navigator.of(context).pop(false),
+                      child: const Text('Disagree'),
+                    ),
+                    FilledButton(
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              setState(() {
+                                isSubmitting = true;
+                                errorMessage = null;
+                              });
+                              try {
+                                await TermsService.acceptTerms(
+                                  versionId: terms.id,
+                                  platform: platform,
+                                  deviceInfo: deviceInfo,
+                                  userAgent: userAgent,
+                                );
+                                Navigator.of(context).pop(true);
+                              } catch (e) {
+                                setState(() {
+                                  isSubmitting = false;
+                                  errorMessage =
+                                      'Failed to record acceptance. Please try again.';
+                                });
+                              }
+                            },
+                      child: isSubmitting
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Agree'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        )) ??
+        false;
+  }
+
+  Future<void> _handleTermsRejected() async {
+    await AuthService.logout();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('You must agree to the Terms of Use to continue.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    context.go('/login');
+  }
+
   Widget _buildBrandedButton({
     required VoidCallback? onPressed,
     required Widget icon,
@@ -241,14 +393,16 @@ class _LoginPageState extends State<LoginPage> {
   }) {
     final bool disableInteraction = isLoading || onPressed == null;
     final Color effectiveTextColor =
-        disableInteraction ? textColor.withOpacity(0.6) : textColor;
+        disableInteraction ? textColor.withValues(alpha: 0.6) : textColor;
     final Color? effectiveBorderColor = borderColor != null
-        ? (disableInteraction ? borderColor.withOpacity(0.6) : borderColor)
+        ? (disableInteraction ? borderColor.withValues(alpha: 0.6) : borderColor)
         : null;
 
     final borderRadius = BorderRadius.circular(8);
     final Color effectiveBackgroundColor =
-        disableInteraction ? backgroundColor.withOpacity(0.6) : backgroundColor;
+        disableInteraction
+            ? backgroundColor.withValues(alpha: 0.6)
+            : backgroundColor;
 
     return SizedBox(
       width: double.infinity,
@@ -1218,7 +1372,7 @@ class _LoginPageState extends State<LoginPage> {
           // 全螢幕 Loading 遮罩
           if (isLoading)
             Container(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
               child: const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,

@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\UserTransactionController;
 use App\Http\Controllers\Admin\AdminPingController;
 use App\Http\Controllers\Admin\PointPolicyController;
 use App\Http\Controllers\Admin\FAQController;
+use App\Http\Controllers\Admin\AppTermsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -43,6 +44,7 @@ Route::prefix('admin')->group(function () {
             Route::post('/{id}/review', [UserController::class, 'review'])->middleware('admin:users.edit');
             Route::get('/{id}/verification', [UserController::class, 'verification'])->middleware('admin:users.view');
             Route::get('/{id}/intro-referral-info', [UserController::class, 'introReferralInfo'])->middleware('admin:users.view');
+            Route::get('/{id}/terms-history', [UserController::class, 'termsHistory'])->middleware('admin:users.view');
         });
 
         // 任務管理
@@ -107,6 +109,13 @@ Route::prefix('admin')->group(function () {
             Route::post('/', [PointPolicyController::class, 'store']);
             Route::put('/{id}', [PointPolicyController::class, 'update']);
             Route::post('/{id}/activate', [PointPolicyController::class, 'activate']);
+        });
+
+        // App Terms 內容管理
+        Route::prefix('app-terms')->middleware('admin:points.edit')->group(function () {
+            Route::get('/', [AppTermsController::class, 'index']);
+            Route::get('/{id}', [AppTermsController::class, 'show']);
+            Route::post('/{id}/push', [AppTermsController::class, 'push']);
         });
 
         // FAQ 內容管理

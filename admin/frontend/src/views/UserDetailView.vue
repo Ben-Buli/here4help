@@ -22,44 +22,28 @@
                 <router-link to="/users" class="text-gray-400 hover:text-gray-500">
                   <svg class="flex-shrink-0 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                     <path
-                      d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"
-                    />
+                      d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
                   </svg>
                 </router-link>
               </li>
               <li>
                 <div class="flex items-center">
-                  <svg
-                    class="flex-shrink-0 h-5 w-5 text-gray-300"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fill-rule="evenodd"
+                  <svg class="flex-shrink-0 h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd"
                       d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                      clip-rule="evenodd"
-                    />
+                      clip-rule="evenodd" />
                   </svg>
-                  <router-link
-                    to="/users"
-                    class="ml-4 text-sm font-medium text-gray-500 hover:text-gray-700"
-                  >
+                  <router-link to="/users" class="ml-4 text-sm font-medium text-gray-500 hover:text-gray-700">
                     Users
                   </router-link>
                 </div>
               </li>
               <li>
                 <div class="flex items-center">
-                  <svg
-                    class="flex-shrink-0 h-5 w-5 text-gray-300"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fill-rule="evenodd"
+                  <svg class="flex-shrink-0 h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd"
                       d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                      clip-rule="evenodd"
-                    />
+                      clip-rule="evenodd" />
                   </svg>
                   <span class="ml-4 text-sm font-medium text-gray-900">{{ user.name }}</span>
                 </div>
@@ -79,16 +63,12 @@
               <h1 class="text-2xl font-bold text-gray-900">{{ user.name }}</h1>
               <p class="text-sm text-gray-500">{{ user.email }}</p>
               <div class="flex items-center space-x-4 mt-2">
-                <span
-                  class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-                  :class="getStatusBadgeClass(user.status)"
-                >
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+                  :class="getStatusBadgeClass(user.status)">
                   {{ getStatusText(user.status) }}
                 </span>
-                <span
-                  class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-                  :class="getPermissionBadgeClass(user.permission)"
-                >
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+                  :class="getPermissionBadgeClass(user.permission)">
                   {{ getPermissionText(user.permission) }}
                 </span>
               </div>
@@ -96,25 +76,30 @@
           </div>
         </div>
         <div class="mt-4 flex md:mt-0 md:ml-4 space-x-3">
-          <button
-            v-if="user.student_verification && user.student_verification.verification_status === 'pending'"
-            @click="openStudentReview"
-            class="admin-button-secondary"
-            :disabled="isLoading"
-          >
-            Review Student ID
+          <button v-if="user.student_verification && user.student_verification.verification_status === 'pending'"
+            @click="openStudentReview" class="admin-button-primary flex items-center gap-2" :disabled="isLoading">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M3.75 7.5A2.25 2.25 0 016 5.25h12a2.25 2.25 0 012.25 2.25v9A2.25 2.25 0 0118 18.75H6A2.25 2.25 0 013.75 16.5v-9z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7.5 9.75h9M7.5 12.75h4.5" />
+            </svg>
+            Review
+          </button>
+          <button @click="loadTermsHistory" class="admin-button-secondary flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2" />
+              <circle cx="12" cy="12" r="9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Terms
           </button>
           <button @click="refreshData" class="admin-button-secondary">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
+            <!-- <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg> -->
             Refresh
           </button>
+
         </div>
       </div>
 
@@ -148,6 +133,14 @@
               <dt class="text-sm font-medium text-gray-500">University</dt>
               <dd class="text-sm text-gray-900">{{ user.university || 'Not provided' }}</dd>
             </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Invite Code</dt>
+              <dd class="text-sm text-gray-900">{{ user.referral_code || 'Not provided' }}</dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Referral Code Used</dt>
+              <dd class="text-sm text-gray-900">{{ user.intro_referral_code || 'Not provided' }}</dd>
+            </div>
           </dl>
         </div>
 
@@ -158,10 +151,8 @@
             <div>
               <dt class="text-sm font-medium text-gray-500">Status</dt>
               <dd>
-                <span
-                  class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-                  :class="getStatusBadgeClass(user.status)"
-                >
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+                  :class="getStatusBadgeClass(user.status)">
                   {{ getStatusText(user.status) }}
                 </span>
               </dd>
@@ -169,10 +160,8 @@
             <div>
               <dt class="text-sm font-medium text-gray-500">Permission Level</dt>
               <dd>
-                <span
-                  class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-                  :class="getPermissionBadgeClass(user.permission)"
-                >
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+                  :class="getPermissionBadgeClass(user.permission)">
                   {{ getPermissionText(user.permission) }}
                 </span>
               </dd>
@@ -221,10 +210,8 @@
             <div>
               <dt class="text-gray-500">Status</dt>
               <dd>
-                <span
-                  class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-                  :class="verificationStatusDisplay(user.student_verification).badgeClass"
-                >
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+                  :class="verificationStatusDisplay(user.student_verification).badgeClass">
                   {{ verificationStatusDisplay(user.student_verification).label }}
                 </span>
               </dd>
@@ -246,21 +233,15 @@
             <dt class="text-gray-500">Student ID Image</dt>
             <dd>
               <div class="relative">
-                <div
-                  v-if="studentImageLoadError"
+                <div v-if="studentImageLoadError"
                   class="flex h-32 w-24 items-center justify-center rounded border border-dashed border-gray-300 bg-gray-50 px-3 text-center text-xs text-gray-500"
-                  aria-live="polite"
-                >
+                  aria-live="polite">
                   Image unavailable
                 </div>
-                <img
-                  v-else
-                  :src="getImageUrl(user.student_verification.student_id_image_path)"
-                  alt="Student ID"
+                <img v-else :src="getImageUrl(user.student_verification.student_id_image_path)" alt="Student ID"
                   class="h-32 w-24 rounded border object-cover cursor-pointer"
                   @click="openImage(user.student_verification.student_id_image_path)"
-                  @error="handleStudentImageError"
-                />
+                  @error="handleStudentImageError" />
               </div>
             </dd>
           </div>
@@ -297,11 +278,8 @@
           No recent activities
         </div>
         <div v-else class="space-y-3">
-          <div
-            v-for="activity in recentActivities"
-            :key="activity.id"
-            class="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0"
-          >
+          <div v-for="activity in recentActivities" :key="activity.id"
+            class="flex items-center justify-between py-2 border-b border-gray-200 last:border-b-0">
             <div class="flex items-center space-x-3">
               <div class="flex-shrink-0 w-2 h-2 bg-blue-400 rounded-full"></div>
               <div>
@@ -320,11 +298,8 @@
       <div class="admin-card mt-8">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-medium text-gray-900">Operation History</h3>
-          <button
-            @click="() => loadOperationLogs(1)"
-            class="text-sm text-primary-600 hover:text-primary-800"
-            :disabled="isLoadingLogs"
-          >
+          <button @click="() => loadOperationLogs(1)" class="text-sm text-primary-600 hover:text-primary-800"
+            :disabled="isLoadingLogs">
             {{ isLoadingLogs ? 'Loading...' : 'Refresh' }}
           </button>
         </div>
@@ -335,21 +310,17 @@
           No operation logs found
         </div>
         <div v-else class="space-y-3">
-          <div
-            v-for="log in operationLogs"
-            :key="log.id"
-            class="flex items-start justify-between py-3 border-b border-gray-200 last:border-b-0"
-          >
+          <div v-for="log in operationLogs" :key="log.id"
+            class="flex items-start justify-between py-3 border-b border-gray-200 last:border-b-0">
             <div class="flex-1">
               <div class="flex items-center space-x-2 mb-1">
-                <span
-                  class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
-                  :class="getActionBadgeClass(log.action)"
-                >
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
+                  :class="getActionBadgeClass(log.action)">
                   {{ getActionText(log.action) }}
                 </span>
                 <span class="text-xs text-gray-500">
-                  by {{ log.actor_type === 'admin' ? (log.admin_full_name || log.admin_username || 'Admin') : 'System' }}
+                  by {{ log.actor_type === 'admin' ? (log.admin_full_name || log.admin_username || 'Admin') : 'System'
+                  }}
                 </span>
               </div>
               <div v-if="log.field" class="text-sm text-gray-700 mt-1">
@@ -367,53 +338,89 @@
           </div>
         </div>
         <div v-if="operationLogsPagination.total > operationLogsPagination.per_page" class="mt-4 flex justify-center">
-          <button
-            @click="loadMoreLogs"
-            class="admin-button-secondary text-sm"
-            :disabled="isLoadingLogs"
-          >
+          <button @click="loadMoreLogs" class="admin-button-secondary text-sm" :disabled="isLoadingLogs">
             Load More
           </button>
         </div>
       </div>
 
-      <UserReviewModal
-        v-if="showReviewModal && user"
-        :user="user"
-        @close="showReviewModal = false"
-        @reviewed="handleStudentReviewed"
-      />
+      <UserReviewModal v-if="showReviewModal && user" :user="user" @close="showReviewModal = false"
+        @reviewed="handleStudentReviewed" />
 
-      <div
-        v-if="showImageModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
-        @click="closeImageModal"
-      >
+      <div v-if="showImageModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
+        @click="closeImageModal">
         <div class="relative max-h-screen max-w-3xl p-4" @click.stop>
-          <button
-            @click="closeImageModal"
-            class="absolute top-4 right-4 text-white hover:text-gray-300"
-            aria-label="Close image preview"
-          >
+          <button @click="closeImageModal" class="absolute top-4 right-4 text-white hover:text-gray-300"
+            aria-label="Close image preview">
             <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
           </button>
-          <img
-            v-if="!modalImageError"
-            :src="selectedImagePath"
-            alt="Student ID preview"
-            class="max-h-screen max-w-full rounded object-contain"
-            @error="handleModalImageError"
-          />
-          <div
-            v-else
-            class="rounded bg-white px-6 py-4 text-center text-gray-700 shadow-lg"
-          >
+          <img v-if="!modalImageError" :src="selectedImagePath" alt="Student ID preview"
+            class="max-h-screen max-w-full rounded object-contain" @error="handleModalImageError" />
+          <div v-else class="rounded bg-white px-6 py-4 text-center text-gray-700 shadow-lg">
             Unable to load the student ID image.
           </div>
         </div>
       </div>
+
+      <!-- Terms Acceptance History -->
+      <transition name="fade">
+        <div v-if="showTermsModal" class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-4"
+          @click="showTermsModal = false">
+          <div
+            class="relative bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border-1 border-gray-200"
+            @click.stop>
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">Terms Acceptance History</h3>
+                <p class="text-sm text-gray-500">Track which versions this user agreed to.</p>
+              </div>
+              <button class="text-gray-400 hover:text-gray-600" @click="showTermsModal = false">✕</button>
+            </div>
+            <div class="flex-1 overflow-y-auto">
+              <div v-if="isLoadingTermsHistory" class="p-6 text-center text-gray-500">
+                Loading terms history...
+              </div>
+              <div v-else class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Version
+                      </th>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title
+                      </th>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Published</th>
+                      <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Accepted</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    <tr v-if="termsHistory.length === 0">
+                      <td colspan="4" class="px-6 py-6 text-center text-gray-500">No applicable versions found.</td>
+                    </tr>
+                    <tr v-for="term in termsHistory" :key="term.id">
+                      <td class="px-6 py-4 text-sm font-medium text-gray-900">v{{ term.version }}</td>
+                      <td class="px-6 py-4 text-sm text-gray-700">{{ term.title }}</td>
+                      <td class="px-6 py-4 text-sm text-gray-500">{{ formatDate(term.created_at) }}</td>
+                      <td class="px-6 py-4 text-sm">
+                        <span v-if="term.accepted_at" class="text-green-600 font-medium">
+                          {{ formatDate(term.accepted_at) }}
+                        </span>
+                        <span v-else class="text-red-500 font-medium">Pending</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-100 text-sm text-gray-500">
+              User registered at {{ formatDate(termsHistoryMeta.user_registered_at) }}
+            </div>
+          </div>
+        </div>
+      </transition>
     </div>
   </div>
 </template>
@@ -466,6 +473,10 @@ const operationLogsPagination = ref({
   total: 0,
   last_page: 1,
 })
+const showTermsModal = ref(false)
+const isLoadingTermsHistory = ref(false)
+const termsHistory = ref<any[]>([])
+const termsHistoryMeta = ref<{ user_registered_at: string | null }>({ user_registered_at: null })
 
 // Methods
 const loadUser = async () => {
@@ -535,6 +546,23 @@ const handleStudentImageError = () => {
 
 const handleModalImageError = () => {
   modalImageError.value = true
+}
+
+const loadTermsHistory = async () => {
+  if (!user.value?.id) return
+  try {
+    isLoadingTermsHistory.value = true
+    const response = await userApi.termsHistory(user.value.id)
+    const payload = response.data.data
+    termsHistory.value = payload?.items ?? []
+    termsHistoryMeta.value.user_registered_at = payload?.user_registered_at ?? null
+    showTermsModal.value = true
+  } catch (error) {
+    console.error('Failed to load terms history', error)
+    alert('Failed to load terms history')
+  } finally {
+    isLoadingTermsHistory.value = false
+  }
 }
 
 // Utility functions
@@ -633,7 +661,7 @@ const getActionText = (action: string) => {
 
 const loadOperationLogs = async (page = 1) => {
   if (!user.value?.id) return
-  
+
   try {
     isLoadingLogs.value = true
     // 後端使用 like 查詢，所以我們只傳遞一個主要的 action 類型，或者不傳遞讓後端返回所有
@@ -646,18 +674,18 @@ const loadOperationLogs = async (page = 1) => {
 
     if (response.data.success && response.data.data) {
       // 過濾出權限和狀態相關的操作
-      const filteredItems = (response.data.data.items || []).filter((item: any) => 
-        item.action === 'permission_change' || 
-        item.action === 'status_change' || 
+      const filteredItems = (response.data.data.items || []).filter((item: any) =>
+        item.action === 'permission_change' ||
+        item.action === 'status_change' ||
         item.action === 'user_verification_review'
       )
-      
+
       if (page === 1) {
         operationLogs.value = filteredItems
       } else {
         operationLogs.value.push(...filteredItems)
       }
-      
+
       const pg = response.data.data.pagination
       if (pg) {
         operationLogsPagination.value = {

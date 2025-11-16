@@ -225,8 +225,8 @@ class _WalletPageState extends State<WalletPage> {
     final cardBorder = primaryColor.withValues(alpha: 0.2);
     final successColor = theme.colorScheme.secondary;
     final warningColor = theme.colorScheme.error;
-    final bannerBackground = Color.alphaBlend(
-        warningColor.withValues(alpha: 0.12), Colors.white);
+    final bannerBackground =
+        Color.alphaBlend(warningColor.withValues(alpha: 0.12), Colors.white);
 
     if (bankAccountInfo == null || !bankAccountInfo!.hasValidAccount) {
       return Container(
@@ -538,7 +538,8 @@ class _WalletPageState extends State<WalletPage> {
                     TextButton(
                       onPressed:
                           isSubmitting ? null : () => Navigator.pop(context),
-                      style: TextButton.styleFrom(foregroundColor: primaryColor),
+                      style:
+                          TextButton.styleFrom(foregroundColor: primaryColor),
                       child: const Text('Cancel'),
                     ),
                     ElevatedButton(
@@ -589,9 +590,8 @@ class _WalletPageState extends State<WalletPage> {
                                   SnackBar(
                                     content: const Text(
                                         'Topup request submitted, waiting for admin approval'),
-                                    backgroundColor: Theme.of(context)
-                                        .colorScheme
-                                        .secondary,
+                                    backgroundColor:
+                                        Theme.of(context).colorScheme.secondary,
                                   ),
                                 );
                               } catch (e) {
@@ -694,6 +694,16 @@ class _WalletPageState extends State<WalletPage> {
                   title: const Text('Points History'),
                   onTap: () {
                     context.go('/account/wallet/point_history');
+                  },
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Icon(Icons.info_outline,
+                      color: Theme.of(context).colorScheme.primary),
+                  title: const Text('Withdraw Points'),
+                  onTap: () {
+                    // TODO: Withdraw Points
+                    GoRouter.of(context).go('/TODO: Withdraw Points');
                   },
                 ),
                 const Divider(height: 1),

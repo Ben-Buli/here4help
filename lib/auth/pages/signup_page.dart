@@ -1,6 +1,7 @@
 // signup_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/task/services/language_service.dart';
@@ -11,6 +12,7 @@ import 'package:here4help/services/api/oauth_api.dart';
 import 'dart:convert';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/auth/services/signup_draft_service.dart';
+import 'package:here4help/services/terms_service.dart';
 
 class SignupPage extends StatefulWidget {
   final Map<String, dynamic>? oauthData;
@@ -85,6 +87,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     _loadLanguages();
     _loadUniversities();
     _loadCountries(); // 新增：載入國家列表
+    _restoreTermsAcceptance();
     // 延遲載入第三方登入資料，確保其他資料先載入完成
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeDraftStateAndLoadOAuth();
@@ -95,6 +98,14 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   bool showConfirmPaymentPassword = false;
   bool isVerifyingReferralCode = false;
   String? referralCodeStatus; // 'valid', 'invalid', 'not_found'
+
+  TermsContent? activeTerms;
+  bool isLoadingTerms = false;
+  String? termsLoadError;
+  bool hasAcceptedTerms = false;
+  int? acceptedTermsVersionId;
+  static const String _termsUnavailableMessage =
+      'This feature is temporarily unavailable. Please contact support.';
 
   // 語言選項
   List<Map<String, dynamic>> languageOptions = [];
@@ -115,12 +126,38 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     await _loadThirdPartyData();
   }
 
+  Future<void> _restoreTermsAcceptance() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedVersionId = prefs.getInt('signup_terms_version_id');
+    if (!mounted) return;
+    setState(() {
+      acceptedTermsVersionId = savedVersionId;
+      hasAcceptedTerms = savedVersionId != null;
+    });
+  }
+
+  Future<void> _persistTermsAcceptance(int? versionId) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (versionId == null) {
+      await prefs.remove('signup_terms_version_id');
+    } else {
+      await prefs.setInt('signup_terms_version_id', versionId);
+    }
+  }
+
   Future<void> _initializeDraftState() async {
     final prefs = await SharedPreferences.getInstance();
     if (_hasOAuthIntent(prefs)) {
       await _loadExistingData(prefs);
     } else {
       await SignupDraftService.clearWithPrefs(prefs, includeOAuth: true);
+      await _persistTermsAcceptance(null);
+      if (mounted) {
+        setState(() {
+          acceptedTermsVersionId = null;
+          hasAcceptedTerms = false;
+        });
+      }
       _resetFormFields();
     }
   }
@@ -266,6 +303,130 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     await prefs.remove('signup_provider');
     await prefs.remove('signup_provider_user_id');
     await prefs.remove('signup_avatar_url');
+  }
+
+  Future<bool> _ensureTermsLoaded({bool forceReload = false}) async {
+    if (isLoadingTerms) {
+      return activeTerms != null;
+    }
+
+    if (!forceReload && activeTerms != null) {
+      return true;
+    }
+
+    setState(() {
+      isLoadingTerms = true;
+      termsLoadError = null;
+    });
+
+    try {
+      final fetched = await TermsService.fetchActiveTerms();
+      if (!mounted) return false;
+
+      if (fetched == null) {
+        setState(() {
+          activeTerms = null;
+          termsLoadError = _termsUnavailableMessage;
+        });
+        return false;
+      }
+
+      setState(() {
+        activeTerms = fetched;
+      });
+
+      if (acceptedTermsVersionId != null &&
+          acceptedTermsVersionId != fetched.id) {
+        setState(() {
+          hasAcceptedTerms = false;
+          acceptedTermsVersionId = null;
+        });
+        await _persistTermsAcceptance(null);
+      }
+
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+      setState(() {
+        termsLoadError = _termsUnavailableMessage;
+      });
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoadingTerms = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleTermsCheckboxChanged(bool value) async {
+    if (value) {
+      await _showTermsDialog();
+    } else {
+      setState(() {
+        hasAcceptedTerms = false;
+        acceptedTermsVersionId = null;
+      });
+      await _persistTermsAcceptance(null);
+    }
+  }
+
+  Future<void> _showTermsDialog() async {
+    final loaded = await _ensureTermsLoaded(forceReload: activeTerms == null);
+    if (!loaded || activeTerms == null || !mounted) {
+      _showErrorSnackBar(_termsUnavailableMessage);
+      return;
+    }
+
+    final dialogHeight = MediaQuery.of(context).size.height * 0.6;
+    final agreed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(
+            activeTerms!.title.isNotEmpty ? activeTerms!.title : 'Terms of Use',
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: dialogHeight,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Version ${activeTerms!.version}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 12),
+                  Html(data: activeTerms!.content),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Close'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Agree'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (agreed == true && mounted) {
+      setState(() {
+        hasAcceptedTerms = true;
+        acceptedTermsVersionId = activeTerms!.id;
+        termsLoadError = null;
+      });
+      await _persistTermsAcceptance(activeTerms!.id);
+    }
   }
 
   // 預填第三方登入資料
@@ -1702,11 +1863,14 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 24),
 
+                _buildTermsAgreementSection(),
+                const SizedBox(height: 16),
+
                 // Submit Button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: isLoading ? null : _handleSubmit,
+                    onPressed: _canSubmit ? _handleSubmit : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Theme.of(context).colorScheme.onPrimary,
@@ -1962,6 +2126,11 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       return;
     }
 
+    if (!hasAcceptedTerms || acceptedTermsVersionId == null) {
+      _showErrorSnackBar('Please agree to the Terms of Use before continuing.');
+      return;
+    }
+
     setState(() {
       isLoading = true;
     });
@@ -2038,6 +2207,62 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   }
 
   /// 建立 6 位數字密碼輸入欄位（使用 Pinput）
+  Widget _buildTermsAgreementSection() {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Checkbox(
+              value: hasAcceptedTerms,
+              onChanged: (value) => _handleTermsCheckboxChanged(value ?? false),
+            ),
+            Expanded(
+              child: Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    'I agree to the',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  GestureDetector(
+                    onTap: _showTermsDialog,
+                    child: Text(
+                      'Terms of Use',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        decoration: TextDecoration.underline,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'required to continue.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (termsLoadError != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            termsLoadError!,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildPinputField({
     required TextEditingController controller,
     String? Function(String?)? validator,
@@ -2110,6 +2335,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       ],
     );
   }
+
+  bool get _canSubmit => !isLoading && hasAcceptedTerms;
 }
 
 /// 自訂膠囊開關，放在 TextFormField 的 suffix 位置使用

@@ -1,63 +1,60 @@
 <template>
   <div class="fee-revenue-page">
     <div class="page-header">
-      <h1>手續費收入統計</h1>
+      <h1>Fee Revenue Overview</h1>
       <div class="header-actions">
-        <button @click="exportData" class="btn btn-success" :disabled="loading">
-          <i class="icon-download"></i> 匯出報表
-        </button>
         <button @click="refreshData" class="btn btn-secondary" :disabled="loading">
-          <i class="icon-refresh"></i> 刷新
+          <i class="icon-refresh"></i> Refresh
         </button>
       </div>
     </div>
 
-    <!-- 篩選器 -->
+    <!-- Filters -->
     <div class="filters-section">
       <div class="filter-group">
-        <label>統計週期:</label>
+        <label>Grouping:</label>
         <select v-model="filters.groupBy" @change="loadRevenueData">
-          <option value="day">按日統計</option>
-          <option value="month">按月統計</option>
-          <option value="year">按年統計</option>
+          <option value="day">Daily</option>
+          <option value="month">Monthly</option>
+          <option value="year">Yearly</option>
         </select>
       </div>
       
       <div class="filter-group">
-        <label>日期範圍:</label>
+        <label>Date Range:</label>
         <input 
           type="date" 
           v-model="filters.fromDate" 
           @change="loadRevenueData"
-          placeholder="開始日期"
+          placeholder="Start date"
         />
-        <span>至</span>
+        <span>to</span>
         <input 
           type="date" 
           v-model="filters.toDate" 
           @change="loadRevenueData"
-          placeholder="結束日期"
+          placeholder="End date"
         />
       </div>
 
       <div class="filter-group">
-        <button @click="setQuickDateRange('today')" class="btn btn-outline">今日</button>
-        <button @click="setQuickDateRange('week')" class="btn btn-outline">本週</button>
-        <button @click="setQuickDateRange('month')" class="btn btn-outline">本月</button>
-        <button @click="setQuickDateRange('quarter')" class="btn btn-outline">本季</button>
+        <button @click="setQuickDateRange('today')" class="btn btn-outline">Today</button>
+        <button @click="setQuickDateRange('week')" class="btn btn-outline">This Week</button>
+        <button @click="setQuickDateRange('month')" class="btn btn-outline">This Month</button>
+        <button @click="setQuickDateRange('quarter')" class="btn btn-outline">This Quarter</button>
       </div>
     </div>
 
-    <!-- 收入統計卡片 -->
+    <!-- Revenue summary cards -->
     <div class="revenue-stats" v-if="revenueData && revenueData.summary">
       <div class="stat-card total-revenue">
         <div class="stat-icon">
           <i class="icon-money"></i>
         </div>
         <div class="stat-content">
-          <h3>總收入</h3>
+          <h3>Total Revenue</h3>
           <div class="stat-value">{{ formatPoints(revenueData.summary.total_revenue) }}</div>
-          <div class="stat-label">點數</div>
+          <div class="stat-label">points</div>
         </div>
       </div>
 
@@ -66,9 +63,9 @@
           <i class="icon-list"></i>
         </div>
         <div class="stat-content">
-          <h3>交易筆數</h3>
+          <h3>Transactions</h3>
           <div class="stat-value">{{ revenueData.summary.total_transactions.toLocaleString() }}</div>
-          <div class="stat-label">筆</div>
+          <div class="stat-label">transactions</div>
         </div>
       </div>
 
@@ -77,9 +74,9 @@
           <i class="icon-calculator"></i>
         </div>
         <div class="stat-content">
-          <h3>平均手續費</h3>
+          <h3>Average Fee</h3>
           <div class="stat-value">{{ revenueData.summary.avg_fee_per_transaction }}</div>
-          <div class="stat-label">點數/筆</div>
+          <div class="stat-label">points / tx</div>
         </div>
       </div>
 
@@ -88,19 +85,19 @@
           <i class="icon-calendar"></i>
         </div>
         <div class="stat-content">
-          <h3>統計期間</h3>
+          <h3>Date Range</h3>
           <div class="stat-value">{{ formatDateRange() }}</div>
           <div class="stat-label">{{ getGroupByLabel() }}</div>
         </div>
       </div>
     </div>
 
-    <!-- 期間統計圖表區域 -->
+    <!-- Revenue chart -->
     <div class="chart-section">
-      <h2>收入趨勢</h2>
+      <h2>Revenue Trend</h2>
       <div class="chart-container">
         <div v-if="revenueData && revenueData.period_stats.length > 0" class="chart-placeholder">
-          <!-- 這裡可以整合圖表庫如 Chart.js 或 ECharts -->
+          <!-- Placeholder for chart integration -->
           <div class="simple-bar-chart">
             <div 
               v-for="(period, index) in revenueData.period_stats.slice(0, 10)" 
@@ -120,25 +117,25 @@
         </div>
         <div v-else-if="!loading" class="no-chart-data">
           <i class="icon-chart"></i>
-          <p>暫無圖表數據</p>
+          <p>No chart data</p>
         </div>
       </div>
     </div>
 
-    <!-- 手續費最高任務排行 -->
+    <!-- Top fee tasks -->
     <div class="top-tasks-section">
-      <h2>手續費最高任務</h2>
+      <h2>Top Tasks by Fee Revenue</h2>
       <div class="top-tasks-container">
         <table class="top-tasks-table" v-if="revenueData && revenueData.top_tasks.length > 0">
           <thead>
             <tr>
-              <th>排名</th>
-              <th>任務ID</th>
-              <th>任務標題</th>
-              <th>總手續費</th>
-              <th>手續費筆數</th>
-              <th>平均費率</th>
-              <th>最後收費時間</th>
+              <th>Rank</th>
+              <th>Task ID</th>
+              <th>Title</th>
+              <th>Total Fees</th>
+              <th>Fee Count</th>
+              <th>Avg Rate</th>
+              <th>Last Fee Time</th>
             </tr>
           </thead>
           <tbody>
@@ -154,9 +151,9 @@
               </td>
               <td class="fee-amount">
                 <span class="amount">{{ formatPoints(task.total_fees) }}</span>
-                <span class="currency">點數</span>
+                <span class="currency">pts</span>
               </td>
-              <td>{{ task.fee_count }} 筆</td>
+              <td>{{ task.fee_count }}</td>
               <td>
                 <span class="rate-badge">{{ task.avg_rate_percentage }}</span>
               </td>
@@ -167,15 +164,15 @@
 
         <div v-else-if="!loading" class="empty-top-tasks">
           <i class="icon-empty"></i>
-          <h3>暫無任務數據</h3>
-          <p>目前沒有產生手續費的任務記錄</p>
+          <h3>No task data</h3>
+          <p>No fee-generating tasks found for the selected range.</p>
         </div>
       </div>
     </div>
 
-    <!-- 費率分佈統計 -->
+    <!-- Fee distribution -->
     <div class="rate-distribution-section">
-      <h2>費率分佈</h2>
+      <h2>Fee Rate Distribution</h2>
       <div class="rate-distribution-container">
         <div v-if="revenueData && revenueData.rate_distribution.length > 0" class="rate-cards">
           <div 
@@ -189,27 +186,27 @@
             </div>
             <div class="rate-stats">
               <div class="rate-stat">
-                <label>交易筆數:</label>
+                <label>Transactions:</label>
                 <span>{{ rate.transaction_count.toLocaleString() }}</span>
               </div>
               <div class="rate-stat">
-                <label>總收入:</label>
-                <span>{{ formatPoints(rate.total_revenue) }} 點數</span>
+                <label>Total Revenue:</label>
+                <span>{{ formatPoints(rate.total_revenue) }} pts</span>
               </div>
             </div>
           </div>
         </div>
 
         <div v-else-if="!loading" class="empty-rate-distribution">
-          <p>暫無費率分佈數據</p>
+          <p>No rate distribution data</p>
         </div>
       </div>
     </div>
 
-    <!-- 載入狀態 -->
+    <!-- Loading state -->
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
-      <p>載入收入統計中...</p>
+      <p>Loading fee revenue...</p>
     </div>
   </div>
 </template>
@@ -220,18 +217,18 @@ import { ref, reactive, computed, onMounted } from 'vue'
 export default {
   name: 'FeeRevenuePage',
   setup() {
-    // 響應式數據
+    // reactive state
     const loading = ref(false)
     const revenueData = ref(null)
     
-    // 篩選器
+    // filters
     const filters = reactive({
       groupBy: 'day',
       fromDate: '',
       toDate: ''
     })
     
-    // 載入收入數據
+    // load revenue summary data
     const loadRevenueData = async () => {
       try {
         loading.value = true
@@ -243,10 +240,10 @@ export default {
         if (filters.fromDate) params.from = filters.fromDate
         if (filters.toDate) params.to = filters.toDate
         
-        // TODO: 實際API調用
+        // TODO: replace with real API call
         // const response = await api.get('/admin/fees/revenue', { params })
         
-        // 模擬數據
+        // mock data for prototype
         const mockResponse = {
           success: true,
           data: {
@@ -268,7 +265,7 @@ export default {
             top_tasks: [
               {
                 task_id: 'T001',
-                task_title: '網站開發專案',
+                task_title: 'Website Development Project',
                 total_fees: 2500,
                 fee_count: 5,
                 avg_rate: 0.025,
@@ -277,7 +274,7 @@ export default {
               },
               {
                 task_id: 'T002', 
-                task_title: 'UI設計任務',
+                task_title: 'UI Design Task',
                 total_fees: 1800,
                 fee_count: 3,
                 avg_rate: 0.03,
@@ -305,14 +302,14 @@ export default {
         revenueData.value = mockResponse.data
         
       } catch (error) {
-        console.error('載入收入統計失敗:', error)
-        // TODO: 顯示錯誤提示
+        console.error('Failed to load fee revenue:', error)
+        // TODO: surface toast or notification
       } finally {
         loading.value = false
       }
     }
     
-    // 設定快速日期範圍
+    // quick range presets
     const setQuickDateRange = (range) => {
       const today = new Date()
       const formatDate = (date) => date.toISOString().split('T')[0]
@@ -342,40 +339,34 @@ export default {
       loadRevenueData()
     }
     
-    // 刷新數據
+    // manual refresh
     const refreshData = () => {
       loadRevenueData()
     }
     
-    // 匯出數據
-    const exportData = () => {
-      // TODO: 實現數據匯出功能
-      console.log('匯出收入統計數據')
-    }
-    
-    // 工具函數
+    // helpers
     const formatPoints = (points) => {
       return points?.toLocaleString() || '0'
     }
     
     const formatDate = (dateString) => {
-      return new Date(dateString).toLocaleString('zh-TW')
+      return new Date(dateString).toLocaleString('en-US')
     }
     
     const formatDateRange = () => {
       if (filters.fromDate && filters.toDate) {
         return `${filters.fromDate} ~ ${filters.toDate}`
       }
-      return '全部期間'
+      return 'All time'
     }
     
     const getGroupByLabel = () => {
       const labels = {
-        day: '按日統計',
-        month: '按月統計', 
-        year: '按年統計'
+        day: 'Daily view',
+        month: 'Monthly view', 
+        year: 'Yearly view'
       }
-      return labels[filters.groupBy] || '統計'
+      return labels[filters.groupBy] || 'Summary'
     }
     
     const getRankClass = (index) => {
@@ -391,9 +382,9 @@ export default {
       return maxValue > 0 ? (value / maxValue) * 100 : 0
     }
     
-    // 初始化
+    // init
     onMounted(() => {
-      // 設定預設日期範圍為本月
+      // default to current month
       setQuickDateRange('month')
     })
     
@@ -404,7 +395,6 @@ export default {
       loadRevenueData,
       setQuickDateRange,
       refreshData,
-      exportData,
       formatPoints,
       formatDate,
       formatDateRange,

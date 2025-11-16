@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
 require_once __DIR__ . '/../../utils/Response.php';
 require_once __DIR__ . '/../../utils/socket_notifier.php';
+require_once __DIR__ . '/../../utils/TaskCompletionProcessor.php';
 
 try {
   if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -75,183 +76,36 @@ try {
     Response::error('Task has no participant assigned', 400);
   }
 
-  // 讀取手續費設定（isActive=1）
-  // 若缺表，fallback 為 0% 手續費
-  $feeRate = 0.0;
-  try {
-    $feeRow = $db->fetch("SELECT rate FROM task_completion_points_fee_settings WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
-    if ($feeRow && isset($feeRow['rate'])) {
-      $feeRate = (float)$feeRow['rate']; // 例如 0.02 表示 2%
-    }
-  } catch (Exception $e) {
-    // 表不存在則以 0 手續費處理
-    $feeRate = 0.0;
-  }
-
-  $amount = isset($task['reward_point']) ? (float)$task['reward_point'] : 0.0;
-  $feeAmount = round($amount * $feeRate, 2);
-  // 修正：接案者獲得完整獎勵，手續費只向發布者額外收取
-  // $netAmount = max(0.0, $amount - $feeAmount); // 錯誤的舊邏輯
-
   // 僅試算：不更動任務狀態、不發送訊息、不寫交易
   if ($preview === 1) {
-    Response::success([
-      'task' => $task,
-      'fee_rate' => $feeRate,
-      'fee' => $feeAmount,
-      'amount' => $amount,
-      'net' => $amount, // 修正：預覽時顯示接案者獲得完整獎勵
-      'preview' => true,
-    ], 'Preview computed');
-  }
-
-  // 切換任務狀態至 completed（以 task_statuses.code）
-  $statusRow = $db->fetch("SELECT id FROM task_statuses WHERE code = 'completed' LIMIT 1");
-  if ($statusRow && isset($statusRow['id'])) {
-    $db->query("UPDATE tasks SET status_id = ?, updated_at = NOW() WHERE id = ?", [(int)$statusRow['id'], $task_id]);
-    
-    // 同步更新 task_applications.status 為 'completed'
-    $db->query(
-      "UPDATE task_applications SET status = 'completed', updated_at = NOW() 
-       WHERE task_id = ? AND status IN ('pending', 'accepted')",
-      [$task_id]
-    );
-  } else {
-    try { $db->query("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS status VARCHAR(64) NULL"); } catch (Exception $e) {}
-    $db->query("UPDATE tasks SET status = 'Completed', updated_at = NOW() WHERE id = ?", [$task_id]);
-    
-    // 同步更新 task_applications.status
-    $db->query(
-      "UPDATE task_applications SET status = 'completed', updated_at = NOW() 
-       WHERE task_id = ? AND status IN ('pending', 'accepted')",
-      [$task_id]
-    );
-  }
-
-  // 實作點數轉移與交易紀錄
-  try {
-    require_once __DIR__ . '/../../utils/PointTransactionLogger.php';
-    require_once __DIR__ . '/../../utils/UserActiveLogEvent.php';
-    
-    // $creatorId 和 $participantId 已在上面定義
-    $taskTitle = $task['title'] ?? 'Unknown Task';
-    
-    // 開始資料庫交易
-    $db->beginTransaction();
-    
     try {
-      // 1. 創建者支出任務獎勵（負數）
-      $rewardTransactionId = PointTransactionLogger::logTaskSpending(
-        $creatorId,
-        (int)$amount,
-        $task_id,
-        $taskTitle
-      );
-      
-      // 2. 接案者收入完整任務獎勵（不扣除手續費）
-      $earningTransactionId = PointTransactionLogger::logTaskEarning(
-        $participantId,
-        (int)$amount, // 修正：接案者獲得完整獎勵
-        $task_id,
-        $taskTitle
-      );
-      
-      // 3. 創建者支出手續費（負數）
-      if ($feeAmount > 0) {
-        $feeTransactionId = PointTransactionLogger::logFee(
-          $creatorId,
-          (int)$feeAmount,
-          $task_id,
-          "Service fee for task: $taskTitle"
-        );
-      }
-      
-      // 4. 記錄手續費收入到 fee_revenue_ledger
-      if ($feeAmount > 0) {
-        $feeRecordSql = "
-          INSERT INTO fee_revenue_ledger (
-            fee_type, src_transaction_id, task_id, payer_user_id, 
-            amount_points, rate, note, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-        ";
-        $db->query($feeRecordSql, [
-          'task_completion',
-          $feeTransactionId ?? $rewardTransactionId,
-          $task_id,
-          $creatorId,
-          (int)$feeAmount,
-          $feeRate,
-          "Task completion fee: $taskTitle"
-        ]);
-      }
-      
-      // 5. 寫入 user_active_log 兩筆支出紀錄
-      $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-      $metadata = json_encode([
-        'task_id' => $task_id,
-        'amount' => $amount,
-        'fee' => $feeAmount,
-        'net' => $amount, // 修正：接案者獲得完整獎勵
-        'rate' => $feeRate,
-        'reward_transaction_id' => $rewardTransactionId,
-        'earning_transaction_id' => $earningTransactionId,
-        'fee_transaction_id' => $feeTransactionId ?? null
-      ]);
-      
-      // 支出獎勵記錄
-      $db->query("
-        INSERT INTO user_active_log (
-          user_id, actor_type, actor_id, action, field, old_value, new_value, 
-          reason, metadata, ip, created_at
-        ) VALUES (?, 'user', ?, 'task_completion_reward', 'points', NULL, NULL, 
-          NULL, ?, ?, NOW())
-      ", [$creatorId, $actor_id, $metadata, $ip]);
-      
-      // 支出手續費記錄
-      if ($feeAmount > 0) {
-        $db->query("
-          INSERT INTO user_active_log (
-            user_id, actor_type, actor_id, action, field, old_value, new_value, 
-            reason, metadata, ip, created_at
-          ) VALUES (?, 'user', ?, 'task_completion_fee', 'points', NULL, NULL, 
-            NULL, ?, ?, NOW())
-        ", [$creatorId, $actor_id, $metadata, $ip]);
-      }
-      
-      // 6. 更新用戶點數餘額
-      $db->query("
-        UPDATE users 
-        SET points = points - ? 
-        WHERE id = ?
-      ", [(int)$amount, $creatorId]);
-      
-      $db->query("
-        UPDATE users 
-        SET points = points + ? 
-        WHERE id = ?
-      ", [(int)$amount, $participantId]); // 修正：接案者獲得完整獎勵
-      
-      // 創建者額外扣除手續費
-      if ($feeAmount > 0) {
-        $db->query("
-          UPDATE users 
-          SET points = points - ? 
-          WHERE id = ?
-        ", [(int)$feeAmount, $creatorId]);
-      }
-      
-      // 提交交易
-      $db->commit();
-      
+      $amountPreview = isset($task['reward_point']) ? (float)$task['reward_point'] : 0.0;
+      $feeRatePreview = TaskCompletionProcessor::getPlatformFeeRate();
+      $feePreview = round($amountPreview * $feeRatePreview, 2);
+      $netPreview = max(0.0, $amountPreview - $feePreview);
+
+      Response::success([
+        'task' => $task,
+        'fee_rate' => $feeRatePreview,
+        'fee' => $feePreview,
+        'amount' => $amountPreview,
+        'net' => $netPreview,
+        'preview' => true,
+      ], 'Preview computed');
     } catch (Exception $e) {
-      $db->rollback();
-      throw $e;
+      Response::error('Unable to load platform fee rate: ' . $e->getMessage(), 500);
     }
-    
-  } catch (Exception $e) {
-    // 如果點數轉移失敗，記錄錯誤但不阻斷主流程
-    error_log("Task completion point transfer failed: " . $e->getMessage());
   }
+
+  $taskResult = TaskCompletionProcessor::completeTask($task, [
+    'actor_id' => $actor_id,
+    'context' => 'chat_confirm',
+  ]);
+
+  $amount = (float)$taskResult['amount'];
+  $feeAmount = (float)$taskResult['fee'];
+  $feeRate = (float)$taskResult['fee_rate'];
+  $netAmount = (float)$taskResult['net'];
 
   // 僅在當前房間發送系統訊息（顯示金額與手續費）
   try {
@@ -261,8 +115,11 @@ try {
     );
     if ($room && isset($room['id'])) {
       $content = sprintf(
-        'Task confirmed as completed. Amount: %.2f, Fee: %.2f (rate: %.2f%%), Net: %.2f',
-        $amount, $feeAmount, $feeRate * 100.0, $netAmount
+        'Task confirmed as completed. Gross: %d pts, Fee (%.2f%%, paid by worker): %d pts, Net payout: %d pts',
+        (int)$amount,
+        $feeRate * 100,
+        (int)$feeAmount,
+        (int)$netAmount
       );
       $db->query(
         "INSERT INTO chat_messages (room_id, from_user_id, content, kind) VALUES (?, ?, ?, 'system')",
@@ -310,4 +167,3 @@ try {
   Response::error('Server error: ' . $e->getMessage(), 500);
 }
 ?>
-

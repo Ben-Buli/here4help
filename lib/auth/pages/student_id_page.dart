@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/constants/app_colors.dart';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/services/media/cross_platform_image_service.dart';
+import 'package:here4help/utils/platform_info_helper.dart';
 
 class StudentIdPage extends StatefulWidget {
   const StudentIdPage({super.key});
@@ -389,6 +390,7 @@ class _StudentIdPageState extends State<StudentIdPage> {
       final primaryLanguages =
           prefs.getStringList('signup_languages') ?? <String>['en'];
       final referralCode = prefs.getString('signup_referral_code') ?? '';
+      final acceptedTermsVersionId = prefs.getInt('signup_terms_version_id');
 
       final missingFields = <String>[];
       if (fullName == null || fullName.isEmpty) {
@@ -412,6 +414,11 @@ class _StudentIdPageState extends State<StudentIdPage> {
             'Missing required registration data: ${missingFields.join(', ')}. Please restart the signup process.');
       }
 
+      if (acceptedTermsVersionId == null) {
+        throw Exception(
+            'Missing terms agreement. Please return to the signup form and agree to the Terms of Use.');
+      }
+
       final studentIdData = <String, String>{
         'name': fullName ?? '',
         'nickname': nickname,
@@ -428,7 +435,11 @@ class _StudentIdPageState extends State<StudentIdPage> {
         'school_name': schoolNameController.text,
         'student_name': studentNameController.text,
         'student_id': studentIdController.text,
+        'accepted_terms_version_id': acceptedTermsVersionId.toString(),
       };
+
+      final termsMetadata = await _buildTermsMetadata();
+      studentIdData.addAll(termsMetadata);
 
       if (!_isOAuthFlow) {
         studentIdData['password'] = password!;
@@ -551,8 +562,27 @@ class _StudentIdPageState extends State<StudentIdPage> {
     await prefs.remove('signup_avatar_url');
     await prefs.remove('signup_provider');
     await prefs.remove('signup_provider_user_id');
+    await prefs.remove('signup_terms_version_id');
 
     debugPrint('🧹 已清理所有註冊暫存資料');
+  }
+
+  Future<Map<String, String>> _buildTermsMetadata() async {
+    final metadata = <String, String>{
+      'accepted_terms_platform': PlatformInfoHelper.detectPlatform(),
+    };
+
+    final deviceInfo = await PlatformInfoHelper.buildDeviceDescription();
+    if (deviceInfo != null && deviceInfo.isNotEmpty) {
+      metadata['accepted_terms_device_info'] = deviceInfo;
+    }
+
+    final userAgent = await PlatformInfoHelper.userAgent();
+    if (userAgent != null && userAgent.isNotEmpty) {
+      metadata['accepted_terms_user_agent'] = userAgent;
+    }
+
+    return metadata;
   }
 
   Future<bool> _showLeaveConfirmationDialog() async {

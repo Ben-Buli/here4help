@@ -227,6 +227,19 @@ const router = createRouter({
       ],
     },
     {
+      path: '/app-terms',
+      component: () => import('../components/AppLayout.vue'),
+      meta: { requiresAuth: true, permission: 'points.edit' },
+      children: [
+        {
+          path: '',
+          name: 'app-terms',
+          component: () => import('../views/AppTermsView.vue'),
+          meta: { title: 'App Terms' },
+        },
+      ],
+    },
+    {
       path: '/faqs',
       component: () => import('../components/AppLayout.vue'),
       meta: { requiresAuth: true },
