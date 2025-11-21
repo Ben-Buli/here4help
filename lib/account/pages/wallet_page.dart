@@ -682,7 +682,7 @@ class _WalletPageState extends State<WalletPage> {
             child: Column(
               children: [
                 ListTile(
-                  leading: Icon(Icons.add_circle_outline,
+                  leading: Icon(Icons.add_card_outlined,
                       color: Theme.of(context).colorScheme.primary),
                   title: const Text('Add Points'),
                   onTap: _showAddPointsDialog,
@@ -698,17 +698,17 @@ class _WalletPageState extends State<WalletPage> {
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: Icon(Icons.info_outline,
+                  leading: Icon(Icons.output_outlined,
                       color: Theme.of(context).colorScheme.primary),
-                  title: const Text('Withdraw Points'),
+                  title: const Text('Withdraw Request'),
                   onTap: () {
-                    // TODO: Withdraw Points
-                    GoRouter.of(context).go('/TODO: Withdraw Points');
+                    // TODO: Withdraw Request
+                    GoRouter.of(context).go('/TODO: Withdraw Request');
                   },
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: Icon(Icons.info_outline,
+                  leading: Icon(Icons.policy_outlined,
                       color: Theme.of(context).colorScheme.primary),
                   title: const Text('Point Policy'),
                   onTap: () {

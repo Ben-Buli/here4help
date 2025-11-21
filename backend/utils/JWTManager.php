@@ -22,7 +22,7 @@ class JWTManager {
     /**
      * Refresh Token 過期時間（秒）
      */
-    private static $refreshTokenExpiration = 604800; // 7 天
+    private static $refreshTokenExpiration = 2592000; // 30 天
     
     /**
      * 獲取 JWT 密鑰

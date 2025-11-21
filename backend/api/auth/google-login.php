@@ -173,13 +173,13 @@ try {
     }
 
     if ($user !== null) {
-        // 建立 JWT
+        // 建立 Access/Refresh Tokens
         $payload = [
             'user_id' => (int)($user['id'] ?? $user['user_id']),
             'email' => $user['email'] ?? $email,
             'name' => $user['name'] ?? $name,
         ];
-        $token = JWTManager::generateToken($payload);
+        $tokenPair = JWTManager::generateTokenPair($payload);
 
         $userData = [
             'id' => (int)($user['id'] ?? $user['user_id']),
@@ -199,7 +199,12 @@ try {
             'is_new_user' => false,
             'provider_user_id' => $googleId,
             'google_id' => $googleId,
-            'token' => $token,
+            'token' => $tokenPair['access_token'],
+            'access_token' => $tokenPair['access_token'],
+            'refresh_token' => $tokenPair['refresh_token'],
+            'token_type' => $tokenPair['token_type'],
+            'expires_in' => $tokenPair['expires_in'],
+            'refresh_expires_in' => $tokenPair['refresh_expires_in'],
         ];
 
         Response::success($userData, 'Login success');

@@ -37,6 +37,10 @@ export default defineConfig(({ mode }) => {
           target: adminApiUrl, 
           changeOrigin: true,
         },
+        '/admin/reset-password': {
+          target: adminApiUrl,
+          changeOrigin: true,
+        },
         '/api/admin/task-disputes': {
           target: backendOrigin,
           changeOrigin: true,

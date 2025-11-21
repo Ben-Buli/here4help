@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:here4help/providers/permission_provider.dart';
 import 'package:here4help/services/permission_service.dart';
 import 'package:here4help/constants/shell_pages.dart';
+import 'package:here4help/services/terms_consent_manager.dart';
 
 import 'package:here4help/layout/app_scaffold.dart' show AppScaffold;
 
@@ -99,6 +100,12 @@ class PermissionGuard {
       });
       return const SizedBox.shrink();
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) {
+        TermsConsentManager.ensureAccepted(context);
+      }
+    });
 
     return page;
   }

@@ -56,6 +56,7 @@
             >
               <path v-if="item.name === 'Dashboard'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
               <path v-else-if="item.name === 'Users'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.75 7.5a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a7.5 7.5 0 1115 0v.75H4.5v-.75z"></path>
+              <path v-else-if="item.name === 'Admin Management'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.75 7.5a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25v-.75a5.25 5.25 0 015.25-5.25h4.5a5.25 5.25 0 015.25 5.25v.75H4.5z"></path>
               <path v-else-if="item.name === 'Settings'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
               <circle v-if="item.name === 'Settings'" cx="12" cy="12" r="3"></circle>
               <path v-else-if="item.name === 'Customer Support'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
@@ -87,7 +88,15 @@
               ]"
             >
               <div class="flex items-center w-full relative">
-               
+                <component
+                  :is="getNavIcon(item.name)"
+                  class="mr-3 h-5 w-5 flex-shrink-0"
+                  :class="[
+                    $route.path === item.href || $route.path.startsWith(item.href + '/')
+                      ? 'text-cyan-500'
+                      : 'text-gray-400 group-hover:text-gray-500',
+                  ]"
+                />
                 <span class="pl-3">{{ item.name }}</span>
               </div>
               <svg
@@ -125,24 +134,8 @@
                       ? 'text-cyan-500'
                       : 'text-gray-400 group-hover:text-gray-500',
                   ]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path v-if="child.name === 'Issues List'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                  <path v-else-if="child.name === 'Support Chat List'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                  <path v-else-if="child.name === 'All Tasks'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                  <path v-else-if="child.name === 'Task Disputes'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                  <path v-else-if="child.name === 'Deposit Requests'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                  <path v-else-if="child.name === 'Fee Settings'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM12 12a3 3 0 100-6 3 3 0 000 6z"></path>
-                  <path v-else-if="child.name === 'Fee Revenue'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v16h16M8 16v-4M12 16v-8M16 16v-6"></path>
-                  <path v-else-if="child.name === 'Official Account'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                  <path v-else-if="child.name === 'System Logs'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                  <path v-else-if="child.name === 'User Activities'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                  <path v-else-if="child.name === 'User Transactions'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
-                  <path v-else-if="child.name === 'User List'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20v-1a4 4 0 00-4-4H7a4 4 0 00-4 4v1m18 0v-1a4 4 0 00-3-3.87M12 12a4 4 0 110-8 4 4 0 010 8zm6 0a3 3 0 100-6 3 3 0 000 6z"></path>
-                  <path v-else-if="child.name === 'Referral Codes'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"></path>
-                </svg>
+                  :is="getChildIcon(child.name)"
+                />
                 {{ child.name }}
               </router-link>
             </div>
@@ -778,6 +771,28 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import {
+  HomeIcon,
+  UsersIcon,
+  UserCircleIcon,
+  ChatBubbleLeftRightIcon,
+  ClipboardDocumentCheckIcon,
+  CreditCardIcon,
+  DocumentTextIcon,
+  QuestionMarkCircleIcon,
+  AdjustmentsHorizontalIcon,
+  DocumentCheckIcon,
+  InboxIcon,
+  ChatBubbleOvalLeftEllipsisIcon,
+  ClipboardDocumentListIcon,
+  ExclamationTriangleIcon,
+  ArrowDownOnSquareStackIcon,
+  ChartBarIcon,
+  BanknotesIcon,
+  QueueListIcon,
+  ArrowsRightLeftIcon,
+  QrCodeIcon,
+} from '@heroicons/vue/24/outline'
 
 
 const router = useRouter()
@@ -807,6 +822,7 @@ const navigation: NavigationItem[] = [
       { name: 'Referral Codes', href: '/users/referral-codes' },
     ]
   },
+  { name: 'Admin Management', href: '/admin-accounts' },
   { 
     name: 'Customer Support', 
     href: '/issues', 
@@ -847,6 +863,39 @@ const navigation: NavigationItem[] = [
   { name: 'Terms of Use', href: '/app-terms' },
   // { name: 'Settings', href: '/settings' },
 ]
+
+const navigationIcons: Record<string, any> = {
+  'Dashboard': HomeIcon,
+  'Users': UsersIcon,
+  'Admin Management': UserCircleIcon,
+  'Customer Support': ChatBubbleLeftRightIcon,
+  'Task Management': ClipboardDocumentCheckIcon,
+  'Payments': CreditCardIcon,
+  'Logs': DocumentTextIcon,
+  'FAQ Management': QuestionMarkCircleIcon,
+  'Point Policy': AdjustmentsHorizontalIcon,
+  'Terms of Use': DocumentCheckIcon,
+}
+
+const getNavIcon = (name: string) => navigationIcons[name] || HomeIcon
+
+const childNavigationIcons: Record<string, any> = {
+  'Issues List': InboxIcon,
+  'Support Chat List': ChatBubbleOvalLeftEllipsisIcon,
+  'All Tasks': ClipboardDocumentListIcon,
+  'Task Disputes': ExclamationTriangleIcon,
+  'Deposit Requests': ArrowDownOnSquareStackIcon,
+  'Fee Settings': AdjustmentsHorizontalIcon,
+  'Fee Revenue': ChartBarIcon,
+  'Official Account': BanknotesIcon,
+  'System Logs': DocumentTextIcon,
+  'User Activities': QueueListIcon,
+  'User Transactions': ArrowsRightLeftIcon,
+  'User List': UsersIcon,
+  'Referral Codes': QrCodeIcon,
+}
+
+const getChildIcon = (name: string) => childNavigationIcons[name] || DocumentTextIcon
 
 const AVATAR_STORAGE_PREFIX = 'admin_avatar_choice_'
 

@@ -54,7 +54,7 @@ build_android_apk() {
   
   echo "🔨 建置 Android APK $build_mode 版本..."
   
-  flutter build apk --$build_mode \
+  if flutter build apk --$build_mode \
     --dart-define=ENVIRONMENT=$environment \
     --dart-define=APP_DEBUG=$app_debug \
     --dart-define=API_BASE_URL=$API_BASE_URL \
@@ -68,11 +68,15 @@ build_android_apk() {
     --dart-define=FACEBOOK_APP_ID=$FACEBOOK_APP_ID \
     --dart-define=FACEBOOK_REDIRECT_URI=$FACEBOOK_REDIRECT_URI \
     --dart-define=APPLE_SERVICE_ID=$APPLE_SERVICE_ID \
-    --dart-define=APPLE_REDIRECT_URI=$APPLE_REDIRECT_URI
-  
-  echo "✅ Android APK $build_mode 建置完成！"
-  echo "📁 建置檔案位於: build/app/outputs/flutter-apk/"
-  echo ""
+    --dart-define=APPLE_REDIRECT_URI=$APPLE_REDIRECT_URI; then
+    echo "✅ Android APK $build_mode 建置完成！"
+    echo "📁 建置檔案位於: build/app/outputs/flutter-apk/"
+    echo ""
+    return 0
+  else
+    echo "❌ Android APK $build_mode 建置失敗！"
+    return 1
+  fi
 }
 
 # 建置 Android App Bundle
@@ -82,7 +86,7 @@ build_android_bundle() {
   
   echo "🔨 建置 Android App Bundle (AAB)..."
   
-  flutter build appbundle --release \
+  if flutter build appbundle --release \
     --dart-define=ENVIRONMENT=$environment \
     --dart-define=APP_DEBUG=$app_debug \
     --dart-define=API_BASE_URL=$API_BASE_URL \
@@ -96,17 +100,35 @@ build_android_bundle() {
     --dart-define=FACEBOOK_APP_ID=$FACEBOOK_APP_ID \
     --dart-define=FACEBOOK_REDIRECT_URI=$FACEBOOK_REDIRECT_URI \
     --dart-define=APPLE_SERVICE_ID=$APPLE_SERVICE_ID \
-    --dart-define=APPLE_REDIRECT_URI=$APPLE_REDIRECT_URI
-  
-  echo "✅ Android App Bundle 建置完成！"
-  echo "📁 建置檔案位於: build/app/outputs/bundle/release/"
-  echo ""
+    --dart-define=APPLE_REDIRECT_URI=$APPLE_REDIRECT_URI; then
+    echo "✅ Android App Bundle 建置完成！"
+    echo "📁 建置檔案位於: build/app/outputs/bundle/release/"
+    echo ""
+    return 0
+  else
+    echo "❌ Android App Bundle 建置失敗！"
+    return 1
+  fi
 }
 
 # 準備 Android 環境
 prepare_android_environment() {
   echo "📱 準備 Android 環境..."
   flutter doctor --android-licenses
+}
+
+# 開啟輸出資料夾
+open_output_folder() {
+  local folder_path=$1
+  local folder_name=$2
+  
+  if [ -d "$folder_path" ]; then
+    echo "📂 開啟 $folder_name 資料夾..."
+    open "$folder_path"
+    echo "✅ 已開啟: $folder_path"
+  else
+    echo "⚠️  警告：資料夾不存在: $folder_path"
+  fi
 }
 
 # ==============================
@@ -124,21 +146,41 @@ prepare_android_environment
 # ==============================
 # 建置 Android (依參數選擇)
 # ==============================
+BUILD_SUCCESS=false
+APK_BUILT=false
+AAB_BUILT=false
+
 case "$MODE" in
   debug)
-    build_android_apk "debug" "development" "true"
+    if build_android_apk "debug" "development" "true"; then
+      BUILD_SUCCESS=true
+      APK_BUILT=true
+    fi
     ;;
   release)
-    build_android_apk "release" "production" "false"
-    build_android_bundle "production" "false"
+    if build_android_apk "release" "production" "false"; then
+      APK_BUILT=true
+      BUILD_SUCCESS=true
+    fi
+    if build_android_bundle "production" "false"; then
+      AAB_BUILT=true
+      BUILD_SUCCESS=true
+    fi
     ;;
   emulator)
-    build_android_apk "debug" "android_emulator" "true"
+    if build_android_apk "debug" "android_emulator" "true"; then
+      BUILD_SUCCESS=true
+      APK_BUILT=true
+    fi
     ;;
   all)
-    build_android_apk "debug" "development" "true"
-    build_android_apk "release" "production" "false"
-    build_android_bundle "production" "false"
+    if build_android_apk "debug" "development" "true" && \
+       build_android_apk "release" "production" "false" && \
+       build_android_bundle "production" "false"; then
+      BUILD_SUCCESS=true
+      APK_BUILT=true
+      AAB_BUILT=true
+    fi
     ;;
   *)
     echo "❌ 未知的建置模式: $MODE"
@@ -146,6 +188,31 @@ case "$MODE" in
     exit 1
     ;;
 esac
+
+# ==============================
+# 建置成功後開啟輸出資料夾
+# ==============================
+if [ "$BUILD_SUCCESS" = true ]; then
+  echo ""
+  echo "🚀 建置成功！正在開啟輸出資料夾..."
+  
+  # 開啟 APK 資料夾（如果有建置成功）
+  if [ "$APK_BUILT" = true ]; then
+    open_output_folder "build/app/outputs/flutter-apk" "APK 輸出"
+  fi
+  
+  # 開啟 AAB 資料夾（如果有建置成功）
+  if [ "$AAB_BUILT" = true ]; then
+    sleep 1  # 稍微延遲，避免同時開啟太多視窗
+    open_output_folder "build/app/outputs/bundle/release" "AAB 輸出"
+  fi
+  
+  echo ""
+else
+  echo ""
+  echo "❌ 所有建置都失敗，不會開啟輸出資料夾"
+  exit 1
+fi
 echo "📋 部署步驟："
 echo "1. APK 檔案可直接安裝到 Android 設備"
 echo "2. AAB 檔案用於上傳到 Google Play Console"

@@ -177,6 +177,9 @@ try {
         // 準備結果數據和重定向 URL
         $frontendUrl = EnvLoader::get('FRONTEND_URL', 'http://localhost:3000');
         
+        $token = null;
+        $tokenPair = null;
+        $userData = null;
         if ($isNewUser) {
             // 新用戶：準備註冊數據
             $result = [
@@ -187,22 +190,27 @@ try {
             ];
             $redirectUrl = $frontendUrl . '/#/signup?token=' . urlencode($oauthToken) . '&provider=apple&is_new_user=true';
         } else {
-            // 現有用戶：生成 JWT
+            // 現有用戶：生成 Access/Refresh Tokens
             $payload = [
                 'user_id' => $user['id'],
                 'email' => $user['email'] ?? '',
                 'name' => $user['name'],
-                'iat' => time(),
-                'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
             ];
             
-            $token = JWTManager::generateToken($payload);
+            $tokenPair = JWTManager::generateTokenPair($payload);
+            $token = $tokenPair['access_token'];
             
             $userData = [
                 'id' => $user['id'],
                 'name' => $user['name'] ?? '',
                 'email' => $user['email'] ?? '',
                 'provider' => 'apple',
+                'token' => $token,
+                'access_token' => $token,
+                'refresh_token' => $tokenPair['refresh_token'],
+                'token_type' => $tokenPair['token_type'],
+                'expires_in' => $tokenPair['expires_in'],
+                'refresh_expires_in' => $tokenPair['refresh_expires_in'],
             ];
             
             $result = [
@@ -210,6 +218,7 @@ try {
                 'provider' => 'apple',
                 'is_new_user' => false,
                 'token' => $token,
+                'refresh_token' => $tokenPair['refresh_token'],
                 'user_data' => $userData
             ];
             $redirectUrl = $frontendUrl . '/#/home';

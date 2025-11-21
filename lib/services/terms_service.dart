@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/services/http_client_service.dart';
@@ -133,6 +134,31 @@ class TermsService {
 
     if (payload['success'] != true) {
       throw Exception(payload['message'] ?? 'Failed to accept terms');
+    }
+  }
+
+  static Future<void> rejectTerms({
+    String? platform,
+    String? deviceInfo,
+  }) async {
+    try {
+      final payload = await HttpClientService.postJson(
+        AppConfig.appTermsRejectUrl,
+        body: {
+          if (platform != null) 'platform': platform,
+          if (deviceInfo != null) 'device_info': deviceInfo,
+        },
+        useQueryParamToken: true,
+      );
+
+      if (payload['success'] != true) {
+        throw Exception(
+            payload['message'] ?? 'Failed to record terms rejection');
+      }
+    } catch (e) {
+      // 記錄拒絕失敗不應該阻止登出流程
+      // 只記錄錯誤，不拋出異常
+      debugPrint('⚠️ [Terms] Failed to record terms rejection: $e');
     }
   }
 }

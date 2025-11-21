@@ -137,16 +137,15 @@ try {
         $stmt = $db->query("SELECT * FROM users WHERE id = ?", [$userId]);
         $user = $stmt->fetch();
         
-        // 5. 生成 JWT Token
+        // 5. 生成 Access/Refresh Tokens
         $payload = [
             'user_id' => $user['id'],
             'email' => $user['email'],
             'name' => $user['name'],
-            'iat' => time(),
-            'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
         ];
         
-        $token = JWTManager::generateToken($payload);
+        $tokenPair = JWTManager::generateTokenPair($payload);
+        $token = $tokenPair['access_token'];
         
         // 6. 準備回應資料
         $userData = [
@@ -178,6 +177,11 @@ try {
             'message' => 'Registration successful',
             'data' => [
                 'token' => $token,
+                'access_token' => $token,
+                'refresh_token' => $tokenPair['refresh_token'],
+                'token_type' => $tokenPair['token_type'],
+                'expires_in' => $tokenPair['expires_in'],
+                'refresh_expires_in' => $tokenPair['refresh_expires_in'],
                 'user' => $userData
             ]
         ]);

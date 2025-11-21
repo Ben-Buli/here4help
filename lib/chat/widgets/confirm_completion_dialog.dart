@@ -135,9 +135,7 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
 
     final data = _previewData!;
     final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
-    final fee = (data['fee'] as num?)?.toDouble() ?? 0.0;
-    final net = (data['net'] as num?)?.toDouble() ?? 0.0;
-    final feeRate = (data['fee_rate'] as num?)?.toDouble() ?? 0.0;
+    final net = (data['net'] as num?)?.toDouble() ?? amount;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -165,9 +163,6 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
           primaryColor,
           subduedText,
         ),
-        _buildInfoRow('Service Fee (${(feeRate * 100).toStringAsFixed(1)}%)',
-            '\$${fee.toStringAsFixed(2)}', primaryColor, subduedText),
-        const Divider(),
         _buildInfoRow(
           'Net Amount',
           '\$${net.toStringAsFixed(2)}',
@@ -189,7 +184,7 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'This action will transfer the reward points to the tasker after deducting the ${(feeRate * 100).toStringAsFixed(2)}% platform fee.',
+                  'This action will release the entire reward to the tasker.',
                   style: TextStyle(
                     fontSize: 12,
                     color: primaryColor,

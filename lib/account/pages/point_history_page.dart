@@ -241,14 +241,19 @@ class _PointHistoryPageState extends State<PointHistoryPage>
           ),
           child: TabBar(
             controller: _tabController,
+            isScrollable: true, // 允許 tabs 橫向滾動
             tabs: const [
               Tab(
                 icon: Icon(Icons.history),
-                text: 'Transaction History',
+                text: 'Transactions',
               ),
               Tab(
                 icon: Icon(Icons.request_page),
-                text: 'Deposit Requests',
+                text: 'Deposits',
+              ),
+              Tab(
+                icon: Icon(Icons.output_outlined),
+                text: 'Withdrawals',
               ),
             ],
           ),

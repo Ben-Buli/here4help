@@ -20,17 +20,11 @@ class SupportPage extends StatelessWidget {
         final route = supportRoutes[index];
         final path = route['path'] as String;
 
-        // 根據 path 設定對應的 Icon
-        Icon trailingIcon;
-        if (path.contains('contact')) {
-          trailingIcon = const Icon(Icons.contact_mail);
-        } else if (path.contains('faq')) {
-          trailingIcon = const Icon(Icons.question_answer);
-        } else if (path.contains('status')) {
-          trailingIcon = const Icon(Icons.info);
-        } else {
-          trailingIcon = const Icon(Icons.help_outline); // 預設 Icon
-        }
+        // 從 shell_pages 設定的 icon 中取得 IconData
+        final iconData = route['icon'];
+        final trailingIcon = iconData is IconData
+            ? Icon(iconData)
+            : const Icon(Icons.help_outline); // 預設 Icon
 
         return Column(
           children: [

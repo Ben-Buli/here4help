@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Admin\AdminPasswordResetController;
 
 /*
 |--------------------------------------------------------------------------
@@ -47,6 +48,15 @@ Route::prefix('admintest')->group(function () {
         return response($phpinfo)->header('Content-Type', 'text/html');
     });
 });
+
+/*
+|--------------------------------------------------------------------------
+| Public manual password reset page
+|--------------------------------------------------------------------------
+*/
+Route::view('/account/reset-password', 'account.reset-password')->name('manual-reset-password');
+Route::get('/admin/reset-password', [AdminPasswordResetController::class, 'show'])->name('admin.password.reset');
+Route::post('/admin/reset-password', [AdminPasswordResetController::class, 'reset'])->name('admin.password.reset.submit');
 
 /*
 |--------------------------------------------------------------------------

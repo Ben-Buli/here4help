@@ -100,6 +100,12 @@ export const API_ENDPOINTS = {
     introReferralInfo: (id: number) => getApiUrl(`/users/${id}/intro-referral-info`),
     termsHistory: (id: number) => getApiUrl(`/users/${id}/terms-history`),
     referralCodes: () => getApiUrl('/users/referral-codes'),
+    passwordResetLink: (id: number) => getApiUrl(`/users/${id}/password-reset-link`),
+  },
+
+  admins: {
+    list: () => getApiUrl('/admins'),
+    passwordResetLink: (id: number) => getApiUrl(`/admins/${id}/password-reset-link`),
   },
   
   // 任務管理

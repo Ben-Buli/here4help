@@ -3,7 +3,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
@@ -16,8 +15,7 @@ import 'package:here4help/auth/services/auth_service.dart';
 import 'package:here4help/providers/permission_provider.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:here4help/services/terms_service.dart';
-import 'package:here4help/utils/platform_info_helper.dart';
+import 'package:here4help/services/terms_consent_manager.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -106,16 +104,6 @@ class _LoginPageState extends State<LoginPage> {
   /// 停止登入超時計時器
   void _stopLoginTimeout() {
     _timeoutTimer?.cancel();
-  }
-
-  void _showErrorSnackBar(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ),
-    );
   }
 
   Future<void> _handleLogin(String email, String password) async {
@@ -252,135 +240,20 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<bool> _handleTermsAfterLogin() async {
     try {
-      final status = await TermsService.fetchStatus();
-      if (!status.requiresAcceptance || status.terms == null) {
-        return true;
-      }
-
-      final accepted = await _showTermsAcceptanceDialog(status.terms!);
-      if (accepted) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Terms accepted')),
-          );
-        }
-        return true;
-      }
-
-      await _handleTermsRejected();
-      return false;
+      return await TermsConsentManager.ensureAccepted(context, force: true);
     } catch (e) {
-      _showErrorSnackBar('Unable to verify terms status: $e');
-      await _handleTermsRejected();
-      return false;
+      debugPrint('⚠️ [Terms] Failed to verify terms status: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Warning: Unable to verify terms status. Please check your connection.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      return true;
     }
-  }
-
-  Future<bool> _showTermsAcceptanceDialog(TermsContent terms) async {
-    final platform = PlatformInfoHelper.detectPlatform();
-    final deviceInfo = await PlatformInfoHelper.buildDeviceDescription();
-    final userAgent = await PlatformInfoHelper.userAgent();
-
-    return (await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) {
-            bool isSubmitting = false;
-            String? errorMessage;
-            final dialogHeight = MediaQuery.of(context).size.height * 0.6;
-            return StatefulBuilder(
-              builder: (context, setState) {
-                return AlertDialog(
-                  title: Text(
-                    terms.title.isNotEmpty
-                        ? terms.title
-                        : 'Updated Terms of Use',
-                  ),
-                  content: SizedBox(
-                    width: double.maxFinite,
-                    height: dialogHeight,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Version ${terms.version}',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 12),
-                          Html(data: terms.content),
-                          if (errorMessage != null) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              errorMessage ?? '',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: isSubmitting
-                          ? null
-                          : () => Navigator.of(context).pop(false),
-                      child: const Text('Disagree'),
-                    ),
-                    FilledButton(
-                      onPressed: isSubmitting
-                          ? null
-                          : () async {
-                              setState(() {
-                                isSubmitting = true;
-                                errorMessage = null;
-                              });
-                              try {
-                                await TermsService.acceptTerms(
-                                  versionId: terms.id,
-                                  platform: platform,
-                                  deviceInfo: deviceInfo,
-                                  userAgent: userAgent,
-                                );
-                                Navigator.of(context).pop(true);
-                              } catch (e) {
-                                setState(() {
-                                  isSubmitting = false;
-                                  errorMessage =
-                                      'Failed to record acceptance. Please try again.';
-                                });
-                              }
-                            },
-                      child: isSubmitting
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Agree'),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
-        )) ??
-        false;
-  }
-
-  Future<void> _handleTermsRejected() async {
-    await AuthService.logout();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('You must agree to the Terms of Use to continue.'),
-        backgroundColor: Colors.red,
-      ),
-    );
-    context.go('/login');
   }
 
   Widget _buildBrandedButton({
@@ -395,14 +268,15 @@ class _LoginPageState extends State<LoginPage> {
     final Color effectiveTextColor =
         disableInteraction ? textColor.withValues(alpha: 0.6) : textColor;
     final Color? effectiveBorderColor = borderColor != null
-        ? (disableInteraction ? borderColor.withValues(alpha: 0.6) : borderColor)
+        ? (disableInteraction
+            ? borderColor.withValues(alpha: 0.6)
+            : borderColor)
         : null;
 
     final borderRadius = BorderRadius.circular(8);
-    final Color effectiveBackgroundColor =
-        disableInteraction
-            ? backgroundColor.withValues(alpha: 0.6)
-            : backgroundColor;
+    final Color effectiveBackgroundColor = disableInteraction
+        ? backgroundColor.withValues(alpha: 0.6)
+        : backgroundColor;
 
     return SizedBox(
       width: double.infinity,
@@ -631,8 +505,20 @@ class _LoginPageState extends State<LoginPage> {
               token.length > 20 ? token.substring(0, 20) : token;
           debugPrint('🔑 Token preview: $tokenPreview...');
 
+          final accessToken =
+              (userData['access_token'] ?? userData['token'] ?? '').toString();
+          final refreshToken = userData['refresh_token']?.toString();
+          final expiresIn = _parseTokenExpiry(userData['expires_in']);
+          final refreshExpiresIn =
+              _parseTokenExpiry(userData['refresh_expires_in']);
+
           // 使用 AuthService 儲存 token（不添加 Bearer 前綴，避免雙重前綴問題）
-          await AuthService.saveToken(userData['token'] ?? '');
+          await AuthService.saveTokenPair(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            accessExpiresIn: expiresIn,
+            refreshExpiresIn: refreshExpiresIn,
+          );
           await AuthService.saveUserData(userData);
 
           // 儲存額外的用戶資訊到 SharedPreferences（用於兼容現有邏輯）
@@ -663,6 +549,11 @@ class _LoginPageState extends State<LoginPage> {
             primary_language: userData['primary_language'] ?? 'English',
             permission: userData['permission'] ?? 0,
           ));
+
+          final termsOk = await _handleTermsAfterLogin();
+          if (!termsOk || !mounted) {
+            return;
+          }
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -727,9 +618,27 @@ class _LoginPageState extends State<LoginPage> {
             rawUserData is Map ? Map<String, dynamic>.from(rawUserData) : null;
         final token = oauthData['token'];
 
-        if (userData != null && token != null) {
+        final resolvedAccessToken = (token ??
+                oauthData['access_token'] ??
+                userData?['access_token'] ??
+                userData?['token'])
+            ?.toString();
+        final resolvedRefreshToken =
+            (oauthData['refresh_token'] ?? userData?['refresh_token'])
+                ?.toString();
+        final expiresIn = _parseTokenExpiry(
+            oauthData['expires_in'] ?? userData?['expires_in']);
+        final refreshExpiresIn = _parseTokenExpiry(
+            oauthData['refresh_expires_in'] ?? userData?['refresh_expires_in']);
+
+        if (userData != null && resolvedAccessToken != null) {
           // 使用 AuthService 儲存登入資訊
-          await AuthService.saveToken(token);
+          await AuthService.saveTokenPair(
+            accessToken: resolvedAccessToken,
+            refreshToken: resolvedRefreshToken,
+            accessExpiresIn: expiresIn,
+            refreshExpiresIn: refreshExpiresIn,
+          );
           await AuthService.saveUserData(userData);
 
           // 儲存用戶資訊到 SharedPreferences
@@ -760,6 +669,11 @@ class _LoginPageState extends State<LoginPage> {
             primary_language: userData['primary_language'] ?? 'English',
             permission: userData['permission'] ?? 0,
           ));
+
+          final termsOk = await _handleTermsAfterLogin();
+          if (!termsOk || !mounted) {
+            return;
+          }
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -881,6 +795,13 @@ class _LoginPageState extends State<LoginPage> {
     return sanitized;
   }
 
+  int? _parseTokenExpiry(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
   // 跨平台 Facebook 登入處理
   Future<void> _handleFacebookLogin() async {
     // 防止重複點擊
@@ -979,8 +900,20 @@ class _LoginPageState extends State<LoginPage> {
               token.length > 20 ? token.substring(0, 20) : token;
           debugPrint('🔑 Token preview: $tokenPreview...');
 
+          final accessToken =
+              (userData['access_token'] ?? userData['token'] ?? '').toString();
+          final refreshToken = userData['refresh_token']?.toString();
+          final expiresIn = _parseTokenExpiry(userData['expires_in']);
+          final refreshExpiresIn =
+              _parseTokenExpiry(userData['refresh_expires_in']);
+
           // 使用 AuthService 儲存 token（不添加 Bearer 前綴，避免雙重前綴問題）
-          await AuthService.saveToken(userData['token'] ?? '');
+          await AuthService.saveTokenPair(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            accessExpiresIn: expiresIn,
+            refreshExpiresIn: refreshExpiresIn,
+          );
           await AuthService.saveUserData(userData);
 
           // 儲存額外的用戶資訊到 SharedPreferences（用於兼容現有邏輯）
@@ -1011,6 +944,11 @@ class _LoginPageState extends State<LoginPage> {
             primary_language: userData['primary_language'] ?? 'English',
             permission: userData['permission'] ?? 0,
           ));
+
+          final termsOk = await _handleTermsAfterLogin();
+          if (!termsOk || !mounted) {
+            return;
+          }
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -1141,8 +1079,20 @@ class _LoginPageState extends State<LoginPage> {
               token.length > 20 ? token.substring(0, 20) : token;
           debugPrint('🔑 Token preview: $tokenPreview...');
 
+          final accessToken =
+              (userData['access_token'] ?? userData['token'] ?? '').toString();
+          final refreshToken = userData['refresh_token']?.toString();
+          final expiresIn = _parseTokenExpiry(userData['expires_in']);
+          final refreshExpiresIn =
+              _parseTokenExpiry(userData['refresh_expires_in']);
+
           // 使用 AuthService 儲存 token（不添加 Bearer 前綴，避免雙重前綴問題）
-          await AuthService.saveToken(userData['token'] ?? '');
+          await AuthService.saveTokenPair(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            accessExpiresIn: expiresIn,
+            refreshExpiresIn: refreshExpiresIn,
+          );
           await AuthService.saveUserData(userData);
 
           // 儲存額外的用戶資訊到 SharedPreferences（用於兼容現有邏輯）
@@ -1173,6 +1123,11 @@ class _LoginPageState extends State<LoginPage> {
             primary_language: userData['primary_language'] ?? 'English',
             permission: userData['permission'] ?? 0,
           ));
+
+          final termsOk = await _handleTermsAfterLogin();
+          if (!termsOk || !mounted) {
+            return;
+          }
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

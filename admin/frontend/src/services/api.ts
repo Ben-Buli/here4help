@@ -88,6 +88,51 @@ export interface PaginatedResponse<T>
     stats?: any
   }> {}
 
+export interface PasswordResetLinkResponse {
+  user_id: number
+  user_name: string
+  email: string
+  reset_link: string
+  token: string
+  expires_at: string
+  remaining_seconds: number
+  created_at: string
+  created_by?: number | null
+  created_by_name?: string | null
+  was_existing_link: boolean
+}
+
+export interface AdminAccount {
+  id: number
+  username: string
+  full_name: string
+  email: string
+  status: string
+  last_login: string | null
+  login_attempts: number
+  locked_until: string | null
+  created_at: string
+  role: {
+    name: string | null
+    display_name: string | null
+  }
+}
+
+export interface AdminPasswordResetLinkResponse {
+  admin_id: number
+  admin_name: string
+  admin_email: string
+  role_name?: string | null
+  reset_link: string
+  token: string
+  expires_at: string
+  remaining_seconds: number
+  created_at: string
+  created_by: number
+  created_by_name?: string | null
+  was_existing_link: boolean
+}
+
 // 認證相關 API
 export const authApi = {
   // 獲取 CSRF Token (Sanctum SPA 認證必需)
@@ -176,6 +221,24 @@ export const userApi = {
       new_permission: number
     },
   ) => api.post<ApiResponse<any>>(API_ENDPOINTS.users.review(id), payload),
+
+  passwordResetLink: (id: number) =>
+    api.post<ApiResponse<PasswordResetLinkResponse>>(API_ENDPOINTS.users.passwordResetLink(id)),
+}
+
+export const adminAccountsApi = {
+  list: (params?: {
+    page?: number
+    per_page?: number
+    search?: string
+    status?: string
+    role?: string
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
+  }) => api.get<PaginatedResponse<AdminAccount>>(API_ENDPOINTS.admins.list(), { params }),
+
+  passwordResetLink: (id: number) =>
+    api.post<ApiResponse<AdminPasswordResetLinkResponse>>(API_ENDPOINTS.admins.passwordResetLink(id)),
 }
 
 // 任務管理 API

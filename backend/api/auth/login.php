@@ -100,27 +100,20 @@ try {
         }
     }
     
-    // 生成 JWT Token
+    // 生成 Access/Refresh Token
     $payload = [
         'user_id' => $user['id'],
         'email' => $user['email'],
         'name' => $user['name'],
         'permission' => $userPermission,
-        'iat' => time(),
-        'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
     ];
-    
+
     try {
-        $token = JWTManager::generateToken($payload);
-        error_log("JWT token generated successfully for user: " . $user['id']);
+        $tokenPair = JWTManager::generateTokenPair($payload);
+        $token = $tokenPair['access_token'];
     } catch (Exception $e) {
         error_log("JWT token generation failed: " . $e->getMessage());
         throw new Exception('Token generation failed: ' . $e->getMessage());
-    }
-    
-    // 防呆：避免產出空字串或不合法 token
-    if (!is_string($token) || strlen(trim($token)) < 20) {
-        throw new Exception('Token generation failed: invalid token');
     }
     
     // 更新最後更新時間（因為沒有 last_login 欄位）
@@ -153,6 +146,11 @@ try {
         'message' => 'Login successful',
         'data' => [
             'token' => $token,
+            'access_token' => $token,
+            'refresh_token' => $tokenPair['refresh_token'],
+            'token_type' => $tokenPair['token_type'],
+            'expires_in' => $tokenPair['expires_in'],
+            'refresh_expires_in' => $tokenPair['refresh_expires_in'],
             'user' => $userData
         ]
     ], 200);

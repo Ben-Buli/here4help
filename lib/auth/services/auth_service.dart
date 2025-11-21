@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/utils/debug_helper.dart';
 import 'package:here4help/chat/services/socket_service.dart';
@@ -10,6 +12,12 @@ import 'package:here4help/services/http_client_service.dart';
 class AuthService {
   static const String _tokenKey = 'auth_token';
   static const String _userKey = 'user_data';
+  static const String _accessExpiryKey = 'auth_token_expiry';
+  static const String _refreshExpiryKey = 'auth_refresh_expiry';
+  static const String _refreshTokenKey = 'auth_refresh_token';
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+
+  static Future<bool>? _refreshingFuture;
 
   // 測試網路連線
   // static Future<bool> testConnection() async {
@@ -74,14 +82,20 @@ class AuthService {
         print('✅ 登入成功');
 
         // 診斷用戶圖片信息
-        if (data['data']['user'] != null) {
-          DebugHelper.printUserImageInfo(data['data']['user']);
+        final responseData = Map<String, dynamic>.from(data['data'] as Map);
+        if (responseData['user'] != null) {
+          DebugHelper.printUserImageInfo(responseData['user']);
         }
 
-        // 儲存 token 和用戶資料
-        await _saveToken(data['data']['token']);
-        await _saveUserData(data['data']['user']);
-        return data['data'];
+        final tokenPayload = _extractTokenPayload(responseData);
+        await saveTokenPair(
+          accessToken: tokenPayload.accessToken,
+          refreshToken: tokenPayload.refreshToken,
+          accessExpiresIn: tokenPayload.expiresIn,
+          refreshExpiresIn: tokenPayload.refreshExpiresIn,
+        );
+        await _saveUserData(responseData['user']);
+        return responseData;
       } else {
         print('❌ 登入失敗: ${data['message']}');
         throw Exception(data['message'] ?? 'Login failed');
@@ -113,10 +127,16 @@ class AuthService {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 201 && data['success']) {
-        // 儲存 token 和用戶資料
-        await _saveToken(data['data']['token']);
-        await _saveUserData(data['data']['user']);
-        return data['data'];
+        final responseData = Map<String, dynamic>.from(data['data'] as Map);
+        final tokenPayload = _extractTokenPayload(responseData);
+        await saveTokenPair(
+          accessToken: tokenPayload.accessToken,
+          refreshToken: tokenPayload.refreshToken,
+          accessExpiresIn: tokenPayload.expiresIn,
+          refreshExpiresIn: tokenPayload.refreshExpiresIn,
+        );
+        await _saveUserData(responseData['user']);
+        return responseData;
       } else {
         throw Exception(data['message'] ?? 'Registration failed');
       }
@@ -169,6 +189,9 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_userKey);
+    await prefs.remove(_accessExpiryKey);
+    await prefs.remove(_refreshExpiryKey);
+    await _secureStorage.delete(key: _refreshTokenKey);
     // 清除 Socket 相關的 SharedPreferences
     await prefs.remove('user_id');
   }
@@ -226,4 +249,141 @@ class AuthService {
   static Future<void> saveUserData(Map<String, dynamic> user) async {
     await _saveUserData(user);
   }
+
+  static Future<void> saveTokenPair({
+    required String accessToken,
+    String? refreshToken,
+    int? accessExpiresIn,
+    int? refreshExpiresIn,
+  }) async {
+    await _saveToken(accessToken);
+    final prefs = await SharedPreferences.getInstance();
+
+    if (accessExpiresIn != null && accessExpiresIn > 0) {
+      final expiry =
+          DateTime.now().millisecondsSinceEpoch + accessExpiresIn * 1000;
+      await prefs.setInt(_accessExpiryKey, expiry);
+    } else {
+      await prefs.remove(_accessExpiryKey);
+    }
+
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
+      if (refreshExpiresIn != null && refreshExpiresIn > 0) {
+        final expiry =
+            DateTime.now().millisecondsSinceEpoch + refreshExpiresIn * 1000;
+        await prefs.setInt(_refreshExpiryKey, expiry);
+      }
+    } else {
+      await _secureStorage.delete(key: _refreshTokenKey);
+      await prefs.remove(_refreshExpiryKey);
+    }
+  }
+
+  static Future<String?> getRefreshToken() async {
+    try {
+      return await _secureStorage.read(key: _refreshTokenKey);
+    } catch (e) {
+      debugPrint('⚠️ Failed to read refresh token: $e');
+      return null;
+    }
+  }
+
+  static Future<bool> tryRefreshToken() async {
+    final existingFuture = _refreshingFuture;
+    if (existingFuture != null) {
+      return existingFuture;
+    }
+
+    final refreshToken = await getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) {
+      return false;
+    }
+
+    final completer = Completer<bool>();
+    _refreshingFuture = completer.future;
+
+    () async {
+      var success = false;
+      try {
+        success = await _refreshAccessToken(refreshToken);
+      } catch (e) {
+        debugPrint('⚠️ Refresh token request failed: $e');
+      } finally {
+        completer.complete(success);
+        _refreshingFuture = null;
+      }
+    }();
+
+    return _refreshingFuture!;
+  }
+
+  static Future<bool> _refreshAccessToken(String refreshToken) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(AppConfig.refreshTokenUrl),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({'refresh_token': refreshToken}),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      final decoded = jsonDecode(response.body);
+      if (response.statusCode == 200 && decoded['success'] == true) {
+        final data = decoded['data'] as Map<String, dynamic>? ?? {};
+        final tokenPayload = _extractTokenPayload(data);
+        await saveTokenPair(
+          accessToken: tokenPayload.accessToken,
+          refreshToken: tokenPayload.refreshToken,
+          accessExpiresIn: tokenPayload.expiresIn,
+          refreshExpiresIn: tokenPayload.refreshExpiresIn,
+        );
+        return true;
+      }
+
+      debugPrint('⚠️ Refresh token failed: ${decoded['message']}');
+      return false;
+    } catch (e) {
+      debugPrint('⚠️ Refresh token exception: $e');
+      return false;
+    }
+  }
+
+  static _TokenPayload _extractTokenPayload(Map<String, dynamic> data) {
+    final accessToken =
+        (data['access_token'] ?? data['token'] ?? '')?.toString() ?? '';
+    final refreshToken = data['refresh_token']?.toString();
+    final expiresIn = _tryParseInt(data['expires_in']);
+    final refreshExpiresIn = _tryParseInt(data['refresh_expires_in']);
+    return _TokenPayload(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      expiresIn: expiresIn,
+      refreshExpiresIn: refreshExpiresIn,
+    );
+  }
+
+  static int? _tryParseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+}
+
+class _TokenPayload {
+  final String accessToken;
+  final String? refreshToken;
+  final int? expiresIn;
+  final int? refreshExpiresIn;
+
+  const _TokenPayload({
+    required this.accessToken,
+    this.refreshToken,
+    this.expiresIn,
+    this.refreshExpiresIn,
+  });
 }

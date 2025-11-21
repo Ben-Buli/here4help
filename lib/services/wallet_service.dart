@@ -29,36 +29,24 @@ class WalletService {
         throw Exception(data['message'] ?? 'Failed to load wallet summary');
       }
     } catch (e) {
-      throw Exception('網路錯誤: $e');
+      throw Exception('Internal error: $e');
     }
   }
 
-  /// 手續費設定數據
+  /// 手續費設定數據（目前平台不再收取完成手續費）
   static Future<FeeSettings> getFeeSettings(UserService userService) async {
-    try {
-      final response = await ApiClient.get(
-        '/wallet/fee-settings.php',
-        useQueryParamToken: true, // MAMP 兼容性
-      );
-
-      if (kDebugMode) {
-        debugPrint('[WalletService] fee status: ${response.statusCode}');
-      }
-
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
-      }
-
-      final data = json.decode(response.body);
-
-      if (data['success'] == true) {
-        return FeeSettings.fromJson(data['data']);
-      } else {
-        throw Exception(data['message'] ?? 'Failed to load fee settings');
-      }
-    } catch (e) {
-      throw Exception('網路錯誤: $e');
-    }
+    return FeeSettings(
+      feeEnabled: false,
+      rate: 0.0,
+      ratePercentage: '0.00%',
+      description: 'No completion fees',
+      calculationExample: CalculationExample(
+        taskReward: 0,
+        feeAmount: 0,
+        creatorPays: 0,
+        acceptorReceives: 0,
+      ),
+    );
   }
 
   /// 格式化點數顯示（千位逗號）
@@ -94,7 +82,7 @@ class WalletService {
         throw Exception(data['message'] ?? 'Failed to load bank account info');
       }
     } catch (e) {
-      throw Exception('網路錯誤: $e');
+      throw Exception('Internal error: $e');
     }
   }
 
@@ -143,7 +131,7 @@ class WalletService {
         throw Exception(data['message'] ?? 'Failed to load deposit requests');
       }
     } catch (e) {
-      throw Exception('網路錯誤: $e');
+      throw Exception('Internal error: $e');
     }
   }
 
@@ -195,7 +183,7 @@ class WalletService {
             data['message'] ?? 'Failed to load transaction history');
       }
     } catch (e) {
-      throw Exception('網路錯誤: $e');
+      throw Exception('Internal error: $e');
     }
   }
 

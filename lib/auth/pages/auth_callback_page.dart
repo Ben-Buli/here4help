@@ -151,8 +151,18 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
     try {
       debugPrint('💾 儲存登入資訊...');
 
+      final refreshToken = userData['refresh_token']?.toString();
+      final expiresIn = _parseTokenExpiry(userData['expires_in']);
+      final refreshExpiresIn =
+          _parseTokenExpiry(userData['refresh_expires_in']);
+
       // 使用 AuthService 儲存登入資訊
-      await AuthService.saveToken(token);
+      await AuthService.saveTokenPair(
+        accessToken: token,
+        refreshToken: refreshToken,
+        accessExpiresIn: expiresIn,
+        refreshExpiresIn: refreshExpiresIn,
+      );
       await AuthService.saveUserData(userData);
 
       debugPrint('✅ 登入資訊儲存成功');
@@ -213,6 +223,13 @@ class _AuthCallbackPageState extends State<AuthCallbackPage> {
 
     debugPrint('🔗 重定向 URL: $signupUrl');
     context.pushReplacement(signupUrl, extra: prefillData);
+  }
+
+  int? _parseTokenExpiry(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
   }
 
   void _retryLogin() {

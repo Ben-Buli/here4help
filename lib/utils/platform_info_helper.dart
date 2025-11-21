@@ -19,13 +19,13 @@ class PlatformInfoHelper {
     try {
       if (UniversalPlatform.isAndroid) {
         final info = await deviceInfo.androidInfo;
-        final manufacturer = info.manufacturer?.trim();
-        final model = info.model?.trim();
+        final manufacturer = info.manufacturer.trim();
+        final model = info.model.trim();
         final version = info.version.release;
         return [
           if (manufacturer != null && manufacturer.isNotEmpty) manufacturer,
           if (model != null && model.isNotEmpty) model,
-          if (version != null && version.isNotEmpty) '(Android $version)',
+          if (version.isNotEmpty) '(Android $version)',
         ].join(' ').trim();
       }
 
@@ -34,9 +34,8 @@ class PlatformInfoHelper {
         final name = info.name;
         final systemVersion = info.systemVersion;
         return [
-          if (name != null && name.isNotEmpty) name,
-          if (systemVersion != null && systemVersion.isNotEmpty)
-            '(iOS $systemVersion)',
+          if (name.isNotEmpty) name,
+          if (systemVersion.isNotEmpty) '(iOS $systemVersion)',
         ].join(' ').trim();
       }
 
@@ -60,7 +59,7 @@ class PlatformInfoHelper {
         final vendor = info.vendor;
         final browserName = describeEnum(info.browserName);
         return [vendor, browserName]
-            .where((part) => part != null && part!.isNotEmpty)
+            .where((part) => part != null && part.isNotEmpty)
             .join(' ');
       }
     } catch (_) {

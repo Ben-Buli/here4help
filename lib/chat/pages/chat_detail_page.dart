@@ -6087,9 +6087,9 @@ class _ConfirmPayDialog extends StatefulWidget {
 }
 
 class _ConfirmPayDialogState extends State<_ConfirmPayDialog> {
-  // 手續費設定
+  // 手續費設定（固定為零）
   FeeSettings? _feeSettings;
-  bool _isLoadingFee = true;
+  bool _isLoadingFee = false;
 
   // UI 狀態
   bool _isAgreed = false;
@@ -6132,24 +6132,22 @@ class _ConfirmPayDialogState extends State<_ConfirmPayDialog> {
 
   /// 載入手續費設定
   Future<void> _loadFeeSettings() async {
-    try {
-      final userService = Provider.of<UserService>(context, listen: false);
-      final settings = await WalletService.getFeeSettings(userService);
-      if (mounted) {
-        setState(() {
-          _feeSettings = settings;
-          _isLoadingFee = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoadingFee = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load fee settings: $e')),
+    if (mounted) {
+      setState(() {
+        _feeSettings = FeeSettings(
+          feeEnabled: false,
+          rate: 0,
+          ratePercentage: '0%',
+          description: 'No completion fees',
+          calculationExample: CalculationExample(
+            taskReward: 0,
+            feeAmount: 0,
+            creatorPays: 0,
+            acceptorReceives: 0,
+          ),
         );
-      }
+        _isLoadingFee = false;
+      });
     }
   }
 
@@ -6171,12 +6169,7 @@ class _ConfirmPayDialogState extends State<_ConfirmPayDialog> {
 
   /// 計算手續費
   int _calculateFee() {
-    if (_feeSettings == null || widget.task == null) return 0;
-
-    final rewardPoints = _safeParseInt(widget.task!['reward_point']);
-    final feeRate = _feeSettings!.rate;
-
-    return WalletService.calculateFee(rewardPoints, feeRate);
+    return 0;
   }
 
   /// 檢查是否可以提交
@@ -6220,11 +6213,11 @@ class _ConfirmPayDialogState extends State<_ConfirmPayDialog> {
         final creatorId = _safeParseInt(room?['creator_id']);
         final participantId = _safeParseInt(room?['participant_id']);
 
-        debugPrint('🔍 [Payment Flow] 提取的參數:');
-        debugPrint('🔍 [Payment Flow] taskId: $taskId');
-        debugPrint('🔍 [Payment Flow] rewardPoints: $rewardPoints');
-        debugPrint('🔍 [Payment Flow] creatorId: $creatorId');
-        debugPrint('🔍 [Payment Flow] participantId: $participantId');
+        // debugPrint('🔍 [Payment Flow] 提取的參數:');
+        // debugPrint('🔍 [Payment Flow] taskId: $taskId');
+        // debugPrint('🔍 [Payment Flow] rewardPoints: $rewardPoints');
+        // debugPrint('🔍 [Payment Flow] creatorId: $creatorId');
+        // debugPrint('🔍 [Payment Flow] participantId: $participantId');
 
         // 🚨 添加數據驗證和錯誤處理
         if (room == null) {
@@ -6392,79 +6385,20 @@ class _ConfirmPayDialogState extends State<_ConfirmPayDialog> {
 
   /// 上半部 - 說明文字 + 手續費說明
   Widget _buildUpperSection() {
-    return Column(
+    return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 說明文字
-        const Text(
+        Text(
           'Please confirm the task is completed and agree to release payment to the assignee.',
           style: TextStyle(fontSize: 14),
         ),
-        const SizedBox(height: 8),
-        const Text(
-          'The completion fee will be deducted from the reward points, rounded to the nearest integer, and collected by the system.',
+        SizedBox(height: 8),
+        Text(
+          'Reward points will be transferred in full to the assignee after you confirm completion.',
           style: TextStyle(fontSize: 14),
         ),
-        const SizedBox(height: 16),
-
-        // 手續費詳情
-        if (_isLoadingFee)
-          const Center(child: CircularProgressIndicator())
-        else
-          _buildFeeDetails(),
       ],
-    );
-  }
-
-  /// 手續費詳情
-  Widget _buildFeeDetails() {
-    if (widget.task == null) return const SizedBox.shrink();
-
-    final rewardPoints = _safeParseInt(widget.task!['reward_point']);
-    final feeRate = _feeSettings?.rate ?? 0.0;
-    final feeAmount = _calculateFee();
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Reward Points Outcome：',
-                  style: TextStyle(fontSize: 12)),
-              Text('$rewardPoints Points',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, color: Colors.red)),
-            ],
-          ),
-          const Divider(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Completion Fee Rate：',
-                  style: TextStyle(fontSize: 12)),
-              Text('${(feeRate * 100).toStringAsFixed(2)}%',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, color: Colors.cyan)),
-            ],
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Fee Amount Outcome：', style: TextStyle(fontSize: 12)),
-              Text('$feeAmount Points',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, color: Colors.red)),
-            ],
-          ),
-        ],
-      ),
     );
   }
 
@@ -6523,8 +6457,7 @@ class _ConfirmPayDialogState extends State<_ConfirmPayDialog> {
               _isAgreed = value ?? false;
             });
           },
-          title: const Text(
-              'I agree to release payment to the assignee and pay the completion fee.'),
+          title: const Text('I agree to release payment to the assignee.'),
           controlAffinity: ListTileControlAffinity.leading,
         ),
 

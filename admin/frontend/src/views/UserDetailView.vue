@@ -92,6 +92,22 @@
             </svg>
             Terms
           </button>
+       
+          <button
+            v-if="canGenerateUserResetLink"
+            class="admin-button-secondary flex items-center gap-2"
+            @click="requestPasswordResetLink"
+            :disabled="isGeneratingResetLink || !user.email"
+            title="Reset Password"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 11c1.657 0 3-1.343 3-3S13.657 5 12 5 9 6.343 9 8s1.343 3 3 3z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M5 21v-2a4 4 0 014-4h6a4 4 0 014 4v2" />
+            </svg>
+            <span>{{ isGeneratingResetLink ? 'Preparing…' : 'Reset PWD' }}</span>
+          </button>
           <button @click="refreshData" class="admin-button-secondary">
             <!-- <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -99,9 +115,9 @@
             </svg> -->
             Refresh
           </button>
-
         </div>
       </div>
+      <p v-if="canGenerateUserResetLink && resetLinkActionError" class="mt-2 text-sm text-red-600">{{ resetLinkActionError }}</p>
 
       <!-- User Information Cards -->
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 mt-8">
@@ -421,19 +437,104 @@
           </div>
         </div>
       </transition>
+
+      <transition name="fade">
+        <div v-if="showResetModal" class="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm px-2 md:px-4"
+          @click="closeResetModal">
+          <div class="relative bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            @click.stop>
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">Manual Password Reset</h3>
+                <p class="text-sm text-gray-500">Share this link securely with the user.</p>
+              </div>
+              <button class="text-gray-400 hover:text-gray-600" @click="closeResetModal" aria-label="Close reset modal">
+                ✕
+              </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4" v-if="resetLinkInfo">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p class="text-gray-500">User Email</p>
+                  <a :href="`mailto:${resetLinkInfo.email}`" class="text-primary-600 break-all">
+                    {{ resetLinkInfo.email }}
+                  </a>
+                </div>
+                <div>
+                  <p class="text-gray-500">Created By</p>
+                  <p class="text-gray-900">
+                    <template v-if="resetLinkInfo.created_by_name">
+                      {{ resetLinkInfo.created_by_name }} (#{{ resetLinkInfo.created_by }})
+                    </template>
+                    <template v-else>
+                      User-Initiated
+                    </template>
+                  </p>
+                </div>
+                <div>
+                  <p class="text-gray-500">Expires In</p>
+                  <p class="text-gray-900">{{ resetCountdownText || 'Expired' }}</p>
+                  <p class="text-xs text-gray-500">
+                    {{ formatDateTime(resetLinkInfo.expires_at) }}
+                  </p>
+                </div>
+              </div>
+
+          
+
+              <div v-if="resetLinkInfo.was_existing_link"
+                class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg p-3">
+                An active reset link already existed for this user. Share the same link below.
+              </div>
+
+              
+              <p class="text-sm font-semibold text-gray-900">Reset Notification Email Template:</p>
+              <div class="relative bg-gray-50 border border-gray-200 rounded-2xl p-4 overflow-x-auto">
+                <button class="absolute top-3 right-3 flex items-center gap-1 text-gray-500 hover:text-gray-900"
+                  @click="copyResetEmailTemplate" :title="resetCopyTooltip">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M8 16h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v9a2 2 0 002 2z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M16 8h2a2 2 0 012 2v7a2 2 0 01-2 2h-8a2 2 0 01-2-2v-1" />
+                  </svg>
+                  <span class="text-xs">{{ resetCopyTooltip }}</span>
+                </button>
+                <pre class="text-sm font-mono whitespace-pre-wrap break-words text-gray-800 pr-10">{{ resetEmailTemplate }}</pre>
+              </div>
+
+              <div class="space-y-2">
+                <p class="text-sm text-gray-600">Reset link</p>
+                <a :href="resetLinkInfo.reset_link" target="_blank" rel="noopener"
+                  class="block text-sm text-primary-600 break-all">
+                  {{ resetLinkInfo.reset_link }}
+                </a>
+              </div>
+
+              <p class="text-xs text-gray-500">
+                Reminder: ask the user to open the link within 1 hour and keep it private.
+              </p>
+
+              <p v-if="resetModalError" class="text-sm text-red-600">{{ resetModalError }}</p>
+            </div>
+          </div>
+        </div>
+      </transition>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { userApi, userActivityApi } from '@/services/api'
+import { userApi, userActivityApi, type PasswordResetLinkResponse } from '@/services/api'
 import { getImageUrl } from '@/config/api'
 import UserReviewModal from '@/components/UserReviewModal.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 // State
 const isLoading = ref(false)
@@ -477,6 +578,51 @@ const showTermsModal = ref(false)
 const isLoadingTermsHistory = ref(false)
 const termsHistory = ref<any[]>([])
 const termsHistoryMeta = ref<{ user_registered_at: string | null }>({ user_registered_at: null })
+
+type ResetLinkInfo = PasswordResetLinkResponse
+const showResetModal = ref(false)
+const isGeneratingResetLink = ref(false)
+const resetLinkActionError = ref('')
+const resetModalError = ref('')
+const resetLinkInfo = ref<ResetLinkInfo | null>(null)
+const resetCopyTooltip = ref('Copy')
+const resetCountdownText = ref('')
+let resetCountdownTimer: number | null = null
+let resetCopyTooltipTimer: number | null = null
+const canGenerateUserResetLink = computed(() => authStore.hasPermission('users.edit'))
+
+const resetEmailTemplate = computed(() => {
+  const name = resetLinkInfo.value?.user_name || user.value?.name || 'there'
+  const link = resetLinkInfo.value?.reset_link || ''
+  return (
+    `Hello ${name},\n\n` +
+    'We received a request to reset the password for your Here4Help account.\n\n' +
+    "If you did not make this request, you can safely ignore this email and no changes will be made to your account.\n\n" +
+    'Please use the link below to reset your password (valid for 1 hour):\n' +
+    `${link}\n\n` +
+    'Best regards,\n' +
+    'The Here4Help Team'
+  )
+})
+
+const getFriendlyResetError = (err: any): string => {
+  const raw = err?.response?.data?.message || err?.message || ''
+  const normalized = raw.toLowerCase()
+
+  if (normalized.includes("unknown column 'created_by_admin_id'")) {
+    return 'The backend database is missing the latest password-reset fields. Please run the new migrations before issuing links.'
+  }
+
+  if (normalized.includes('sqlstate')) {
+    return 'The backend reported a database error while generating the link. Please check the server logs.'
+  }
+
+  if (err?.response?.status === 403) {
+    return raw || 'You do not have permission to generate reset links for this user.'
+  }
+
+  return raw || 'Unable to generate reset link. Please try again later.'
+}
 
 // Methods
 const loadUser = async () => {
@@ -562,6 +708,88 @@ const loadTermsHistory = async () => {
     alert('Failed to load terms history')
   } finally {
     isLoadingTermsHistory.value = false
+  }
+}
+
+const requestPasswordResetLink = async () => {
+  if (!canGenerateUserResetLink.value || !user.value?.id) return
+  try {
+    isGeneratingResetLink.value = true
+    resetLinkActionError.value = ''
+
+    const response = await userApi.passwordResetLink(user.value.id)
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Unable to generate reset link')
+    }
+
+    resetLinkInfo.value = response.data.data
+    resetModalError.value = ''
+    resetCopyTooltip.value = 'Copy'
+    showResetModal.value = true
+    startResetCountdown()
+  } catch (err: any) {
+    console.error('Failed to create password reset link', err)
+    const message = getFriendlyResetError(err)
+    resetLinkActionError.value = message
+    if (showResetModal.value) {
+      resetModalError.value = message
+    }
+  } finally {
+    isGeneratingResetLink.value = false
+  }
+}
+
+const closeResetModal = () => {
+  showResetModal.value = false
+  resetModalError.value = ''
+}
+
+const updateResetCountdown = () => {
+  if (!resetLinkInfo.value) {
+    resetCountdownText.value = ''
+    return
+  }
+  const expiresAt = new Date(resetLinkInfo.value.expires_at)
+  const diff = expiresAt.getTime() - Date.now()
+  if (diff <= 0) {
+    resetCountdownText.value = 'Expired'
+    stopResetCountdown()
+    return
+  }
+  const totalSeconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  resetCountdownText.value = `${minutes}m ${seconds.toString().padStart(2, '0')}s`
+}
+
+const startResetCountdown = () => {
+  stopResetCountdown()
+  updateResetCountdown()
+  resetCountdownTimer = window.setInterval(updateResetCountdown, 1000)
+}
+
+const stopResetCountdown = () => {
+  if (resetCountdownTimer) {
+    clearInterval(resetCountdownTimer)
+    resetCountdownTimer = null
+  }
+}
+
+const copyResetEmailTemplate = async () => {
+  if (!resetLinkInfo.value) return
+  try {
+    await navigator.clipboard.writeText(resetEmailTemplate.value)
+    resetCopyTooltip.value = 'Copied!'
+    if (resetCopyTooltipTimer) {
+      clearTimeout(resetCopyTooltipTimer)
+    }
+    resetCopyTooltipTimer = window.setTimeout(() => {
+      resetCopyTooltip.value = 'Copy'
+      resetCopyTooltipTimer = null
+    }, 2000)
+    resetModalError.value = ''
+  } catch (err: any) {
+    resetModalError.value = 'Unable to copy text automatically. Please copy it manually.'
   }
 }
 
@@ -775,4 +1003,31 @@ watch(
     studentImageLoadError.value = false
   }
 )
+
+watch(showResetModal, (isOpen) => {
+  if (isOpen && resetLinkInfo.value) {
+    startResetCountdown()
+  } else {
+    stopResetCountdown()
+    resetCopyTooltip.value = 'Copy'
+    resetModalError.value = ''
+  }
+})
+
+watch(
+  () => resetLinkInfo.value?.expires_at,
+  () => {
+    if (showResetModal.value && resetLinkInfo.value) {
+      startResetCountdown()
+    }
+  }
+)
+
+onBeforeUnmount(() => {
+  stopResetCountdown()
+  if (resetCopyTooltipTimer) {
+    clearTimeout(resetCopyTooltipTimer)
+    resetCopyTooltipTimer = null
+  }
+})
 </script>

@@ -9,7 +9,7 @@ import 'package:here4help/account/pages/contact_us_page.dart';
 import 'package:here4help/account/pages/faq_page.dart';
 import 'package:here4help/account/pages/issue_status_page.dart';
 import 'package:here4help/account/pages/logout_page.dart';
-import 'package:here4help/account/pages/point_policy.dart';
+import 'package:here4help/account/pages/point_policy_page.dart';
 import 'package:here4help/account/pages/profile_page.dart';
 import 'package:here4help/account/pages/ratings_page.dart';
 import 'package:here4help/account/pages/security_page.dart';
@@ -414,7 +414,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
-    'icon': Icons.description,
+    'icon': Icons.file_open,
     'permission': 0,
   },
   {

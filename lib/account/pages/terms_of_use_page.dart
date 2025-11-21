@@ -90,10 +90,10 @@ class _TermsOfUsePageState extends State<TermsOfUsePage> {
             const Icon(Icons.warning_amber_rounded,
                 size: 48, color: Colors.red),
             const SizedBox(height: 12),
-            Text(
+            const Text(
               _errorMessage,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.red,
                 fontWeight: FontWeight.w600,
               ),

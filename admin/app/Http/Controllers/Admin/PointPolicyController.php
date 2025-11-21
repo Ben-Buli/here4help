@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
@@ -113,8 +114,8 @@ class PointPolicyController extends Controller
                     $request->input('title'),
                     $contentJson,
                     $isActive ? 1 : 0,
-                    auth()->id(),
-                    auth()->id(),
+                    Auth::id(),
+                    Auth::id(),
                 ]);
 
                 $newId = (int)$db->lastInsertId();
@@ -197,7 +198,7 @@ class PointPolicyController extends Controller
                 }
 
                 $fields[] = 'updated_by = ?';
-                $params[] = auth()->id();
+                $params[] = Auth::id();
                 $fields[] = 'updated_at = NOW()';
 
                 $params[] = $id;
@@ -240,7 +241,7 @@ class PointPolicyController extends Controller
         }
     }
 
-    public function activate(int $id)
+    public function activate(int $id, Request $request)
     {
         try {
             $db = $this->getBackendDB();
@@ -258,7 +259,7 @@ class PointPolicyController extends Controller
             try {
                 $db->exec('UPDATE point_policies SET is_active = 0');
                 $update = $db->prepare('UPDATE point_policies SET is_active = 1, updated_by = ?, updated_at = NOW() WHERE id = ?');
-                $update->execute([auth()->id(), $id]);
+                $update->execute([Auth::id(), $id]);
                 $db->commit();
 
                 $this->logPolicyAction(
@@ -323,13 +324,13 @@ class PointPolicyController extends Controller
 
     private function logPolicyAction(Request $request, string $action, ?int $recordId, ?array $oldData, ?array $newData): void
     {
-        $admin = $request->user();
-        if (!$admin) {
+        $adminId = Auth::id();
+        if (!$adminId) {
             return;
         }
 
         DB::table('admin_activity_logs')->insert([
-            'admin_id' => $admin->id,
+            'admin_id' => $adminId,
             'action' => $action,
             'table_name' => 'point_policies',
             'record_id' => $recordId,

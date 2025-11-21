@@ -15,6 +15,12 @@ const router = createRouter({
       meta: { requiresGuest: true },
     },
     {
+      path: '/reset-password',
+      name: 'admin-password-reset',
+      component: () => import('../views/AdminPasswordResetView.vue'),
+      meta: { title: 'Reset Password', publicPage: true },
+    },
+    {
       path: '/dashboard',
       name: 'dashboard',
       component: () => import('../components/AppLayout.vue'),
@@ -50,6 +56,19 @@ const router = createRouter({
           name: 'user-detail',
           component: () => import('../views/UserDetailView.vue'),
           meta: { title: 'User Detail' },
+        },
+      ],
+    },
+    {
+      path: '/admin-accounts',
+      component: () => import('../components/AppLayout.vue'),
+      meta: { requiresAuth: true, permission: 'admins.list' },
+      children: [
+        {
+          path: '',
+          name: 'admin-accounts',
+          component: () => import('../views/AdminsView.vue'),
+          meta: { title: 'Admin Management' },
         },
       ],
     },

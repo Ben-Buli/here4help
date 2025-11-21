@@ -40,8 +40,9 @@ class TaskCompletionProcessor
             throw new Exception('Task reward must be greater than zero to complete');
         }
 
-        $feeRate = self::getPlatformFeeRate();
-        $feeAmount = (int)round($amount * $feeRate);
+        // 平台暫停收取任務完成手續費，直接全額轉移
+        $feeRate = 0.0;
+        $feeAmount = 0;
         $netAmount = max(0, $amount - $feeAmount);
 
         $completedStatusId = self::getStatusId('completed');

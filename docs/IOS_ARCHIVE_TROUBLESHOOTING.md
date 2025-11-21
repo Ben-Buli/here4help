@@ -28,6 +28,19 @@ with a private key was found.
 - 或證書存在但沒有對應的私鑰
 - Release 配置可能設定錯誤
 
+### 3. PIF Transfer Session Error
+**錯誤訊息：**
+```
+Could not compute dependency graph: MsgHandlingError(message: "unable to initiate PIF transfer session (operation in progress?)")
+```
+
+**原因：**
+- Xcode 正在進行其他操作（索引、建置、Archive 等）
+- DerivedData 損壞或鎖定
+- Xcode 進程卡住
+- 多個 Xcode 實例同時運行
+- PIF (Project Interchange Format) 緩存問題
+
 ## ✅ 解決方案
 
 ### 步驟 1: 同意 Program License Agreement
@@ -89,7 +102,72 @@ with a private key was found.
    - 在 Xcode 中：Preferences → Accounts → 選擇帳號 → 點擊 "Download Manual Profiles"
    - 或在 Apple Developer Portal 手動建立
 
-### 步驟 3: 更新建置腳本（可選）
+### 步驟 3: 修復 PIF Transfer Session 錯誤
+
+如果遇到 `unable to initiate PIF transfer session` 錯誤，請按照以下步驟操作：
+
+#### 方法 A: 清理 Xcode 緩存（推薦）
+
+```bash
+# 1. 完全關閉 Xcode
+killall Xcode 2>/dev/null || true
+
+# 2. 清理 DerivedData
+rm -rf ~/Library/Developer/Xcode/DerivedData/*
+
+# 3. 清理模組緩存
+rm -rf ~/Library/Developer/Xcode/ModuleCache.noindex/*
+
+# 4. 清理建置資料夾
+cd ios
+xcodebuild clean -workspace Runner.xcworkspace -scheme Runner
+cd ..
+
+# 5. 重新開啟 Xcode
+open ios/Runner.xcworkspace
+```
+
+#### 方法 B: 使用腳本自動清理
+
+執行以下命令進行完整清理：
+
+```bash
+# 清理所有 Xcode 相關緩存
+./scripts/clean_xcode_cache.sh
+```
+
+#### 方法 C: 手動清理（如果方法 A 無效）
+
+```bash
+# 1. 關閉所有 Xcode 相關進程
+killall Xcode com.apple.CoreSimulator.CoreSimulatorService 2>/dev/null || true
+
+# 2. 等待幾秒確保進程完全關閉
+sleep 3
+
+# 3. 清理所有 Xcode 緩存
+rm -rf ~/Library/Developer/Xcode/DerivedData
+rm -rf ~/Library/Developer/Xcode/Archives
+rm -rf ~/Library/Developer/Xcode/ModuleCache.noindex
+rm -rf ~/Library/Caches/com.apple.dt.Xcode
+
+# 4. 清理專案建置資料
+cd ios
+rm -rf build
+rm -rf Pods
+rm -rf Podfile.lock
+cd ..
+
+# 5. 重新安裝依賴
+cd ios
+pod install
+cd ..
+
+# 6. 重新建置
+./build_ios.sh release
+```
+
+### 步驟 4: 更新建置腳本（可選）
 
 如果需要在建置腳本中自動檢查，可以添加以下檢查：
 
@@ -143,6 +221,30 @@ cd ..
 ./build_ios.sh release
 ```
 
+### 2.5. 修復 PIF Transfer Session 錯誤後重新建置
+
+如果遇到 PIF 錯誤，請先執行清理步驟：
+
+```bash
+# 1. 關閉 Xcode
+killall Xcode 2>/dev/null || true
+
+# 2. 清理 DerivedData
+rm -rf ~/Library/Developer/Xcode/DerivedData/*
+
+# 3. 清理專案建置資料
+cd ios
+rm -rf build Pods Podfile.lock
+pod install
+cd ..
+
+# 4. 重新建置
+./build_ios.sh release
+
+# 5. 重新開啟 Xcode
+open ios/Runner.xcworkspace
+```
+
 ### 3. 在 Xcode 中 Archive
 
 1. 選擇 "Any iOS Device" 或 "Generic iOS Device"
@@ -181,6 +283,21 @@ A: 在 Xcode 中：
 - Preferences → Accounts → 選擇帳號
 - 點擊 "Download Manual Profiles"
 - 或點擊 "Manage Certificates" → "+" → 選擇 "Apple Distribution"
+
+### Q: 遇到 "unable to initiate PIF transfer session" 錯誤怎麼辦？
+A: 這通常是 Xcode 緩存問題，解決步驟：
+1. **完全關閉 Xcode**：`killall Xcode`
+2. **清理 DerivedData**：`rm -rf ~/Library/Developer/Xcode/DerivedData/*`
+3. **等待 5-10 秒**確保所有進程關閉
+4. **重新開啟 Xcode** 並嘗試 Archive
+5. 如果還是不行，清理所有 Xcode 緩存（見步驟 3 方法 C）
+
+### Q: 為什麼清理 DerivedData 後還是無法 Archive？
+A: 可能原因：
+- Xcode 進程沒有完全關閉（檢查 `ps aux | grep Xcode`）
+- 有其他應用程式正在使用專案檔案
+- 磁碟空間不足
+- 權限問題（檢查 `ls -la ~/Library/Developer/Xcode/`）
 
 ## 📝 注意事項
 

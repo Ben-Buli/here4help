@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -795,6 +796,130 @@ class UserController extends Controller
     }
 
     /**
+     * 產生或取得使用者的密碼重設連結
+     */
+    public function passwordResetLink(Request $request, $id)
+    {
+        $admin = $request->user();
+        $user = DB::table('users')->where('id', $id)->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found',
+            ], 404);
+        }
+
+        if (empty($user->email)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The user does not have a valid email address on file.',
+            ], 422);
+        }
+
+        $now = Carbon::now();
+        $existingToken = DB::table('email_verification_tokens')
+            ->where('user_id', $id)
+            ->where('type', 'password_reset')
+            ->where('used', 0)
+            ->where('expires_at', '>', $now)
+            ->orderByDesc('created_at')
+            ->first();
+
+        $tokenRecord = $existingToken;
+        $isNew = false;
+
+        DB::beginTransaction();
+        try {
+            if (!$tokenRecord) {
+                DB::table('email_verification_tokens')
+                    ->where('user_id', $id)
+                    ->where('type', 'password_reset')
+                    ->where('used', 0)
+                    ->update([
+                        'used' => 1,
+                        'used_at' => $now,
+                    ]);
+
+                $token = bin2hex(random_bytes(32));
+                $expiresAt = Carbon::now()->addHour();
+                $adminName = $admin->full_name ?? $admin->username ?? $admin->email;
+
+                DB::table('email_verification_tokens')->insert([
+                    'user_id' => $id,
+                    'token' => $token,
+                    'type' => 'password_reset',
+                    'expires_at' => $expiresAt,
+                    'used' => 0,
+                    'created_at' => $now,
+                    'created_by' => $admin->id,
+                    'created_by_name' => $adminName,
+                ]);
+
+                $tokenRecord = (object) [
+                    'token' => $token,
+                    'expires_at' => $expiresAt->toDateTimeString(),
+                    'created_at' => $now->toDateTimeString(),
+                    'created_by' => $admin->id,
+                    'created_by_name' => $adminName,
+                ];
+                $isNew = true;
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create password reset link: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        $expiresAt = Carbon::parse($tokenRecord->expires_at);
+        $resetLink = $this->buildPasswordResetLink($tokenRecord->token, $user->email);
+        $remainingSeconds = max(0, $now->diffInSeconds($expiresAt, false));
+
+        $responseData = [
+            'user_id' => (int) $user->id,
+            'user_name' => $user->name,
+            'email' => $user->email,
+            'reset_link' => $resetLink,
+            'token' => $tokenRecord->token,
+            'expires_at' => $expiresAt->toDateTimeString(),
+            'remaining_seconds' => $remainingSeconds,
+            'created_at' => $tokenRecord->created_at ?? $now->toDateTimeString(),
+            'created_by' => $tokenRecord->created_by ?? null,
+            'created_by_name' => $tokenRecord->created_by_name ?? null,
+            'was_existing_link' => !$isNew,
+        ];
+
+        DB::table('admin_activity_logs')->insert([
+            'admin_id' => $admin->id,
+            'action' => $isNew ? 'password_reset_link_created' : 'password_reset_link_viewed',
+            'table_name' => 'users',
+            'record_id' => $user->id,
+            'old_data' => null,
+            'new_data' => json_encode([
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'expires_at' => $responseData['expires_at'],
+                'was_existing_link' => !$isNew,
+            ]),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $responseData,
+            'message' => $isNew
+                ? 'Password reset link generated successfully.'
+                : 'An active password reset link already exists.',
+        ]);
+    }
+
+    /**
      * 記錄批量操作
      */
     private function logBatchAction($admin, $action, $userIds, $reason)
@@ -810,6 +935,29 @@ class UserController extends Controller
             'user_agent' => request()->userAgent(),
             'created_at' => now()
         ]);
+    }
+
+    private function buildPasswordResetLink(string $token, string $email): string
+    {
+        $baseUrl = $this->getPasswordResetBaseUrl();
+        return $baseUrl . '?token=' . urlencode($token) . '&email=' . urlencode($email);
+    }
+
+    private function getPasswordResetBaseUrl(): string
+    {
+        $configured = trim((string) env('PASSWORD_RESET_PAGE_URL', ''));
+        if ($configured !== '') {
+            return rtrim($configured, '/');
+        }
+
+        $appUrl = config('app.url', env('APP_URL', 'http://localhost'));
+        $appUrl = rtrim($appUrl ?: 'http://localhost', '/');
+
+        if (str_ends_with($appUrl, '/admin')) {
+            $appUrl = rtrim(substr($appUrl, 0, -strlen('/admin')), '/');
+        }
+
+        return rtrim($appUrl, '/') . '/account/reset-password';
     }
 
     /**

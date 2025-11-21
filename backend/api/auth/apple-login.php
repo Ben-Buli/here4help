@@ -175,19 +175,17 @@ try {
         }
     }
     
-    // 生成 JWT Token
+    // 生成 Access/Refresh Token
     $resolvedUserId = isset($user['id']) ? (int)$user['id'] : (int)($user['user_id'] ?? 0);
     $payload = [
         'user_id' => $resolvedUserId,
         'email' => $user['email'] ?? $email,
         'name' => $user['name'] ?? $safeName,
-        'iat' => time(),
-        'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
     ];
 
     try {
-        $token = JWTManager::generateToken($payload);
-        error_log("JWT token generated successfully for user: " . $resolvedUserId);
+        $tokenPair = JWTManager::generateTokenPair($payload);
+        $token = $tokenPair['access_token'];
     } catch (Exception $e) {
         error_log("JWT token generation failed: " . $e->getMessage());
         throw new Exception('Token generation failed: ' . $e->getMessage());
@@ -213,6 +211,11 @@ try {
         'provider_user_id' => $appleId,
         'apple_id' => $appleId,
         'token' => $token,
+        'access_token' => $token,
+        'refresh_token' => $tokenPair['refresh_token'],
+        'token_type' => $tokenPair['token_type'],
+        'expires_in' => $tokenPair['expires_in'],
+        'refresh_expires_in' => $tokenPair['refresh_expires_in'],
     ];
 
     error_log("Apple Login - 登入成功，用戶 ID: {$resolvedUserId}, 新用戶: 否");

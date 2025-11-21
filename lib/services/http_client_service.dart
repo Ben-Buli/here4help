@@ -84,6 +84,7 @@ class HttpClientService {
     Object? body,
     bool useQueryParamToken = true,
     Duration timeout = const Duration(seconds: 30),
+    bool retryOnAuthFailure = true,
   }) async {
     try {
       final token = await AuthService.getToken();
@@ -147,6 +148,20 @@ class HttpClientService {
 
       // 自動處理 401 錯誤（Token 過期）
       if (response.statusCode == 401) {
+        if (retryOnAuthFailure) {
+          final refreshed = await AuthService.tryRefreshToken();
+          if (refreshed) {
+            return _send(
+              method,
+              url,
+              additionalHeaders: additionalHeaders,
+              body: body,
+              useQueryParamToken: useQueryParamToken,
+              timeout: timeout,
+              retryOnAuthFailure: false,
+            );
+          }
+        }
         debugPrint('🚨 [HTTP] 檢測到 401 錯誤，觸發 Token 過期處理');
 
         // 解析錯誤訊息

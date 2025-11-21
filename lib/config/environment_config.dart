@@ -140,15 +140,94 @@ class EnvironmentConfig {
         }
       }
 
-      final configFile = 'assets/app_env/$environment.json';
-      final configString = await rootBundle.loadString(configFile);
-      _config = json.decode(configString) as Map<String, dynamic>;
+      // 優先檢查是否有 dart-define 傳入的環境變數
+      final apiBaseUrl = _getEnvValue('API_BASE_URL');
+      final socketUrl = _getEnvValue('SOCKET_URL');
+      final imageBaseUrl = _getEnvValue('IMAGE_BASE_URL');
+      final apiOrigin = _getEnvValue('API_ORIGIN');
 
-      if (kDebugMode) {
-        print('🌍 環境配置已載入: $environment');
-        print('📁 配置檔案: $configFile');
-        print(
-            '🔑 Google Client ID: ${_config?['public']?['google_client_id'] ?? 'NULL'}');
+      // 如果有 dart-define 參數，優先使用
+      if (apiBaseUrl.isNotEmpty ||
+          socketUrl.isNotEmpty ||
+          imageBaseUrl.isNotEmpty ||
+          apiOrigin.isNotEmpty) {
+        if (kDebugMode) {
+          print('🔧 檢測到 dart-define 參數，優先使用環境變數配置');
+        }
+        // 先嘗試加載 JSON 文件作為基礎配置
+        Map<String, dynamic>? baseConfig;
+        try {
+          final configFile = 'assets/app_env/$environment.json';
+          final configString = await rootBundle.loadString(configFile);
+          baseConfig = json.decode(configString) as Map<String, dynamic>;
+        } catch (e) {
+          if (kDebugMode) {
+            print('⚠️ 無法加載 JSON 配置文件，使用純環境變數配置');
+          }
+        }
+
+        // 使用 dart-define 參數覆蓋 JSON 配置
+        _config = {
+          'environment': environment,
+          'public': {
+            'api_base_url': apiBaseUrl.isNotEmpty
+                ? apiBaseUrl
+                : (baseConfig?['public']?['api_base_url'] ??
+                    _getNetworkAddress(EnvConfig.apiBaseUrl)),
+            'socket_url': socketUrl.isNotEmpty
+                ? socketUrl
+                : (baseConfig?['public']?['socket_url'] ??
+                    _getNetworkAddress(EnvConfig.socketUrl)),
+            'image_base_url': imageBaseUrl.isNotEmpty
+                ? imageBaseUrl
+                : (baseConfig?['public']?['image_base_url'] ??
+                    _getNetworkAddress(EnvConfig.imageBaseUrl)),
+            'google_client_id': _getEnvValue('GOOGLE_CLIENT_ID').isNotEmpty
+                ? _getEnvValue('GOOGLE_CLIENT_ID')
+                : (baseConfig?['public']?['google_client_id'] ?? ''),
+            'google_redirect_uri':
+                _getEnvValue('GOOGLE_REDIRECT_URI').isNotEmpty
+                    ? _getEnvValue('GOOGLE_REDIRECT_URI')
+                    : (baseConfig?['public']?['google_redirect_uri'] ?? ''),
+            'facebook_app_id': _getEnvValue('FACEBOOK_APP_ID').isNotEmpty
+                ? _getEnvValue('FACEBOOK_APP_ID')
+                : (baseConfig?['public']?['facebook_app_id'] ?? ''),
+            'facebook_redirect_uri':
+                _getEnvValue('FACEBOOK_REDIRECT_URI').isNotEmpty
+                    ? _getEnvValue('FACEBOOK_REDIRECT_URI')
+                    : (baseConfig?['public']?['facebook_redirect_uri'] ?? ''),
+            'apple_service_id': _getEnvValue('APPLE_SERVICE_ID').isNotEmpty
+                ? _getEnvValue('APPLE_SERVICE_ID')
+                : (baseConfig?['public']?['apple_service_id'] ?? ''),
+            'apple_redirect_uri': _getEnvValue('APPLE_REDIRECT_URI').isNotEmpty
+                ? _getEnvValue('APPLE_REDIRECT_URI')
+                : (baseConfig?['public']?['apple_redirect_uri'] ?? ''),
+          },
+          'app': baseConfig?['app'] ??
+              {
+                'debug_mode': true,
+                'log_level': 'debug',
+                'features': {},
+              },
+        };
+
+        if (kDebugMode) {
+          print('🌍 環境配置已載入: $environment (使用 dart-define 參數)');
+          print('📡 API Base URL: ${_config?['public']?['api_base_url']}');
+          print('📡 Socket URL: ${_config?['public']?['socket_url']}');
+        }
+      } else {
+        // 沒有 dart-define 參數，使用 JSON 文件
+        final configFile = 'assets/app_env/$environment.json';
+        final configString = await rootBundle.loadString(configFile);
+        _config = json.decode(configString) as Map<String, dynamic>;
+
+        if (kDebugMode) {
+          print('🌍 環境配置已載入: $environment');
+          print('📁 配置檔案: $configFile');
+          print(
+              '🔑 Google Client ID: ${_config?['public']?['google_client_id'] ?? 'NULL'}');
+        }
       }
     } catch (e) {
       if (kDebugMode) {

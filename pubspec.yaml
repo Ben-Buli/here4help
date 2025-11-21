@@ -3,7 +3,7 @@ description: NCCU Social Task Posting APP  - Here4help.
 
 publish_to: 'none'
 
-version: 1.9.5+202511091
+version: 1.9.5+202511221
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -46,8 +46,10 @@ dependencies:
   file_saver: ^0.3.1
   awesome_dialog: ^3.2.1
   flutter_html: ^3.0.0-beta.2
+  flutter_html_table: ^3.0.0
   device_info_plus: ^9.1.2
   package_info_plus: ^4.2.0
+  flutter_secure_storage: ^9.2.4
   # 評分機制
   flutter_rating_bar: ^4.0.1
   # 圖片壓縮和處理

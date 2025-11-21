@@ -43,6 +43,7 @@ class AdminRole extends Model
             'users.list', 'users.view',
             'tasks.list', 'tasks.view',
             'disputes.list', 'disputes.view',
+            'admins.list', 'admins.view', 'admins.edit',
             'logs.view'
         ],
         'support' => [

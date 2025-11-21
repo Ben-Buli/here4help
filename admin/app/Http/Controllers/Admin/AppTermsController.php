@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\AdminActivityLog;
@@ -111,7 +112,7 @@ class AppTermsController extends Controller
                     $summary,
                     $content,
                     $requiresAck ? 1 : 0,
-                    auth()->id(),
+                    Auth::id(),
                 ]);
 
                 $newId = (int)$db->lastInsertId();
@@ -150,7 +151,7 @@ class AppTermsController extends Controller
 
     private function generateNewSlug(?string $baseSlug): string
     {
-        $prefix = $baseSlug ?: 'terms_of_service';
+        $prefix = $baseSlug ?: 'terms_of_H4H';
         $normalized = strtolower(preg_replace('/[^a-z0-9_]+/i', '_', $prefix));
         return trim($normalized, '_') . '_' . date('YmdHis');
     }
@@ -208,7 +209,7 @@ class AppTermsController extends Controller
     ): void {
         try {
             AdminActivityLog::create([
-                'admin_id' => auth()->id(),
+                'admin_id' => Auth::id(),
                 'action' => $action,
                 'table_name' => $table,
                 'record_id' => $recordId,

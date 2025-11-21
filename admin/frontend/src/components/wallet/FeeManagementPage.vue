@@ -30,16 +30,20 @@
       <div class="flex items-end space-x-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Fee Percentage (%)</label>
-          <input 
-            v-model.number="percentage" 
-            type="number" 
-            min="0" 
-            max="100" 
-            step="0.1" 
-            class="admin-input w-40" 
-            placeholder="0.0"
-          />
+          <div class="relative w-40">
+            <input 
+              v-model.number="percentage" 
+              type="number" 
+              min="0" 
+              max="100" 
+              step="0.1" 
+              class="admin-input w-full pr-8" 
+              placeholder="0.0"
+            />
+            <span class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none select-none">%</span>
+          </div>
         </div>
+       
         <button 
           @click="save" 
           class="admin-button-primary" 

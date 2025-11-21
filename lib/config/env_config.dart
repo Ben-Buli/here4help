@@ -183,7 +183,7 @@ class EnvConfig {
 
   /// Socket URL
   static String get socketUrl =>
-      get('SOCKET_URL', defaultValue: 'http://127.0.0.1:3001');
+      get('SOCKET_URL', defaultValue: 'http://127.0.0.1:3000');
 
   // =============================================================================
   // OAuth 配置（僅公開資訊）

@@ -157,17 +157,16 @@ try {
         error_log("OAuth Signup - 新用戶和 user_identity 建立完成");
     }
     
-    // 生成 JWT Token
+    // 生成 Access/Refresh Token
     $payload = [
         'user_id' => $user['id'],
         'email' => $user['email'] ?? '',
         'name' => $user['name'],
-        'iat' => time(),
-        'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
     ];
     
     try {
-        $token = JWTManager::generateToken($payload);
+        $tokenPair = JWTManager::generateTokenPair($payload);
+        $token = $tokenPair['access_token'];
         error_log("JWT token generated successfully for user: " . $user['id']);
     } catch (Exception $e) {
         error_log("JWT token generation failed: " . $e->getMessage());
@@ -202,6 +201,11 @@ try {
         'message' => 'OAuth signup successful',
         'data' => [
             'token' => $token,
+            'access_token' => $token,
+            'refresh_token' => $tokenPair['refresh_token'],
+            'token_type' => $tokenPair['token_type'],
+            'expires_in' => $tokenPair['expires_in'],
+            'refresh_expires_in' => $tokenPair['refresh_expires_in'],
             'user' => $userData
         ]
     ]);

@@ -41,8 +41,19 @@ try {
 
     $userId = (int)$payload['user_id'];
 
-    $terms = TermsManager::getActiveTerms(true);
-    $latestAcceptance = TermsManager::getLatestAcceptance($userId);
+    try {
+        $terms = TermsManager::getActiveTerms(true);
+    } catch (Exception $e) {
+        error_log("Failed to get active terms: " . $e->getMessage());
+        $terms = null;
+    }
+
+    try {
+        $latestAcceptance = TermsManager::getLatestAcceptance($userId);
+    } catch (Exception $e) {
+        error_log("Failed to get latest acceptance for user {$userId}: " . $e->getMessage());
+        $latestAcceptance = null;
+    }
 
     $requiresAcceptance = false;
     if ($terms) {
@@ -77,6 +88,8 @@ try {
         ] : null,
     ]);
 } catch (Exception $e) {
+    error_log("Terms Status API Error: " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
     Response::serverError('Failed to load terms status: ' . $e->getMessage());
 }
 

@@ -173,17 +173,16 @@ try {
         $db->commit();
         error_log("OAuth Register - 資料庫交易提交成功");
         
-        // 生成 JWT Token
+        // 生成 Access/Refresh Tokens
         $payload = [
             'user_id' => $userId,
             'email' => $email,
             'name' => $name,
-            'iat' => time(),
-            'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
         ];
         
         try {
-            $token = JWTManager::generateToken($payload);
+            $tokenPair = JWTManager::generateTokenPair($payload);
+            $token = $tokenPair['access_token'];
             error_log("OAuth Register - JWT token 生成成功，用戶: $userId");
         } catch (Exception $e) {
             error_log("OAuth Register - JWT token 生成失敗: " . $e->getMessage());
@@ -219,6 +218,11 @@ try {
             'message' => 'Registration successful',
             'data' => [
                 'token' => $token,
+                'access_token' => $token,
+                'refresh_token' => $tokenPair['refresh_token'],
+                'token_type' => $tokenPair['token_type'],
+                'expires_in' => $tokenPair['expires_in'],
+                'refresh_expires_in' => $tokenPair['refresh_expires_in'],
                 'user' => $userData
             ]
         ]);

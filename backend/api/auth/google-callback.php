@@ -301,18 +301,18 @@ try {
         }
     }
     
-    // 生成 JWT Token（情況1和情況2都需要）
+    // 生成 Access/Refresh Token（情況1和情況2都需要）
+    $tokenPair = null;
     if ($user !== null) {
         $payload = [
             'user_id' => $user['id'],
             'email' => $user['email'] ?? '',
             'name' => $user['name'],
-            'iat' => time(),
-            'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
         ];
         
         try {
-            $token = JWTManager::generateToken($payload);
+            $tokenPair = JWTManager::generateTokenPair($payload);
+            $token = $tokenPair['access_token'];
             error_log("Google OAuth Callback - JWT token 生成成功，用戶: " . $user['id']);
         } catch (Exception $e) {
             error_log("Google OAuth Callback - JWT token 生成失敗: " . $e->getMessage());
@@ -341,7 +341,13 @@ try {
             'primary_language' => $user['primary_language'] ?? 'English',
             'permission' => (int)($user['permission'] ?? 0),
             'is_new_user' => $isNewUser,
-            'provider_user_id' => $googleId
+            'provider_user_id' => $googleId,
+            'token' => $token,
+            'access_token' => $token,
+            'refresh_token' => $tokenPair['refresh_token'],
+            'token_type' => $tokenPair['token_type'],
+            'expires_in' => $tokenPair['expires_in'],
+            'refresh_expires_in' => $tokenPair['refresh_expires_in'],
         ];
     } else {
         // 情況2和3：不需要生成 JWT token
@@ -446,6 +452,7 @@ try {
             'token' => $isNewUser ? $tempToken : $token,
             'provider' => 'google',
             'is_new_user' => $isNewUser,
+            'refresh_token' => $isNewUser ? null : ($tokenPair['refresh_token'] ?? null),
             'user_data' => $isNewUser ? null : $userData
         ];
         

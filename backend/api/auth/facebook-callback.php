@@ -204,6 +204,9 @@ try {
     // 準備重定向 URL
     $frontendUrl = EnvLoader::get('FRONTEND_URL', 'http://localhost:3000');
     
+    $token = null;
+    $tokenPair = null;
+    $userData = null;
     if ($isNewUser) {
         // 新用戶：重定向到註冊頁面
         $redirectUrl = $frontendUrl . '/#/signup?token=' . urlencode($oauthToken) . '&provider=facebook&is_new_user=true';
@@ -220,17 +223,22 @@ try {
             'user_id' => $user['id'],
             'email' => $user['email'] ?? '',
             'name' => $user['name'],
-            'iat' => time(),
-            'exp' => time() + (60 * 60 * 24 * 7) // 7 天過期
         ];
         
-        $token = JWTManager::generateToken($payload);
+        $tokenPair = JWTManager::generateTokenPair($payload);
+        $token = $tokenPair['access_token'];
         
         $userData = [
             'id' => $user['id'],
             'name' => $user['name'] ?? '',
             'email' => $user['email'] ?? '',
             'provider' => 'facebook',
+            'token' => $token,
+            'access_token' => $token,
+            'refresh_token' => $tokenPair['refresh_token'],
+            'token_type' => $tokenPair['token_type'],
+            'expires_in' => $tokenPair['expires_in'],
+            'refresh_expires_in' => $tokenPair['refresh_expires_in'],
         ];
         
         $redirectUrl = $frontendUrl . '/#/home';
@@ -239,6 +247,7 @@ try {
             'provider' => 'facebook',
             'is_new_user' => false,
             'token' => $token,
+            'refresh_token' => $tokenPair['refresh_token'],
             'user_data' => $userData,
             'redirect_url' => $redirectUrl
         ];
@@ -255,6 +264,7 @@ try {
             'is_new_user' => $isNewUser,
             'oauth_token' => $isNewUser ? $oauthToken : null,
             'token' => $isNewUser ? null : $token,
+            'refresh_token' => $isNewUser ? null : ($tokenPair['refresh_token'] ?? null),
             'user_data' => $isNewUser ? null : $userData,
             'redirect_url' => $redirectUrl
         ];

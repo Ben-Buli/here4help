@@ -1063,7 +1063,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                     ),
                     labelText: 'Phone number *',
                     border: const OutlineInputBorder(),
-                    hintText: 'Taiwan format: 09xxxxxxxx or +8869xxxxxxxx',
+                    hintText: '09xxxxxxxx or +8869xxxxxxxx',
                   ),
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),

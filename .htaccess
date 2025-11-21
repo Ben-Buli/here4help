@@ -33,6 +33,14 @@ AddType application/json .json
 RewriteCond %{REQUEST_URI} ^/api/admin [NC]
 RewriteRule ^ admin/index.php [L]
 
+RewriteCond %{REQUEST_URI} ^/account/reset-password [NC]
+RewriteRule ^ admin/index.php [L]
+
+# Admin reset password requests (both GET and POST) hit Laravel
+# Handle both /admin/reset-password and /here4help/admin/reset-password
+RewriteCond %{REQUEST_URI} ^(/here4help)?/admin/reset-password [NC]
+RewriteRule ^.*$ admin/index.php [L]
+
 RewriteCond %{REQUEST_URI} ^/api/ [NC]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

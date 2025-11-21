@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\UserActivityController;
 use App\Http\Controllers\Admin\UserTransactionController;
 use App\Http\Controllers\Admin\AdminPingController;
+use App\Http\Controllers\Admin\AdminAccountController;
 use App\Http\Controllers\Admin\PointPolicyController;
 use App\Http\Controllers\Admin\FAQController;
 use App\Http\Controllers\Admin\AppTermsController;
@@ -45,6 +46,7 @@ Route::prefix('admin')->group(function () {
             Route::get('/{id}/verification', [UserController::class, 'verification'])->middleware('admin:users.view');
             Route::get('/{id}/intro-referral-info', [UserController::class, 'introReferralInfo'])->middleware('admin:users.view');
             Route::get('/{id}/terms-history', [UserController::class, 'termsHistory'])->middleware('admin:users.view');
+            Route::post('/{id}/password-reset-link', [UserController::class, 'passwordResetLink'])->middleware('admin:users.edit');
         });
 
         // 任務管理
@@ -128,8 +130,12 @@ Route::prefix('admin')->group(function () {
             Route::post('/update-order', [FAQController::class, 'updateOrder']);
         });
 
-        // 管理員列表 / 系統資訊
-        Route::get('/admins', [AdminPingController::class, 'admins'])->middleware('admin:admins.list');
+        // 管理員帳號管理
+        Route::prefix('admins')->group(function () {
+            Route::get('/', [AdminAccountController::class, 'index'])->middleware('admin:admins.list');
+            Route::post('/{id}/password-reset-link', [AdminAccountController::class, 'passwordResetLink'])->middleware('admin:admins.edit');
+        });
+
         Route::get('/dashboard', [AdminPingController::class, 'dashboard']);
     });
 });

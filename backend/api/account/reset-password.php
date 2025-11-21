@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 require_once __DIR__ . '/../../config/env_loader.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/UserActiveLogger.php';
 
 // CORS headers
 header('Content-Type: application/json');
@@ -59,13 +60,13 @@ try {
         throw new Exception('New password and confirmation do not match');
     }
     
-    // 密碼強度檢查
-    if (strlen($newPassword) < 8) {
-        throw new Exception('Password must be at least 8 characters long');
+    // 密碼強度檢查（對齊 Flutter App 使用者註冊規則）
+    if (strlen($newPassword) < 6) {
+        throw new Exception('Password must be at least 6 characters long');
     }
     
-    if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/', $newPassword)) {
-        throw new Exception('Password must contain at least one uppercase letter, one lowercase letter, and one number');
+    if (!preg_match('/^[A-Za-z0-9]+$/', $newPassword)) {
+        throw new Exception('Password can only contain letters and numbers');
     }
     
     // 建立資料庫連線
@@ -74,7 +75,7 @@ try {
     
     // 驗證重設 token
     $stmt = $pdo->prepare("
-        SELECT evt.user_id, evt.created_at, u.email 
+        SELECT evt.user_id, evt.created_at, evt.created_by, evt.created_by_name, u.email 
         FROM email_verification_tokens evt
         JOIN users u ON evt.user_id = u.id
         WHERE evt.token = ? AND u.email = ? AND evt.type = 'password_reset' 
@@ -136,10 +137,46 @@ try {
             json_encode([
                 'email' => $email,
                 'reset_token_created_at' => $resetRecord['created_at'],
+                'reset_requested_by_admin_id' => $resetRecord['created_by'] ?? null,
+                'reset_requested_by_admin_name' => $resetRecord['created_by_name'] ?? null,
                 'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
             ]),
             $_SERVER['REMOTE_ADDR'] ?? 'unknown'
         ]);
+
+        try {
+            $metadata = [
+                'email' => $email,
+                'reset_token_created_at' => $resetRecord['created_at'],
+                'reset_requested_by_admin_id' => $resetRecord['created_by'] ?? null,
+                'reset_requested_by_admin_name' => $resetRecord['created_by_name'] ?? null,
+            ];
+
+            $reason = $resetRecord['created_by']
+                ? sprintf(
+                    'Reset link issued by admin %s (#%s)',
+                    $resetRecord['created_by_name'] ?? 'unknown',
+                    $resetRecord['created_by']
+                )
+                : 'Self-service password reset';
+
+            UserActiveLogger::logAction(
+                $pdo,
+                (int)$user['id'],
+                'password_reset_completed',
+                'password',
+                null,
+                'updated',
+                $reason,
+                'user',
+                (int)$user['id'],
+                null,
+                null,
+                $metadata
+            );
+        } catch (Exception $logError) {
+            // swallow logging errors
+        }
         
         // 提交交易
         $pdo->commit();

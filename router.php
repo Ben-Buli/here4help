@@ -46,6 +46,23 @@ if (
     exit();
 }
 
+// Laravel-powered admin password reset (both GET and POST)
+if ($path === '/admin/reset-password') {
+    $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/admin/index.php';
+    $_SERVER['REQUEST_URI'] = '/admin/reset-password';
+    require $_SERVER['SCRIPT_FILENAME'];
+    exit();
+}
+
+// Laravel-powered user password reset page
+if ($path === '/account/reset-password') {
+    $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/admin/index.php';
+    $_SERVER['REQUEST_URI'] = '/account/reset-password';
+    require $_SERVER['SCRIPT_FILENAME'];
+    exit();
+}
+
+
 // 管理後臺靜態資源
 if (strpos($path, '/admin/assets/') === 0) {
     $assetPath = __DIR__ . '/admin/public' . $path;
