@@ -464,5 +464,23 @@ bool isValidShellPage(String path) {
   // 移除查詢參數，只檢查路徑
   final cleanPath = Uri.parse(path).path;
 
-  return shellPages.any((page) => page['path'] == cleanPath);
+  // 允許匹配子路徑（例如 /account/support/contact/chat）
+  // shellPages 可能包含 routes: [] 的子路由，需要展開檢查。
+  final allPaths = <String>[];
+  for (final page in shellPages) {
+    final basePath = page['path'] as String?;
+    if (basePath == null || basePath.isEmpty) continue;
+    allPaths.add(basePath);
+
+    final subRoutes = page['routes'];
+    if (subRoutes is List) {
+      for (final sub in subRoutes) {
+        if (sub is Map && sub['path'] is String) {
+          allPaths.add('$basePath/${sub['path']}');
+        }
+      }
+    }
+  }
+
+  return allPaths.any((p) => cleanPath == p || cleanPath.startsWith('$p/'));
 }

@@ -118,8 +118,8 @@ try {
         AND EXISTS (
             SELECT 1 FROM tasks t
             WHERE t.id = cr.task_id
-            AND t.status_id NOT IN (1,2,3,4) -- 1: open, 2: in_progress, 3: pending_confirmation, 4: dispute
-        ) -- 如果該聊天室對應的任務status_id 尚未完成，則該聊天室為活躍的聊天室
+            AND t.status_id IN (1,2,3,4) -- 1: open, 2: in_progress, 3: pending_confirmation, 4: dispute
+        ) -- 如果該聊天室對應的任務仍處於進行狀態，則該聊天室為活躍的聊天室
     ");
     $activeChatStmt->execute([$userId, $userId]);
     $activeChatCount = $activeChatStmt->fetch(PDO::FETCH_ASSOC)['count'];
@@ -238,10 +238,19 @@ try {
             if ($pdo->inTransaction()) { $pdo->rollBack(); }
         } catch (Throwable $_) {}
     }
-    http_response_code(400);
+    $rawMessage = $e->getMessage();
+    $isSqlError = $e instanceof PDOException || (is_string($rawMessage) && str_contains($rawMessage, 'SQLSTATE'));
+
+    // 避免在 production 直接回傳資料庫錯誤細節到前端
+    $message = $rawMessage;
+    if ($isSqlError && !EnvLoader::isDevelopment()) {
+        $message = 'Server error. Please try again later.';
+    }
+
+    http_response_code($isSqlError ? 500 : 400);
     echo json_encode([
         'success' => false,
-        'message' => $e->getMessage()
+        'message' => $message
     ]);
 }
 ?>

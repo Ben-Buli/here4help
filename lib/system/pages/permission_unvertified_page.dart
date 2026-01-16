@@ -62,6 +62,7 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
   }
 
   Widget _buildVerificationContent() {
+    final infoMessage = _verificationIntroMessage();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -79,7 +80,7 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Your registration is almost complete. Our team is reviewing the student ID you submitted. You will gain full access as soon as it is approved.',
+                  infoMessage,
                   style: TextStyle(
                     color: Colors.blue.shade900,
                     fontSize: 16,
@@ -95,7 +96,8 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: _isLoadingVerification ? null : _loadVerificationStatus,
+            onPressed:
+                _isLoadingVerification ? null : _refreshVerificationAndUser,
             icon: _isLoadingVerification
                 ? const SizedBox(
                     width: 20,
@@ -427,6 +429,25 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
     );
   }
 
+  String _verificationIntroMessage() {
+    if (_verificationData == null || _verificationData!.isEmpty) {
+      return 'We have not received a student ID submission yet. Please return to the onboarding flow to upload your document.';
+    }
+
+    final status =
+        (_verificationData!['verification_status'] ?? 'pending').toString();
+
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return 'Your student ID is approved. Tap Refresh Status to update your access.';
+      case 'rejected':
+        return 'Your student ID was rejected. Please resubmit your document from the onboarding flow.';
+      case 'pending':
+      default:
+        return 'Your registration is almost complete. Our team is reviewing the student ID you submitted. You will gain full access as soon as it is approved.';
+    }
+  }
+
   Widget _buildStatusRow(
       {required IconData icon, required String label, required String value}) {
     return Padding(
@@ -518,6 +539,8 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         if (decoded['success'] == true && decoded['data'] != null) {
+          await _syncPermissionFromVerification(
+              Map<String, dynamic>.from(decoded['data'] as Map));
           setState(() {
             _verificationData =
                 Map<String, dynamic>.from(decoded['data'] as Map);
@@ -546,6 +569,43 @@ class _PermissionUnverifiedPageState extends State<PermissionUnverifiedPage> {
           _isLoadingVerification = false;
         });
       }
+    }
+  }
+
+  Future<void> _syncPermissionFromVerification(
+      Map<String, dynamic> verificationData) async {
+    if (!mounted) return;
+
+    final rawPermission = verificationData['permission'];
+    final parsedPermission = rawPermission is int
+        ? rawPermission
+        : int.tryParse(rawPermission?.toString() ?? '');
+
+    if (parsedPermission == null) return;
+
+    final permissionProvider =
+        Provider.of<PermissionProvider>(context, listen: false);
+    if (permissionProvider.permission != parsedPermission) {
+      permissionProvider.updatePermission(parsedPermission);
+    }
+
+    final userService = Provider.of<UserService>(context, listen: false);
+    final currentUser = userService.currentUser;
+    if (currentUser != null && currentUser.permission != parsedPermission) {
+      await userService.setUser(
+        currentUser.copyWith(permission: parsedPermission),
+      );
+    }
+  }
+
+  Future<void> _refreshVerificationAndUser() async {
+    await _loadVerificationStatus();
+
+    final status = (_verificationData?['verification_status'] ?? 'pending')
+        .toString()
+        .toLowerCase();
+    if (status == 'approved') {
+      await _refreshUserData();
     }
   }
 

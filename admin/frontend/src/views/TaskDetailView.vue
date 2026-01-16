@@ -646,6 +646,11 @@ const submitOperation = async () => {
     return
   }
 
+  if (operationReason.value.trim().length < 10) {
+    alert('Reason must be at least 10 characters to proceed.')
+    return
+  }
+
   if (!window.confirm('This action cannot be undone. Are you sure you want to proceed?')) {
     return
   }

@@ -4,6 +4,8 @@ require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * 管理員處理任務爭議
+ * ✅ Legacy PHP endpoint (Flutter / 使用者端仍透過此路徑)
+ * Vue Admin 已改接 Laravel /api/admin/task-disputes/resolve
  * POST /api/admin/task-disputes/resolve
  */
 

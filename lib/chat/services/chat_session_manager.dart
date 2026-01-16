@@ -112,9 +112,9 @@ class ChatSessionManager {
     final sourceTab = session['sourceTab'] as String?;
     switch (sourceTab) {
       case 'posted-tasks':
-        return '/chat/posted-tasks';
+        return '/chat';
       case 'my-works':
-        return '/chat/my-works';
+        return '/chat';
       case 'support':
         return '/account/support';
       default:

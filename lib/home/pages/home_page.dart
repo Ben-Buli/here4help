@@ -16,6 +16,7 @@ import 'package:here4help/auth/services/auth_service.dart';
 // import 'package:here4help/services/theme_config_manager.dart'; // 已註解 - Achievements 功能暫時停用
 import 'package:here4help/utils/image_helper.dart';
 import 'package:here4help/providers/rating_provider.dart';
+import 'package:here4help/providers/permission_provider.dart';
 import 'package:here4help/services/rating_service.dart';
 // import 'package:here4help/providers/achievement_provider.dart'; // 已註解 - Achievements 功能暫時停用
 import 'package:here4help/config/app_config.dart';
@@ -106,6 +107,7 @@ class _HomePageState extends State<HomePage> {
         final data = json.decode(response.body);
         if (data['success'] == true && data['data'] != null) {
           final verificationData = data['data'] as Map<String, dynamic>;
+          await _syncPermissionFromVerification(verificationData);
           final status = (verificationData['verification_status'] ?? '')
               .toString()
               .toLowerCase();
@@ -155,6 +157,31 @@ class _HomePageState extends State<HomePage> {
           _isCheckingStudentVerification = false;
         });
       }
+    }
+  }
+
+  Future<void> _syncPermissionFromVerification(
+      Map<String, dynamic> verificationData) async {
+    if (!mounted) return;
+
+    final rawPermission = verificationData['permission'];
+    final parsedPermission = rawPermission is int
+        ? rawPermission
+        : int.tryParse(rawPermission?.toString() ?? '');
+
+    if (parsedPermission == null) return;
+
+    final permissionProvider = context.read<PermissionProvider>();
+    if (permissionProvider.permission != parsedPermission) {
+      permissionProvider.updatePermission(parsedPermission);
+    }
+
+    final userService = context.read<UserService>();
+    final currentUser = userService.currentUser;
+    if (currentUser != null && currentUser.permission != parsedPermission) {
+      await userService.setUser(
+        currentUser.copyWith(permission: parsedPermission),
+      );
     }
   }
 

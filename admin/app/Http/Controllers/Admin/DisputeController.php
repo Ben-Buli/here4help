@@ -601,7 +601,8 @@ class DisputeController extends Controller
     }
 
     /**
-     * 解決任務爭議
+     * 解決任務爭議（提供給 Vue Admin 使用）
+     * 注意：Flutter App 仍使用 legacy PHP API (backend/api/admin/task-disputes/resolve.php)
      * POST /api/admin/task-disputes/resolve
      */
     public function resolveDispute(Request $request)
@@ -609,7 +610,7 @@ class DisputeController extends Controller
         try {
             $validator = Validator::make($request->all(), [
                 'dispute_id' => 'required|string',
-                'decision' => 'required|in:approve_creator,approve_participant,reject',
+                'decision' => 'required|in:completed,back_to_progress,reset',
                 'note' => 'required|string|max:1000'
             ]);
 
@@ -625,48 +626,247 @@ class DisputeController extends Controller
             $decision = $request->decision;
             $note = $request->note;
             $admin = $request->user();
+            $now = now();
 
             DB::beginTransaction();
 
-            // 更新爭議狀態
-            $updated = DB::table('task_dispute_events')
+            $dispute = DB::table('task_dispute_events as tde')
+                ->join('tasks as t', 'tde.task_id', '=', 't.id')
+                ->leftJoin('task_statuses as ts', 't.status_id', '=', 'ts.id')
+                ->select([
+                    'tde.id as dispute_id',
+                    'tde.status as dispute_status',
+                    'tde.decision_result',
+                    'tde.user_id as dispute_user_id',
+                    'tde.task_id',
+                    'tde.title',
+                    'tde.description',
+                    'tde.created_at',
+                    'tde.updated_at',
+                    't.reward_point',
+                    't.creator_id',
+                    't.participant_id',
+                    't.title as task_title',
+                    't.status_id as current_task_status_id',
+                    'ts.code as current_task_status_code',
+                ])
+                ->where('tde.id', $disputeId)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$dispute) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dispute not found'
+                ], 404);
+            }
+
+            if ($dispute->dispute_status === 'resolved') {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dispute has already been resolved'
+                ], 409);
+            }
+
+            $statusMap = DB::table('task_statuses')
+                ->whereIn('code', ['open', 'in_progress', 'completed'])
+                ->pluck('id', 'code')
+                ->map(fn($id) => (int)$id)
+                ->toArray();
+
+            foreach (['open', 'in_progress', 'completed'] as $code) {
+                if (!isset($statusMap[$code])) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Task status '{$code}' is not configured in task_statuses table"
+                    ], 500);
+                }
+            }
+
+            $taskId = $dispute->task_id;
+            $creatorId = (int)$dispute->creator_id;
+            $participantId = $dispute->participant_id ? (int)$dispute->participant_id : null;
+            $taskTitle = $dispute->task_title ?? 'Task dispute';
+            $payoutMeta = null;
+            $newTaskStatusId = (int)$dispute->current_task_status_id;
+            $newTaskStatusCode = $dispute->current_task_status_code;
+
+            switch ($decision) {
+                case 'completed':
+                    if (!$participantId) {
+                        throw new \RuntimeException('Task has no participant to reward');
+                    }
+                    $amount = (int)round($dispute->reward_point ?? 0);
+                    if ($amount <= 0) {
+                        throw new \RuntimeException('Task reward must be greater than zero to complete');
+                    }
+
+                    DB::table('tasks')->where('id', $taskId)->update([
+                        'status_id' => $statusMap['completed'],
+                        'updated_at' => $now
+                    ]);
+
+                    DB::table('task_applications')
+                        ->where('task_id', $taskId)
+                        ->where('user_id', $participantId)
+                        ->update([
+                            'status' => 'completed',
+                            'updated_at' => $now
+                        ]);
+
+                    DB::table('users')->where('id', $creatorId)->decrement('points', $amount);
+                    DB::table('users')->where('id', $participantId)->increment('points', $amount);
+
+                    DB::table('point_transactions')->insert([
+                        [
+                            'user_id' => $creatorId,
+                            'transaction_type' => 'spend',
+                            'amount' => -abs($amount),
+                            'description' => "Task payment: {$taskTitle}",
+                            'related_task_id' => $taskId,
+                            'status' => 'completed',
+                            'created_at' => $now,
+                        ],
+                        [
+                            'user_id' => $participantId,
+                            'transaction_type' => 'earn',
+                            'amount' => abs($amount),
+                            'description' => "Task completed: {$taskTitle}",
+                            'related_task_id' => $taskId,
+                            'status' => 'completed',
+                            'created_at' => $now,
+                        ],
+                    ]);
+
+                    $metadata = [
+                        'task_id' => $taskId,
+                        'task_title' => $taskTitle,
+                        'amount' => $amount,
+                        'decision' => $decision,
+                        'dispute_id' => $disputeId,
+                    ];
+                    $this->logUserActivity($request, $creatorId, 'task_completion_payment', $admin->id, $metadata);
+                    $this->logUserActivity($request, $participantId, 'task_completion_earning', $admin->id, $metadata);
+
+                    $payoutMeta = [
+                        'amount' => $amount,
+                        'from_user_id' => $creatorId,
+                        'to_user_id' => $participantId,
+                    ];
+                    $newTaskStatusId = $statusMap['completed'];
+                    $newTaskStatusCode = 'completed';
+                    break;
+
+                case 'back_to_progress':
+                    DB::table('tasks')->where('id', $taskId)->update([
+                        'status_id' => $statusMap['in_progress'],
+                        'updated_at' => $now
+                    ]);
+
+                    if ($participantId) {
+                        DB::table('task_applications')
+                            ->where('task_id', $taskId)
+                            ->where('user_id', $participantId)
+                            ->update([
+                                'status' => 'in_progress',
+                                'updated_at' => $now
+                            ]);
+                    }
+
+                    $newTaskStatusId = $statusMap['in_progress'];
+                    $newTaskStatusCode = 'in_progress';
+                    break;
+
+                case 'reset':
+                    DB::table('tasks')->where('id', $taskId)->update([
+                        'status_id' => $statusMap['open'],
+                        'participant_id' => null,
+                        'updated_at' => $now
+                    ]);
+
+                    if ($participantId) {
+                        DB::table('task_applications')
+                            ->where('task_id', $taskId)
+                            ->where('user_id', $participantId)
+                            ->update([
+                                'status' => 'rejected',
+                                'updated_at' => $now
+                            ]);
+                    }
+
+                    $newTaskStatusId = $statusMap['open'];
+                    $newTaskStatusCode = 'open';
+                    break;
+            }
+
+            DB::table('task_dispute_events')
                 ->where('id', $disputeId)
                 ->update([
                     'status' => 'resolved',
                     'decision_result' => $decision,
                     'decision_note' => $note,
                     'admin_id' => $admin->id,
-                    'updated_at' => now()
+                    'updated_at' => $now
                 ]);
 
-            if (!$updated) {
-                DB::rollBack();
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Dispute not found or already resolved'
-                ], 404);
-            }
+            DB::table('task_dispute_event_logs')->insert([
+                'event_id' => is_numeric($disputeId) ? (int)$disputeId : $disputeId,
+                'admin_id' => $admin->id,
+                'old_status' => $dispute->dispute_status,
+                'new_status' => 'resolved',
+                'old_decision' => $dispute->decision_result,
+                'new_decision' => $decision,
+                'note' => $note,
+                'created_at' => $now
+            ]);
 
-            // 記錄活動日誌
             try {
                 AdminActivityLog::create([
                     'admin_id' => $admin->id,
                     'action' => 'resolve',
                     'table_name' => 'task_dispute_events',
-                    'record_id' => is_numeric($disputeId) ? (int)$disputeId : null, // 確保 record_id 是整數
+                    'record_id' => is_numeric($disputeId) ? (int)$disputeId : null,
                     'description' => "Admin resolved dispute {$disputeId} with decision: {$decision}",
-                    'old_data' => null,
+                    'old_data' => json_encode([
+                        'status' => $dispute->dispute_status,
+                        'decision' => $dispute->decision_result
+                    ]),
                     'new_data' => json_encode([
                         'dispute_id' => $disputeId,
                         'decision' => $decision,
-                        'note' => $note
+                        'note' => $note,
+                        'task_status_code' => $newTaskStatusCode
                     ]),
                     'ip_address' => $request->ip(),
                     'user_agent' => $request->userAgent(),
                 ]);
             } catch (\Exception $logException) {
                 Log::error("Failed to log admin activity for resolve: " . $logException->getMessage());
-                // 繼續執行，不因為日誌失敗而中斷
+            }
+
+            $chatRoom = DB::table('chat_rooms')
+                ->where('task_id', $taskId)
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if ($chatRoom) {
+                try {
+                    DB::table('chat_messages')->insert([
+                        'room_id' => $chatRoom->id,
+                        'from_user_id' => $dispute->dispute_user_id,
+                        'content' => "Dispute resolved: {$decision}\nAdmin note: {$note}",
+                        'kind' => 'system',
+                        'created_at' => $now,
+                    ]);
+                } catch (\Exception $messageException) {
+                    Log::warning('Failed to insert system message for dispute resolution', [
+                        'task_id' => $taskId,
+                        'error' => $messageException->getMessage(),
+                    ]);
+                }
             }
 
             DB::commit();
@@ -678,8 +878,11 @@ class DisputeController extends Controller
                     'dispute_id' => $disputeId,
                     'decision' => $decision,
                     'note' => $note,
+                    'task_status_code' => $newTaskStatusCode,
+                    'task_status_id' => $newTaskStatusId,
                     'resolved_by' => $admin->username ?? $admin->full_name,
-                    'resolved_at' => now()->toDateTimeString()
+                    'resolved_at' => $now->toDateTimeString(),
+                    'payout' => $payoutMeta,
                 ]
             ]);
 
@@ -690,6 +893,32 @@ class DisputeController extends Controller
                 'success' => false,
                 'message' => 'Server error occurred'
             ], 500);
+        }
+    }
+
+    private function logUserActivity(Request $request, int $userId, string $action, int $adminId, array $metadata = []): void
+    {
+        try {
+            DB::table('user_active_log')->insert([
+                'user_id' => $userId,
+                'actor_type' => 'admin',
+                'actor_id' => $adminId,
+                'action' => $action,
+                'field' => 'points',
+                'old_value' => null,
+                'new_value' => null,
+                'reason' => 'admin_dispute_resolution',
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'metadata' => json_encode($metadata),
+                'created_at' => now()
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to write user_active_log for dispute resolution', [
+                'user_id' => $userId,
+                'action' => $action,
+                'error' => $e->getMessage()
+            ]);
         }
     }
 

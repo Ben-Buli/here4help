@@ -65,7 +65,7 @@ try {
     $db = Database::getInstance()->getConnection();
     
     // 檢查用戶是否存在
-    $userStmt = $db->prepare("SELECT id, email FROM users WHERE id = ?");
+    $userStmt = $db->prepare("SELECT id, email, permission FROM users WHERE id = ?");
     $userStmt->execute([$userId]);
     $user = $userStmt->fetch(PDO::FETCH_ASSOC);
     
@@ -100,6 +100,7 @@ try {
         Response::success([
             'has_verification' => false,
             'verification_status' => null,
+            'permission' => (int)($user['permission'] ?? 0),
             'message' => 'No student verification record found'
         ]);
         return;
@@ -115,6 +116,7 @@ try {
         'student_id' => $verification['student_id'],
         'student_id_image_path' => $verification['student_id_image_path'],
         'verification_status' => $verification['verification_status'],
+        'permission' => (int)($user['permission'] ?? 0),
         'verification_notes' => $verification['verification_notes'],
         'created_at' => $verification['created_at'],
         'updated_at' => $verification['updated_at']

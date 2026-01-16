@@ -20,7 +20,9 @@ if [ ! -d "node_modules" ]; then
 fi
 
 # 啟動 Socket.IO 服務器
-echo "🔌 Starting Socket.IO server on port 3001..."
+PORT_TO_USE=${1:-${PORT:-3000}}
+export PORT="$PORT_TO_USE"
+echo "🔌 Starting Socket.IO server on port ${PORT_TO_USE}..."
 npm start
 
 # 如果沒有 npm start 腳本，直接運行 server.js

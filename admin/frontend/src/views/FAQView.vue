@@ -212,10 +212,15 @@ const loadFAQs = async () => {
   try {
     const response = await api.get(API_ENDPOINTS.faq.list())
     // 確保 items 陣列存在，並驗證每個 FAQ 都有有效的 ID
-    faqs.value = (response.data.data?.items || response.data.data || []).map((faq: any) => ({
-      ...faq,
-      id: faq.id ? Number(faq.id) : undefined
-    })).filter((faq: any) => faq.id !== undefined)
+    faqs.value = (response.data.data?.items || response.data.data || [])
+      .map((faq: any, idx: number) => ({
+        ...faq,
+        id: faq.id ? Number(faq.id) : undefined,
+        // 後端返回的 0/1 或 '0'/'1' 正規化為 boolean，避免 toggle 判斷錯誤
+        is_active: faq.is_active === true || faq.is_active === 1 || faq.is_active === '1',
+        sort_order: faq.sort_order ? Number(faq.sort_order) : idx + 1,
+      }))
+      .filter((faq: any) => faq.id !== undefined)
   } catch (error) {
     console.error('Failed to load FAQs:', error)
     alert('Failed to load FAQs')
@@ -346,6 +351,9 @@ const toggleEditMode = async () => {
       savingOrder.value = false
       saveOrderSuccess.value = false
       alert(`Failed to update FAQ order: ${error.response?.data?.message || error.message || 'Unknown error'}`)
+    } finally {
+      // 確保按鈕恢復可用狀態
+      savingOrder.value = false
     }
   } else {
     isEditMode.value = true

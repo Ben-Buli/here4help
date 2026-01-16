@@ -21,7 +21,6 @@ import 'package:here4help/chat/services/support_chat_service.dart'
 import 'package:here4help/services/rating_service.dart';
 import 'package:here4help/services/user_info_service.dart';
 import 'package:here4help/chat/services/socket_service.dart';
-import 'package:here4help/services/wallet_service.dart';
 import 'package:here4help/chat/services/support_chat_storage_service.dart';
 import 'package:here4help/services/media/cross_platform_image_service.dart';
 import 'package:here4help/chat/models/image_upload_status.dart';
@@ -6579,16 +6578,16 @@ class _ConfirmPayDialogState extends State<_ConfirmPayDialog> {
 
   /// 上半部 - 說明文字 + 手續費說明
   Widget _buildUpperSection() {
-    return Column(
+    return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 說明文字
-        const Text(
+        Text(
           'Please confirm the task is completed and agree to release payment to the assignee.',
           style: TextStyle(fontSize: 14),
         ),
-        const SizedBox(height: 8),
-        const Text(
+        SizedBox(height: 8),
+        Text(
           'Reward points will be transferred in full to the assignee after you confirm completion.',
           style: TextStyle(fontSize: 14),
         ),

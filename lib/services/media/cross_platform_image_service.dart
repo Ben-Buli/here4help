@@ -195,11 +195,24 @@ class CrossPlatformImageService {
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        if (response.body.isNotEmpty) {
+          return jsonDecode(response.body);
+        }
+        return {'success': true};
       } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Upload failed');
+        String message = 'Upload failed';
+        try {
+          final error = jsonDecode(response.body);
+          if (error is Map && error['message'] != null) {
+            message = error['message'].toString();
+          }
+        } catch (_) {
+          if (response.body.isNotEmpty) {
+            message = response.body;
+          }
+        }
+        throw Exception(message);
       }
     } catch (e) {
       throw Exception('上傳失敗: $e');

@@ -30,30 +30,34 @@ class UserActiveLogger {
         ?string $traceId = null,
         ?array $metadata = null
     ): void {
-        $stmt = $pdo->prepare("
-            INSERT INTO user_active_log
-                (user_id, actor_type, actor_id, action, field, old_value, new_value, reason, ip, user_agent, request_id, trace_id, metadata, created_at)
-            VALUES
-                (:user_id, :actor_type, :actor_id, :action, :field, :old_value, :new_value, :reason, :ip, :user_agent, :request_id, :trace_id, :metadata, NOW())
-        ");
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO user_active_log
+                    (user_id, actor_type, actor_id, action, field, old_value, new_value, reason, ip, user_agent, request_id, trace_id, metadata, created_at)
+                VALUES
+                    (:user_id, :actor_type, :actor_id, :action, :field, :old_value, :new_value, :reason, :ip, :user_agent, :request_id, :trace_id, :metadata, NOW())
+            ");
 
-        $ip = $_SERVER['REMOTE_ADDR'] ?? null;
-        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? null;
+            $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+            $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? null;
 
-        $stmt->execute([
-            ':user_id'    => $userId,
-            ':actor_type' => $actorType,
-            ':actor_id'   => $actorId,
-            ':action'     => $action,
-            ':field'      => $field,
-            ':old_value'  => $oldValue,
-            ':new_value'  => $newValue,
-            ':reason'     => $reason,
-            ':ip'         => $ip,
-            ':user_agent' => $userAgent,
-            ':request_id' => $requestId,
-            ':trace_id'   => $traceId,
-            ':metadata'   => $metadata ? json_encode($metadata) : null,
-        ]);
+            $stmt->execute([
+                ':user_id'    => $userId,
+                ':actor_type' => $actorType,
+                ':actor_id'   => $actorId,
+                ':action'     => $action,
+                ':field'      => $field,
+                ':old_value'  => $oldValue,
+                ':new_value'  => $newValue,
+                ':reason'     => $reason,
+                ':ip'         => $ip,
+                ':user_agent' => $userAgent,
+                ':request_id' => $requestId,
+                ':trace_id'   => $traceId,
+                ':metadata'   => $metadata ? json_encode($metadata) : null,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('Failed to record user active log: ' . $e->getMessage());
+        }
     }
 }

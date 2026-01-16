@@ -3,6 +3,21 @@ import 'package:here4help/services/http_client_service.dart';
 import 'package:here4help/config/app_config.dart';
 
 class PasswordApi {
+  static Exception _toUserFacingException(Object e) {
+    final message = e.toString();
+
+    // 後端若回傳 SQL / PDO 例外，避免直接顯示資料庫細節到前端
+    final looksLikeSql =
+        message.contains('SQLSTATE') || message.contains('Unknown column');
+    if (looksLikeSql) {
+      return Exception('Server error. Please try again later.');
+    }
+
+    // 去掉預設 Exception prefix，讓 UI 顯示更乾淨
+    final cleaned = message.replaceFirst('Exception: ', '');
+    return Exception(cleaned);
+  }
+
   /// 變更密碼
   static Future<Map<String, dynamic>> changePassword({
     required String currentPassword,
@@ -28,7 +43,7 @@ class PasswordApi {
         throw Exception(error['message'] ?? 'Failed to change password');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      throw _toUserFacingException('Network error: $e');
     }
   }
 
@@ -53,7 +68,7 @@ class PasswordApi {
         throw Exception(error['message'] ?? 'Failed to request password reset');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      throw _toUserFacingException('Network error: $e');
     }
   }
 
@@ -84,7 +99,7 @@ class PasswordApi {
         throw Exception(error['message'] ?? 'Failed to reset password');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      throw _toUserFacingException('Network error: $e');
     }
   }
 
@@ -116,7 +131,7 @@ class PasswordApi {
         throw Exception(error['message'] ?? 'Failed to delete account');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      throw _toUserFacingException('Network error: $e');
     }
   }
 }

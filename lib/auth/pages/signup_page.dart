@@ -1,7 +1,6 @@
 // signup_page.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_html/flutter_html.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:here4help/task/services/language_service.dart';
@@ -13,6 +12,8 @@ import 'dart:convert';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/auth/services/signup_draft_service.dart';
 import 'package:here4help/services/terms_service.dart';
+import 'package:here4help/account/pages/terms_of_use_page.dart';
+import 'package:here4help/widgets/terms_consent_dialog.dart';
 
 class SignupPage extends StatefulWidget {
   final Map<String, dynamic>? oauthData;
@@ -379,43 +380,21 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
       return;
     }
 
-    final dialogHeight = MediaQuery.of(context).size.height * 0.6;
-    final agreed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          title: Text(
-            activeTerms!.title.isNotEmpty ? activeTerms!.title : 'Terms of Use',
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            height: dialogHeight,
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Version ${activeTerms!.version}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 12),
-                  Html(data: activeTerms!.content),
-                ],
-              ),
+    final agreed = await TermsConsentDialog.show(
+      context,
+      terms: activeTerms!,
+      onAccept: () async {
+        // 註冊階段僅需記錄本地狀態，真正寫入資料庫在學生證提交時進行
+      },
+      onViewFullTerms: () {
+        if (context.mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const TermsOfUsePage(),
+              fullscreenDialog: true,
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Close'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Agree'),
-            ),
-          ],
-        );
+          );
+        }
       },
     );
 

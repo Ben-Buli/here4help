@@ -3,6 +3,8 @@ import 'package:here4help/config/app_config.dart';
 import 'package:here4help/services/http_client_service.dart';
 
 /// 任務爭議 API 服務
+/// ⚠️ Flutter/使用者端仍透過 legacy PHP endpoints (`/task-disputes/*.php`)
+/// Vue Admin 則改走 Laravel Admin API，不要共用路徑避免權限混淆
 class DisputeApi {
   static String get _baseUrl => AppConfig.api('/task-disputes');
 

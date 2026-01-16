@@ -252,7 +252,8 @@ const savePolicy = async () => {
     }
 
     await loadPolicies()
-    closeEditor()
+    initialSnapshot.value = serializeFormState()
+    showEditor.value = false
   } catch (error) {
     console.error('Failed to save point policy', error)
     alert('Failed to save point policy')

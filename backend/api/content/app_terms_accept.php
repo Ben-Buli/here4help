@@ -97,6 +97,6 @@ try {
         ],
     ], 'Terms accepted');
 } catch (Exception $e) {
-    Response::serverError('Failed to record acceptance: ' . $e->getMessage());
+    error_log('app_terms_accept failed: ' . $e->getMessage());
+    Response::serverError('Failed to record acceptance. Please try again later.');
 }
-

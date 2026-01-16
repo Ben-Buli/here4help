@@ -23,8 +23,8 @@ class PlatformInfoHelper {
         final model = info.model.trim();
         final version = info.version.release;
         return [
-          if (manufacturer != null && manufacturer.isNotEmpty) manufacturer,
-          if (model != null && model.isNotEmpty) model,
+          if (manufacturer.isNotEmpty) manufacturer,
+          if (model.isNotEmpty) model,
           if (version.isNotEmpty) '(Android $version)',
         ].join(' ').trim();
       }

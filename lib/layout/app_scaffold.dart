@@ -72,6 +72,9 @@ class _AppScaffoldState extends State<AppScaffold> {
   };
 
   double _dragOffset = 0.0;
+  bool _routeRecordScheduled = false;
+  int? _currentTabIndex;
+  int? _previousTabIndex;
 
   // 靜態方法來獲取當前的路由歷史
   static _AppScaffoldState? _currentInstance;
@@ -80,6 +83,7 @@ class _AppScaffoldState extends State<AppScaffold> {
   void initState() {
     super.initState();
     _currentInstance = this;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scheduleRecordRoute());
   }
 
   @override
@@ -148,40 +152,53 @@ class _AppScaffoldState extends State<AppScaffold> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _scheduleRecordRoute();
+  }
 
-    // 檢查 Widget 是否仍然被掛載且可以安全存取 context
+  void _scheduleRecordRoute() {
+    if (_routeRecordScheduled) return;
+    _routeRecordScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _routeRecordScheduled = false;
+      _recordCurrentRoute();
+    });
+  }
+
+  void _recordCurrentRoute() {
     if (!mounted) return;
 
     try {
       final raw = GoRouterState.of(context).uri.toString();
       final currentPath = _normalizeRoute(raw);
 
-      // 檢查當前路徑是否為有效的 shell page
-      if (currentPath.isNotEmpty && !_isSystemPage(currentPath)) {
-        if (!isValidShellPage(currentPath)) {
-          debugPrint('🚫 無效路徑檢測到: $currentPath，重定向到 404');
-          // 延遲執行重定向，避免在 build 過程中修改路由
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              context.go('/page-not-found', extra: currentPath);
-            }
-          });
-          return;
-        }
+      if (currentPath.isEmpty) return;
+
+      // 檢查當前路徑是否為有效的 shell page（支援子路徑）
+      if (!_isSystemPage(currentPath) && !isValidShellPage(currentPath)) {
+        debugPrint('🚫 無效路徑檢測到: $currentPath，重定向到 404');
+        if (!mounted) return;
+        context.go('/page-not-found', extra: currentPath);
+        return;
       }
 
       // 只將非系統頁面加入路由歷史，避免系統頁面污染歷史記錄
-      if (currentPath.isNotEmpty && !_isSystemPage(currentPath)) {
+      if (!_isSystemPage(currentPath)) {
         if (_routeHistory.isEmpty || _routeHistory.last != currentPath) {
           _routeHistory.add(currentPath);
-          debugPrint('📝 路由歷史更新: $currentPath (歷史長度: ${_routeHistory.length})');
+          debugPrint(
+              '📝 路由歷史更新: $currentPath (歷史長度: ${_routeHistory.length})');
         }
-      } else if (_isSystemPage(currentPath)) {
-        debugPrint('🚫 系統頁面跳過歷史記錄: $currentPath');
+      }
+
+      // 記錄底部 Tab 切換歷史（Android 硬體返回需要用到）
+      final idx = _getCurrentIndex(context);
+      _currentTabIndex ??= idx;
+      if (idx != _currentTabIndex) {
+        _previousTabIndex = _currentTabIndex;
+        _currentTabIndex = idx;
       }
     } catch (e) {
       // 如果無法存取 GoRouterState，忽略這次更新
-      // 這可能發生在 Widget 樹重建期間
       debugPrint('Failed to access GoRouterState: $e');
     }
   }
@@ -205,12 +222,32 @@ class _AppScaffoldState extends State<AppScaffold> {
       }
 
       // 檢查是否在聊天室中，如果是，使用會話管理器的返回路徑
-      if (await ChatSessionManager.isInChatRoom()) {
+      final chatSession = await ChatSessionManager.getCurrentChatSession();
+      if (chatSession != null) {
         final returnPath = await ChatSessionManager.getReturnPath();
+        final sourceTab = chatSession['sourceTab'] as String?;
+
         debugPrint('🔙 從聊天室返回到: ${returnPath ?? '(history fallback)'}');
         await ChatSessionManager.clearCurrentChatSession(); // 清除會話
+        if (!mounted) return;
+
         if (returnPath != null && returnPath.isNotEmpty) {
           context.go(returnPath);
+
+          // 若返回 /chat，依來源 tab 還原分頁（避免使用不存在的 /chat/xxx 路由）
+          if (returnPath == '/chat') {
+            final int? tabIndex = switch (sourceTab) {
+              'posted-tasks' => ChatListProvider.tabPostedTasks,
+              'my-works' => ChatListProvider.tabMyWorks,
+              _ => null,
+            };
+            if (tabIndex != null) {
+              Future.microtask(() {
+                ChatListProvider.instance?.switchTab(tabIndex);
+              });
+            }
+          }
+
           return;
         }
       }
@@ -240,16 +277,31 @@ class _AppScaffoldState extends State<AppScaffold> {
         if (targetPath != null && targetIndex >= 0) {
           // 移除當前路徑和目標路徑之後的所有路徑
           _routeHistory.removeRange(targetIndex + 1, _routeHistory.length);
+          if (!mounted) return;
           context.go(targetPath);
         } else {
+          if (!mounted) return;
           Navigator.of(context).maybePop();
         }
       } else {
+        // 沒有路由歷史可用時：Android 常見預期為「回到上一個 Tab」而不是直接退出 App
+        if (!mounted) return;
+        final currentIndex = _getCurrentIndex(context);
+        if (widget.showBottomNav && currentIndex != 0) {
+          final int? prevIndex = _previousTabIndex;
+          final targetIndex = (prevIndex != null && prevIndex != currentIndex)
+              ? prevIndex
+              : 0;
+          context.go(_navigationItems[targetIndex].route);
+          return;
+        }
+
         Navigator.of(context).maybePop();
       }
     } catch (e) {
       // 備用方案
       debugPrint('❌ 返回操作失敗: $e');
+      if (!mounted) return;
       Navigator.of(context).maybePop();
     }
   }
@@ -436,6 +488,7 @@ class _AppScaffoldState extends State<AppScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    _scheduleRecordRoute();
     return PopScope(
       canPop: false, // 阻止默認的 pop 行為，由我們自定義處理
       onPopInvoked: (didPop) async {
@@ -732,6 +785,13 @@ class _AppScaffoldState extends State<AppScaffold> {
     }
 
     if (_routeHistory.length <= 1) {
+      // 若在底部 Tab（非 Home），提供返回（切回上一個 Tab / Home）
+      try {
+        final currentIndex = _getCurrentIndex(context);
+        if (widget.showBottomNav && currentIndex != 0) {
+          return true;
+        }
+      } catch (_) {}
       return false;
     }
 
