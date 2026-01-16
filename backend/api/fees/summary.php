@@ -36,7 +36,7 @@ try {
     $whereConditions = ['1=1'];
     $params = [];
     
-    if ($feeType && in_array($feeType, ['task_completion'])) {
+    if ($feeType && in_array($feeType, ['task_completion', 'withdrawal_fee'])) {
         $whereConditions[] = 'fee_type = ?';
         $params[] = $feeType;
     }

@@ -1,20 +1,20 @@
 <?php
 class UserActiveLogger {
     /**
-     * 紀錄使用者行為
+     * 紀錄使用者行為 / Log user activity
      *
-     * @param PDO $pdo              PDO 連線
-     * @param int $userId           受影響的 user_id
-     * @param string $action        動作名稱（例如: register, deactivate, reactivate, profile_update, avatar_upload）
-     * @param string|null $field    變更的欄位名稱（例如: status, permission；沒有就傳 null）
-     * @param string|null $oldValue 舊值
-     * @param string|null $newValue 新值
-     * @param string|null $reason   操作原因或描述
-     * @param string $actorType     操作者類型：user | admin | system
-     * @param int|null $actorId     操作者 ID（對應 users.id 或 admins.id，system 可為 NULL）
-     * @param string|null $requestId 可選，用於追蹤請求 id
-     * @param string|null $traceId   可選，用於分散式 trace
-     * @param array|null $metadata   額外資料，會以 JSON 儲存
+     * @param PDO $pdo               PDO 連線 / PDO connection
+     * @param int $userId            受影響的 user_id / affected user_id
+     * @param string $action         動作名稱（例如: register, deactivate, reactivate, profile_update, avatar_upload）/ action name
+     * @param string|null $field     變更的欄位名稱（例如: status, permission；沒有就傳 null）/ changed field name
+     * @param string|null $oldValue  舊值 / old value
+     * @param string|null $newValue  新值 / new value
+     * @param string|null $reason    操作原因或描述 / reason or description
+     * @param string $actorType      操作者類型：user | admin | system / actor type
+     * @param int|null $actorId      操作者 ID（對應 users.id 或 admins.id，system 可為 NULL）/ actor id
+     * @param string|null $requestId 可選，用於追蹤請求 id / request id
+     * @param string|null $traceId   可選，用於分散式 trace / trace id
+     * @param array|null $metadata   額外資料，會以 JSON 儲存 / metadata stored as JSON
      */
     public static function logAction(
         PDO $pdo,

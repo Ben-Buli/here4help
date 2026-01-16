@@ -121,8 +121,7 @@
             <tr>
               <th>Percentage</th>
               <th>Status</th>
-              <th>Created Time</th>
-              <th>Updated Time</th>
+              <th>Setting Date</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">
@@ -140,9 +139,6 @@
               </td>
               <td class="text-sm text-gray-500">
                 {{ formatDate(item.created_at) }}
-              </td>
-              <td class="text-sm text-gray-500">
-                {{ formatDate(item.updated_at) }}
               </td>
             </tr>
           </tbody>

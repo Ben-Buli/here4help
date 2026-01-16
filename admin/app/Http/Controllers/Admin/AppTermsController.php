@@ -92,8 +92,6 @@ class AppTermsController extends Controller
 
             $db->beginTransaction();
             try {
-                $db->exec('UPDATE app_terms SET is_active = 0');
-
                 $title = $request->input('title', $baseTerm['title']);
                 $summary = $request->input('summary', $baseTerm['summary']);
                 $content = $request->input('content', $baseTerm['content']);
@@ -101,9 +99,10 @@ class AppTermsController extends Controller
                     ? $request->boolean('requires_ack')
                     : (int)($baseTerm['requires_ack'] ?? 1) === 1;
 
+                // 先插入新記錄，is_active = 0
                 $insert = $db->prepare("
                     INSERT INTO app_terms (slug, type, title, summary, content, is_active, requires_ack, created_by, created_at, updated_at, published_at)
-                    VALUES (?, ?, ?, ?, ?, 1, ?, ?, NOW(), NOW(), NOW())
+                    VALUES (?, ?, ?, ?, ?, 0, ?, ?, NOW(), NOW(), NOW())
                 ");
                 $insert->execute([
                     $this->generateNewSlug($baseTerm['slug'] ?? null),
@@ -116,6 +115,15 @@ class AppTermsController extends Controller
                 ]);
 
                 $newId = (int)$db->lastInsertId();
+
+                // 將所有其他記錄設為 inactive
+                $deactivate = $db->prepare("UPDATE app_terms SET is_active = 0 WHERE id != ?");
+                $deactivate->execute([$newId]);
+
+                // 將新記錄設為 active
+                $activate = $db->prepare("UPDATE app_terms SET is_active = 1 WHERE id = ?");
+                $activate->execute([$newId]);
+
                 $db->commit();
 
                 $this->recordAdminActivity(

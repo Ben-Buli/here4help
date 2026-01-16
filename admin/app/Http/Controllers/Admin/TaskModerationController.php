@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class TaskModerationController extends Controller
@@ -20,6 +21,12 @@ class TaskModerationController extends Controller
         ]);
 
         if ($validator->fails()) {
+            Log::channel('admin_ops')->warning('Task moderation validation failed', [
+                'task_id' => $taskId,
+                'admin_id' => $request->user()?->id,
+                'errors' => $validator->errors()->toArray(),
+                'payload_keys' => array_keys($request->all()),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
@@ -43,20 +50,21 @@ class TaskModerationController extends Controller
             ], 422);
         }
 
-        return DB::transaction(function () use ($taskId, $action, $reason, $admin, $request) {
-            $task = DB::table('tasks as t')
-                ->leftJoin('task_statuses as ts', 't.status_id', '=', 'ts.id')
-                ->select('t.*', 'ts.code as status_code', 'ts.display_name as status_display')
-                ->lockForUpdate()
-                ->where('t.id', $taskId)
-                ->first();
+        try {
+            return DB::transaction(function () use ($taskId, $action, $reason, $admin, $request) {
+                $task = DB::table('tasks as t')
+                    ->leftJoin('task_statuses as ts', 't.status_id', '=', 'ts.id')
+                    ->select('t.*', 'ts.code as status_code', 'ts.display_name as status_display')
+                    ->lockForUpdate()
+                    ->where('t.id', $taskId)
+                    ->first();
 
-            if (!$task) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Task not found'
-                ], 404);
-            }
+                if (!$task) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Task not found'
+                    ], 404);
+                }
 
             $statusCode = $task->status_code ?? null;
             $allowedStatuses = ['open', 'in_progress', 'pending_confirmation'];
@@ -181,14 +189,26 @@ class TaskModerationController extends Controller
                     ], 422);
             }
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Task updated successfully',
-                'data' => [
-                    'task_id' => (int) $task->id,
-                    'action' => $action
-                ]
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Task updated successfully',
+                    'data' => [
+                        'task_id' => (int) $task->id,
+                        'action' => $action
+                    ]
+                ]);
+            });
+        } catch (\Throwable $e) {
+            Log::channel('admin_ops')->error('Task moderation failed', [
+                'task_id' => $taskId,
+                'admin_id' => $admin?->id,
+                'action' => $action,
+                'exception' => $e->getMessage(),
             ]);
-        });
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to update the task right now. Please try again later.'
+            ], 500);
+        }
     }
 }

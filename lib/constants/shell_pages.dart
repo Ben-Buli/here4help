@@ -17,6 +17,7 @@ import 'package:here4help/account/pages/support_page.dart';
 import 'package:here4help/account/pages/terms_of_use_page.dart';
 import 'package:here4help/account/pages/theme_settings_page.dart';
 import 'package:here4help/account/pages/wallet_page.dart';
+import 'package:here4help/account/pages/wallet_withdraw_page.dart';
 import 'package:here4help/account/pages/point_history_page.dart';
 
 // ==================== auth 模組 ====================
@@ -291,6 +292,16 @@ final List<Map<String, dynamic>> shellPages = [
     'showBackArrow': true,
     'icon': Icons.history,
     'permission': 0, // 需要已認證用戶才能查看點數歷史
+  },
+  {
+    'path': '/account/wallet/withdraw',
+    'child': const WalletWithdrawPage(),
+    'title': 'Withdraw Request',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'icon': Icons.output_outlined,
+    'permission': 1, // 需要已認證用戶才能申請提領
   },
   {
     'path': '/account/wallet/point_policy',

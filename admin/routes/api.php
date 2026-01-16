@@ -96,6 +96,10 @@ Route::prefix('admin')->group(function () {
             Route::get('/requests', [PaymentController::class, 'requests']);
             Route::post('/requests/{id}/approve', [PaymentController::class, 'approve']);
             Route::post('/requests/{id}/reject', [PaymentController::class, 'reject']); // 新增 reject 路由
+            Route::get('/withdraw-requests', [PaymentController::class, 'withdrawRequests']);
+            Route::post('/withdraw-requests/{id}/approve', [PaymentController::class, 'approveWithdraw']);
+            Route::post('/withdraw-requests/{id}/reject', [PaymentController::class, 'rejectWithdraw']);
+            Route::post('/withdraw-requests/{id}/paid', [PaymentController::class, 'markWithdrawPaid']);
             Route::match(['get', 'post'], '/fee-settings', [PaymentController::class, 'feeSettings']);
             Route::match(['get', 'post'], '/official-accounts', [PaymentController::class, 'officialAccounts']);
         });

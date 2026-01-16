@@ -45,13 +45,21 @@
             <svg v-if="savingOrder" class="w-4 h-4 mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            <svg v-else-if="saveOrderSuccess" class="w-4 h-4 mr-2 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-            </svg>
-            <svg v-else class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-            <span>{{ savingOrder ? 'Saving...' : saveOrderSuccess ? 'Saved!' : 'Save Order' }}</span>
+            <transition name="fade">
+              <span v-if="saveOrderSuccess" class="inline-flex items-center">
+                <svg class="w-4 h-4 mr-2 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                </svg>
+                <span>Saved!</span>
+              </span>
+            </transition>
+            <span v-if="!savingOrder && !saveOrderSuccess" class="inline-flex items-center">
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+              </svg>
+              <span>Save Order</span>
+            </span>
+            <span v-if="savingOrder">Saving...</span>
           </template>
           <template v-else>
             <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -338,11 +346,11 @@ const toggleEditMode = async () => {
         saveOrderSuccess.value = true
         await loadFAQs()
         
-        // 2秒後重置成功狀態並退出編輯模式
+        // 1秒後重置成功狀態並退出編輯模式
         setTimeout(() => {
           saveOrderSuccess.value = false
           isEditMode.value = false
-        }, 2000)
+        }, 1000)
       } else {
         throw new Error(response.data.message || 'Failed to save order')
       }
@@ -443,3 +451,20 @@ onMounted(() => {
   loadFAQs()
 })
 </script>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.fade-enter-to,
+.fade-leave-from {
+  opacity: 1;
+}
+</style>

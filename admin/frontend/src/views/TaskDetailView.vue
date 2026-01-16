@@ -665,7 +665,22 @@ const submitOperation = async () => {
     closeOperationModal()
     await loadTask()
   } catch (err: any) {
-    alert(err.response?.data?.message || err.message || 'Failed to update task')
+    const status = err.response?.status
+    const message = err.response?.data?.message
+    const errors = err.response?.data?.errors
+    let userMessage = 'Operation failed. Please try again.'
+
+    if (status === 422 && errors?.reason?.length) {
+      userMessage = errors.reason[0]
+    } else if (message === 'Resolve pending reports before performing this action.') {
+      userMessage = 'Please resolve pending reports before cancelling this task.'
+    } else if (message === 'Task status does not allow moderation.') {
+      userMessage = 'This task status cannot be cancelled.'
+    } else if (message && message !== 'Validation failed') {
+      userMessage = message
+    }
+
+    alert(userMessage)
   } finally {
     operationSubmitting.value = false
   }

@@ -1,0 +1,437 @@
+/**
+ * 共用富文本編輯器樣式
+ * 用於 TipTap 編輯器的統一樣式
+ */
+
+/* ========== 工具列樣式 ========== */
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 9999px;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+.toolbar-group.table-tools {
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #4b5563;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toolbar-btn:hover {
+  background-color: #f3f4f6;
+  color: #0891b2;
+}
+
+.toolbar-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #22d3ee40;
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toolbar-btn.active {
+  background-color: #ecfeff;
+  color: #0891b2;
+  border-color: #a5f3fc;
+  box-shadow: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+}
+
+.toolbar-btn.icon-only {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  font-size: 1rem;
+}
+
+.toolbar-btn.text-pill {
+  padding: 0.375rem 0.75rem;
+  min-width: 2.5rem;
+}
+
+.toolbar-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.toolbar-svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: currentColor;
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 1.5rem;
+  background-color: #e5e7eb;
+  margin: 0 0.25rem;
+}
+
+/* ========== 編輯器外殼樣式 ========== */
+.editor-shell {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background-color: white;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  overflow: hidden;
+}
+
+.editor-shell:focus-within {
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 3px #22d3ee20;
+}
+
+/* ========== ProseMirror 編輯區域樣式 ========== */
+.editor-shell .ProseMirror {
+  min-height: 320px;
+  padding: 1.25rem;
+  background-color: #fff;
+  outline: none;
+  font-size: 1rem;
+  line-height: 1.625;
+  color: #1f2937;
+}
+
+.editor-shell .ProseMirror:focus {
+  outline: none;
+}
+
+/* Placeholder 樣式 */
+.editor-shell .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #9ca3af;
+  pointer-events: none;
+  height: 0;
+}
+
+/* ========== 段落樣式 ==========
+ * Flutter p: margin-bottom 16, line-height 1.5
+ */
+.editor-shell .ProseMirror p {
+  margin: 0 0 1rem; /* 16px - 與 Flutter Margins.only(bottom: 16) 對應 */
+  line-height: 1.5;
+}
+
+.editor-shell .ProseMirror p:last-child {
+  margin-bottom: 0;
+}
+
+/* ========== 標題樣式 ==========
+ * 注意：這些樣式與 Flutter 端 point_policy_page.dart 保持一致
+ * Flutter h1: 24px, bold
+ * Flutter h2: 20px, bold, primary color
+ * Flutter h3: 18px, semibold
+ */
+.editor-shell .ProseMirror h1 {
+  font-size: 1.5rem; /* 24px - 與 Flutter FontSize(24) 對應 */
+  font-weight: 700;
+  margin: 1rem 0 1rem;
+  color: #111827;
+  line-height: 1.25;
+}
+
+.editor-shell .ProseMirror h1:first-child {
+  margin-top: 0;
+}
+
+.editor-shell .ProseMirror h2 {
+  font-size: 1.25rem; /* 20px - 與 Flutter FontSize(20) 對應 */
+  font-weight: 700;
+  margin: 0.5rem 0 0.75rem;
+  color: #0891b2; /* cyan-600，與 Flutter AppColors.primary 對應 */
+  line-height: 1.3;
+}
+
+.editor-shell .ProseMirror h2:first-child {
+  margin-top: 0;
+}
+
+.editor-shell .ProseMirror h3 {
+  font-size: 1.125rem; /* 18px - 與 Flutter FontSize(18) 對應 */
+  font-weight: 600;
+  margin: 0.5rem 0 0.625rem;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.editor-shell .ProseMirror h3:first-child {
+  margin-top: 0;
+}
+
+.editor-shell .ProseMirror h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0.5rem;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+.editor-shell .ProseMirror h4:first-child {
+  margin-top: 0;
+}
+
+/* ========== 文字格式樣式 ========== */
+.editor-shell .ProseMirror strong {
+  font-weight: 700;
+}
+
+.editor-shell .ProseMirror em {
+  font-style: italic;
+}
+
+.editor-shell .ProseMirror u {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.editor-shell .ProseMirror s {
+  text-decoration: line-through;
+}
+
+.editor-shell .ProseMirror code {
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.875em;
+}
+
+/* ========== 清單樣式 ==========
+ * Flutter ul/ol: margin-left 20, margin-bottom 16
+ * Flutter li: margin-bottom 8
+ */
+.editor-shell .ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.25rem; /* 20px - 與 Flutter Margins.only(left: 20) 對應 */
+  margin: 0.5rem 0 1rem;
+}
+
+.editor-shell .ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.editor-shell .ProseMirror li {
+  margin-bottom: 0.5rem; /* 8px - 與 Flutter Margins.only(bottom: 8) 對應 */
+}
+
+.editor-shell .ProseMirror li p {
+  margin: 0;
+}
+
+.editor-shell .ProseMirror li::marker {
+  color: #6b7280;
+}
+
+/* 巢狀清單樣式 */
+.editor-shell .ProseMirror ul ul,
+.editor-shell .ProseMirror ol ol,
+.editor-shell .ProseMirror ul ol,
+.editor-shell .ProseMirror ol ul {
+  margin: 0.25rem 0;
+}
+
+.editor-shell .ProseMirror ul ul {
+  list-style-type: circle;
+}
+
+.editor-shell .ProseMirror ul ul ul {
+  list-style-type: square;
+}
+
+/* ========== 表格樣式 ==========
+ * Flutter table: margin top/bottom 12
+ * Flutter th: padding 12, bg grey.shade100, fontWeight 600
+ * Flutter td: padding 12
+ */
+.editor-shell .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0; /* 12px - 與 Flutter Margins.only(top: 12, bottom: 12) 對應 */
+  table-layout: fixed;
+}
+
+.editor-shell .ProseMirror table td,
+.editor-shell .ProseMirror table th {
+  border: 1px solid #d1d5db;
+  padding: 0.75rem; /* 12px - 與 Flutter HtmlPaddings.all(12) 對應 */
+  vertical-align: top;
+  position: relative;
+}
+
+.editor-shell .ProseMirror table th {
+  background-color: #f3f4f6; /* grey.shade100 */
+  font-weight: 600;
+  color: #374151;
+  text-align: left;
+}
+
+.editor-shell .ProseMirror table td {
+  background-color: #fff;
+}
+
+/* 表格選中狀態 */
+.editor-shell .ProseMirror .selectedCell::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: #22d3ee20;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* 表格欄位拖曳調整大小的把手 */
+.editor-shell .ProseMirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: #22d3ee;
+  cursor: col-resize;
+  z-index: 20;
+}
+
+.editor-shell .ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+
+/* ========== 引用區塊樣式 ========== */
+.editor-shell .ProseMirror blockquote {
+  border-left: 4px solid #22d3ee;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* ========== 分隔線樣式 ========== */
+.editor-shell .ProseMirror hr {
+  border: none;
+  border-top: 2px solid #e5e7eb;
+  margin: 1.5rem 0;
+}
+
+/* ========== 程式碼區塊樣式 ========== */
+.editor-shell .ProseMirror pre {
+  background-color: #1f2937;
+  color: #f9fafb;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.editor-shell .ProseMirror pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+/* ========== Bubble Menu 氣泡選單樣式 ========== */
+.bubble-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.25rem;
+  background-color: #1f2937;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.bubble-menu .toolbar-btn {
+  color: #f3f4f6;
+  padding: 0.375rem;
+  border-radius: 0.25rem;
+}
+
+.bubble-menu .toolbar-btn:hover {
+  background-color: #374151;
+  color: #fff;
+}
+
+.bubble-menu .toolbar-btn.active {
+  background-color: #0891b2;
+  color: #fff;
+}
+
+.bubble-menu .toolbar-divider {
+  background-color: #4b5563;
+  height: 1.25rem;
+}
+
+/* ========== Floating Menu 浮動選單樣式 ========== */
+.floating-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem;
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.floating-menu .toolbar-btn {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* ========== 選取狀態樣式 ========== */
+.editor-shell .ProseMirror ::selection {
+  background-color: #a5f3fc;
+}
+
+/* ========== 連結樣式 ========== */
+.editor-shell .ProseMirror a {
+  color: #0891b2;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.editor-shell .ProseMirror a:hover {
+  color: #0e7490;
+}

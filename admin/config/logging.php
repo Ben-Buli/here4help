@@ -72,6 +72,14 @@ return [
             'days' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,
         ],
+        'admin_ops' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/admin_ops.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
+            'tap' => [App\Logging\CustomizeAdminOpsLog::class],
+        ],
 
         'slack' => [
             'driver' => 'slack',

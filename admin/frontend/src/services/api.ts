@@ -499,6 +499,21 @@ export const paymentApi = {
   approve: (id: number, note?: string) => api.post<ApiResponse>(`/api/admin/payment/requests/${id}/approve`, { note }),
   reject: (id: number, note?: string) => api.post<ApiResponse>(`/api/admin/payment/requests/${id}/reject`, { note }),
 
+  withdrawRequests: (params?: {
+    page?: number
+    per_page?: number
+    status?: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'paid'
+    from_date?: string
+    to_date?: string
+  }) => api.get<PaginatedResponse<any>>('/api/admin/payment/withdraw-requests', { params }),
+
+  approveWithdraw: (id: number, note?: string) =>
+    api.post<ApiResponse>(`/api/admin/payment/withdraw-requests/${id}/approve`, { note }),
+  rejectWithdraw: (id: number, note?: string) =>
+    api.post<ApiResponse>(`/api/admin/payment/withdraw-requests/${id}/reject`, { note }),
+  markWithdrawPaid: (id: number) =>
+    api.post<ApiResponse>(`/api/admin/payment/withdraw-requests/${id}/paid`, {}),
+
   getFeeSettings: () => api.get<ApiResponse<{ items: any[] }>>('/api/admin/payment/fee-settings'),
   setFeeSettings: (percentage: number) => api.post<ApiResponse>('/api/admin/payment/fee-settings', { percentage }),
 

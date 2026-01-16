@@ -213,6 +213,12 @@ const router = createRouter({
           meta: { title: 'Deposit Requests' },
         },
         {
+          path: 'withdraw-requests',
+          name: 'payment-withdraw-requests',
+          component: () => import('../components/wallet/WithdrawApprovalPage.vue'),
+          meta: { title: 'Withdraw Requests' },
+        },
+        {
           path: 'fee-settings',
           name: 'payment-fee-settings',
           component: () => import('../components/wallet/FeeManagementPage.vue'),

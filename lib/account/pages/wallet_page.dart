@@ -702,8 +702,7 @@ class _WalletPageState extends State<WalletPage> {
                       color: Theme.of(context).colorScheme.primary),
                   title: const Text('Withdraw Request'),
                   onTap: () {
-                    // TODO: Withdraw Request
-                    GoRouter.of(context).go('/TODO: Withdraw Request');
+                    GoRouter.of(context).go('/account/wallet/withdraw');
                   },
                 ),
                 const Divider(height: 1),

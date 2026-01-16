@@ -29,118 +29,104 @@
       </div>
 
       <!-- 導航選單 -->
-      <nav class="flex-1 mt-8 px-4 space-y-2 overflow-y-auto">
-        <template v-for="item in navigation" :key="item.name">
-          <!-- 一般選單項目 -->
-          <router-link
-            v-if="!item.children"
-            :to="item.href"
-            class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200"
-            :class="[
-              $route.path === item.href || $route.path.startsWith(item.href + '/')
-                ? 'bg-cyan-100 text-cyan-700 border-r-2 border-cyan-500'
-                : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900',
-            ]"
-            @click="sidebarOpen = false"
-          >
-            <svg
-              class="mr-3 h-5 w-5 flex-shrink-0"
+      <nav class="flex-1 mt-6 px-3 pb-6 overflow-y-auto">
+        <div
+          v-for="section in navigationSections"
+          :key="section.title"
+          class="space-y-2"
+        >
+          <template v-for="item in section.items" :key="item.name">
+            <!-- 一般選單項目 -->
+            <router-link
+              v-if="!item.children"
+              :to="item.href"
+              class="group flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors duration-150 border-l-4 border-transparent"
               :class="[
                 $route.path === item.href || $route.path.startsWith(item.href + '/')
-                  ? 'text-cyan-500'
-                  : 'text-gray-400 group-hover:text-gray-500',
-              ]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path v-if="item.name === 'Dashboard'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-              <path v-else-if="item.name === 'Users'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.75 7.5a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a7.5 7.5 0 1115 0v.75H4.5v-.75z"></path>
-              <path v-else-if="item.name === 'Admin Management'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.75 7.5a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25v-.75a5.25 5.25 0 015.25-5.25h4.5a5.25 5.25 0 015.25 5.25v.75H4.5z"></path>
-              <path v-else-if="item.name === 'Settings'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-              <circle v-if="item.name === 'Settings'" cx="12" cy="12" r="3"></circle>
-              <path v-else-if="item.name === 'Customer Support'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-              <path v-else-if="item.name === 'Task Management'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-              <path v-else-if="item.name === 'Payments'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
-              <path v-else-if="item.name === 'Logs'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-              <path v-else-if="item.name === 'FAQ Management'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              <path v-else-if="item.name === 'Point Policy'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m-7 5h8a2 2 0 002-2V5a2 2 0 00-2-2H9a2 2 0 00-2 2v14a2 2 0 002 2zm0 0H7a2 2 0 01-2-2V7m12-4v4h4"></path>
-              <path
-  v-else-if="item.name === 'Terms of Use'"
-  stroke-linecap="round"
-  stroke-linejoin="round"
-  stroke-width="2"
-  d="M8 4h8a2 2 0 012 2v12a2 2 0 01-2 2H8a2 2 0 01-2-2V6a2 2 0 012-2zm3 8h5m-5 4h5m-8-8h3"
-></path>            
-            </svg>
-            {{ item.name }}
-          </router-link>
-
-          <!-- 有子選單的項目 -->
-          <div v-else class="space-y-1">
-            <button
-              @click="toggleSubmenu(item.name)"
-              class="group w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200"
-              :class="[
-                $route.path.startsWith(item.href)
-                  ? 'bg-cyan-100 text-cyan-700 border-r-2 border-cyan-500'
+                  ? 'bg-cyan-50 text-cyan-800 border-cyan-500'
                   : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900',
               ]"
+              @click="sidebarOpen = false"
             >
-              <div class="flex items-center w-full relative">
-                <component
-                  :is="getNavIcon(item.name)"
-                  class="mr-3 h-5 w-5 flex-shrink-0"
-                  :class="[
-                    $route.path === item.href || $route.path.startsWith(item.href + '/')
-                      ? 'text-cyan-500'
-                      : 'text-gray-400 group-hover:text-gray-500',
-                  ]"
-                />
-                <span class="pl-3">{{ item.name }}</span>
-              </div>
-              <svg
-                class="w-4 h-4 transition-transform duration-200"
-                :class="{ 'rotate-180': openSubmenus.includes(item.name) }"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            
-            <!-- 子選單 -->
-            <div
-              v-show="openSubmenus.includes(item.name)"
-              class="ml-4 space-y-1"
-            >
-              <router-link
-                v-for="child in item.children"
-                :key="child.name"
-                :to="child.href"
-                class="group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200"
+              <component
+                :is="getNavIcon(item.name)"
+                class="h-5 w-5 flex-shrink-0"
                 :class="[
-                  $route.path === child.href
-                    ? 'bg-cyan-50 text-cyan-600'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                  $route.path === item.href || $route.path.startsWith(item.href + '/')
+                    ? 'text-cyan-500'
+                    : 'text-gray-400 group-hover:text-gray-500',
                 ]"
-                @click="sidebarOpen = false"
+              />
+              {{ item.name }}
+            </router-link>
+
+            <!-- 有子選單的項目 -->
+            <div v-else class="space-y-1">
+              <button
+                @click="toggleSubmenu(item.name)"
+                class="group w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors duration-150 border-l-4 border-transparent"
+                :class="[
+                  isParentActive(item.href)
+                    ? 'bg-cyan-50 text-cyan-800 border-cyan-500'
+                    : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900',
+                ]"
               >
+                <div class="flex items-center gap-3 w-full">
+                  <component
+                    :is="getNavIcon(item.name)"
+                    class="h-5 w-5 flex-shrink-0"
+                    :class="[
+                      isParentActive(item.href)
+                        ? 'text-cyan-500'
+                        : 'text-gray-400 group-hover:text-gray-500',
+                    ]"
+                  />
+                  <span>{{ item.name }}</span>
+                </div>
                 <svg
-                  class="mr-3 h-4 w-4 flex-shrink-0"
-                  :class="[
-                    $route.path === child.href
-                      ? 'text-cyan-500'
-                      : 'text-gray-400 group-hover:text-gray-500',
-                  ]"
-                  :is="getChildIcon(child.name)"
-                />
-                {{ child.name }}
-              </router-link>
+                  class="w-4 h-4 transition-transform duration-200"
+                  :class="{ 'rotate-180': openSubmenus.includes(item.name) }"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              
+              <!-- 子選單 -->
+              <transition name="submenu">
+                <div
+                  v-show="openSubmenus.includes(item.name)"
+                  class="ml-6 pl-4 border-l border-gray-200 space-y-1 overflow-hidden"
+                >
+                  <router-link
+                    v-for="child in item.children"
+                    :key="child.name"
+                    :to="child.href"
+                    class="group flex items-center gap-2 px-2 py-2 text-[13px] font-medium rounded-md transition-colors duration-150"
+                    :class="[
+                      $route.path === child.href
+                        ? 'bg-cyan-50 text-cyan-700'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                    ]"
+                    @click="sidebarOpen = false"
+                  >
+                    <span
+                      class="h-1.5 w-1.5 rounded-full"
+                      :class="[
+                        $route.path === child.href
+                          ? 'bg-cyan-500'
+                          : 'bg-gray-300 group-hover:bg-gray-400',
+                      ]"
+                    ></span>
+                    {{ child.name }}
+                  </router-link>
+                </div>
+              </transition>
             </div>
-          </div>
-        </template>
+          </template>
+        </div>
       </nav>
     </div>
 
@@ -782,16 +768,6 @@ import {
   QuestionMarkCircleIcon,
   AdjustmentsHorizontalIcon,
   DocumentCheckIcon,
-  InboxIcon,
-  ChatBubbleOvalLeftEllipsisIcon,
-  ClipboardDocumentListIcon,
-  ExclamationTriangleIcon,
-  ArrowDownOnSquareStackIcon,
-  ChartBarIcon,
-  BanknotesIcon,
-  QueueListIcon,
-  ArrowsRightLeftIcon,
-  QrCodeIcon,
 } from '@heroicons/vue/24/outline'
 
 
@@ -812,57 +788,92 @@ interface NavigationItem {
   children?: NavigationItem[]
 }
 
-const navigation: NavigationItem[] = [
-  { name: 'Dashboard', href: '/dashboard' },
-  { 
-    name: 'Users', 
-    href: '/users',
-    children: [
-      { name: 'User List', href: '/users' },
-      { name: 'Referral Codes', href: '/users/referral-codes' },
-    ]
+interface NavigationSection {
+  title: string
+  items: NavigationItem[]
+}
+
+const navigationSections: NavigationSection[] = [
+  {
+    title: 'Overview',
+    items: [{ name: 'Dashboard', href: '/dashboard' }],
   },
-  { name: 'Admin Management', href: '/admin-accounts' },
-  { 
-    name: 'Customer Support', 
-    href: '/issues', 
-    children: [
-      { name: 'Issues List', href: '/issues' },
-      { name: 'Support Chat List', href: '/support-chat-list' },
-    ]
+  {
+    title: 'People',
+    items: [
+      {
+        name: 'Users',
+        href: '/users',
+        children: [
+          { name: 'User List', href: '/users' },
+          { name: 'Referral Codes', href: '/users/referral-codes' },
+        ],
+      },
+      { name: 'Admin Management', href: '/admin-accounts' },
+    ],
   },
-  { 
-    name: 'Task Management', 
-    href: '/tasks', 
-    children: [
-      { name: 'All Tasks', href: '/tasks' },
-      { name: 'Task Disputes', href: '/task-disputes' },
-    ]
+  {
+    title: 'Operations',
+    items: [
+      {
+        name: 'Customer Support',
+        href: '/issues',
+        children: [
+          { name: 'Issues List', href: '/issues' },
+          { name: 'Support Chat List', href: '/support-chat-list' },
+        ],
+      },
+      {
+        name: 'Task Management',
+        href: '/tasks',
+        children: [
+          { name: 'All Tasks', href: '/tasks' },
+          { name: 'Task Disputes', href: '/task-disputes' },
+        ],
+      },
+    ],
   },
-  { 
-    name: 'Payments', 
-    href: '/payments/requests', 
-    children: [
-      { name: 'Deposit Requests', href: '/payments/requests' },
-      { name: 'Fee Settings', href: '/payments/fee-settings' },
-      { name: 'Fee Revenue', href: '/payments/fee-revenue' },
-      { name: 'Official Account', href: '/payments/official-account' },
-    ]
+  {
+    title: 'Finance',
+    items: [
+      {
+        name: 'Payments',
+        href: '/payments/requests',
+        children: [
+          { name: 'Deposit Requests', href: '/payments/requests' },
+          { name: 'Withdraw Requests', href: '/payments/withdraw-requests' },
+          { name: 'Fee Settings', href: '/payments/fee-settings' },
+          { name: 'Fee Revenue', href: '/payments/fee-revenue' },
+          { name: 'Official Account', href: '/payments/official-account' },
+        ],
+      },
+    ],
   },
-  { 
-    name: 'Logs', 
-    href: '/logs', 
-    children: [
-      { name: 'System Logs', href: '/logs' },
-      { name: 'User Activities', href: '/user-activities' },
-      { name: 'User Transactions', href: '/user-transactions' },
-    ]
+  {
+    title: 'Audit',
+    items: [
+      {
+        name: 'Logs',
+        href: '/logs',
+        children: [
+          { name: 'System Logs', href: '/logs' },
+          { name: 'User Activities', href: '/user-activities' },
+          { name: 'User Transactions', href: '/user-transactions' },
+        ],
+      },
+    ],
   },
-  { name: 'FAQ Management', href: '/faqs' },
-  { name: 'Point Policy', href: '/point-policies' },
-  { name: 'Terms of Use', href: '/app-terms' },
-  // { name: 'Settings', href: '/settings' },
+  {
+    title: 'Content',
+    items: [
+      { name: 'FAQ Management', href: '/faqs' },
+      { name: 'Point Policy', href: '/point-policies' },
+      { name: 'Terms of Use', href: '/app-terms' },
+    ],
+  },
 ]
+
+const navigationItems = navigationSections.flatMap((section) => section.items)
 
 const navigationIcons: Record<string, any> = {
   'Dashboard': HomeIcon,
@@ -878,24 +889,6 @@ const navigationIcons: Record<string, any> = {
 }
 
 const getNavIcon = (name: string) => navigationIcons[name] || HomeIcon
-
-const childNavigationIcons: Record<string, any> = {
-  'Issues List': InboxIcon,
-  'Support Chat List': ChatBubbleOvalLeftEllipsisIcon,
-  'All Tasks': ClipboardDocumentListIcon,
-  'Task Disputes': ExclamationTriangleIcon,
-  'Deposit Requests': ArrowDownOnSquareStackIcon,
-  'Fee Settings': AdjustmentsHorizontalIcon,
-  'Fee Revenue': ChartBarIcon,
-  'Official Account': BanknotesIcon,
-  'System Logs': DocumentTextIcon,
-  'User Activities': QueueListIcon,
-  'User Transactions': ArrowsRightLeftIcon,
-  'User List': UsersIcon,
-  'Referral Codes': QrCodeIcon,
-}
-
-const getChildIcon = (name: string) => childNavigationIcons[name] || DocumentTextIcon
 
 const AVATAR_STORAGE_PREFIX = 'admin_avatar_choice_'
 
@@ -1026,7 +1019,7 @@ const autoExpandSubmenu = () => {
   const currentPath = route.path
   
   // 查找當前路由對應的父選單
-  for (const item of navigation) {
+  for (const item of navigationItems) {
     if (item.children) {
       const hasActiveChild = item.children.some(child => 
         currentPath === child.href || currentPath.startsWith(child.href + '/')
@@ -1097,5 +1090,20 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* 點擊外部關閉選單的指令 */
+.submenu-enter-active,
+.submenu-leave-active {
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+}
+
+.submenu-enter-from,
+.submenu-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+.submenu-enter-to,
+.submenu-leave-from {
+  max-height: 320px;
+  opacity: 1;
+}
 </style>

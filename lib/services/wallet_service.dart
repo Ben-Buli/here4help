@@ -49,6 +49,138 @@ class WalletService {
     );
   }
 
+  /// 提領手續費設定
+  static Future<WithdrawFeeSettings> getWithdrawFeeSettings(
+      UserService userService) async {
+    try {
+      final response = await ApiClient.get(
+        '/wallet/withdraw-fee-settings.php',
+        useQueryParamToken: true,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+      }
+
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return WithdrawFeeSettings.fromJson(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? 'Failed to load withdraw fee settings');
+      }
+    } catch (e) {
+      throw Exception('Internal error: $e');
+    }
+  }
+
+  /// 提領申請列表
+  static Future<WithdrawRequestsResult> getWithdrawRequests(
+    UserService userService, {
+    int page = 1,
+    int perPage = 20,
+    String? status,
+    String? fromDate,
+    String? toDate,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'per_page': perPage.toString(),
+      };
+
+      if (status != null) {
+        queryParams['status'] = status;
+      }
+      if (fromDate != null) {
+        queryParams['from_date'] = fromDate;
+      }
+      if (toDate != null) {
+        queryParams['to_date'] = toDate;
+      }
+
+      final uri = Uri.parse(AppConfig.api('/wallet/withdraw-requests.php'))
+          .replace(queryParameters: queryParams);
+
+      final response = await HttpClientService.get(
+        uri.toString(),
+        useQueryParamToken: true,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+      }
+
+      final data = json.decode(response.body);
+
+      if (data['success'] == true) {
+        return WithdrawRequestsResult.fromJson(data['data']);
+      } else {
+        throw Exception(data['message'] ?? 'Failed to load withdraw requests');
+      }
+    } catch (e) {
+      throw Exception('Internal error: $e');
+    }
+  }
+
+  /// 送出提領申請
+  static Future<WithdrawCreateResult> createWithdrawRequest(
+    UserService userService, {
+    required int amountPoints,
+  }) async {
+    try {
+      final response = await ApiClient.post(
+        '/wallet/withdraw-requests.php',
+        useQueryParamToken: true,
+        body: {
+          'amount_points': amountPoints,
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+      }
+
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return WithdrawCreateResult.fromJson(data['data']);
+      } else {
+        throw Exception(data['message'] ?? 'Failed to submit withdraw request');
+      }
+    } catch (e) {
+      throw Exception('Internal error: $e');
+    }
+  }
+
+  /// 取消提領申請（僅 pending）
+  static Future<int> cancelWithdrawRequest(
+    UserService userService, {
+    required int requestId,
+  }) async {
+    try {
+      final response = await ApiClient.post(
+        '/wallet/withdraw-requests-cancel.php',
+        useQueryParamToken: true,
+        body: {
+          'request_id': requestId,
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+      }
+
+      final data = json.decode(response.body);
+      if (data['success'] == true) {
+        return data['data']?['request_id'] ?? requestId;
+      } else {
+        throw Exception(data['message'] ?? 'Failed to cancel withdraw request');
+      }
+    } catch (e) {
+      throw Exception('Internal error: $e');
+    }
+  }
+
   /// 格式化點數顯示（千位逗號）
   static String formatPoints(int points) {
     return points.toString().replaceAllMapped(
@@ -245,11 +377,13 @@ class UserInfo {
 class PointsSummary {
   final int totalPoints;
   final int occupiedPoints;
+  final int frozenWithdrawPoints;
   final int availablePoints;
 
   PointsSummary({
     required this.totalPoints,
     required this.occupiedPoints,
+    required this.frozenWithdrawPoints,
     required this.availablePoints,
   });
 
@@ -257,6 +391,7 @@ class PointsSummary {
     return PointsSummary(
       totalPoints: json['total_points'] ?? 0,
       occupiedPoints: json['occupied_points'] ?? 0,
+      frozenWithdrawPoints: json['frozen_withdraw_points'] ?? 0,
       availablePoints: json['available_points'] ?? 0,
     );
   }
@@ -624,4 +759,170 @@ class DepositStatusStats {
       displayName: json['display_name'],
     );
   }
+}
+
+/// 提領手續費設定模型
+class WithdrawFeeSettings {
+  final int id;
+  final double rate;
+  final String? description;
+  final bool isActive;
+  final String? createdAt;
+  final String? updatedAt;
+  final int minWithdrawPoints;
+
+  WithdrawFeeSettings({
+    required this.id,
+    required this.rate,
+    this.description,
+    required this.isActive,
+    this.createdAt,
+    this.updatedAt,
+    required this.minWithdrawPoints,
+  });
+
+  factory WithdrawFeeSettings.fromJson(Map<String, dynamic> json) {
+    final feeSetting = json['fee_setting'] ?? {};
+    return WithdrawFeeSettings(
+      id: feeSetting['id'] ?? 0,
+      rate: (feeSetting['rate'] ?? 0.0).toDouble(),
+      description: feeSetting['description'],
+      isActive: feeSetting['is_active'] == 1 || feeSetting['is_active'] == true,
+      createdAt: feeSetting['created_at'],
+      updatedAt: feeSetting['updated_at'],
+      minWithdrawPoints: json['min_withdraw_points'] ?? 0,
+    );
+  }
+
+  String get ratePercentage => '${(rate * 100).toStringAsFixed(2)}%';
+}
+
+/// 提領申請記錄模型
+class WithdrawRequest {
+  final int id;
+  final int userId;
+  final int amountPoints;
+  final double feeRate;
+  final int feePoints;
+  final int totalDeductPoints;
+  final int netPayoutPoints;
+  final String status;
+  final int? adminId;
+  final String? adminName;
+  final String? adminReply;
+  final String? reviewedAt;
+  final String? paidAt;
+  final String? cancelledAt;
+  final String createdAt;
+  final String updatedAt;
+
+  WithdrawRequest({
+    required this.id,
+    required this.userId,
+    required this.amountPoints,
+    required this.feeRate,
+    required this.feePoints,
+    required this.totalDeductPoints,
+    required this.netPayoutPoints,
+    required this.status,
+    this.adminId,
+    this.adminName,
+    this.adminReply,
+    this.reviewedAt,
+    this.paidAt,
+    this.cancelledAt,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory WithdrawRequest.fromJson(Map<String, dynamic> json) {
+    return WithdrawRequest(
+      id: json['id'],
+      userId: json['user_id'],
+      amountPoints: json['amount_points'],
+      feeRate: (json['fee_rate'] ?? 0.0).toDouble(),
+      feePoints: json['fee_points'],
+      totalDeductPoints: json['total_deduct_points'],
+      netPayoutPoints: json['net_payout_points'],
+      status: json['status'],
+      adminId: json['admin_id'],
+      adminName: json['admin_name'],
+      adminReply: json['admin_reply'],
+      reviewedAt: json['reviewed_at'],
+      paidAt: json['paid_at'],
+      cancelledAt: json['cancelled_at'],
+      createdAt: json['created_at'],
+      updatedAt: json['updated_at'],
+    );
+  }
+
+  bool get isPending => status == 'pending';
+  bool get isApproved => status == 'approved';
+  bool get isRejected => status == 'rejected';
+  bool get isCancelled => status == 'cancelled';
+  bool get isPaid => status == 'paid';
+}
+
+/// 提領申請列表結果
+class WithdrawRequestsResult {
+  final List<WithdrawRequest> requests;
+  final PaginationInfo pagination;
+  final Map<String, dynamic> filters;
+  final int minWithdrawPoints;
+
+  WithdrawRequestsResult({
+    required this.requests,
+    required this.pagination,
+    required this.filters,
+    required this.minWithdrawPoints,
+  });
+
+  factory WithdrawRequestsResult.fromJson(Map<String, dynamic> json) {
+    return WithdrawRequestsResult(
+      requests: (json['requests'] as List)
+          .map((req) => WithdrawRequest.fromJson(req))
+          .toList(),
+      pagination: PaginationInfo.fromJson(json['pagination']),
+      filters: json['filters'] ?? {},
+      minWithdrawPoints: json['min_withdraw_points'] ?? 0,
+    );
+  }
+}
+
+/// 提領建立結果
+class WithdrawCreateResult {
+  final int requestId;
+  final int amountPoints;
+  final double feeRate;
+  final int feePoints;
+  final int totalDeductPoints;
+  final int netPayoutPoints;
+  final String status;
+  final int minWithdrawPoints;
+
+  WithdrawCreateResult({
+    required this.requestId,
+    required this.amountPoints,
+    required this.feeRate,
+    required this.feePoints,
+    required this.totalDeductPoints,
+    required this.netPayoutPoints,
+    required this.status,
+    required this.minWithdrawPoints,
+  });
+
+  factory WithdrawCreateResult.fromJson(Map<String, dynamic> json) {
+    return WithdrawCreateResult(
+      requestId: json['request_id'],
+      amountPoints: json['amount_points'],
+      feeRate: (json['fee_rate'] ?? 0.0).toDouble(),
+      feePoints: json['fee_points'],
+      totalDeductPoints: json['total_deduct_points'],
+      netPayoutPoints: json['net_payout_points'],
+      status: json['status'],
+      minWithdrawPoints: json['min_withdraw_points'] ?? 0,
+    );
+  }
+
+  String get ratePercentage => '${(feeRate * 100).toStringAsFixed(2)}%';
 }

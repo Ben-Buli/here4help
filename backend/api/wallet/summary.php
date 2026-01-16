@@ -61,8 +61,18 @@ try {
     $occupiedResult = $db->fetch($occupiedQuery, [$userId]);
     $occupiedPoints = (int)$occupiedResult['occupied_points'];
     
-    // 3. 計算可用點數
-    $availablePoints = max(0, $totalPoints - $occupiedPoints);
+    // 3. 計算提領凍結點數（pending / approved）
+    $withdrawFrozenQuery = "
+        SELECT COALESCE(SUM(total_deduct_points), 0) AS frozen_points
+        FROM point_withdraw_requests
+        WHERE user_id = ?
+          AND status IN ('pending', 'approved')
+    ";
+    $withdrawFrozenResult = $db->fetch($withdrawFrozenQuery, [$userId]);
+    $frozenPoints = (int)$withdrawFrozenResult['frozen_points'];
+
+    // 4. 計算可用點數
+    $availablePoints = max(0, $totalPoints - $occupiedPoints - $frozenPoints);
     
     // 4. 獲取發布中任務詳情（用於調試和驗證）
     $tasksQuery = "
@@ -96,11 +106,12 @@ try {
         'points_summary' => [
             'total_points' => $totalPoints,
             'occupied_points' => $occupiedPoints,
+            'frozen_withdraw_points' => $frozenPoints,
             'available_points' => $availablePoints
         ],
         'active_tasks' => $formattedTasks,
         'active_tasks_count' => count($formattedTasks),
-        'calculation_note' => 'Available points = Total points - Occupied points (tasks with status_id IN 1,2,3,4,5)'
+        'calculation_note' => 'Available points = Total points - Occupied points (tasks status_id IN 1,2,3,4,5) - Frozen withdraw points'
     ];
     
     Response::success($responseData, 'Wallet summary retrieved successfully');
