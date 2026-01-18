@@ -87,6 +87,8 @@ export const SIMPLE_TOOLBAR_CONFIG: EditorToolbarConfig = {
   underline: true,
   headings: [1, 2, 3, 4],
   paragraph: true,
+  textColor: true,
+  colorPresets: DEFAULT_COLOR_PRESETS,
   bulletList: true,
   orderedList: true,
   history: true,

@@ -29,8 +29,8 @@
               <td colspan="5" class="px-6 py-6 text-center text-gray-500">No terms versions found.</td>
             </tr>
             <tr v-for="term in terms" :key="term.id" class="hover:bg-gray-50">
-              <td class="px-6 py-4 text-sm text-gray-900 font-medium">v{{ term.version }}</td>
-              <td class="px-6 py-4 text-sm text-gray-700">{{ term.title }}</td>
+              <td class="px-6 py-4 text-sm text-gray-900 font-medium break-words">v{{ term.version }}</td>
+              <td class="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{{ term.title }}</td>
               <td class="px-6 py-4">
                 <span
                   class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
@@ -39,7 +39,7 @@
                   {{ term.is_active ? 'Active' : 'Archived' }}
                 </span>
               </td>
-              <td class="px-6 py-4 text-sm text-gray-500">{{ formatDate(term.updated_at) }}</td>
+              <td class="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">{{ formatDate(term.updated_at) }}</td>
               <td class="px-6 py-4 text-right text-sm font-medium space-x-2">
                 <button class="admin-button-secondary !px-4 !py-1 text-sm" @click="openTerm(term.id)">Edit</button>
            
@@ -71,7 +71,7 @@
                 type="text"
                 :maxlength="TITLE_LIMIT"
                 :class="[
-                  'block w-full rounded-lg px-3 py-2 focus-visible:outline-none',
+                  'block w-full rounded-lg px-3 py-2 focus-visible:outline-none border',
                   titleLimitReached
                     ? 'border-red-500 focus:border-red-500 focus:ring-red-500/40'
                     : 'border-gray-200 focus:border-cyan-500 focus:ring-cyan-500/40'
@@ -89,7 +89,7 @@
                 rows="2"
                 :maxlength="SUMMARY_LIMIT"
                 :class="[
-                  'block w-full rounded-lg px-3 py-2 focus-visible:outline-none',
+                  'block w-full rounded-lg px-3 py-2 focus-visible:outline-none border',
                   summaryLimitReached
                     ? 'border-red-500 focus:border-red-500 focus:ring-red-500/40'
                     : 'border-gray-200 focus:border-cyan-500 focus:ring-cyan-500/40'
@@ -222,19 +222,10 @@ const pushTerm = async (id: number) => {
       content: modalForm.content,
       requires_ack: modalForm.requires_ack,
     })
-    const newTerm = response.data?.data as AppTermDetail | undefined
     await loadTerms()
-    if (newTerm) {
-      selectedTerm.value = newTerm
-      modalForm.title = newTerm.title
-      modalForm.summary = newTerm.summary ?? ''
-      modalForm.content = newTerm.content ?? '<p></p>'
-      modalForm.requires_ack = newTerm.requires_ack ?? true
-      showModal.value = true
-    } else if (showModal.value) {
-      await openTerm(id)
-    }
     alert('New terms version published successfully.')
+    // 關閉 modal，讓用戶可以在列表中查看新版本
+    closeModal()
   } catch (error) {
     console.error('Failed to push new terms version', error)
     alert('Failed to push new version')

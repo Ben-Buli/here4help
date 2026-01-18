@@ -34,6 +34,14 @@
       </button>
     </div>
 
+    <!-- 文字顏色 -->
+    <div v-if="config.textColor" class="toolbar-group">
+      <ColorPicker
+        :presets="config.colorPresets"
+        @select="handleColorSelect"
+      />
+    </div>
+
     <!-- 標題 -->
     <div v-if="config.headings?.length || config.paragraph" class="toolbar-group">
       <button
@@ -57,14 +65,6 @@
       >
         P
       </button>
-    </div>
-
-    <!-- 文字顏色 -->
-    <div v-if="config.textColor" class="toolbar-group">
-      <ColorPicker
-        :presets="config.colorPresets"
-        @select="handleColorSelect"
-      />
     </div>
 
     <!-- 清單 -->

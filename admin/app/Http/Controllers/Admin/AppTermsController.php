@@ -105,7 +105,7 @@ class AppTermsController extends Controller
                     VALUES (?, ?, ?, ?, ?, 0, ?, ?, NOW(), NOW(), NOW())
                 ");
                 $insert->execute([
-                    $this->generateNewSlug($baseTerm['slug'] ?? null),
+                    $this->generateNewSlug(),
                     $baseTerm['type'] ?? 'terms',
                     $title,
                     $summary,
@@ -157,11 +157,9 @@ class AppTermsController extends Controller
         }
     }
 
-    private function generateNewSlug(?string $baseSlug): string
+    private function generateNewSlug(): string
     {
-        $prefix = $baseSlug ?: 'terms_of_H4H';
-        $normalized = strtolower(preg_replace('/[^a-z0-9_]+/i', '_', $prefix));
-        return trim($normalized, '_') . '_' . date('YmdHis');
+        return 'terms_' . date('YmdHis');
     }
 
     private function getBackendDB()
