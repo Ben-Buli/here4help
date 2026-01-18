@@ -1,5 +1,15 @@
+<!-- 積分提領審核頁面 -->
 <template>
   <div class="space-y-6">
+    <transition name="toast-fade">
+      <div
+        v-if="toastMessage"
+        class="fixed top-4 right-4 z-50 max-w-sm rounded-lg border px-4 py-3 text-sm shadow-lg"
+        :class="toastClasses"
+      >
+        {{ toastMessage.message }}
+      </div>
+    </transition>
     <div class="md:flex md:items-center md:justify-between">
       <div class="flex-1 min-w-0">
         <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
@@ -238,7 +248,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { paymentApi } from '@/services/api'
 
 const loading = ref(false)
@@ -267,6 +277,31 @@ const selectedWithdraw = ref<any>(null)
 const actionNote = ref('')
 const actionType = ref<'approve' | 'reject'>('approve')
 const actionSubmitting = ref(false)
+const toastMessage = ref<{ message: string; type: 'success' | 'error' } | null>(null)
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+
+const toastClasses = computed(() => {
+  if (!toastMessage.value) return ''
+  return toastMessage.value.type === 'success'
+    ? 'bg-green-50 border-green-200 text-green-800'
+    : 'bg-red-50 border-red-200 text-red-800'
+})
+
+const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+  toastMessage.value = { message, type }
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+  }
+  toastTimer = setTimeout(() => {
+    toastMessage.value = null
+    toastTimer = null
+  }, 3000)
+}
+
+const getApiErrorMessage = (error: unknown, fallback: string) => {
+  const message = (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+  return message || fallback
+}
 
 const loadWithdraws = async () => {
   loading.value = true
@@ -288,6 +323,7 @@ const loadWithdraws = async () => {
     statistics.value = data.stats || {}
   } catch (error) {
     console.error('Failed to load withdraw requests:', error)
+    showToast(getApiErrorMessage(error, 'Failed to load withdraw requests'), 'error')
   } finally {
     loading.value = false
   }
@@ -326,10 +362,15 @@ const submitAction = async () => {
     } else {
       await paymentApi.rejectWithdraw(id, actionNote.value)
     }
+    showToast(
+      actionType.value === 'approve' ? 'Withdraw request approved' : 'Withdraw request rejected',
+      'success',
+    )
     closeActionModal()
     await loadWithdraws()
   } catch (error) {
     console.error('Failed to update withdraw request:', error)
+    showToast(getApiErrorMessage(error, 'Failed to update withdraw request'), 'error')
   } finally {
     actionSubmitting.value = false
   }
@@ -338,9 +379,11 @@ const submitAction = async () => {
 const markPaid = async (item: any) => {
   try {
     await paymentApi.markWithdrawPaid(item.id)
+    showToast('Withdraw request marked as paid', 'success')
     await loadWithdraws()
   } catch (error) {
     console.error('Failed to mark withdraw as paid:', error)
+    showToast(getApiErrorMessage(error, 'Failed to mark withdraw as paid'), 'error')
   }
 }
 
@@ -384,4 +427,23 @@ const actionTitle = computed(() =>
 onMounted(() => {
   loadWithdraws()
 })
+
+onUnmounted(() => {
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+    toastTimer = null
+  }
+})
 </script>
+
+<style scoped>
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+</style>

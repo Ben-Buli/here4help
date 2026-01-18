@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Schema;
 
@@ -223,66 +224,79 @@ class PaymentController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid request'], 400);
         }
 
-        DB::table('point_withdraw_requests')->where('id', $id)->update([
-            'status' => 'approved',
-            'admin_id' => $adminId,
-            'admin_reply' => $request->get('note', ''),
-            'reviewed_at' => now(),
-            'updated_at' => now(),
-        ]);
+        DB::beginTransaction();
+        try {
+            DB::table('point_withdraw_requests')->where('id', $id)->update([
+                'status' => 'approved',
+                'admin_id' => $adminId,
+                'admin_reply' => $request->get('note', ''),
+                'reviewed_at' => now(),
+                'updated_at' => now(),
+            ]);
 
-        DB::table('admin_activity_logs')->insert([
-            'admin_id' => $adminId,
-            'action' => 'withdraw_approve',
-            'table_name' => 'point_withdraw_requests',
-            'record_id' => $id,
-            'old_data' => json_encode(['status' => 'pending']),
-            'new_data' => json_encode(['status' => 'approved']),
-            'created_at' => now(),
-        ]);
+            DB::table('admin_activity_logs')->insert([
+                'admin_id' => $adminId,
+                'action' => 'withdraw_approve',
+                'table_name' => 'point_withdraw_requests',
+                'record_id' => $id,
+                'old_data' => json_encode(['status' => 'pending']),
+                'new_data' => json_encode(['status' => 'approved']),
+                'created_at' => now(),
+            ]);
 
-        DB::table('user_active_log')->insert([
-            'user_id' => $req->user_id,
-            'actor_type' => 'admin',
-            'actor_id' => $adminId,
-            'action' => 'withdraw_approve',
-            'field' => 'withdraw_status',
-            'old_value' => 'pending',
-            'new_value' => 'approved',
-            'reason' => $request->get('note', ''),
-            'ip' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'metadata' => json_encode([
-                'request_id' => $id,
-                'amount_points' => (int) $req->amount_points,
-                'fee_points' => (int) $req->fee_points,
-                'total_deduct_points' => (int) $req->total_deduct_points,
-            ]),
-            'created_at' => now(),
-        ]);
+            DB::table('user_active_log')->insert([
+                'user_id' => $req->user_id,
+                'actor_type' => 'admin',
+                'actor_id' => $adminId,
+                'action' => 'withdraw_approve',
+                'field' => 'withdraw_status',
+                'old_value' => 'pending',
+                'new_value' => 'approved',
+                'reason' => $request->get('note', ''),
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'metadata' => json_encode([
+                    'request_id' => $id,
+                    'amount_points' => (int) $req->amount_points,
+                    'fee_points' => (int) $req->fee_points,
+                    'total_deduct_points' => (int) $req->total_deduct_points,
+                ]),
+                'created_at' => now(),
+            ]);
 
-        if ((int) $req->fee_points > 0) {
-            $exists = DB::table('fee_revenue_ledger')
-                ->where('fee_type', 'withdrawal_fee')
-                ->where('withdraw_request_id', $id)
-                ->exists();
+            if ((int) $req->fee_points > 0) {
+                $exists = DB::table('fee_revenue_ledger')
+                    ->where('fee_type', 'withdrawal_fee')
+                    ->where('withdraw_request_id', $id)
+                    ->exists();
 
-            if (!$exists) {
-                DB::table('fee_revenue_ledger')->insert([
-                    'fee_type' => 'withdrawal_fee',
-                    'src_transaction_id' => null,
-                    'task_id' => null,
-                    'withdraw_request_id' => $id,
-                    'payer_user_id' => $req->user_id,
-                    'amount_points' => (int) $req->fee_points,
-                    'rate' => (float) $req->fee_rate,
-                    'note' => 'Withdraw fee',
-                    'created_at' => now(),
-                ]);
+                if (!$exists) {
+                    DB::table('fee_revenue_ledger')->insert([
+                        'fee_type' => 'withdrawal_fee',
+                        'src_transaction_id' => null,
+                        'task_id' => null,
+                        'withdraw_request_id' => $id,
+                        'payer_user_id' => $req->user_id,
+                        'amount_points' => (int) $req->fee_points,
+                        'rate' => (float) $req->fee_rate,
+                        'note' => 'Withdraw fee',
+                        'created_at' => now(),
+                    ]);
+                }
             }
-        }
 
-        return response()->json(['success' => true, 'message' => 'Withdraw request approved']);
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Withdraw request approved']);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Withdraw approve failed', [
+                'withdraw_request_id' => $id,
+                'admin_id' => $adminId,
+                'note' => $request->get('note', ''),
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['success' => false, 'message' => 'Unable to approve the request right now.'], 500);
+        }
     }
 
     /** POST /admin/payment/withdraw-requests/{id}/reject */
@@ -294,45 +308,58 @@ class PaymentController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid request'], 400);
         }
 
-        DB::table('point_withdraw_requests')->where('id', $id)->update([
-            'status' => 'rejected',
-            'admin_id' => $adminId,
-            'admin_reply' => $request->get('note', ''),
-            'reviewed_at' => now(),
-            'updated_at' => now(),
-        ]);
+        DB::beginTransaction();
+        try {
+            DB::table('point_withdraw_requests')->where('id', $id)->update([
+                'status' => 'rejected',
+                'admin_id' => $adminId,
+                'admin_reply' => $request->get('note', ''),
+                'reviewed_at' => now(),
+                'updated_at' => now(),
+            ]);
 
-        DB::table('admin_activity_logs')->insert([
-            'admin_id' => $adminId,
-            'action' => 'withdraw_reject',
-            'table_name' => 'point_withdraw_requests',
-            'record_id' => $id,
-            'old_data' => json_encode(['status' => 'pending']),
-            'new_data' => json_encode(['status' => 'rejected']),
-            'created_at' => now(),
-        ]);
+            DB::table('admin_activity_logs')->insert([
+                'admin_id' => $adminId,
+                'action' => 'withdraw_reject',
+                'table_name' => 'point_withdraw_requests',
+                'record_id' => $id,
+                'old_data' => json_encode(['status' => 'pending']),
+                'new_data' => json_encode(['status' => 'rejected']),
+                'created_at' => now(),
+            ]);
 
-        DB::table('user_active_log')->insert([
-            'user_id' => $req->user_id,
-            'actor_type' => 'admin',
-            'actor_id' => $adminId,
-            'action' => 'withdraw_reject',
-            'field' => 'withdraw_status',
-            'old_value' => 'pending',
-            'new_value' => 'rejected',
-            'reason' => $request->get('note', ''),
-            'ip' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'metadata' => json_encode([
-                'request_id' => $id,
-                'amount_points' => (int) $req->amount_points,
-                'fee_points' => (int) $req->fee_points,
-                'total_deduct_points' => (int) $req->total_deduct_points,
-            ]),
-            'created_at' => now(),
-        ]);
+            DB::table('user_active_log')->insert([
+                'user_id' => $req->user_id,
+                'actor_type' => 'admin',
+                'actor_id' => $adminId,
+                'action' => 'withdraw_reject',
+                'field' => 'withdraw_status',
+                'old_value' => 'pending',
+                'new_value' => 'rejected',
+                'reason' => $request->get('note', ''),
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'metadata' => json_encode([
+                    'request_id' => $id,
+                    'amount_points' => (int) $req->amount_points,
+                    'fee_points' => (int) $req->fee_points,
+                    'total_deduct_points' => (int) $req->total_deduct_points,
+                ]),
+                'created_at' => now(),
+            ]);
 
-        return response()->json(['success' => true, 'message' => 'Withdraw request rejected']);
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Withdraw request rejected']);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Withdraw reject failed', [
+                'withdraw_request_id' => $id,
+                'admin_id' => $adminId,
+                'note' => $request->get('note', ''),
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['success' => false, 'message' => 'Unable to reject the request right now.'], 500);
+        }
     }
 
     /** POST /admin/payment/withdraw-requests/{id}/paid */
@@ -344,44 +371,56 @@ class PaymentController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid request'], 400);
         }
 
-        DB::table('point_withdraw_requests')->where('id', $id)->update([
-            'status' => 'paid',
-            'admin_id' => $adminId,
-            'paid_at' => now(),
-            'updated_at' => now(),
-        ]);
+        DB::beginTransaction();
+        try {
+            DB::table('point_withdraw_requests')->where('id', $id)->update([
+                'status' => 'paid',
+                'admin_id' => $adminId,
+                'paid_at' => now(),
+                'updated_at' => now(),
+            ]);
 
-        DB::table('admin_activity_logs')->insert([
-            'admin_id' => $adminId,
-            'action' => 'withdraw_paid',
-            'table_name' => 'point_withdraw_requests',
-            'record_id' => $id,
-            'old_data' => json_encode(['status' => 'approved']),
-            'new_data' => json_encode(['status' => 'paid']),
-            'created_at' => now(),
-        ]);
+            DB::table('admin_activity_logs')->insert([
+                'admin_id' => $adminId,
+                'action' => 'withdraw_paid',
+                'table_name' => 'point_withdraw_requests',
+                'record_id' => $id,
+                'old_data' => json_encode(['status' => 'approved']),
+                'new_data' => json_encode(['status' => 'paid']),
+                'created_at' => now(),
+            ]);
 
-        DB::table('user_active_log')->insert([
-            'user_id' => $req->user_id,
-            'actor_type' => 'admin',
-            'actor_id' => $adminId,
-            'action' => 'withdraw_paid',
-            'field' => 'withdraw_status',
-            'old_value' => 'approved',
-            'new_value' => 'paid',
-            'reason' => null,
-            'ip' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'metadata' => json_encode([
-                'request_id' => $id,
-                'amount_points' => (int) $req->amount_points,
-                'fee_points' => (int) $req->fee_points,
-                'total_deduct_points' => (int) $req->total_deduct_points,
-            ]),
-            'created_at' => now(),
-        ]);
+            DB::table('user_active_log')->insert([
+                'user_id' => $req->user_id,
+                'actor_type' => 'admin',
+                'actor_id' => $adminId,
+                'action' => 'withdraw_paid',
+                'field' => 'withdraw_status',
+                'old_value' => 'approved',
+                'new_value' => 'paid',
+                'reason' => null,
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'metadata' => json_encode([
+                    'request_id' => $id,
+                    'amount_points' => (int) $req->amount_points,
+                    'fee_points' => (int) $req->fee_points,
+                    'total_deduct_points' => (int) $req->total_deduct_points,
+                ]),
+                'created_at' => now(),
+            ]);
 
-        return response()->json(['success' => true, 'message' => 'Withdraw request marked as paid']);
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Withdraw request marked as paid']);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Withdraw mark paid failed', [
+                'withdraw_request_id' => $id,
+                'admin_id' => $adminId,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['success' => false, 'message' => 'Unable to mark as paid right now.'], 500);
+        }
     }
 
     /** GET/POST /admin/payment/fee-settings（唯一 active） */
