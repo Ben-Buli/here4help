@@ -531,13 +531,11 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 import { userApi } from '@/services/api'
 import UserEditModal from '@/components/UserEditModal.vue'
 import UserReviewModal from '@/components/UserReviewModal.vue'
 
 const router = useRouter()
-const authStore = useAuthStore()
 
 // State
 const isLoading = ref(false)
@@ -635,14 +633,6 @@ const handlePerPageChange = () => {
   loadUsers(1)
 }
 
-const toggleAllSelection = () => {
-  if (allSelected.value) {
-    selectedUsers.value = []
-  } else {
-    selectedUsers.value = users.value.map((user) => user.id)
-  }
-}
-
 const clearSelection = () => {
   selectedUsers.value = []
   showBatchActions.value = false
@@ -665,11 +655,6 @@ const batchAction = async (action: string) => {
 
 const viewUser = (userId: number) => {
   router.push(`/users/${userId}`)
-}
-
-const editUser = (user: any) => {
-  selectedUser.value = user
-  showEditModal.value = true
 }
 
 const handleUserSaved = () => {

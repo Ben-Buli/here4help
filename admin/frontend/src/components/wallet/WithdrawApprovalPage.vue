@@ -252,7 +252,11 @@ const pagination = ref({
   last_page: 1,
 })
 
-const filters = ref({
+const filters = ref<{
+  status: '' | 'pending' | 'approved' | 'rejected' | 'cancelled' | 'paid'
+  fromDate: string
+  toDate: string
+}>({
   status: '',
   fromDate: '',
   toDate: '',
@@ -274,7 +278,11 @@ const loadWithdraws = async () => {
       from_date: filters.value.fromDate || undefined,
       to_date: filters.value.toDate || undefined,
     })
-    const data = response.data.data || {}
+    const data = (response.data.data || {}) as {
+      items?: any[]
+      pagination?: typeof pagination.value
+      stats?: any
+    }
     withdraws.value = data.items || []
     pagination.value = data.pagination || pagination.value
     statistics.value = data.stats || {}
@@ -358,8 +366,11 @@ const getStatusBadgeClass = (status: string) => {
   return map[status] || 'bg-gray-100 text-gray-800'
 }
 
-const formatPoints = (points: number) =>
-  points.toString().replaceAllMapped(/\B(?=(\d{3})+(?!\d))/g, ',')
+const formatPoints = (points: number | null | undefined) => {
+  const normalized = Number(points ?? 0)
+  if (!Number.isFinite(normalized)) return '0'
+  return normalized.toLocaleString()
+}
 
 const formatDate = (dateString?: string) => {
   if (!dateString) return '-'

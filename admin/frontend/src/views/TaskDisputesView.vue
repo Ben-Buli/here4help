@@ -406,11 +406,6 @@ const showDetailDialog = ref(false)
 const selectedDispute = ref<Dispute | null>(null)
 
 // Computed
-const resolutionRate = computed(() => {
-  if (statistics.value.total_disputes === 0) return 0
-  return Math.round((statistics.value.resolved_count / statistics.value.total_disputes) * 100)
-})
-
 const visiblePages = computed(() => {
   const current = pagination.value.current_page
   const total = pagination.value.last_page
@@ -571,11 +566,6 @@ const handleOpenOperation = async () => {
   showReviewDialog.value = true
 }
 
-const openReviewDialog = (dispute: Dispute) => {
-  selectedDispute.value = dispute
-  showReviewDialog.value = true
-}
-
 const closeReviewDialog = () => {
   showReviewDialog.value = false
   selectedDispute.value = null
@@ -584,12 +574,6 @@ const closeReviewDialog = () => {
 const handleDisputeResolved = () => {
   closeReviewDialog()
   refreshData()
-}
-
-const viewDisputeDetail = (dispute: Dispute) => {
-  console.log('🔍 Opening dispute detail:', dispute)
-  selectedDispute.value = dispute
-  showDetailDialog.value = true
 }
 
 const closeDetailDialog = () => {

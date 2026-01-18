@@ -212,17 +212,6 @@ const load = async () => {
   }
 }
 
-const save = async () => {
-  if (!valid.value) return
-  loading.value = true
-  try {
-    await paymentApi.setOfficialAccount(form.value)
-    await load()
-  } finally {
-    loading.value = false
-  }
-}
-
 const confirmSave = async () => {
   if (!valid.value) return
   
@@ -265,5 +254,4 @@ const formatDate = (d?: string) => (d ? new Date(d).toLocaleString() : '-')
 
 onMounted(load)
 </script>
-
 

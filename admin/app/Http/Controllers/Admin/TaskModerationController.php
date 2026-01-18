@@ -113,7 +113,7 @@ class TaskModerationController extends Controller
                             'updated_at' => now()
                         ]);
 
-                    $systemMessage = "This task was found to violate platform policies and has been cancelled by an administrator.";
+                    $systemMessage = "This task was found to violate platform policies and has been cancelled by an administrator. Reason: {$reason}";
                     if (!empty($oldParticipant)) {
                         $room = DB::table('chat_rooms')
                             ->select('id')
@@ -132,30 +132,14 @@ class TaskModerationController extends Controller
                         }
                     }
 
-                    $eventTitle = 'Admin Task Moderation';
-                    $eventDescription = 'After review, this task was found to be non-compliant with platform policies.';
-
-                    DB::table('task_dispute_events')->insert([
-                        'task_id' => $task->id,
-                        'task_dispute_chat_room_id' => null,
-                        'user_id' => null,
-                        'title' => $eventTitle,
-                        'description' => $eventDescription,
-                        'status' => 'resolved',
-                        'decision_result' => 'admin_task_cancelled',
-                        'decision_note' => $reason,
-                        'admin_id' => $admin->id,
-                        'created_at' => now(),
-                        'updated_at' => now()
-                    ]);
-
                     DB::table('task_logs')->insert([
                         'task_id' => $task->id,
                         'user_id' => null,
+                        'admin_id' => $admin->id,
                         'action' => 'admin_task_cancel',
                         'old_status' => $oldStatusCode,
                         'new_status' => 'cancelled',
-                        'notes' => "Admin #{$admin->id} cancelled task directly. {$reason}",
+                        'description' => "Admin #{$admin->id} cancelled task directly. {$reason}",
                         'created_at' => now()
                     ]);
 

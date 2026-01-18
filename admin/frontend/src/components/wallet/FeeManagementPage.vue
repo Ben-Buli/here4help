@@ -1,5 +1,14 @@
 <template>
   <div class="space-y-6">
+    <transition name="toast-fade">
+      <div
+        v-if="toastMessage"
+        class="fixed right-6 top-6 z-50 max-w-sm rounded-lg border px-4 py-3 text-sm font-medium shadow-lg"
+        :class="toastClasses"
+      >
+        {{ toastMessage?.message }}
+      </div>
+    </transition>
     <!-- 頁面標題與操作 -->
     <div class="md:flex md:items-center md:justify-between">
       <div class="flex-1 min-w-0">
@@ -62,21 +71,28 @@
       </div>
       
       <!-- 計算範例 -->
-      <div v-if="percentage !== null && percentage > 0" class="mt-4 p-4 bg-blue-50 rounded-md">
-        <h4 class="text-sm font-medium text-blue-900 mb-2">Calculation Example</h4>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-          <div>
-            <span class="text-blue-700">Task Reward:</span>
-            <span class="font-medium">1,000 Points</span>
-          </div>
-          <div>
-            <span class="text-blue-700">Fee (Worker Pays):</span>
-            <span class="font-medium">{{ calculateFee(1000) }} Points</span>
-          </div>
-          <div>
-            <span class="text-blue-700">Worker Receives:</span>
-            <span class="font-medium">{{ 1000 - calculateFee(1000) }} Points</span>
-          </div>
+      <div class="mt-4 p-4 rounded-md bg-blue-50">
+        <h4 class="text-sm font-medium text-blue-900 mb-2">Fee Rate Application Explanation</h4>
+        <p class="text-sm text-gray-800">
+          <span v-if="percentage !== null">
+            After updating this setting, the configured fee rate will be applied to user withdrawal requests submitted from now on. 
+            Users will incur an additional fee based on the newly set rate for each withdrawal they make.<br>
+            For example: If a user requests to withdraw <strong>{{ exampleWithdrawPoints }}</strong> points, an additional fee of <strong>{{ exampleFeePoints }}</strong> points ({{ percentageDisplay }}) will be charged as a transaction fee.
+          </span>
+          <span v-else>
+            No effective fee rate is set yet. Please save a fee rate to see how it will be applied.
+          </span>
+        </p>
+        <div
+          v-if="percentage !== null"
+          class="mt-3 grid grid-cols-1 gap-2 text-sm text-gray-700 bg-white p-3 rounded-lg border border-blue-100"
+        >
+          <p>
+            For example: If a user requests to withdraw <strong>{{ exampleWithdrawPoints }}</strong> points, the platform will deduct an additional fee of <strong>{{ exampleFeePoints }}</strong> points ({{ percentageDisplay }}) from the withdrawal. 
+          </p>
+          <p>
+            The user will actually receive <strong>{{ exampleReceivePoints }}</strong> points. The field <code>total_deduct_points</code> will display the total deduction of <strong>{{ exampleWithdrawPoints }}</strong> points (including the fee), and the system will record <strong>{{ exampleFeePoints }}</strong> points in the <code>fee_points</code> field as the platform fee.
+          </p>
         </div>
       </div>
     </div>
@@ -149,13 +165,40 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { paymentApi } from '@/services/api'
 
 // State
 const loading = ref(false)
 const items = ref<any[]>([])
 const percentage = ref<number | null>(null)
+const toastMessage = ref<{ message: string; type: 'success' | 'error' } | null>(null)
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+
+const toastClasses = computed(() => {
+  if (!toastMessage.value) return ''
+  return toastMessage.value.type === 'success'
+    ? 'bg-green-50 border-green-200 text-green-800'
+    : 'bg-red-50 border-red-200 text-red-800'
+})
+
+const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+  toastMessage.value = { message, type }
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+  }
+  toastTimer = setTimeout(() => {
+    toastMessage.value = null
+    toastTimer = null
+  }, 4000)
+}
+
+const buildBackendErrorMessage = (error: any) => {
+  const baseMessage =
+    error?.response?.data?.message || error?.message || 'Failed to update fee setting'
+  const laravelLog = error?.response?.data?.laravel_log
+  return laravelLog ? `${baseMessage}（Laravel log: ${laravelLog}）` : baseMessage
+}
 
 const normalizePercentage = (value: any): number | null => {
   if (value === null || value === undefined) return null
@@ -194,13 +237,15 @@ const load = async () => {
 // 儲存手續費設定
 const save = async () => {
   if (percentage.value === null || percentage.value < 0) return
-  
+
   loading.value = true
   try {
-    await paymentApi.setFeeSettings(percentage.value)
+    const res = await paymentApi.setFeeSettings(percentage.value)
+    showToast(res.data.message || 'Fee setting updated', 'success')
     await load() // 重新載入以更新列表
   } catch (error) {
     console.error('Failed to save fee settings:', error)
+    showToast(buildBackendErrorMessage(error), 'error')
   } finally {
     loading.value = false
   }
@@ -211,6 +256,15 @@ const calculateFee = (amount: number) => {
   if (percentage.value === null || percentage.value <= 0) return 0
   return Math.round(amount * (percentage.value / 100))
 }
+
+const exampleWithdrawPoints = 100
+const exampleFeePoints = computed(() => calculateFee(exampleWithdrawPoints))
+const exampleReceivePoints = computed(() =>
+  Math.max(exampleWithdrawPoints - exampleFeePoints.value, 0),
+)
+const percentageDisplay = computed(() =>
+  percentage.value !== null ? `${percentage.value.toFixed(2)}%` : '—',
+)
 
 const formatPercentage = (value?: number | null) => {
   if (value === null || value === undefined || Number.isNaN(value)) return '-'
@@ -224,6 +278,12 @@ const formatDate = (dateString?: string) => {
 }
 
 // 初始化
+onUnmounted(() => {
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+    toastTimer = null
+  }
+})
 onMounted(() => {
   load()
 })

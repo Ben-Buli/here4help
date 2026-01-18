@@ -286,21 +286,7 @@ const handlePerPageChange = () => {
   loadRecords()
 }
 
-const resetFilters = () => {
-  filters.search = ''
-  filters.user_id = ''
-  filters.sort_by = 'updated_at'
-  filters.sort_order = 'desc'
-  filters.per_page = 20
-  loadRecords(1)
-}
-
 const changePage = (page: number) => loadRecords(page)
-
-const formatDate = (value: string) => {
-  if (!value) return '-'
-  return new Date(value).toLocaleString()
-}
 
 const goUser = (id: number) => {
   router.push(`/users/${id}`)

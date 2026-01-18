@@ -1,5 +1,14 @@
 <template>
-  <div class="p-6 space-y-6">
+    <!-- Toast 通知 -->
+    <transition name="toast-fade">
+      <div
+        v-if="toastMessage"
+        class="fixed right-6 top-6 z-[100] max-w-sm rounded-lg border px-4 py-3 text-sm font-medium shadow-lg"
+        :class="toastClasses"
+      >
+        {{ toastMessage.message }}
+      </div>
+    </transition>
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
         <h1 class="text-2xl font-semibold text-gray-900">Point Policy</h1>
@@ -55,17 +64,17 @@
               </td>
               <td class="px-6 py-4 text-right text-sm font-medium space-x-2">
                 <button
-                  class="inline-flex items-center rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-teal-700 cursor-pointer"
+                  class="inline-flex items-center rounded-md bg-stone-50 text-stone-900 px-4 py-2 text-sm font-medium shadow hover:bg-stone-400 hover:text-white cursor-pointer"
                   @click="openEditModal(policy)"
                 >
                   Edit
                 </button>
                 <button
-                  class="text-gray-500 hover:text-gray-800"
+                  class="inline-flex items-center rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-teal-700 cursor-pointer"
                   v-if="!policy.is_active"
                   @click="activatePolicy(policy)"
                 >
-                  Set Active
+                  Apply
                 </button>
               </td>
             </tr>
@@ -77,15 +86,15 @@
     <transition name="fade">
       <div
         v-if="showEditor"
-        class="fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-8 overflow-y-auto"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8"
       >
-        <div class="w-full max-w-4xl rounded-2xl bg-white shadow-xl">
-          <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+        <div class="w-full max-w-4xl max-h-[90vh] rounded-2xl bg-white shadow-xl flex flex-col">
+          <!-- Header（固定） -->
+          <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 flex-shrink-0">
             <div>
               <h2 class="text-lg font-semibold text-gray-900">
-                {{ editingPolicy ? 'Edit Point Policy' : 'Create Point Policy' }}
+                {{ editingPolicy ? 'Edit' : 'Create' }} Point Policy
               </h2>
-              <p class="text-sm text-gray-500">Update the document content and publish when ready.</p>
             </div>
             <button class="text-gray-400 hover:text-gray-600" @click="closeEditor">
               <span class="sr-only">Close</span>
@@ -93,7 +102,8 @@
             </button>
           </div>
 
-          <div class="px-6 py-5 space-y-5">
+          <!-- Content（可 scroll） -->
+          <div class="px-6 py-5 space-y-5 overflow-y-auto flex-1">
             <div>
               <label class="block text-sm font-medium text-gray-700">Title</label>
               <input
@@ -112,24 +122,24 @@
               <label class="block text-sm font-medium text-gray-700 mb-2">Document content</label>
               <PointPolicyEditor v-model="form.content" />
             </div>
+          </div>
 
-            <div class="flex items-center justify-end gap-3 border-t border-gray-100 pt-4">
-              <button class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900" @click="closeEditor" :disabled="saving">
-                Cancel
-              </button>
-              <button
-                class="inline-flex items-center rounded-md bg-cyan-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-cyan-700 disabled:opacity-50"
-                @click="savePolicy"
-                :disabled="saving"
-              >
-                {{ saving ? 'Saving...' : editingPolicy ? 'Update Policy' : 'Create Policy' }}
-              </button>
-            </div>
+          <!-- Footer（固定在底部） -->
+          <div class="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4 flex-shrink-0">
+            <button class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900" @click="closeEditor" :disabled="saving">
+              Cancel
+            </button>
+            <button
+              class="inline-flex items-center rounded-md bg-cyan-600 px-5 py-2 text-sm font-semibold text-white shadow hover:bg-cyan-700 disabled:opacity-50"
+              @click="savePolicy"
+              :disabled="saving"
+            >
+              {{ saving ? 'Saving...' : editingPolicy ? 'Update Policy' : 'Create Policy' }}
+            </button>
           </div>
         </div>
       </div>
     </transition>
-  </div>
 </template>
 
 <script setup lang="ts">
@@ -158,6 +168,28 @@ const saving = ref(false)
 const showEditor = ref(false)
 const editingPolicy = ref<PointPolicySummary | null>(null)
 
+// Toast 通知
+const toastMessage = ref<{ message: string; type: 'success' | 'error' } | null>(null)
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+
+const toastClasses = computed(() => {
+  if (!toastMessage.value) return ''
+  return toastMessage.value.type === 'success'
+    ? 'bg-green-50 border-green-200 text-green-800'
+    : 'bg-red-50 border-red-200 text-red-800'
+})
+
+const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+  toastMessage.value = { message, type }
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+  }
+  toastTimer = setTimeout(() => {
+    toastMessage.value = null
+    toastTimer = null
+  }, 4000)
+}
+
 const cloneDoc = (doc: Record<string, any>) => JSON.parse(JSON.stringify(doc))
 
 const form = reactive({
@@ -180,9 +212,9 @@ const loadPolicies = async () => {
     loading.value = true
     const response = await api.get<ApiResponse<PointPolicySummary[]>>(API_ENDPOINTS.pointPolicy.list())
     policies.value = response.data.data ?? []
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to load point policies', error)
-    alert('Failed to load point policies')
+    showToast(error?.response?.data?.message || 'Failed to load point policies', 'error')
   } finally {
     loading.value = false
   }
@@ -213,9 +245,9 @@ const openEditModal = async (policy: PointPolicySummary) => {
       initialSnapshot.value = serializeFormState()
       showEditor.value = true
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to load policy detail', error)
-    alert('Failed to load policy detail')
+    showToast(error?.response?.data?.message || 'Failed to load policy detail', 'error')
   }
 }
 
@@ -241,22 +273,24 @@ const savePolicy = async () => {
     }
 
     if (!payload.title) {
-      alert('Title is required')
+      showToast('Title is required', 'error')
       return
     }
 
     if (editingPolicy.value) {
       await api.put<ApiResponse>(API_ENDPOINTS.pointPolicy.detail(editingPolicy.value.id), payload)
+      showToast('Policy updated successfully', 'success')
     } else {
       await api.post<ApiResponse>(API_ENDPOINTS.pointPolicy.list(), payload)
+      showToast('Policy created successfully', 'success')
     }
 
     await loadPolicies()
     initialSnapshot.value = serializeFormState()
     showEditor.value = false
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to save point policy', error)
-    alert('Failed to save point policy')
+    showToast(error?.response?.data?.message || 'Failed to save point policy', 'error')
   } finally {
     saving.value = false
   }
@@ -270,9 +304,10 @@ const activatePolicy = async (policy: PointPolicySummary) => {
   try {
     await api.post<ApiResponse>(API_ENDPOINTS.pointPolicy.activate(policy.id))
     await loadPolicies()
-  } catch (error) {
+    showToast('Policy activated successfully', 'success')
+  } catch (error: any) {
     console.error('Failed to activate policy', error)
-    alert('Failed to activate policy')
+    showToast(error?.response?.data?.message || 'Failed to activate policy', 'error')
   }
 }
 
@@ -304,6 +339,10 @@ watch(
 
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', handleBeforeUnload)
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+    toastTimer = null
+  }
 })
 
 onBeforeRouteLeave((_to, _from, next) => {
@@ -323,5 +362,19 @@ onBeforeRouteLeave((_to, _from, next) => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Toast 動畫 */
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: all 0.3s ease;
+}
+.toast-fade-enter-from {
+  opacity: 0;
+  transform: translateX(20px);
+}
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
 }
 </style>

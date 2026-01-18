@@ -788,7 +788,7 @@ const copyResetEmailTemplate = async () => {
       resetCopyTooltipTimer = null
     }, 2000)
     resetModalError.value = ''
-  } catch (err: any) {
+  } catch {
     resetModalError.value = 'Unable to copy text automatically. Please copy it manually.'
   }
 }

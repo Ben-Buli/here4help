@@ -856,9 +856,8 @@ const navigationSections: NavigationSection[] = [
         name: 'Logs',
         href: '/logs',
         children: [
-          { name: 'System Logs', href: '/logs' },
-          { name: 'User Activities', href: '/user-activities' },
-          { name: 'User Transactions', href: '/user-transactions' },
+          { name: 'Admin Logs', href: '/logs' },
+          { name: 'User Logs', href: '/user-logs' },
         ],
       },
     ],

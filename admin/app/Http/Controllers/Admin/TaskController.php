@@ -74,12 +74,29 @@ class TaskController extends Controller
             $query->where('tasks.participant_id', $participantId);
         }
 
+        /**
+         * Search 欄位支援以下查詢：
+         * - 任務標題 (Task title)
+         * - 任務描述 (Task description)
+         * - 任務 ID (Task ID) - UUID 格式
+         * - 創建者 ID (Creator ID) - 數字
+         * - 參與者 ID (Participant ID) - 數字
+         * - 創建者名稱 (Creator name)
+         * - 參與者名稱 (Participant name)
+         */
         if ($search) {
             $query->where(function($q) use ($search) {
                 $q->where('tasks.title', 'LIKE', "%{$search}%")
                   ->orWhere('tasks.description', 'LIKE', "%{$search}%")
+                  ->orWhere('tasks.id', 'LIKE', "%{$search}%")
                   ->orWhere('creators.name', 'LIKE', "%{$search}%")
                   ->orWhere('participants.name', 'LIKE', "%{$search}%");
+                
+                // 如果是純數字，也搜尋 creator_id 和 participant_id
+                if (is_numeric($search)) {
+                    $q->orWhere('tasks.creator_id', '=', (int)$search)
+                      ->orWhere('tasks.participant_id', '=', (int)$search);
+                }
             });
         }
 
@@ -199,6 +216,39 @@ class TaskController extends Controller
                     return $task;
                 })($task)
             ]
+        ]);
+    }
+
+    /**
+     * 任務狀態列表（支援 ?active=1/0）
+     */
+    public function statuses(Request $request)
+    {
+        $onlyActive = (int) $request->get('active', 1);
+
+        $query = DB::table('task_statuses')
+            ->select([
+                'id',
+                'code',
+                'display_name',
+                'progress_ratio',
+                'sort_order',
+                'include_in_unread',
+                'is_active',
+            ])
+            ->orderBy('sort_order')
+            ->orderBy('id');
+
+        if ($onlyActive) {
+            $query->where('is_active', 1);
+        }
+
+        $rows = $query->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Task statuses retrieved successfully',
+            'data' => $rows,
         ]);
     }
 

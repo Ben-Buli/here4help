@@ -70,10 +70,32 @@ try {
         $params[] = (int)$participantId;
     }
     
+    /**
+     * Search 欄位支援以下查詢：
+     * - 任務標題 (Task title)
+     * - 任務描述 (Task description)
+     * - 任務 ID (Task ID) - UUID 格式
+     * - 創建者 ID (Creator ID) - 數字
+     * - 參與者 ID (Participant ID) - 數字
+     * - 創建者名稱 (Creator name)
+     * - 參與者名稱 (Participant name)
+     */
     if (!empty($search)) {
-        $whereConditions[] = "(t.title LIKE ? OR t.description LIKE ? OR creator.name LIKE ? OR participant.name LIKE ?)";
+        // 基本搜尋條件：標題、描述、任務ID、創建者名稱、參與者名稱
+        $searchConditions = "(t.title LIKE ? OR t.description LIKE ? OR t.id LIKE ? OR creator.name LIKE ? OR participant.name LIKE ?";
         $searchTerm = "%{$search}%";
-        $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm, $searchTerm]);
+        $searchParams = [$searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm];
+        
+        // 如果是純數字，也搜尋 creator_id 和 participant_id
+        if (is_numeric($search)) {
+            $searchConditions .= " OR t.creator_id = ? OR t.participant_id = ?";
+            $searchParams[] = (int)$search;
+            $searchParams[] = (int)$search;
+        }
+        
+        $searchConditions .= ")";
+        $whereConditions[] = $searchConditions;
+        $params = array_merge($params, $searchParams);
     }
     
     if (!empty($dateFrom)) {

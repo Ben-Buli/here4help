@@ -3,11 +3,11 @@
     <!-- 頁面標題與操作 -->
     <div class="md:flex md:items-center md:justify-between">
       <div class="flex-1 min-w-0">
-        <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-          System Logs
+        <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl">
+          Admin Logs
         </h2>
         <p class="mt-1 text-sm text-gray-500">
-          Monitor system activities, user actions, and login records
+          Monitor admin activities, actions, and login records
         </p>
       </div>
       <div class="mt-4 flex md:mt-0 md:ml-4 space-x-3">
@@ -511,10 +511,6 @@ const changePage = (page: number) => {
   if (page >= 1 && page <= pagination.value.last_page) {
     loadLogs(page)
   }
-}
-
-const exportLogs = () => {
-  alert('Export functionality coming soon!')
 }
 
 const handleDateRangeChange = () => {

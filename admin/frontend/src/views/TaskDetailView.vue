@@ -16,70 +16,16 @@
       <!-- Header -->
       <div class="md:flex md:items-center md:justify-between">
         <div class="flex-1 min-w-0">
-          <nav class="flex mb-4" aria-label="Breadcrumb">
-            <ol class="flex items-center space-x-4">
-              <li>
-                <router-link to="/tasks" class="text-gray-400 hover:text-gray-500">
-                  <svg class="flex-shrink-0 h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"
-                    />
-                  </svg>
-                </router-link>
-              </li>
-              <li>
-                <div class="flex items-center">
-                  <svg
-                    class="flex-shrink-0 h-5 w-5 text-gray-300"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fill-rule="evenodd"
-                      d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                      clip-rule="evenodd"
-                    />
-                  </svg>
-                  <router-link
-                    to="/tasks"
-                    class="ml-4 text-sm font-medium text-gray-500 hover:text-gray-700"
-                  >
-                    Tasks
-                  </router-link>
-                </div>
-              </li>
-              <li>
-                <div class="flex items-center">
-                  <svg
-                    class="flex-shrink-0 h-5 w-5 text-gray-300"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path
-                      fill-rule="evenodd"
-                      d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                      clip-rule="evenodd"
-                    />
-                  </svg>
-                  <span class="ml-4 text-sm font-medium text-gray-900">{{ task.title }}</span>
-                </div>
-              </li>
-            </ol>
-          </nav>
-
           <div class="flex items-start space-x-4">
             <div class="flex-1">
-              <h1 class="text-2xl font-bold text-gray-900">{{ task.title }}</h1>
-              <p class="text-sm text-gray-500 mt-1">{{ task.description }}</p>
-              <div class="flex items-center space-x-4 mt-2">
+              <h1 class="text-2xl font-bold text-gray-900">{{ task.title }}
                 <span
                   class="inline-flex px-2 py-1 text-xs font-semibold rounded-full"
                   :class="getStatusBadgeClass(task.status_name)"
                 >
                   {{ task.status_display_name || task.status_name }}
                 </span>
-                <span class="text-sm text-gray-500">ID: {{ task.id }}</span>
-              </div>
+              </h1>
             </div>
           </div>
         </div>
@@ -392,6 +338,7 @@
           </button>
         </div>
 
+        <!-- 任務基本資訊 -->
         <div class="mt-4 space-y-4 text-sm text-gray-700">
           <div>
             <p class="font-medium text-gray-900">{{ task?.title }}</p>
@@ -415,7 +362,24 @@
               </li>
             </ul>
           </div>
+        </div>
 
+        <!-- 如果任務已取消或已完成，顯示說明訊息 -->
+        <div v-if="taskIsFinalized" class="mt-6">
+          <div class="bg-gray-100 rounded-lg p-4 text-center">
+            <svg class="mx-auto h-10 w-10 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p class="text-gray-600">
+              This task has been
+              <strong class="text-gray-900">{{ task?.status_code === 'cancelled' ? 'cancelled' : 'completed' }}</strong>
+              and cannot be modified.
+            </p>
+          </div>
+        </div>
+
+        <!-- 正常操作區域（僅當任務未終結時顯示） -->
+        <div v-else class="mt-4 space-y-4 text-sm text-gray-700">
           <div>
             <label class="text-sm font-medium text-gray-700">Action</label>
             <div class="mt-2 space-y-2">
@@ -443,20 +407,32 @@
               rows="4"
               class="admin-input mt-2 w-full px-2"
               placeholder="Explain why this task should be updated..."
+              minlength="10"
+              maxlength="200"
             ></textarea>
+            <div class="mt-1 flex items-center justify-between text-xs text-gray-500">
+              <span>10-200 characters required</span>
+              <span>{{ operationReason.trim().length }} / 200</span>
+            </div>
           </div>
 
           <p class="text-xs text-red-600">
-            This operation is irreversible. Double check before submitting.
+            This operation is irreversible. Please check before submitting.
           </p>
         </div>
 
+        <!-- Footer 按鈕 -->
         <div class="mt-6 flex justify-end space-x-3">
-          <button class="admin-button-secondary" @click="closeOperationModal">Cancel</button>
-          <button class="admin-button-primary" :disabled="operationSubmitting" @click="submitOperation">
-            <span v-if="operationSubmitting">Processing...</span>
-            <span v-else>Confirm</span>
-          </button>
+          <template v-if="taskIsFinalized">
+            <button class="admin-button-primary" @click="closeOperationModal">OK</button>
+          </template>
+          <template v-else>
+            <button class="admin-button-secondary" @click="closeOperationModal">Cancel</button>
+            <button class="admin-button-primary" :disabled="operationSubmitting" @click="submitOperation">
+              <span v-if="operationSubmitting">Processing...</span>
+              <span v-else>Confirm</span>
+            </button>
+          </template>
         </div>
       </div>
     </div>
@@ -495,6 +471,15 @@ const operationSubmitting = ref(false)
 const taskHasDispute = computed(() => {
   if (!task.value) return false
   return task.value.status_code === 'dispute' || task.value.status_id === 4
+})
+
+// 檢查任務是否已取消或已完成（不可再操作）
+const taskIsFinalized = computed(() => {
+  if (!task.value) return false
+  const code = task.value.status_code
+  const id = task.value.status_id
+  // cancelled = status_id 8, completed = status_id 5
+  return code === 'cancelled' || code === 'completed' || id === 8 || id === 5
 })
 
 const operationBlocked = computed(() => hasPendingReportsState.value || taskHasDispute.value)
@@ -648,6 +633,11 @@ const submitOperation = async () => {
 
   if (operationReason.value.trim().length < 10) {
     alert('Reason must be at least 10 characters to proceed.')
+    return
+  }
+
+  if (operationReason.value.trim().length > 1000) {
+    alert('Reason must be 1000 characters or fewer.')
     return
   }
 

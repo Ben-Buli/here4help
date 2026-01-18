@@ -105,30 +105,26 @@ const router = createRouter({
       ],
     },
     {
-      path: '/user-activities',
+      path: '/user-logs',
       component: () => import('../components/AppLayout.vue'),
       meta: { requiresAuth: true, permission: 'logs.view' },
       children: [
         {
           path: '',
-          name: 'user-activities',
-          component: () => import('../views/UserActivitiesView.vue'),
-          meta: { title: 'User Activities' },
+          name: 'user-logs',
+          component: () => import('../views/UserLogsView.vue'),
+          meta: { title: 'User Logs' },
         },
       ],
     },
+    // 保留舊路由以向下相容，重定向到新頁面
+    {
+      path: '/user-activities',
+      redirect: '/user-logs',
+    },
     {
       path: '/user-transactions',
-      component: () => import('../components/AppLayout.vue'),
-      meta: { requiresAuth: true, permission: 'logs.view' },
-      children: [
-        {
-          path: '',
-          name: 'user-transactions',
-          component: () => import('../views/UserTransactionsView.vue'),
-          meta: { title: 'User Transactions' },
-        },
-      ],
+      redirect: '/user-logs',
     },
     {
       path: '/task-disputes',

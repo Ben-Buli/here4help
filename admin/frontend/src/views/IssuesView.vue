@@ -348,35 +348,6 @@ const openChatRoom = (it: any) => {
   window.location.href = targetUrl
 }
 
-// 更新事件狀態
-const updateStatus = async (it: any, newStatus: string) => {
-  try {
-    isLoading.value = true
-    
-    const response = await adminSupportApi.updateStatus(String(it.room_id), newStatus as 'submitted' | 'in_progress' | 'resolved')
-    
-    if (response.data.success) {
-      console.log('Status updated successfully:', response.data.data?.message)
-      await refreshData()
-    } else {
-      throw new Error(response.data.message || 'Failed to update status')
-    }
-  } catch (error: any) {
-    console.error('Failed to update status:', error)
-    
-    const message = error.response?.data?.message || error.message || 'Failed to update status'
-    alert(`Error: ${message}`)
-  } finally {
-    isLoading.value = false
-  }
-}
-
-// 向後相容的舊方法（標記為 deprecated）
-/** @deprecated 使用 claimIssue 替代 */
-const accept = async (it: any) => {
-  await claimIssue(it)
-}
-
 // 僅當前管理員被指派時可聊天
 const isAssignedToMe = (it: any): boolean => {
   if (currentAdminId.value == null) return false
@@ -419,4 +390,3 @@ onMounted(() => {
   loadIssues()
 })
 </script>
-

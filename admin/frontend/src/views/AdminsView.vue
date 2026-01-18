@@ -213,20 +213,6 @@ let searchDebounceTimer: number | null = null
 
 const authStore = useAuthStore()
 
-const roleOptions = [
-  { value: 'super_admin', label: 'Super Admin' },
-  { value: 'admin', label: 'Admin' },
-  { value: 'moderator', label: 'Moderator' },
-  { value: 'developer', label: 'Developer' },
-  { value: 'support', label: 'Support' },
-]
-
-const statusOptions = [
-  { value: 'active', label: 'Active' },
-  { value: 'inactive', label: 'Inactive' },
-  { value: 'suspended', label: 'Suspended' },
-  { value: 'locked', label: 'Locked' },
-]
 
 const currentAdminRole = computed(() => authStore.user?.role?.name || '')
 const currentAdminName = computed(() => authStore.user?.full_name || authStore.user?.username || 'Here4Help Admin')
@@ -318,13 +304,6 @@ const handleSearchInput = () => {
     applyFilters()
     searchDebounceTimer = null
   }, 500)
-}
-
-const resetFilters = () => {
-  filters.search = ''
-  filters.role = ''
-  filters.status = ''
-  applyFilters()
 }
 
 const changePage = (delta: number) => {
@@ -428,7 +407,7 @@ const copyResetMessage = async () => {
       copyTimer = null
     }, 2000)
     resetModalError.value = ''
-  } catch (error) {
+  } catch {
     resetModalError.value = 'Unable to copy automatically. Please select and copy manually.'
   }
 }

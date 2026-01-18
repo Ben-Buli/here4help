@@ -3,7 +3,7 @@
     <!-- 頁面標題與操作 -->
     <div class="md:flex md:items-center md:justify-between">
       <div class="flex-1 min-w-0">
-        <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+        <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl">
           Task Management
         </h2>
         <p class="mt-1 text-sm text-gray-500">
@@ -38,14 +38,20 @@
 
     <!-- 篩選與搜尋 -->
     <div class="admin-card">
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <!-- 搜尋 -->
-        <div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <!-- 
+          搜尋欄位 - 可查詢條件：
+          - 任務標題 (Task title)
+          - 任務 ID (Task ID) - 輸入數字
+          - 創建者 ID (Creator ID) - 輸入數字
+          - 參與者 ID (Participant ID) - 輸入數字
+        -->
+        <div class="lg:col-span-2">
           <label class="block text-sm font-medium text-gray-700 mb-1">Search</label>
           <input
             v-model="filters.search"
             type="text"
-            placeholder="Task title, creator, participant..."
+            placeholder="Task title, Task ID, Creator ID, Participant ID..."
             class="admin-input px-2"
             @input="debouncedSearch"
           />
@@ -62,65 +68,25 @@
           </select>
         </div>
 
-        <!-- 創建者篩選 -->
+        <!-- 日期範圍 -->
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Creator</label>
-          <input
-            v-model="filters.creator_id"
-            type="number"
-            placeholder="Creator ID"
-            class="admin-input px-2"
-            @input="() => loadTasks()"
-          />
-        </div>
-
-        <!-- 參與者篩選 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Participant</label>
-          <input
-            v-model="filters.participant_id"
-            type="number"
-            placeholder="Participant ID"
-            class="admin-input px-2"
-            @input="() => loadTasks()"
-          />
-        </div>
-
-        <!-- 排序：改為點擊表頭控制，這裡預留佔位 -->
-        <!-- <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Sort</label>
-          <div class="text-sm text-gray-500 bg-gray-50 border rounded px-3 py-2">
-            Click table headers to sort
-          </div>
-        </div> -->
-      </div>
-
-      <!-- 日期範圍 -->
-      <div class="mt-4 flex items-center justify-between">
-        <div class="flex items-center space-x-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Date From</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+          <div class="flex items-center space-x-2">
             <input
               v-model="filters.date_from"
               type="date"
-              class="admin-input px-2"
+              class="admin-input px-2 w-full"
               @change="() => loadTasks()"
             />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Date To</label>
+            <span class="text-gray-400 text-sm">至</span>
             <input
               v-model="filters.date_to"
               type="date"
-              class="admin-input px-2"
+              class="admin-input px-2 w-full"
               @change="() => loadTasks()"
             />
           </div>
         </div>
-        <!-- <div class="flex items-center space-x-4 text-sm text-gray-500">
-          <span>Current sort:</span>
-          <span class="font-mono">{{ filters.sort_by || 'created_at' }} {{ filters.sort_order.toUpperCase() }}</span>
-        </div> -->
       </div>
     </div>
 
@@ -293,11 +259,9 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
 import { taskApi } from '@/services/api'
 
 const router = useRouter()
-const authStore = useAuthStore()
 
 // State
 const isLoading = ref(false)
@@ -318,11 +282,17 @@ const pagination = ref({
   last_page: 1,
 })
 
+/**
+ * 篩選條件
+ * search 欄位支援以下查詢：
+ * - 任務標題 (Task title)
+ * - 任務 ID (Task ID) - 輸入數字
+ * - 創建者 ID (Creator ID) - 輸入數字  
+ * - 參與者 ID (Participant ID) - 輸入數字
+ */
 const filters = reactive({
   search: '',
   status_id: '',
-  creator_id: '',
-  participant_id: '',
   date_from: '',
   date_to: '',
   sort_by: 'created_at',
@@ -336,13 +306,12 @@ const loadTasks = async (page = 1) => {
     const targetPage = Number(page) || 1
     const perPage = Number(pagination.value.per_page) || 15
 
+    // search 欄位會在後端解析，支援：Task title, Task ID, Creator ID, Participant ID
     const params = {
       page: targetPage,
       per_page: perPage,
       search: filters.search || undefined,
       status_id: filters.status_id ? parseInt(filters.status_id) : undefined,
-      creator_id: filters.creator_id ? parseInt(filters.creator_id) : undefined,
-      participant_id: filters.participant_id ? parseInt(filters.participant_id) : undefined,
       date_from: filters.date_from || undefined,
       date_to: filters.date_to || undefined,
       sort_by: filters.sort_by,
@@ -379,9 +348,6 @@ const loadTasks = async (page = 1) => {
   }
 }
 
-const refreshData = () => {
-  loadTasks(pagination.value.current_page)
-}
 
 const changePage = (page: number) => {
   const nextPage = Number(page)
@@ -410,10 +376,6 @@ const viewTask = (taskId: string | number) => {
   router.push(`/tasks/${taskId}`)
 }
 
-const exportTasks = () => {
-  // TODO: Implement task export functionality
-  alert('Export functionality coming soon!')
-}
 
 // Debounced search
 let searchTimeout: number

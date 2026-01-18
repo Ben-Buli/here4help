@@ -51,6 +51,7 @@ Route::prefix('admin')->group(function () {
 
         // 任務管理
         Route::prefix('tasks')->group(function () {
+            Route::get('/statuses', [TaskController::class, 'statuses'])->middleware('admin:tasks.view');
             Route::get('/', [TaskController::class, 'index'])->middleware('admin:tasks.list');
             Route::get('/{taskId}/reports', [TaskReportController::class, 'index'])->middleware('admin:tasks.view');
             Route::post('/reports/{reportId}/resolve', [TaskReportController::class, 'resolve'])->middleware('admin:tasks.edit');

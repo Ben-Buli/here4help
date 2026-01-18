@@ -212,7 +212,7 @@
 </template>
 
 <script>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 
 export default {
   name: 'FeeRevenuePage',

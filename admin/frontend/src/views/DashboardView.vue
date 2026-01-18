@@ -264,7 +264,6 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js'
-import { Line, Bar, Doughnut } from 'vue-chartjs'
 
 // Register Chart.js components
 ChartJS.register(
@@ -290,31 +289,6 @@ const taskStatusData = ref<any>(null)
 const dailyActivityData = ref<any>(null)
 const pointsDistributionData = ref<any>(null)
 
-// Chart options
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'top' as const,
-    },
-  },
-  scales: {
-    y: {
-      beginAtZero: true,
-    },
-  },
-}
-
-const doughnutOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'right' as const,
-    },
-  },
-}
 
 const loadDashboardData = async () => {
   try {
@@ -443,10 +417,6 @@ const loadMockChartData = () => {
 
 const refreshData = () => {
   loadDashboardData()
-}
-
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleString()
 }
 
 onMounted(() => {

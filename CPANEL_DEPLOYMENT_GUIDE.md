@@ -133,6 +133,28 @@ cd public_html/admin
 php artisan migrate --force
 ```
 
+#### 4. 部署後常用指令 (cPanel)
+```bash
+cd public_html/admin
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+php artisan view:clear
+```
+
+> 如需重新產生 APP_KEY：`php artisan key:generate --force`
+
+### 🔗 管理端 (Laravel) API 路由
+
+> 以下路由供 admin 前端使用（均在 `admin/routes/api.php`）  
+> 權限由 middleware `admin:*` 控制
+
+- `GET /api/admin/tasks`：任務列表
+- `GET /api/admin/tasks/{id}`：任務詳情
+- `GET /api/admin/tasks/statuses`：任務狀態列表（支援 `?active=1/0`）
+- `PATCH /api/admin/tasks/{id}/status`：更新任務狀態
+- `POST /api/admin/tasks/{taskId}/moderate`：管理員直接處理任務
+
 ### 🔄 啟動 Socket 伺服器
 
 #### 方法 1: 使用 PM2 (推薦)

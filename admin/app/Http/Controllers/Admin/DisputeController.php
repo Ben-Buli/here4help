@@ -255,15 +255,14 @@ class DisputeController extends Controller
             // 不使用 dispute_status_logs，改用 admin_activity_logs
 
             // 記錄管理員活動日誌
-            // 注意：因為 task_id 是 UUID，不能直接存入 record_id（INT 類型）
             DB::table('admin_activity_logs')->insert([
                 'admin_id' => $adminId,
                 'action' => "dispute_{$action}",
                 'table_name' => 'tasks',
-                'record_id' => null,  // UUID 不能存入 INT 欄位，設為 NULL
+                'record_id' => $id,
                 'old_data' => json_encode(['status_id' => $task->status_id]),
                 'new_data' => json_encode([
-                    'task_id' => $id,  // UUID 存在 JSON 中
+                    'task_id' => $id,
                     'status_id' => $newStatusId,
                     'action' => $action,
                     'notes' => $request->notes,
@@ -350,15 +349,14 @@ class DisputeController extends Controller
                     ]);
 
                 // 記錄管理員活動日誌
-                // 注意：因為 task_id 是 UUID，不能直接存入 record_id（INT 類型）
                 DB::table('admin_activity_logs')->insert([
                     'admin_id' => $adminId,
                     'action' => "dispute_batch_{$action}",
                     'table_name' => 'tasks',
-                    'record_id' => null,  // UUID 不能存入 INT 欄位，設為 NULL
+                    'record_id' => $taskId,
                     'old_data' => json_encode(['status_id' => $oldStatusId]),
                     'new_data' => json_encode([
-                        'task_id' => $taskId,  // UUID 存在 JSON 中
+                        'task_id' => $taskId,
                         'status_id' => $newStatusId,
                         'action' => $action,
                         'notes' => $request->notes,
@@ -828,7 +826,7 @@ class DisputeController extends Controller
                     'admin_id' => $admin->id,
                     'action' => 'resolve',
                     'table_name' => 'task_dispute_events',
-                    'record_id' => is_numeric($disputeId) ? (int)$disputeId : null,
+                    'record_id' => $disputeId,
                     'description' => "Admin resolved dispute {$disputeId} with decision: {$decision}",
                     'old_data' => json_encode([
                         'status' => $dispute->dispute_status,

@@ -49,8 +49,6 @@ export class ChatRoomPermissionService {
     config: ChatRoomPermissionConfig,
     action: PermissionAction
   ): PermissionResult {
-    const { roomType, userRole, roomStatus, isAssignedAdmin, isRoomCreator } = config
-
     // 基本權限檢查
     switch (action) {
       case 'view':
@@ -80,7 +78,7 @@ export class ChatRoomPermissionService {
    * 檢查查看權限
    */
   private static _checkViewPermission(config: ChatRoomPermissionConfig): PermissionResult {
-    const { roomType, userRole } = config
+    const { userRole } = config
 
     // 所有用戶都可以查看聊天室
     if (userRole === 'admin' || userRole === 'user') {
@@ -99,7 +97,7 @@ export class ChatRoomPermissionService {
    * 檢查發送訊息權限
    */
   private static _checkSendMessagePermission(config: ChatRoomPermissionConfig): PermissionResult {
-    const { roomType, userRole, roomStatus, isAssignedAdmin, isRoomCreator } = config
+    const { roomType, userRole, roomStatus } = config
 
     // 已關閉的聊天室不允許發送訊息
     if (roomStatus === 'closed' || roomStatus === 'resolved') {
@@ -190,7 +188,7 @@ export class ChatRoomPermissionService {
    * 檢查轉派權限
    */
   private static _checkTransferPermission(config: ChatRoomPermissionConfig): PermissionResult {
-    const { roomType, userRole, isAssignedAdmin } = config
+    const { userRole, isAssignedAdmin } = config
 
     // 只有管理員可以轉派
     if (userRole !== 'admin') {
@@ -215,7 +213,7 @@ export class ChatRoomPermissionService {
    * 檢查解決權限
    */
   private static _checkResolvePermission(config: ChatRoomPermissionConfig): PermissionResult {
-    const { roomType, userRole, isAssignedAdmin } = config
+    const { userRole, isAssignedAdmin } = config
 
     // 只有管理員可以解決
     if (userRole !== 'admin') {

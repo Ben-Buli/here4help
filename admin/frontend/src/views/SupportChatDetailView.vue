@@ -501,26 +501,6 @@ const sendMessage = async (event?: Event) => {
   }
 }
 
-const updateStatus = async (status: string) => {
-  try {
-    isLoading.value = true
-    
-    const response = await adminSupportApi.updateStatus(roomId, status as 'submitted' | 'in_progress' | 'resolved')
-    
-    if (response.data.success) {
-      // 只更新聊天室狀態，不重新載入整個聊天室（避免 Socket 重新連接）
-      await loadChatRoom(true) // skipSocketSetup = true
-    } else {
-      throw new Error(response.data.message || 'Failed to update status')
-    }
-  } catch (error: any) {
-    console.error('Failed to update status:', error)
-    alert(`Error: ${error.message}`)
-  } finally {
-    isLoading.value = false
-  }
-}
-
 const refreshData = async () => {
   const response = await adminSupportApi.getChatRoom(roomId)
   if (response.data.success) {
@@ -650,25 +630,12 @@ const getChatImageUrl = (imagePath: string) => {
   return imagePath
 }
 
-const openImageModal = (imagePath: string) => {
-  modalImageUrl.value = getChatImageUrl(imagePath)
-  showImageModal.value = true
-}
-
 const closeImageModal = () => {
   showImageModal.value = false
   modalImageUrl.value = ''
 }
 
-const handleImageError = () => {
-  console.error('Failed to load image')
-}
-
 // 圖片上傳相關方法
-const triggerImageUpload = () => {
-  imageInput.value?.click()
-}
-
 const handleImageUpload = (event: Event) => {
   const target = event.target as HTMLInputElement
   const files = target.files

@@ -1,5 +1,4 @@
 <template>
-  <div class="p-6 space-y-6">
     <div class="flex items-center justify-between flex-wrap gap-4">
       <div>
         <h1 class="text-2xl font-semibold text-gray-900">App Terms of Use</h1>
@@ -127,7 +126,6 @@
         </div>
       </div>
     </transition>
-  </div>
 </template>
 
 <script setup lang="ts">

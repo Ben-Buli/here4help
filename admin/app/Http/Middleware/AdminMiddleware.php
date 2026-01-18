@@ -143,15 +143,20 @@ class AdminMiddleware
     }
 
     /**
-     * 從請求中獲取資源 ID
+     * 從請求中獲取資源 ID（支援整數 ID 和 UUID）
      */
-    private function getResourceIdFromRequest(Request $request): ?int
+    private function getResourceIdFromRequest(Request $request): ?string
     {
         $path = $request->path();
         
-        // 從路徑中提取數字 ID
+        // 優先匹配 UUID 格式（如 01179c66-81b7-11f0-b900-de7dd6bb237f）
+        if (preg_match('/\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i', $path, $matches)) {
+            return $matches[1];
+        }
+        
+        // 匹配數字 ID
         if (preg_match('/\/(\d+)(?:\/|$)/', $path, $matches)) {
-            return (int) $matches[1];
+            return $matches[1];
         }
 
         return null;

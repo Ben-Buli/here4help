@@ -1,5 +1,4 @@
 <template>
-  <div class="space-y-6">
     <!-- 頁面標題和操作按鈕 -->
     <div class="flex justify-between items-center">
       <h1 class="text-2xl font-semibold text-gray-900">FAQ Management</h1>
@@ -192,7 +191,6 @@
       @close="closeModal"
       @save="handleSave"
     />
-  </div>
 </template>
 
 <script setup lang="ts">
@@ -433,7 +431,7 @@ const handleDragLeave = (index: number) => {
   }, 50)
 }
 
-const handleDrop = (dropIndex: number) => {
+const handleDrop = () => {
   // 順序已經在 updateVisualOrder 中更新了，這裡只需要清理狀態
   draggedIndex.value = null
   dragOverIndex.value = null

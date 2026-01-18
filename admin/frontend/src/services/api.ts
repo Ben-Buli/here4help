@@ -256,12 +256,9 @@ export const taskApi = {
     sort_order?: 'asc' | 'desc'
   }) => api.get<PaginatedResponse<any>>('/api/admin/tasks', { params }),
 
-  // Note: 任務狀態來自 backend API（非管理員 API），使用完整 URL
-  statuses: () => {
-    const backendUrl = API_CONFIG.backendUrl || 'https://hero4help.demofhs.com/backend'
-    const url = `${backendUrl}/api/tasks/statuses.php`
-    return axios.get<ApiResponse<any[]>>(url)
-  },
+  // 任務狀態（管理端 Laravel API）
+  statuses: (params?: { active?: 0 | 1 }) =>
+    api.get<ApiResponse<any[]>>('/api/admin/tasks/statuses', { params }),
 
   show: (id: string) =>
     api.get<
