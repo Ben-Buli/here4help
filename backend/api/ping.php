@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 /**
  * Ping API 端點
  * 用於檢查後端服務是否正常運作
@@ -11,7 +12,6 @@
  */
 
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 // 設置 CORS 頭
 header('Content-Type: application/json');

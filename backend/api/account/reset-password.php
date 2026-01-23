@@ -1,9 +1,7 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
-require_once __DIR__ . '/../../config/env_loader.php';
-require_once __DIR__ . '/../../utils/Response.php';
 require_once __DIR__ . '/../../utils/UserActiveLogger.php';
 
 // CORS headers
@@ -89,11 +87,11 @@ try {
     }
     
     // 查詢用戶
-    $userStmt = $pdo->prepare("SELECT id, password FROM users WHERE email = ? AND status != 'deleted'");
+    $userStmt = $pdo->prepare("SELECT id, password, permission FROM users WHERE email = ?");
     $userStmt->execute([$email]);
     $user = $userStmt->fetch(PDO::FETCH_ASSOC);
     
-    if (!$user) {
+    if (!$user || PermissionHelper::isDeleted($user['permission'] ?? 0)) {
         throw new Exception('User not found');
     }
     

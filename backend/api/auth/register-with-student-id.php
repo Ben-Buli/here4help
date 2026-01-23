@@ -1,11 +1,9 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
-require_once __DIR__ . '/../../utils/Response.php';
 require_once __DIR__ . '/../../utils/TermsManager.php';
 require_once __DIR__ . '/../../utils/AccountBlocker.php';
 
@@ -94,16 +92,14 @@ try {
     }
     
     // 可選：推薦碼驗證（如有輸入）
-    $introReferralCode = trim($_POST['intro_referral_code'] ?? '');
+    $introReferralCode = strtoupper(trim($_POST['intro_referral_code'] ?? ''));
     $referrerId = null;
     if (!empty($introReferralCode)) {
         $ref = $db->fetch("SELECT id, status, permission FROM users WHERE referral_code = ?", [$introReferralCode]);
         if (!$ref) {
             Response::error(ErrorCodes::INVALID_PARAMETER, 'Invalid referral code');
         }
-        $isStatusValid = in_array(strtolower($ref['status']), ['active', 'verified'], true);
-        $isPermissionValid = (int)($ref['permission'] ?? 0) > 0;
-        if (!($isStatusValid && $isPermissionValid)) {
+        if (!PermissionHelper::isVerified($ref['permission'] ?? 0)) {
             Response::error(ErrorCodes::INVALID_REQUEST, 'Referral code owner is not active verified');
         }
         $referrerId = $ref['id'];

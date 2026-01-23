@@ -1,9 +1,7 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
-require_once __DIR__ . '/../../config/env_loader.php';
-require_once __DIR__ . '/../../utils/Response.php';
 
 // CORS headers
 header('Content-Type: application/json');
@@ -45,11 +43,11 @@ try {
                    EnvLoader::get('DB_USERNAME'), EnvLoader::get('DB_PASSWORD'));
     
     // 檢查用戶是否存在
-    $stmt = $pdo->prepare("SELECT id, name, email FROM users WHERE email = ? AND status != 'deleted'");
+    $stmt = $pdo->prepare("SELECT id, name, email, permission FROM users WHERE email = ?");
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    if (!$user) {
+    if (!$user || PermissionHelper::isDeleted($user['permission'] ?? 0)) {
         // 為了安全考量，即使用戶不存在也返回成功訊息
         echo json_encode([
             'success' => true,

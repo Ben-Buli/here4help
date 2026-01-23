@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 // 添加 CORS 和 COOP 標頭
 header('Access-Control-Allow-Origin: *');
@@ -30,11 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // 引入必要的檔案
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
-require_once __DIR__ . '/../../utils/Response.php';
 
 // 載入環境配置
-require_once __DIR__ . '/../../config/env_loader.php';
 
 try {
     // 檢查是否為 GET 請求（OAuth 回調通常是 GET）

@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -21,7 +21,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 // 引入資料庫配置
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/Response.php';
 
 try {
     // 獲取 POST 資料
@@ -31,7 +30,7 @@ try {
         throw new Exception('Invalid JSON input');
     }
     
-    $referralCode = trim($input['referral_code'] ?? '');
+    $referralCode = strtoupper(trim($input['referral_code'] ?? ''));
     
     // 驗證輸入
     if (empty($referralCode)) {
@@ -41,8 +40,7 @@ try {
     // 建立資料庫連線
     $db = Database::getInstance();
     
-    // 檢查推薦碼是否存在且擁有者為有效用戶（status 有效且 permission > 0）
-    // 注意：部分資料庫內可能將 verified 與 active 作為不同標記，這裡兩者皆視為可用
+    // 檢查推薦碼是否存在且擁有者為有效用戶（permission >= 1）
     $stmt = $db->query(
         "SELECT id, name, nickname, email, status, permission FROM users 
          WHERE referral_code = ?",
@@ -59,11 +57,7 @@ try {
         exit;
     }
 
-    // 條件：擁有者狀態需為 active 或 verified，且 permission > 0（視為通過管理員核可的正式用戶）
-    $isStatusValid = in_array(strtolower($user['status']), ['active', 'verified'], true);
-    $isPermissionValid = (int)($user['permission'] ?? 0) > 0;
-
-    if (!($isStatusValid && $isPermissionValid)) {
+    if (!PermissionHelper::isVerified($user['permission'] ?? 0)) {
         echo json_encode([
             'success' => false,
             'message' => 'Referral code owner is not an active verified user'
@@ -90,4 +84,3 @@ try {
     ]);
 }
 ?>
-

@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * GET /api/wallet/withdraw-fee-settings.php
@@ -8,8 +8,6 @@ require_once __DIR__ . '/../../config/php84_compatibility.php';
  */
 
 require_once dirname(__DIR__, 2) . '/config/database.php';
-require_once dirname(__DIR__, 2) . '/utils/Response.php';
-require_once dirname(__DIR__, 2) . '/utils/JWTManager.php';
 
 Response::setCorsHeaders();
 

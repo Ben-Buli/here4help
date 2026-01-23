@@ -1,9 +1,7 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../../config/php84_compatibility.php';
 
-require_once __DIR__ . '/../../../config/env_loader.php';
-require_once __DIR__ . '/../../../utils/Response.php';
 require_once __DIR__ . '/../../../utils/TokenValidator.php';
 require_once __DIR__ . '/../../../utils/UserActiveLogger.php';
 require_once __DIR__ . '/../../../utils/socket_notifier.php';

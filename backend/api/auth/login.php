@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-// require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 // 啟用輸出緩衝，避免任何非 JSON 前置輸出破壞回應
 ob_start();
@@ -35,10 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // 引入資料庫配置
-require_once __DIR__ . '/../../config/env_loader.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
 
 // 確保環境配置已載入
 EnvLoader::load();

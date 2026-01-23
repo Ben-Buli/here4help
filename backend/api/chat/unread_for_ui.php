@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * NOTICE: 此 API 過於複雜，建議拆分為多個專用端點
@@ -24,7 +24,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
-require_once __DIR__ . '/../../utils/Response.php';
 
 
 try {

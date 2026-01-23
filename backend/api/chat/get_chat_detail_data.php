@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * 聊天室聚合詳情 API
@@ -8,10 +8,8 @@ require_once __DIR__ . '/../../config/php84_compatibility.php';
  * 回傳：room 基本資訊、task 基本資訊、user_role、chat_partner_info
  */
 
-require_once __DIR__ . '/../../config/env_loader.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
-require_once __DIR__ . '/../../utils/Response.php';
 
 // 確保環境變數已載入
 EnvLoader::load();

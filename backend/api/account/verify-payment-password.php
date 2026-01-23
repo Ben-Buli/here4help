@@ -1,10 +1,8 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 require_once dirname(__DIR__, 2) . '/config/database.php';
-require_once dirname(__DIR__, 2) . '/utils/response.php';
-require_once dirname(__DIR__, 2) . '/utils/JWTManager.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -65,10 +63,10 @@ try {
     $db = Database::getInstance();
     
     // 查詢用戶的付款密碼
-    $sql = "SELECT id, payment_password FROM users WHERE id = ? AND status != 'deleted'";
+    $sql = "SELECT id, payment_password, permission FROM users WHERE id = ?";
     $user = $db->fetch($sql, [$userId]);
     
-    if (!$user) {
+    if (!$user || PermissionHelper::isDeleted($user['permission'] ?? 0)) {
         Response::error('User not found', 404);
     }
     

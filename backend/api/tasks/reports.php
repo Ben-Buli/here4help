@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * 任務檢舉管理 API
@@ -13,9 +13,6 @@ require_once __DIR__ . '/../../config/php84_compatibility.php';
  */
 
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
-require_once __DIR__ . '/../../utils/Response.php';
-require_once __DIR__ . '/../../auth_helper.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');

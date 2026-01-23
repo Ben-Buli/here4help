@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * GET /api/users/public-info.php?user_id=123
@@ -9,9 +9,6 @@ require_once __DIR__ . '/../../config/php84_compatibility.php';
  */
 
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/Response.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
-require_once __DIR__ . '/../../auth_helper.php';
 
 Response::setCorsHeaders();
 
@@ -41,14 +38,16 @@ try {
             id,
             name,
             nickname,
-            avatar_url
+            avatar_url,
+            permission
         FROM users 
-        WHERE id = ? AND status = 'active'
+        WHERE id = ?
     ";
     
     $user = $db->fetch($userQuery, [$targetUserId]);
     
-    if (!$user) {
+    if (!$user || PermissionHelper::isDeleted($user['permission'] ?? 0) ||
+        PermissionHelper::isSuspended($user['permission'] ?? 0)) {
         Response::error('User not found or inactive', 404);
     }
     

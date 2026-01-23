@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../../config/php84_compatibility.php';
 
 /**
  * 調試版本的 list_by_user.php
@@ -12,7 +12,6 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../utils/Response.php';
 
 Response::setCorsHeaders();
 

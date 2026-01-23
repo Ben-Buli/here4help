@@ -1,10 +1,8 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/Response.php';
-require_once __DIR__ . '/../../config/env_loader.php';
 require_once __DIR__ . '/../../utils/TermsManager.php';
 require_once __DIR__ . '/../../utils/AccountBlocker.php';
 
@@ -79,7 +77,7 @@ try {
     $primaryLanguage = trim($_POST['primary_language'] ?? 'English');
     $isPermanentAddressRaw = $_POST['is_permanent_address'] ?? false;
     $isPermanentAddress = filter_var($isPermanentAddressRaw, FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
-    $introReferralCode = trim($_POST['intro_referral_code'] ?? '');
+    $introReferralCode = strtoupper(trim($_POST['intro_referral_code'] ?? ''));
     $paymentPassword = $_POST['payment_password'] ?? null;
     $avatarUrl = trim($_POST['avatar_url'] ?? ($tempUser['avatar_url'] ?? ''));
 
@@ -102,9 +100,7 @@ try {
         if (!$ref) {
             Response::error('Invalid referral code');
         }
-        $isStatusValid = in_array(strtolower($ref['status']), ['active', 'verified'], true);
-        $isPermissionValid = (int)($ref['permission'] ?? 0) > 0;
-        if (!($isStatusValid && $isPermissionValid)) {
+        if (!PermissionHelper::isVerified($ref['permission'] ?? 0)) {
             Response::error('Referral code owner is not active verified');
         }
         $referrerId = $ref['id'];

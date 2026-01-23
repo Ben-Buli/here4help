@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * 統一標記已讀 API - 遵循聊天系統規格文件標準
@@ -25,7 +25,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
-require_once __DIR__ . '/../../utils/Response.php';
 require_once __DIR__ . '/../../utils/ChatSecurity.php';
 
 

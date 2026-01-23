@@ -1,17 +1,14 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * 媒體檔案上傳 API
  * 支援聊天室、申訴、頭像等不同情境的檔案上傳
  */
 
-require_once __DIR__ . '/../../config/env_loader.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/MediaValidator.php';
-require_once __DIR__ . '/../../utils/Response.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Logger.php';
 
 // 禁用自動日誌記錄

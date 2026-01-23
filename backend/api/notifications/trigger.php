@@ -1,15 +1,12 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * 通知觸發 API
  * 用於手動觸發通知事件
  */
 
-require_once __DIR__ . '/../../config/env_loader.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
-require_once __DIR__ . '/../../utils/Response.php';
 require_once __DIR__ . '/../../utils/NotificationManager.php';
 
 // 設定 CORS

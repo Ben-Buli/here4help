@@ -1,15 +1,12 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * 站內通知 API
  * 處理站內通知的查詢、標記已讀、刪除等操作
  */
 
-require_once __DIR__ . '/../../config/env_loader.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
-require_once __DIR__ . '/../../utils/Response.php';
 require_once __DIR__ . '/../../database/database_manager.php';
 require_once __DIR__ . '/../../utils/Logger.php';
 

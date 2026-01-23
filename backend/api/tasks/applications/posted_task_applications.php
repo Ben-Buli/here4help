@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../../config/php84_compatibility.php';
 
 /**
  * Posted Tasks 聚合 API
@@ -8,11 +8,7 @@ require_once __DIR__ . '/../../../config/php84_compatibility.php';
  * 專為 Posted Tasks 分頁設計的聚合數據API
  */
 
-require_once __DIR__ . '/../../../config/env_loader.php';
 require_once __DIR__ . '/../../../config/database.php';
-require_once __DIR__ . '/../../../utils/Response.php';
-require_once __DIR__ . '/../../../utils/JWTManager.php';
-require_once __DIR__ . '/../../../auth_helper.php';
 
 // 確保環境變數已載入
 EnvLoader::load();

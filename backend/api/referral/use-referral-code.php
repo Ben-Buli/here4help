@@ -1,9 +1,8 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/Response.php';
 
 Response::setCorsHeaders();
 
@@ -44,8 +43,8 @@ try {
         exit;
     }
     
-    // 檢查推薦碼擁有者是否為有效用戶（status 有效且 permission > 0）
-    if (!(($referralData['status'] === 'active' || $referralData['status'] === 'verified') && ((int)$referralData['permission'] > 0))) {
+    // 檢查推薦碼擁有者是否為有效用戶（permission >= 1）
+    if (!PermissionHelper::isVerified($referralData['permission'] ?? 0)) {
         Response::error('Referral code is not active');
         exit;
     }

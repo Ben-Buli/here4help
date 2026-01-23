@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -11,10 +11,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(0); }
 
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/TokenValidator.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
-require_once __DIR__ . '/../../auth_helper.php';
-require_once __DIR__ . '/../../utils/Response.php';
-require_once __DIR__ . '/../../config/env_loader.php';
 
 // 確保環境變數已載入
 EnvLoader::load();

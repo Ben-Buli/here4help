@@ -1,9 +1,8 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/Response.php';
 require_once '../../middleware/AuthMiddleware.php';
 
 Response::setCorsHeaders();
@@ -37,14 +36,7 @@ try {
         exit;
     }
     
-    // 檢查用戶是否為有效用戶：狀態有效且（若有 permission 欄位）permission > 0
-    // 若無 permission 欄位，向後相容僅檢查狀態
-    $isStatusOk = ($user['status'] === 'active' || $user['status'] === 'verified');
-    $permissionOk = true;
-    if (array_key_exists('permission', $user)) {
-        $permissionOk = ((int)$user['permission']) > 0;
-    }
-    if (!($isStatusOk && $permissionOk)) {
+    if (!PermissionHelper::isVerified($user['permission'] ?? 0)) {
         Response::error('User must be verified to get referral code');
         exit;
     }

@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * JWT Token 刷新端點
@@ -8,8 +8,6 @@ require_once __DIR__ . '/../../config/php84_compatibility.php';
  */
 
 require_once __DIR__ . '/../../middleware/api_middleware.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
-require_once __DIR__ . '/../../utils/Response.php';
 
 // 執行中介層
 ApiMiddleware::handle(['skip_rate_limit' => false]);

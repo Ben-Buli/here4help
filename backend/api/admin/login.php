@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * 管理員登入 API
@@ -8,8 +8,6 @@ require_once __DIR__ . '/../../config/php84_compatibility.php';
  */
 
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/Response.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
 
 Response::setCorsHeaders();
 

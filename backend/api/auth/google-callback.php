@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 // 完整的 CORS 標頭，支援三域跨域
 header('Access-Control-Allow-Origin: *');
@@ -31,11 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // 引入必要的檔案
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
-require_once __DIR__ . '/../../utils/Response.php';
 
 // 載入環境配置
-require_once __DIR__ . '/../../config/env_loader.php';
 
 // 啟動 session 管理（僅在需要時）
 if (function_exists('session_status') && session_status() === PHP_SESSION_NONE) {

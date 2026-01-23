@@ -1,11 +1,8 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /// 操作帳號軟刪除
-require_once __DIR__ . '/../../config/env_loader.php';
-require_once __DIR__ . '/../../utils/Response.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/UserActiveLogger.php';
 
 // CORS headers
@@ -88,7 +85,7 @@ try {
     }
     
     // 檢查用戶是否已被管理員停權
-    if ($user['permission'] == -1 || $user['status'] == 'banned') {
+    if (PermissionHelper::isAdminSuspended($user['permission'] ?? 0)) {
         throw new Exception('Account is suspended by administrator. Please contact support for account deletion.');
     }
     

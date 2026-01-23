@@ -1,6 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 // 載入 PHP 8.4 相容性配置
-require_once __DIR__ . '/../../config/php84_compatibility.php';
 
 /**
  * GET /api/ratings/user-stats
@@ -8,11 +8,7 @@ require_once __DIR__ . '/../../config/php84_compatibility.php';
  * 包含平均評分、總評論數、總被評論數
  */
 
-require_once __DIR__ . '/../../config/env_loader.php';
 require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../utils/Response.php';
-require_once __DIR__ . '/../../utils/JWTManager.php';
-require_once __DIR__ . '/../../auth_helper.php';
 
 // 確保環境配置已載入
 EnvLoader::load();
