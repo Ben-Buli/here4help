@@ -87,10 +87,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
       // 檢查 Provider 是否已初始化
       if (chatProvider?.isInitialized == true) {
-        debugPrint('✅ [Posted Tasks] Provider 已初始化，檢查分頁狀態');
+        if (kDebugMode) debugPrint('✅ [Posted Tasks] Provider 已初始化，檢查分頁狀態');
         _checkAndLoadIfNeeded();
       } else {
-        debugPrint('⏳ [Posted Tasks] Provider 未初始化，等待初始化完成');
+        if (kDebugMode) debugPrint('⏳ [Posted Tasks] Provider 未初始化，等待初始化完成');
         // 等待 Provider 初始化完成
         _initializationListener = () {
           if (!mounted) return;
@@ -133,39 +133,40 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
     // 檢查 Provider 是否已初始化
     if (!chatProvider.isInitialized) {
-      debugPrint('⏳ [Posted Tasks] Provider 尚未初始化，跳過載入檢查');
+      if (kDebugMode) debugPrint('⏳ [Posted Tasks] Provider 尚未初始化，跳過載入檢查');
       return;
     }
 
     // 檢查當前是否為 Posted Tasks 分頁且可見
     if (chatProvider.isPostedTasksTab) {
-      debugPrint('🔍 [Posted Tasks] 當前為 Posted Tasks 分頁，檢查載入狀態');
-      debugPrint(
-          '  - 分頁載入狀態: ${chatProvider.isTabLoading(ChatListProvider.tabPostedTasks)}');
-      debugPrint(
-          '  - 分頁載入完成: ${chatProvider.isTabLoaded(ChatListProvider.tabPostedTasks)}');
-      debugPrint(
-          '  - 分頁錯誤: ${chatProvider.getTabError(ChatListProvider.tabPostedTasks)}');
+      if (kDebugMode) {
+        debugPrint('🔍 [Posted Tasks] 當前為 Posted Tasks 分頁，檢查載入狀態');
+        debugPrint(
+            '  - 分頁載入狀態: ${chatProvider.isTabLoading(ChatListProvider.tabPostedTasks)}');
+        debugPrint(
+            '  - 分頁載入完成: ${chatProvider.isTabLoaded(ChatListProvider.tabPostedTasks)}');
+        debugPrint(
+            '  - 分頁錯誤: ${chatProvider.getTabError(ChatListProvider.tabPostedTasks)}');
+      }
 
       // 如果分頁尚未載入且不在載入中，觸發載入
       if (!chatProvider.isTabLoaded(ChatListProvider.tabPostedTasks) &&
           !chatProvider.isTabLoading(ChatListProvider.tabPostedTasks)) {
-        debugPrint('🚀 [Posted Tasks] 觸發分頁數據載入');
+        if (kDebugMode) debugPrint('🚀 [Posted Tasks] 觸發分頁數據載入');
 
         // 先觸發 Provider 的載入
         chatProvider.checkAndTriggerTabLoad(ChatListProvider.tabPostedTasks);
 
         // 同時直接載入任務數據
+
         debugPrint('🚀 [Posted Tasks] 直接調用 _fetchAllTasks() 載入任務數據');
         _fetchAllTasks();
       } else {
         debugPrint('✅ [Posted Tasks] 分頁已載入或正在載入中');
 
         // 即使分頁已載入，也要檢查本地任務數據是否需要更新
-        if (_allTasks.isEmpty) {
-          debugPrint('🔄 [Posted Tasks] 分頁已載入但本地任務數據為空，重新載入任務數據');
-          _fetchAllTasks();
-        }
+        debugPrint('🔄 [Posted Tasks] 分頁已載入但本地任務數據為空，重新載入任務數據');
+        _fetchAllTasks();
       }
     } else {
       debugPrint('⏸️ [Posted Tasks] 當前不是 Posted Tasks 分頁，跳過載入');
@@ -257,9 +258,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
 
       // 只有狀態真正改變時才更新
       if (oldState != hasUnread) {
-        if (kDebugMode && verboseSearchLog) {
-          debugPrint('🔄 [Posted Tasks] 未讀狀態變化: $oldState -> $hasUnread');
-        }
+        debugPrint('🔄 [Posted Tasks] 未讀狀態變化: $oldState -> $hasUnread');
 
         // 使用 addPostFrameCallback 避免在 build 過程中調用
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -284,9 +283,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
           }
         });
       } else {
-        if (kDebugMode && verboseSearchLog) {
-          debugPrint('🔄 [Posted Tasks] 未讀狀態未改變，跳過更新: $hasUnread');
-        }
+        debugPrint('🔄 [Posted Tasks] 未讀狀態未改變，跳過更新: $hasUnread');
       }
     } catch (e) {
       debugPrint('❌ [Posted Tasks] 更新 Tab 未讀狀態失敗: $e');
@@ -301,9 +298,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       _unreadSub = NotificationCenter().byRoomStream.listen((unreadData) {
         if (!mounted) return;
 
-        if (kDebugMode && verboseSearchLog) {
-          debugPrint('📡 [Posted Tasks] 收到未讀數據更新: ${unreadData.length} 個房間');
-        }
+        debugPrint('📡 [Posted Tasks] 收到未讀數據更新: ${unreadData.length} 個房間');
 
         // 只更新 Tab 未讀標記，不重複呼叫 replaceUnreadByRoom
         Future.delayed(const Duration(milliseconds: 100), () {
@@ -447,9 +442,7 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
   /// 確保未讀數據已載入
   Future<void> _ensureUnreadDataLoaded() async {
     try {
-      if (kDebugMode && verboseSearchLog) {
-        debugPrint('🔄 [Posted Tasks] 開始載入未讀數據...');
-      }
+      debugPrint('🔄 [Posted Tasks] 開始載入未讀數據...');
 
       // 等待 NotificationCenter 初始化完成
       await NotificationCenter().waitForUnreadData();
@@ -882,10 +875,10 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
       ChatListProvider chatProvider) {
     switch (chatProvider.currentSortBy) {
       case 'status_order':
-        final aOrder =
-            int.tryParse(a['sort_order']?.toString() ?? '') ?? (int.tryParse(a['status_id']?.toString() ?? '') ?? 999);
-        final bOrder =
-            int.tryParse(b['sort_order']?.toString() ?? '') ?? (int.tryParse(b['status_id']?.toString() ?? '') ?? 999);
+        final aOrder = int.tryParse(a['sort_order']?.toString() ?? '') ??
+            (int.tryParse(a['status_id']?.toString() ?? '') ?? 999);
+        final bOrder = int.tryParse(b['sort_order']?.toString() ?? '') ??
+            (int.tryParse(b['status_id']?.toString() ?? '') ?? 999);
         final orderComparison = aOrder.compareTo(bOrder);
         if (orderComparison != 0) {
           return chatProvider.sortAscending
@@ -1004,11 +997,8 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
             //     '  - chatProvider.searchQuery: "${chatProvider.searchQuery}"');
 
             if (chatProvider.isTabLoading(0)) {
-              debugPrint('🔍 [Posted Tasks] [build()] 顯示載入中狀態');
               return _buildLoadingState();
             } else if (chatProvider.getTabError(0) != null) {
-              debugPrint(
-                  '🔍 [Posted Tasks] [build()] 顯示錯誤狀態: ${chatProvider.getTabError(0)}');
               return _buildErrorState(chatProvider);
             }
             // 使用 ChatListProvider 的篩選結果（支援即時搜尋和篩選）
@@ -1016,11 +1006,13 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
               builder: (context, chatProvider, child) {
                 final filteredTasks = chatProvider.filteredPostedTasks;
 
-                debugPrint(
-                    '🔍 [Posted Tasks] 使用 ChatListProvider 篩選結果: ${filteredTasks.length} 個任務');
-                debugPrint('  - 搜尋查詢: "${chatProvider.searchQuery}"');
-                debugPrint('  - 選中位置: ${chatProvider.selectedLocations}');
-                debugPrint('  - 選中狀態: ${chatProvider.selectedStatuses}');
+                if (kDebugMode) {
+                  debugPrint(
+                      '🔍 [Posted Tasks] 使用 ChatListProvider 篩選結果: ${filteredTasks.length} 個任務');
+                  debugPrint('  - 搜尋查詢: "${chatProvider.searchQuery}"');
+                  debugPrint('  - 選中位置: ${chatProvider.selectedLocations}');
+                  debugPrint('  - 選中狀態: ${chatProvider.selectedStatuses}');
+                }
 
                 return RefreshIndicator(
                   onRefresh: () async {
@@ -1579,18 +1571,6 @@ class _PostedTasksWidgetState extends State<PostedTasksWidget>
     final currentPermission = userService.getCurrentPermissionLevel();
     final isAdmin = PermissionService.canAccessAdmin(currentPermission);
     final isPendingConfirmation = task['status_id'] == 3;
-
-    // 調試日誌
-    debugPrint('🔍 [Posted Tasks] Timeup 按鈕調試:');
-    debugPrint('  - 任務 ID: ${task['id']}');
-    debugPrint('  - 任務標題: ${task['title']}');
-    debugPrint('  - 當前用戶權限: $currentPermission');
-    debugPrint('  - isAdmin: $isAdmin');
-    debugPrint('  - 任務狀態結構: $task');
-    debugPrint('  - 任務狀態 code: ${task['status_id']}');
-    debugPrint('  - isPendingConfirmation: $isPendingConfirmation');
-    debugPrint('  - displayStatus: $displayStatus');
-    debugPrint('  - 應該顯示 Timeup 按鈕: ${isAdmin && isPendingConfirmation}');
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

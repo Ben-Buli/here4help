@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:provider/provider.dart';
@@ -612,11 +613,13 @@ class _MyWorksWidgetState extends State<MyWorksWidget> {
           builder: (context, chatProvider, child) {
             final filteredWorks = chatProvider.filteredMyWorks;
 
-            debugPrint(
-                '🔍 [My Works] 使用 ChatListProvider 篩選結果: ${filteredWorks.length} 個任務');
-            debugPrint('  - 搜尋查詢: "${chatProvider.searchQuery}"');
-            debugPrint('  - 選中位置: ${chatProvider.selectedLocations}');
-            debugPrint('  - 選中狀態: ${chatProvider.selectedStatuses}');
+            if (kDebugMode) {
+              debugPrint(
+                  '🔍 [My Works] 使用 ChatListProvider 篩選結果: ${filteredWorks.length} 個任務');
+              debugPrint('  - 搜尋查詢: "${chatProvider.searchQuery}"');
+              debugPrint('  - 選中位置: ${chatProvider.selectedLocations}');
+              debugPrint('  - 選中狀態: ${chatProvider.selectedStatuses}');
+            }
 
             return RefreshIndicator(
               onRefresh: () async {

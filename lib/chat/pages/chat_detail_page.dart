@@ -28,7 +28,7 @@ import 'package:provider/provider.dart';
 
 import 'package:photo_view/photo_view.dart';
 import 'package:here4help/utils/path_mapper.dart';
-import 'package:here4help/services/theme_config_manager.dart';
+import 'package:here4help/theme/h4h_theme_extension.dart';
 import 'dart:ui';
 import 'package:here4help/services/notification_service.dart';
 import 'package:here4help/chat/providers/chat_list_provider.dart';
@@ -234,13 +234,17 @@ class _ChatDetailPageState extends State<ChatDetailPage>
   /// 取得玻璃導航顏色
   Color _glassNavColor(BuildContext context) {
     try {
-      final themeManager =
-          Provider.of<ThemeConfigManager>(context, listen: false);
-      return themeManager.navigationBarBackground;
+      final themeExtension =
+          Theme.of(context).extension<Here4HelpThemeExtension>();
+      if (themeExtension != null) {
+        return themeExtension.navigationBarBackground;
+      }
     } catch (_) {
       final appBarBg = Theme.of(context).appBarTheme.backgroundColor;
       return (appBarBg ?? Colors.white).withOpacity(0.3);
     }
+    final appBarBg = Theme.of(context).appBarTheme.backgroundColor;
+    return (appBarBg ?? Colors.white).withOpacity(0.3);
   }
 
   /// 根據用戶角色獲取配色方案

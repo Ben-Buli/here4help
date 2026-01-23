@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'package:here4help/theme/h4h_theme_extension.dart';
 
 /// 主題色系配置
 class ThemeScheme {
@@ -29,19 +30,6 @@ class ThemeScheme {
   // 新增 backArrowColor 與 backArrowColorInactive
   final Color backArrowColor;
   final Color backArrowColorInactive;
-
-  // 新增 task_create_page.dart 需要的顏色屬性
-  final Color cardBackground; // 卡片背景色
-  final Color cardBorder; // 卡片邊框色
-  final Color inputBackground; // 輸入框背景色
-  final Color inputBorder; // 輸入框邊框色
-  final Color hintText; // 提示文字顏色
-  final Color disabledText; // 禁用文字顏色
-  final Color divider; // 分割線顏色
-  final Color overlay; // 遮罩顏色
-  final Color successBackground; // 成功背景色
-  final Color warningBackground; // 警告背景色
-  final Color errorBackground; // 錯誤背景色
 
   // 新增 AppBar 標題與次標題顏色（可選）。若未提供，將在 ThemeConfigManager 中自動推導
   final Color? appBarTitleColor;
@@ -75,17 +63,6 @@ class ThemeScheme {
     this.gradientEnd,
     required this.backArrowColor,
     required this.backArrowColorInactive,
-    this.cardBackground = const Color(0xFFFFFFFF), // 白色
-    this.cardBorder = const Color(0xFFE5E7EB), // 淺灰色
-    this.inputBackground = const Color(0xFFFFFFFF), // 白色
-    this.inputBorder = const Color(0xFFD1D5DB), // 中灰色
-    this.hintText = const Color(0xFF9CA3AF), // 深灰色
-    this.disabledText = const Color(0xFF6B7280), // 中深灰色
-    this.divider = const Color(0xFFF3F4F6), // 極淺灰色
-    this.overlay = const Color(0x80000000), // 半透明黑色
-    this.successBackground = const Color(0xFFD1FAE5), // 淺綠色
-    this.warningBackground = const Color(0xFFFEF3C7), // 淺橙色
-    this.errorBackground = const Color(0xFFFEE2E2), // 淺紅色
     this.appBarTitleColor,
     this.appBarSubtitleColor,
   });
@@ -112,17 +89,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFFB5D2E5),
     backArrowColor: Color(0xFFFFFFFF), // 與 AppBar 標題顏色相同
     backArrowColorInactive: Color(0x80FFFFFF), // Disable 狀態：半透明白色 (0.5 opacity)
-    cardBackground: Color(0xFFFFFFFF),
-    cardBorder: Color(0xFFE0E7EF),
-    inputBackground: Color(0xFFFFFFFF),
-    inputBorder: Color(0xFFB8D0E0),
-    hintText: Color(0xFF6B7280),
-    disabledText: Color(0xFF94A3B8),
-    divider: Color(0xFFE5EDF5),
-    overlay: Color(0x800C4C7B),
-    successBackground: Color(0xFFD1FAE5),
-    warningBackground: Color(0xFFFFEDD5),
-    errorBackground: Color(0xFFFEE2E2),
     appBarTitleColor: Color(0xFFFFFFFF), // 白色主要文字
     appBarSubtitleColor:
         Color.fromARGB(179, 12, 76, 123), // 深色略微透明 (0.7 opacity)
@@ -150,17 +116,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFF2A3A4A),
     backArrowColor: Color(0xFF5BB3E8), // 淺藍色返回箭頭
     backArrowColorInactive: Color(0xFF3B9ACF), // 中等藍色非活動返回箭頭
-    cardBackground: Color(0xFF1F2933), // 深色卡片背景
-    cardBorder: Color(0xFF2A3A4A), // 深色卡片邊框
-    inputBackground: Color(0xFF1F2933), // 深色輸入框背景
-    inputBorder: Color(0xFF3A4A5A), // 深色輸入框邊框
-    hintText: Color(0xFF6B7280), // 灰色提示文字
-    disabledText: Color(0xFF4A5568), // 深灰色禁用文字
-    divider: Color(0xFF2A3A4A), // 深色分割線
-    overlay: Color(0xCC000000), // 深色遮罩
-    successBackground: Color(0xFF1A3A2A), // 深色成功背景
-    warningBackground: Color(0xFF3A2A1A), // 深色警告背景
-    errorBackground: Color(0xFF3A1A1A), // 深色錯誤背景
     appBarTitleColor: Color(0xFFFFFFFF), // 白色 AppBar 標題
     appBarSubtitleColor:
         Color.fromARGB(204, 229, 237, 245), // 淺色略微透明 AppBar 次標題 (0.8 opacity)
@@ -188,17 +143,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFFB5D2E5),
     backArrowColor: Color(0xFFFFFFFF), // 與 AppBar 標題顏色相同
     backArrowColorInactive: Color(0x80FFFFFF), // Disable 狀態：半透明白色 (0.5 opacity)
-    cardBackground: Color(0xFFFFFFFF),
-    cardBorder: Color(0xFFD0E8F0),
-    inputBackground: Color(0xFFFFFFFF),
-    inputBorder: Color(0xFFB5D2E5),
-    hintText: Color(0xFF6B7280),
-    disabledText: Color(0xFF94A3B8),
-    divider: Color(0xFFE0EDF5),
-    overlay: Color(0x803B9ACF),
-    successBackground: Color(0xFFD1FAE5),
-    warningBackground: Color(0xFFFFEDD5),
-    errorBackground: Color(0xFFFEE2E2),
     appBarTitleColor: Color(0xFFFFFFFF), // 白色 AppBar 標題（確保在藍色背景上有足夠對比度）
     appBarSubtitleColor: Color(0xFFFFFFFF), // 白色 AppBar 次標題
     backgroundGradient: [
@@ -233,17 +177,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFF8B5CF6), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
-    cardBackground: Color(0xFFFFFFFF), // 白色卡片背景
-    cardBorder: Color(0xFFE5E7EB), // 淺灰色邊框
-    inputBackground: Color(0xFFFFFFFF), // 白色輸入框背景
-    inputBorder: Color(0xFFD1D5DB), // 中灰色輸入框邊框
-    hintText: Color(0xFF9CA3AF), // 深灰色提示文字
-    disabledText: Color(0xFF6B7280), // 中深灰色禁用文字
-    divider: Color(0xFFF3F4F6), // 極淺灰色分割線
-    overlay: Color(0x80000000), // 半透明黑色遮罩
-    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
-    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
-    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// Meta 商業網站風格 (Meta Business Style) - 淡紫色主題
@@ -277,17 +210,6 @@ class ThemeScheme {
     gradientEnd: Alignment.bottomRight,
     backArrowColor: Color(0xFF1C1E21),
     backArrowColorInactive: Color(0x4D1C1E21),
-    cardBackground: Color(0xFFFFFFFF), // 白色卡片背景
-    cardBorder: Color(0xFFE5E7EB), // 淺灰色邊框
-    inputBackground: Color(0xFFFFFFFF), // 白色輸入框背景
-    inputBorder: Color(0xFFD1D5DB), // 中灰色輸入框邊框
-    hintText: Color(0xFF9CA3AF), // 深灰色提示文字
-    disabledText: Color(0xFF6B7280), // 中深灰色禁用文字
-    divider: Color(0xFFF3F4F6), // 極淺灰色分割線
-    overlay: Color(0x80000000), // 半透明黑色遮罩
-    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
-    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
-    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 商業漸層風格 (Business Gradient) - 淺粉紅到淺黃色到淺藍色
@@ -324,17 +246,6 @@ class ThemeScheme {
     gradientEnd: Alignment.bottomRight,
     backArrowColor: Color(0xFF1F2937),
     backArrowColorInactive: Color(0x4D1F2937),
-    cardBackground: Color(0xFFFFFFFF), // 白色卡片背景
-    cardBorder: Color(0xFFE5E7EB), // 淺灰色邊框
-    inputBackground: Color(0xFFFFFFFF), // 白色輸入框背景
-    inputBorder: Color(0xFFD1D5DB), // 中灰色輸入框邊框
-    hintText: Color(0xFF9CA3AF), // 深灰色提示文字
-    disabledText: Color(0xFF6B7280), // 中深灰色禁用文字
-    divider: Color(0xFFF3F4F6), // 極淺灰色分割線
-    overlay: Color(0x80000000), // 半透明黑色遮罩
-    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
-    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
-    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 莫蘭迪藍色系
@@ -359,17 +270,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFF6B7A85), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
-    cardBackground: Color(0xFFF8FAFC), // 淺藍色卡片背景
-    cardBorder: Color(0xFFE2E8F0), // 淺藍灰色邊框
-    inputBackground: Color(0xFFF8FAFC), // 淺藍色輸入框背景
-    inputBorder: Color(0xFFCBD5E1), // 中藍灰色輸入框邊框
-    hintText: Color(0xFF64748B), // 深藍灰色提示文字
-    disabledText: Color(0xFF475569), // 中深藍灰色禁用文字
-    divider: Color(0xFFF1F5F9), // 極淺藍灰色分割線
-    overlay: Color(0x80000000), // 半透明黑色遮罩
-    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
-    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
-    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 莫蘭迪綠色系 - 抹茶綠
@@ -394,17 +294,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFF6A8A6A), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
-    cardBackground: Color(0xFFF8FCF8), // 淺綠色卡片背景
-    cardBorder: Color(0xFFE2F0E2), // 淺綠色邊框
-    inputBackground: Color(0xFFF8FCF8), // 淺綠色輸入框背景
-    inputBorder: Color(0xFFCBD5CB), // 中綠色輸入框邊框
-    hintText: Color(0xFF647864), // 深綠色提示文字
-    disabledText: Color(0xFF475547), // 中深綠色禁用文字
-    divider: Color(0xFFF1F5F1), // 極淺綠色分割線
-    overlay: Color(0x80000000), // 半透明黑色遮罩
-    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
-    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
-    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 莫蘭迪紫色系
@@ -429,17 +318,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFF8B7A85), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
-    cardBackground: Color(0xFFFCF8FC), // 淺紫色卡片背景
-    cardBorder: Color(0xFFF0E8F0), // 淺紫色邊框
-    inputBackground: Color(0xFFFCF8FC), // 淺紫色輸入框背景
-    inputBorder: Color(0xFFE5D5E5), // 中紫色輸入框邊框
-    hintText: Color(0xFF786478), // 深紫色提示文字
-    disabledText: Color(0xFF574857), // 中深紫色禁用文字
-    divider: Color(0xFFF5F1F5), // 極淺紫色分割線
-    overlay: Color(0x80000000), // 半透明黑色遮罩
-    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
-    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
-    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 莫蘭迪粉色系
@@ -464,17 +342,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFFA55566), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
-    cardBackground: Color(0xFFFCF8FA), // 淺粉色卡片背景
-    cardBorder: Color(0xFFF0E8EA), // 淺粉色邊框
-    inputBackground: Color(0xFFFCF8FA), // 淺粉色輸入框背景
-    inputBorder: Color(0xFFE5D5D9), // 中粉色輸入框邊框
-    hintText: Color(0xFF78646B), // 深粉色提示文字
-    disabledText: Color(0xFF574857), // 中深粉色禁用文字
-    divider: Color(0xFFF5F1F3), // 極淺粉色分割線
-    overlay: Color(0x80000000), // 半透明黑色遮罩
-    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
-    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
-    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 莫蘭迪橙色系
@@ -499,17 +366,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFFC49564), // 新增 outlineVariant
     backArrowColor: Colors.white,
     backArrowColorInactive: Color(0x4DFFFFFF),
-    cardBackground: Color(0xFFFCFAF8), // 淺橙色卡片背景
-    cardBorder: Color(0xFFF0EAE0), // 淺橙色邊框
-    inputBackground: Color(0xFFFCFAF8), // 淺橙色輸入框背景
-    inputBorder: Color(0xFFE5D5C5), // 中橙色輸入框邊框
-    hintText: Color(0xFF78645A), // 深橙色提示文字
-    disabledText: Color(0xFF574857), // 中深橙色禁用文字
-    divider: Color(0xFFF5F1ED), // 極淺橙色分割線
-    overlay: Color(0x80000000), // 半透明黑色遮罩
-    successBackground: Color(0xFFD1FAE5), // 淺綠色成功背景
-    warningBackground: Color(0xFFFEF3C7), // 淺橙色警告背景
-    errorBackground: Color(0xFFFEE2E2), // 淺紅色錯誤背景
   );
 
   /// 莫蘭迪檸檬黃色系
@@ -748,17 +604,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFFCEC8C0),
     backArrowColor: Color(0xFF3B3B3B),
     backArrowColorInactive: Color(0x803B3B3B),
-    cardBackground: Color(0xFFFAF8F5),
-    cardBorder: Color(0xFFE6E0D7),
-    inputBackground: Color(0xFFFAF8F5),
-    inputBorder: Color(0xFFDCD4CA),
-    hintText: Color(0xFF7A746C),
-    disabledText: Color(0xFF9D968D),
-    divider: Color(0xFFEFEAE3),
-    overlay: Color(0x33000000),
-    successBackground: Color(0xFFDDE7D8),
-    warningBackground: Color(0xFFF3E8D5),
-    errorBackground: Color(0xFFF4DADA),
     appBarTitleColor: Colors.white,
     appBarSubtitleColor: Colors.white,
   );
@@ -785,17 +630,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFFBFD4F2),
     backArrowColor: Color(0xFF273043),
     backArrowColorInactive: Color(0x80273043),
-    cardBackground: Color(0xFFF7FAFF),
-    cardBorder: Color(0xFFD6E6FF),
-    inputBackground: Color(0xFFF7FAFF),
-    inputBorder: Color(0xFFC9DBF4),
-    hintText: Color(0xFF6B7A90),
-    disabledText: Color(0xFF90A4B8),
-    divider: Color(0xFFE3EEFF),
-    overlay: Color(0x33000000),
-    successBackground: Color(0xFFD7F0E0),
-    warningBackground: Color(0xFFF3EBD6),
-    errorBackground: Color(0xFFF6DADA),
     appBarTitleColor: Colors.white,
     appBarSubtitleColor: Colors.white,
   );
@@ -822,17 +656,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFFE5E7EB),
     backArrowColor: Color(0xFF1F2937),
     backArrowColorInactive: Color(0x801F2937),
-    cardBackground: Color(0xFFFFFFFF),
-    cardBorder: Color(0xFFE5E7EB),
-    inputBackground: Color(0xFFFFFFFF),
-    inputBorder: Color(0xFFD1D5DB),
-    hintText: Color(0xFF6B7280),
-    disabledText: Color(0xFF9CA3AF),
-    divider: Color(0xFFF3F4F6),
-    overlay: Color(0x33000000),
-    successBackground: Color(0xFFE6F4EA),
-    warningBackground: Color(0xFFFFF4E5),
-    errorBackground: Color(0xFFFDE8E8),
     // 45° 背景漸層（降低飽和度的一階柔和版）
     backgroundGradient: [
       Color(0xFFE65C5C), // softer + darker red
@@ -868,17 +691,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFFE5E7EB),
     backArrowColor: Color(0xFF111827),
     backArrowColorInactive: Color(0x80111827),
-    cardBackground: Color(0xFFFFFFFF),
-    cardBorder: Color(0xFFE5E7EB),
-    inputBackground: Color(0xFFFFFFFF),
-    inputBorder: Color(0xFFD1D5DB),
-    hintText: Color(0xFF6B7280),
-    disabledText: Color(0xFF9CA3AF),
-    divider: Color(0xFFF3F4F6),
-    overlay: Color(0x33000000),
-    successBackground: Color(0xFFE7F7ED),
-    warningBackground: Color(0xFFFFF4E5),
-    errorBackground: Color(0xFFFDE8E8),
     backgroundGradient: [
       Color(0xFF9ED5F0), // darker light blue
       Color(0xFFFFFFFF), // white
@@ -911,17 +723,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFFF1D2E5),
     backArrowColor: Color(0xFF1F2937),
     backArrowColorInactive: Color(0x801F2937),
-    cardBackground: Color(0xFFFFFFFF),
-    cardBorder: Color(0xFFE5E7EB),
-    inputBackground: Color(0xFFFFFFFF),
-    inputBorder: Color(0xFFD1D5DB),
-    hintText: Color(0xFF6B7280),
-    disabledText: Color(0xFF9CA3AF),
-    divider: Color(0xFFF3F4F6),
-    overlay: Color(0x33000000),
-    successBackground: Color(0xFFE6F4EA),
-    warningBackground: Color(0xFFFFF4E5),
-    errorBackground: Color(0xFFFDE8E8),
     backgroundGradient: [
       Color(0xFFC05890), // darker magenta
       Color(0xFFD496B6), // darker pink purple
@@ -953,17 +754,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFFE5E7EB),
     backArrowColor: Color(0xFF111827),
     backArrowColorInactive: Color(0x80111827),
-    cardBackground: Color(0xFFFFFFFF),
-    cardBorder: Color(0xFFE5E7EB),
-    inputBackground: Color(0xFFFFFFFF),
-    inputBorder: Color(0xFFD1D5DB),
-    hintText: Color(0xFF6B7280),
-    disabledText: Color(0xFF9CA3AF),
-    divider: Color(0xFFF3F4F6),
-    overlay: Color(0x33000000),
-    successBackground: Color(0xFFE7F7ED),
-    warningBackground: Color(0xFFFFF4E5),
-    errorBackground: Color(0xFFFDE8E8),
     backgroundGradient: [
       Color(0xFFF0EA94), // darker yellow
       Color(0xFFFFFFFF), // white
@@ -996,17 +786,6 @@ class ThemeScheme {
     outlineVariant: Color(0xFFE6D8C8),
     backArrowColor: Color(0xFF2D2520),
     backArrowColorInactive: Color(0x802D2520),
-    cardBackground: Color(0xFFFEFCFA),
-    cardBorder: Color(0xFFEADCCB),
-    inputBackground: Color(0xFFFEFCFA),
-    inputBorder: Color(0xFFE1D3C2),
-    hintText: Color(0xFF7A6E63),
-    disabledText: Color(0xFFA39588),
-    divider: Color(0xFFF0E5D8),
-    overlay: Color(0x33000000),
-    successBackground: Color(0xFFE7F2E5),
-    warningBackground: Color(0xFFF7ECD9),
-    errorBackground: Color(0xFFF6DEDE),
     backgroundGradient: [
       Color(0xFF8B6D55), // darker brown
       Color(0xFFE5A561), // darker soft orange
@@ -1192,7 +971,7 @@ class ThemeScheme {
     milkTeaEarth,
     minimalistStill,
     glassmorphismBlur,
-    glassmorphismBlueGrey,
+    // glassmorphismBlueGrey,
     taipei,
     taipei101,
     rainbowPride,
@@ -1220,10 +999,10 @@ class ThemeScheme {
       return Color.alphaBlend(color.withValues(alpha: amount), Colors.white);
     }
 
-    final resolvedAppBarTitleColor = appBarTitleColor ?? onPrimary;
-    final resolvedAppBarSubtitleColor =
-        appBarSubtitleColor ?? resolvedAppBarTitleColor.withValues(alpha: 0.85);
-    final dialogBackground = blendWithWhite(primary);
+    final extension = _buildThemeExtension(blendWithWhite);
+    final resolvedAppBarTitleColor = extension.appBarTextColor;
+    final resolvedAppBarSubtitleColor = extension.appBarSubtitleColor;
+    final dialogBackground = extension.dialogBackgroundColor;
     final dialogBorderColor = primary.withValues(alpha: 0.2);
 
     // 為特定主題（如 taipei_101）提供可選的裝飾背景（此處以無漸層為原則，背景圖樣可由 AppScaffold 另行覆蓋）
@@ -1349,6 +1128,166 @@ class ThemeScheme {
         onError: onError,
       ),
       useMaterial3: true,
+      extensions: <ThemeExtension<dynamic>>[
+        extension,
+      ],
+    );
+  }
+
+  Here4HelpThemeExtension _buildThemeExtension(
+      Color Function(Color color, [double amount]) blendWithWhite) {
+    final style = category.toLowerCase();
+
+    Color resolveAppBarTextColor() {
+      if (appBarTitleColor != null) return appBarTitleColor!;
+      switch (style) {
+        case 'ocean':
+          return Colors.white;
+        case 'morandi':
+          return Colors.white;
+        case 'glassmorphism':
+          return primary;
+        case 'business':
+          if (name == 'meta_business_style') {
+            return const Color(0xFF1C1E21);
+          }
+          if (name == 'business_gradient') {
+            return const Color(0xFF1F2937);
+          }
+          if (name == 'milk_tea_earth') {
+            return const Color(0xFF2D3748);
+          }
+          if (name == 'minimalist_still') {
+            return const Color(0xFF2D3748);
+          }
+          return primary;
+        case 'emotions':
+          return const Color(0xFF2D3748);
+        case 'taiwan':
+          return Colors.white;
+        default:
+          if (name == 'sandy_footprints') {
+            return Colors.white;
+          }
+          return primary;
+      }
+    }
+
+    final appBarTextColor = resolveAppBarTextColor();
+    final resolvedAppBarSubtitleColor =
+        appBarSubtitleColor ?? appBarTextColor.withOpacity(0.8);
+
+    List<Color> resolveAppBarGradient() {
+      switch (style) {
+        case 'ocean':
+          return [
+            const Color(0xFF3B82F6).withValues(alpha: 0.9),
+            const Color(0xFF60A5FA).withValues(alpha: 0.8),
+          ];
+        case 'morandi':
+          return [
+            primary,
+            primary.withValues(alpha: 0.8),
+          ];
+        case 'glassmorphism':
+          return [Colors.white, Colors.white];
+        case 'business':
+          if (name == 'meta_business_style') {
+            return [
+              Colors.white.withValues(alpha: 1),
+              Colors.white.withValues(alpha: 0.2),
+            ];
+          }
+          if (name == 'business_gradient') {
+            return [
+              Colors.white.withValues(alpha: 0.3),
+              Colors.white.withValues(alpha: 0.2),
+            ];
+          }
+          return [
+            Colors.white.withValues(alpha: 1),
+            Colors.white.withValues(alpha: 0.2),
+          ];
+        case 'taiwan':
+          return [
+            primary.withValues(alpha: 0.9),
+            secondary.withValues(alpha: 0.7),
+          ];
+        case 'emotions':
+          return [];
+        default:
+          if (name == 'beach_sunset') {
+            return [
+              const Color(0xFF00BCD4).withValues(alpha: 0.9),
+              const Color(0xFF26C6DA).withValues(alpha: 0.8),
+            ];
+          }
+          return [
+            primary.withValues(alpha: 0.8),
+            secondary.withValues(alpha: 0.6),
+          ];
+      }
+    }
+
+    Color resolveNavigationBarBackground() {
+      switch (style) {
+        case 'ocean':
+          return const Color(0xFF3B82F6).withValues(alpha: 0.9);
+        case 'morandi':
+          return primary.withValues(alpha: 0.9);
+        case 'glassmorphism':
+          return Colors.white;
+        case 'business':
+          return Colors.white.withValues(alpha: 0.3);
+        case 'taiwan':
+          return primary.withValues(alpha: 0.3);
+        case 'emotions':
+          return Colors.white.withValues(alpha: 0.3);
+        default:
+          if (name == 'beach_sunset') {
+            return const Color(0xFF00BCD4).withValues(alpha: 0.3);
+          }
+          return Colors.white.withValues(alpha: 0.2);
+      }
+    }
+
+    Color resolveNavigationSelectedColor() {
+      switch (style) {
+        case 'ocean':
+          return const Color.fromARGB(255, 229, 194, 163);
+        case 'morandi':
+          return Colors.white;
+        case 'glassmorphism':
+        case 'business':
+        default:
+          return primary;
+      }
+    }
+
+    Color resolveNavigationUnselectedColor() {
+      switch (style) {
+        case 'ocean':
+          return Colors.white.withValues(alpha: 0.7);
+        case 'morandi':
+          return Colors.white.withValues(alpha: 0.6);
+        case 'glassmorphism':
+        case 'business':
+        default:
+          return onSurface.withValues(alpha: 0.7);
+      }
+    }
+
+    return Here4HelpThemeExtension(
+      appBarTextColor: appBarTextColor,
+      appBarSubtitleColor: resolvedAppBarSubtitleColor,
+      appBarGradient: resolveAppBarGradient(),
+      navigationBarBackground: resolveNavigationBarBackground(),
+      navigationBarSelectedColor: resolveNavigationSelectedColor(),
+      navigationBarUnselectedColor: resolveNavigationUnselectedColor(),
+      dialogBackgroundColor: blendWithWhite(primary),
+      dialogTitleColor: appBarTextColor,
+      dialogContentColor: onSurface.withOpacity(0.9),
+      dialogPrimaryColor: primary,
     );
   }
 

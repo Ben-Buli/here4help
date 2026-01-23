@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:here4help/services/theme_config_manager.dart';
+import 'package:here4help/theme/h4h_theme_extension.dart';
 
 /// 駁回完成理由輸入 Dialog
 class DisagreeCompletionDialog extends StatefulWidget {
@@ -33,11 +32,25 @@ class _DisagreeCompletionDialogState extends State<DisagreeCompletionDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final themeManager = context.watch<ThemeConfigManager>();
+    final themeExtension =
+        theme.extension<Here4HelpThemeExtension>() ??
+            Here4HelpThemeExtension(
+              appBarTextColor: theme.colorScheme.onSurface,
+              appBarSubtitleColor: theme.colorScheme.onSurface.withOpacity(0.8),
+              appBarGradient: const [],
+              navigationBarBackground: theme.colorScheme.surface,
+              navigationBarSelectedColor: theme.colorScheme.primary,
+              navigationBarUnselectedColor:
+                  theme.colorScheme.onSurface.withOpacity(0.7),
+              dialogBackgroundColor: theme.colorScheme.surface,
+              dialogTitleColor: theme.colorScheme.onSurface,
+              dialogContentColor: theme.colorScheme.onSurface.withOpacity(0.9),
+              dialogPrimaryColor: theme.colorScheme.primary,
+            );
     final dialogBackground =
-        theme.dialogTheme.backgroundColor ?? themeManager.dialogBackgroundColor;
-    final primaryColor = themeManager.dialogPrimaryColor;
-    final subduedColor = themeManager.dialogContentColor.withOpacity(0.7);
+        theme.dialogTheme.backgroundColor ?? themeExtension.dialogBackgroundColor;
+    final primaryColor = themeExtension.dialogPrimaryColor;
+    final subduedColor = themeExtension.dialogContentColor.withOpacity(0.7);
 
     return AlertDialog(
       backgroundColor: dialogBackground,
@@ -60,7 +73,7 @@ class _DisagreeCompletionDialogState extends State<DisagreeCompletionDialog> {
             'Please provide a reason for disagreeing with the completion:',
             style: TextStyle(
               fontSize: 14,
-              color: themeManager.dialogTitleColor,
+              color: themeExtension.dialogTitleColor,
             ),
           ),
           const SizedBox(height: 8),

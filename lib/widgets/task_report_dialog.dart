@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:provider/provider.dart';
-import 'package:here4help/services/theme_config_manager.dart';
 import 'package:here4help/services/api/task_reports_api.dart';
+import 'package:here4help/theme/h4h_theme_extension.dart';
 
 /// 任務檢舉對話框
 class TaskReportDialog extends StatefulWidget {
@@ -86,11 +85,25 @@ class _TaskReportDialogState extends State<TaskReportDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final themeManager = context.watch<ThemeConfigManager>();
+    final themeExtension =
+        theme.extension<Here4HelpThemeExtension>() ??
+            Here4HelpThemeExtension(
+              appBarTextColor: theme.colorScheme.onSurface,
+              appBarSubtitleColor: theme.colorScheme.onSurface.withOpacity(0.8),
+              appBarGradient: const [],
+              navigationBarBackground: theme.colorScheme.surface,
+              navigationBarSelectedColor: theme.colorScheme.primary,
+              navigationBarUnselectedColor:
+                  theme.colorScheme.onSurface.withOpacity(0.7),
+              dialogBackgroundColor: theme.colorScheme.surface,
+              dialogTitleColor: theme.colorScheme.onSurface,
+              dialogContentColor: theme.colorScheme.onSurface.withOpacity(0.9),
+              dialogPrimaryColor: theme.colorScheme.primary,
+            );
     final dialogBackground =
-        theme.dialogTheme.backgroundColor ?? themeManager.dialogBackgroundColor;
-    final primaryColor = themeManager.dialogPrimaryColor;
-    final titleColor = themeManager.dialogTitleColor;
+        theme.dialogTheme.backgroundColor ?? themeExtension.dialogBackgroundColor;
+    final primaryColor = themeExtension.dialogPrimaryColor;
+    final titleColor = themeExtension.dialogTitleColor;
     final warningColor = theme.colorScheme.error.withOpacity(0.85);
     final cardBackground =
         Color.alphaBlend(primaryColor.withOpacity(0.08), Colors.white);

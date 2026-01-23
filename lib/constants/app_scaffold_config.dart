@@ -8,4 +8,5 @@ class AppScaffoldDefaults {
   static const bool defaultShowBackArrow = false;
   static const bool defaultCenterTitle = true;
   static const List<Widget>? defaultActions = null;
+  static const bool defaultAllowSwipeBack = false;
 }

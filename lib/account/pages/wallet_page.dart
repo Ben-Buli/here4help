@@ -5,7 +5,7 @@ import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/services/wallet_service.dart';
 import 'package:flutter/services.dart';
-import 'package:here4help/services/theme_config_manager.dart';
+import 'package:here4help/theme/h4h_theme_extension.dart';
 
 import 'package:here4help/services/http_client_service.dart';
 import 'dart:convert';
@@ -216,10 +216,24 @@ class _WalletPageState extends State<WalletPage> {
 
   Widget _buildBankInfoContainer() {
     final theme = Theme.of(context);
-    final themeManager = context.watch<ThemeConfigManager>();
-    final primaryColor = themeManager.dialogPrimaryColor;
-    final subtleColor = themeManager.dialogContentColor.withValues(alpha: 0.7);
-    final titleColor = themeManager.dialogTitleColor;
+    final themeExtension =
+        theme.extension<Here4HelpThemeExtension>() ??
+            Here4HelpThemeExtension(
+              appBarTextColor: theme.colorScheme.onSurface,
+              appBarSubtitleColor: theme.colorScheme.onSurface.withOpacity(0.8),
+              appBarGradient: const [],
+              navigationBarBackground: theme.colorScheme.surface,
+              navigationBarSelectedColor: theme.colorScheme.primary,
+              navigationBarUnselectedColor:
+                  theme.colorScheme.onSurface.withOpacity(0.7),
+              dialogBackgroundColor: theme.colorScheme.surface,
+              dialogTitleColor: theme.colorScheme.onSurface,
+              dialogContentColor: theme.colorScheme.onSurface.withOpacity(0.9),
+              dialogPrimaryColor: theme.colorScheme.primary,
+            );
+    final primaryColor = themeExtension.dialogPrimaryColor;
+    final subtleColor = themeExtension.dialogContentColor.withValues(alpha: 0.7);
+    final titleColor = themeExtension.dialogTitleColor;
     final cardBackground =
         Color.alphaBlend(primaryColor.withValues(alpha: 0.08), Colors.white);
     final cardBorder = primaryColor.withValues(alpha: 0.2);
@@ -397,10 +411,26 @@ class _WalletPageState extends State<WalletPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             final theme = Theme.of(context);
-            final themeManager = context.watch<ThemeConfigManager>();
+            final themeExtension =
+                theme.extension<Here4HelpThemeExtension>() ??
+                    Here4HelpThemeExtension(
+                      appBarTextColor: theme.colorScheme.onSurface,
+                      appBarSubtitleColor:
+                          theme.colorScheme.onSurface.withOpacity(0.8),
+                      appBarGradient: const [],
+                      navigationBarBackground: theme.colorScheme.surface,
+                      navigationBarSelectedColor: theme.colorScheme.primary,
+                      navigationBarUnselectedColor:
+                          theme.colorScheme.onSurface.withOpacity(0.7),
+                      dialogBackgroundColor: theme.colorScheme.surface,
+                      dialogTitleColor: theme.colorScheme.onSurface,
+                      dialogContentColor:
+                          theme.colorScheme.onSurface.withOpacity(0.9),
+                      dialogPrimaryColor: theme.colorScheme.primary,
+                    );
             final dialogBackground = theme.dialogTheme.backgroundColor ??
-                themeManager.dialogBackgroundColor;
-            final primaryColor = themeManager.dialogPrimaryColor;
+                themeExtension.dialogBackgroundColor;
+            final primaryColor = themeExtension.dialogPrimaryColor;
             final warningColor = theme.colorScheme.error;
 
             return StreamBuilder<List<Object?>>(

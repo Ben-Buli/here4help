@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:here4help/services/theme_config_manager.dart';
+import 'package:here4help/theme/h4h_theme_extension.dart';
 import 'package:here4help/services/data_preload_service.dart';
 import 'package:here4help/chat/services/chat_session_manager.dart';
 import 'package:here4help/auth/services/user_service.dart';
@@ -40,6 +41,7 @@ class AppScaffold extends StatefulWidget {
     this.centerTitle = true,
     this.showBottomNav = true,
     this.showBackArrow = false, // 返回鍵：預設不顯示
+    this.allowSwipeBack = false,
     this.actions, // 新增
   });
 
@@ -50,6 +52,7 @@ class AppScaffold extends StatefulWidget {
   final bool centerTitle;
   final bool showBottomNav;
   final bool showBackArrow;
+  final bool allowSwipeBack;
   final List<Widget>? actions;
 
   @override
@@ -62,6 +65,7 @@ class AppScaffold extends StatefulWidget {
 }
 
 class _AppScaffoldState extends State<AppScaffold> {
+  String? _lastLoggedTitle;
   // 新增 route history
   final List<String> _routeHistory = [];
   // 新增不可返回的路由清單
@@ -489,10 +493,12 @@ class _AppScaffoldState extends State<AppScaffold> {
   @override
   Widget build(BuildContext context) {
     _scheduleRecordRoute();
+    final allowSystemPop = widget.allowSwipeBack &&
+        defaultTargetPlatform == TargetPlatform.iOS;
     return PopScope(
-      canPop: false, // 阻止默認的 pop 行為，由我們自定義處理
+      canPop: allowSystemPop, // iOS 可由原生手勢 pop，其餘仍自定義處理
       onPopInvoked: (didPop) async {
-        // didPop 為 false，因為我們設置了 canPop: false
+        // didPop 為 true 表示已由系統完成 pop
         if (didPop) return;
         // 調用自定義的返回處理邏輯（_handleBack 是 async void，不需要 await）
         _handleBack();
@@ -502,6 +508,29 @@ class _AppScaffoldState extends State<AppScaffold> {
         onTap: () => FocusScope.of(context).unfocus(),
         child: Consumer<ThemeConfigManager>(
           builder: (context, themeManager, child) {
+            final themeExtension =
+                Theme.of(context).extension<Here4HelpThemeExtension>() ??
+                    Here4HelpThemeExtension(
+                      appBarTextColor: themeManager.currentTheme.onPrimary,
+                      appBarSubtitleColor:
+                          themeManager.currentTheme.onPrimary.withOpacity(0.8),
+                      appBarGradient: const [],
+                      navigationBarBackground:
+                          themeManager.currentTheme.surface,
+                      navigationBarSelectedColor:
+                          themeManager.currentTheme.primary,
+                      navigationBarUnselectedColor:
+                          themeManager.currentTheme.onSurface
+                              .withValues(alpha: 0.7),
+                      dialogBackgroundColor: Theme.of(context)
+                          .colorScheme
+                          .surface
+                          .withValues(alpha: 0.95),
+                      dialogTitleColor: themeManager.currentTheme.onSurface,
+                      dialogContentColor:
+                          themeManager.currentTheme.onSurface.withOpacity(0.9),
+                      dialogPrimaryColor: themeManager.currentTheme.primary,
+                    );
             // 若主題為 taipei_101 或 milk_tea_earth，提供專屬背景
             final baseThemeName =
                 themeManager.currentTheme.name.replaceAll('_dark', '');
@@ -514,7 +543,8 @@ class _AppScaffoldState extends State<AppScaffold> {
                 child: Scaffold(
                   backgroundColor: Colors.transparent, // 讓 Scaffold 背景透明以顯示漸層
                   appBar: widget.showAppBar
-                      ? _buildGlassmorphismAppBar(themeManager)
+                      ? _buildGlassmorphismAppBar(
+                          themeManager, themeExtension)
                       : null,
                   body: SafeArea(
                     top: true, // 總是為頂部添加安全區域，避免被瀏海遮住
@@ -522,7 +552,8 @@ class _AppScaffoldState extends State<AppScaffold> {
                     child: _buildSwipeBackWrapper(context, widget.child),
                   ),
                   bottomNavigationBar: widget.showBottomNav
-                      ? _buildGlassmorphismBottomNav(themeManager, context)
+                      ? _buildGlassmorphismBottomNav(
+                          themeManager, themeExtension, context)
                       : null,
                 ),
               ),
@@ -609,9 +640,10 @@ class _AppScaffoldState extends State<AppScaffold> {
   }
 
   /// 構建 AppBar 標題
-  Widget _buildAppBarTitle(ThemeConfigManager themeManager) {
+  Widget _buildAppBarTitle(Here4HelpThemeExtension themeExtension) {
     // 只在 debug 模式下輸出一次調試信息
-    if (kDebugMode) {
+    if (kDebugMode && widget.title != _lastLoggedTitle) {
+      _lastLoggedTitle = widget.title;
       debugPrint('🔍 [AppScaffold] 構建 AppBar title: ${widget.title}');
     }
 
@@ -619,7 +651,7 @@ class _AppScaffoldState extends State<AppScaffold> {
         Text(
           widget.title ?? '',
           style: TextStyle(
-            color: themeManager.appBarTextColor,
+            color: themeExtension.appBarTextColor,
             fontWeight: FontWeight.w600,
             fontSize: 20,
           ),
@@ -628,7 +660,7 @@ class _AppScaffoldState extends State<AppScaffold> {
 
   /// 創建毛玻璃效果的 AppBar
   PreferredSizeWidget _buildGlassmorphismAppBar(
-      ThemeConfigManager themeManager) {
+      ThemeConfigManager themeManager, Here4HelpThemeExtension themeExtension) {
     return PreferredSize(
       preferredSize: const Size.fromHeight(kToolbarHeight),
       child: ClipRRect(
@@ -640,18 +672,18 @@ class _AppScaffoldState extends State<AppScaffold> {
           filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: Container(
             decoration: BoxDecoration(
-              gradient: themeManager.appBarGradient.isNotEmpty
+              gradient: themeExtension.appBarGradient.isNotEmpty
                   ? LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: themeManager.appBarGradient
+                      colors: themeExtension.appBarGradient
                           .map((c) => c.withOpacity(0.95))
                           .toList(),
                     )
                   : null,
-              color: themeManager.appBarGradient.isNotEmpty
+              color: themeExtension.appBarGradient.isNotEmpty
                   ? null
-                  : themeManager.navigationBarBackground,
+                  : themeExtension.navigationBarBackground,
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.08),
@@ -675,7 +707,7 @@ class _AppScaffoldState extends State<AppScaffold> {
                       onPressed: _handleBack,
                     )
                   : null,
-              title: _buildAppBarTitle(themeManager),
+              title: _buildAppBarTitle(themeExtension),
               actions: [
                 ...?widget.actions,
               ],
@@ -688,13 +720,15 @@ class _AppScaffoldState extends State<AppScaffold> {
 
   /// 創建毛玻璃效果的 BottomNavigationBar
   Widget _buildGlassmorphismBottomNav(
-      ThemeConfigManager themeManager, BuildContext context) {
+      ThemeConfigManager themeManager,
+      Here4HelpThemeExtension themeExtension,
+      BuildContext context) {
     return ClipRRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           decoration: BoxDecoration(
-            color: themeManager.navigationBarBackground,
+            color: themeExtension.navigationBarBackground,
             border: Border(
               top: BorderSide(
                 color: Colors.white.withOpacity(0.1),
@@ -708,8 +742,8 @@ class _AppScaffoldState extends State<AppScaffold> {
             currentIndex: _getCurrentIndex(context),
             showSelectedLabels: true,
             showUnselectedLabels: true,
-            selectedItemColor: themeManager.navigationBarSelectedColor,
-            unselectedItemColor: themeManager.navigationBarUnselectedColor,
+            selectedItemColor: themeExtension.navigationBarSelectedColor,
+            unselectedItemColor: themeExtension.navigationBarUnselectedColor,
             elevation: 0,
             onTap: (index) async {
               final current = _getCurrentIndex(context);

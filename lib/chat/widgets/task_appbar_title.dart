@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:here4help/services/theme_config_manager.dart';
-import 'package:provider/provider.dart';
+import 'package:here4help/theme/h4h_theme_extension.dart';
 
 /// 任務標題（AppBar 專用）
 /// - 主標題：任務名稱（可點擊彈出任務詳情）
@@ -40,11 +39,25 @@ class TaskAppBarTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeConfigManager>(
-      builder: (context, themeManager, child) {
-        // 使用主題配色
-        final titleColor = themeManager.appBarTextColor;
-        final subtitleColor = themeManager.appBarSubtitleColor;
+    final theme = Theme.of(context);
+    final themeExtension =
+        theme.extension<Here4HelpThemeExtension>() ??
+            Here4HelpThemeExtension(
+              appBarTextColor: theme.colorScheme.onSurface,
+              appBarSubtitleColor: theme.colorScheme.onSurface.withOpacity(0.8),
+              appBarGradient: const [],
+              navigationBarBackground: theme.colorScheme.surface,
+              navigationBarSelectedColor: theme.colorScheme.primary,
+              navigationBarUnselectedColor:
+                  theme.colorScheme.onSurface.withOpacity(0.7),
+              dialogBackgroundColor: theme.colorScheme.surface,
+              dialogTitleColor: theme.colorScheme.onSurface,
+              dialogContentColor: theme.colorScheme.onSurface.withOpacity(0.9),
+              dialogPrimaryColor: theme.colorScheme.primary,
+            );
+
+    final titleColor = themeExtension.appBarTextColor;
+    final subtitleColor = themeExtension.appBarSubtitleColor;
 
         // 根據使用者角色決定顯示的聊天對象名稱
         String displayPartnerName = chatPartnerName ?? 'Chat Partner';
@@ -56,64 +69,43 @@ class TaskAppBarTitle extends StatelessWidget {
         // 獲取任務狀態顯示
         // String statusDisplay = _getStatusDisplay();
 
-        return GestureDetector(
-          onTap: () => _showTaskInfoDialog(context),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
+    return GestureDetector(
+      onTap: () => _showTaskInfoDialog(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            (task['title'] as String?)?.trim().isNotEmpty == true
+                ? task['title'] as String
+                : 'Untitled Task',
+            style: titleStyle ??
+                TextStyle(
+                  fontSize: 20,
+                  color: titleColor,
+                  fontWeight: FontWeight.w600,
+                ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          // 顯示聊天對象名稱和任務狀態
+          Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                (task['title'] as String?)?.trim().isNotEmpty == true
-                    ? task['title'] as String
-                    : 'Untitled Task',
-                style: titleStyle ??
+                displayPartnerName,
+                style: subtitleStyle ??
                     TextStyle(
-                      fontSize: 20,
-                      color: titleColor,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      color: subtitleColor,
+                      fontWeight: FontWeight.w400,
                     ),
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 2),
-              // 顯示聊天對象名稱和任務狀態
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    displayPartnerName,
-                    style: subtitleStyle ??
-                        TextStyle(
-                          fontSize: 12,
-                          color: subtitleColor,
-                          fontWeight: FontWeight.w400,
-                        ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  // if (statusDisplay.isNotEmpty) ...[
-                  //   const SizedBox(width: 8),
-                  //   Container(
-                  //     padding: const EdgeInsets.symmetric(
-                  //         horizontal: 6, vertical: 2),
-                  //     decoration: BoxDecoration(
-                  //       color: _getStatusColor(themeManager.effectiveTheme),
-                  //       borderRadius: BorderRadius.circular(8),
-                  //     ),
-                  //     child: Text(
-                  //       statusDisplay,
-                  //       style: const TextStyle(
-                  //         fontSize: 10,
-                  //         color: Colors.white,
-                  //         fontWeight: FontWeight.w500,
-                  //       ),
-                  //     ),
-                  //   ),
-                  // ],
-                ],
-              ),
             ],
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 

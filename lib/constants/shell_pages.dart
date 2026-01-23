@@ -66,6 +66,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': false,
     'showBottomNav': false,
     'showBackArrow': false,
+    'allowSwipeBack': false,
     'permission': -10, // 公開頁面：任何狀態都可訪問登入頁
   },
   {
@@ -81,6 +82,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': false,
     'permission': -10, // 公開頁面：任何狀態都可訪問（包括未登入）
   },
 
@@ -91,6 +93,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': false,
     'permission': -10, // 公開頁面：任何狀態都可訪問（包括未登入）
   },
   {
@@ -116,6 +119,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': false,
     'permission': 0, // 已登入用戶可更新學生證
   },
   {
@@ -125,6 +129,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showBottomNav': true,
     'showAppBar': true,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'permission': 0, // 新用戶可訪問首頁
   },
   {
@@ -133,6 +138,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Chats',
     'showBottomNav': true,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'permission': 1, // 需要已認證用戶才能訪問聊天
     'titleWidgetBuilder': (context, data) {
       // 透過 ChatListProvider 的靜態實例建立雙向同步
@@ -154,6 +160,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'permission': 1, // 需要已認證用戶才能訪問聊天詳情
     'titleWidgetBuilder': (context, data) {
       return ChatTitleWidget(data: data as Map<String, dynamic>?);
@@ -165,6 +172,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Account',
     'showBottomNav': true,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'permission': 0, // 新用戶可訪問帳戶頁面
   },
   {
@@ -177,6 +185,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Posting Task',
     'showBottomNav': true,
     'showBackArrow': true,
+    'allowSwipeBack': false,
     'permission': 1, // 需要已認證用戶才能創建任務
   },
   {
@@ -189,6 +198,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Editing Task',
     'showBottomNav': true,
     'showBackArrow': true,
+    'allowSwipeBack': false,
     'permission': 1, // 需要已認證用戶才能編輯任務
   },
   {
@@ -197,6 +207,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Task Preview',
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'permission': 1, // 需要已認證用戶才能預覽任務
   },
   {
@@ -205,6 +216,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Task',
     'showBottomNav': true,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'permission': 0, // 新用戶可瀏覽任務列表
     'actionsBuilder': (context) => [
           IconButton(
@@ -245,15 +257,6 @@ final List<Map<String, dynamic>> shellPages = [
         ],
   },
   {
-    'path': '/task/create/preview',
-    'builder': (context, state) {
-      return const TaskPreviewPage();
-    },
-    'title': 'Task Preview',
-    'showBottomNav': false,
-    'showBackArrow': true
-  },
-  {
     'path': '/task/apply',
     'builder': (context, state) {
       return TaskApplyPage(data: state as Map<dynamic, dynamic>);
@@ -261,6 +264,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Task Apply Resume',
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': false,
     'permission': 1, // 需要已認證用戶才能應徵任務
   },
   // Account 模組路由
@@ -271,6 +275,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': false,
     'icon': Icons.person,
     'permission': 0, // 新用戶可編輯個人資料
   },
@@ -281,6 +286,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'icon': Icons.account_balance_wallet,
     'permission': 1, // 需要已認證用戶才能訪問錢包
   },
@@ -291,6 +297,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'icon': Icons.history,
     'permission': 0, // 需要已認證用戶才能查看點數歷史
   },
@@ -301,6 +308,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': false,
     'icon': Icons.output_outlined,
     'permission': 1, // 需要已認證用戶才能申請提領
   },
@@ -311,6 +319,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'icon': Icons.stars,
     'permission': 0, // 新用戶可查看點數政策
   },
@@ -332,6 +341,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'icon': Icons.history,
     'permission': 1, // 需要已認證用戶才能查看任務歷史
   },
@@ -342,6 +352,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': false,
     'icon': Icons.lock,
     'permission': 0, // 新用戶可訪問安全設定
   },
@@ -352,6 +363,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'icon': Icons.palette,
     'permission': 0, // 新用戶可訪問主題設定
   },
@@ -362,6 +374,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'icon': Icons.support_agent,
     'permission': 0, // 新用戶可聯繫客服
   },
@@ -372,6 +385,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': false,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': false,
     'icon': Icons.logout,
     'permission': 0, // 新用戶可登出
   },
@@ -383,6 +397,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': false,
     'icon': Icons.contact_mail,
     'permission': 0, // 新用戶可聯繫客服
   },
@@ -394,6 +409,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'icon': Icons.report_problem,
     'permission': 0, // 新用戶可查看問題狀態
   },
@@ -406,6 +422,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'icon': Icons.chat,
     'permission': 0, // 新用戶可訪問客服聊天室
   },
@@ -416,6 +433,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'icon': Icons.help_outline,
     'permission': 0, // 新用戶可查看 FAQ
   },
@@ -426,6 +444,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'permission': -10, // 公開頁面：任何狀態都可訪問
   },
   {
@@ -435,6 +454,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'permission': -10, // 公開頁面：任何狀態都可訪問
   },
   {
@@ -444,6 +464,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': true,
     'icon': Icons.file_open,
     'permission': 0,
   },
@@ -453,6 +474,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Pay Setting',
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': false,
     'permission': 0, // 新用戶可設定支付
   },
   // #region 權限不足頁面
@@ -463,6 +485,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': false,
+    'allowSwipeBack': false,
     'permission': -10, // 公開頁面：任何狀態都可訪問權限不足頁面
   },
   {
@@ -472,6 +495,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': false,
+    'allowSwipeBack': false,
     'permission': 0, // 新用戶可訪問權限不足頁面
   },
   {
@@ -484,6 +508,7 @@ final List<Map<String, dynamic>> shellPages = [
     'showAppBar': true,
     'showBottomNav': false,
     'showBackArrow': true,
+    'allowSwipeBack': false,
     'permission': -10, // 公開頁面：任何狀態都可訪問 404 頁面
   },
   // #endregion

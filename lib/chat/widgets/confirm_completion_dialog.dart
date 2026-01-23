@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:here4help/services/theme_config_manager.dart';
+import 'package:here4help/theme/h4h_theme_extension.dart';
 
 /// 同意完成二次確認 Dialog
 class ConfirmCompletionDialog extends StatefulWidget {
@@ -57,9 +56,23 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final themeManager = context.watch<ThemeConfigManager>();
+    final themeExtension =
+        theme.extension<Here4HelpThemeExtension>() ??
+            Here4HelpThemeExtension(
+              appBarTextColor: theme.colorScheme.onSurface,
+              appBarSubtitleColor: theme.colorScheme.onSurface.withOpacity(0.8),
+              appBarGradient: const [],
+              navigationBarBackground: theme.colorScheme.surface,
+              navigationBarSelectedColor: theme.colorScheme.primary,
+              navigationBarUnselectedColor:
+                  theme.colorScheme.onSurface.withOpacity(0.7),
+              dialogBackgroundColor: theme.colorScheme.surface,
+              dialogTitleColor: theme.colorScheme.onSurface,
+              dialogContentColor: theme.colorScheme.onSurface.withOpacity(0.9),
+              dialogPrimaryColor: theme.colorScheme.primary,
+            );
     final dialogBackground =
-        theme.dialogTheme.backgroundColor ?? themeManager.dialogBackgroundColor;
+        theme.dialogTheme.backgroundColor ?? themeExtension.dialogBackgroundColor;
 
     return AlertDialog(
       backgroundColor: dialogBackground,
@@ -67,18 +80,18 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
       titleTextStyle: theme.dialogTheme.titleTextStyle,
       contentTextStyle: theme.dialogTheme.contentTextStyle,
       title: const Text('Confirm Completion'),
-      content: _buildContent(themeManager),
-      actions: _buildActions(themeManager.dialogPrimaryColor),
+      content: _buildContent(themeExtension),
+      actions: _buildActions(themeExtension.dialogPrimaryColor),
     );
   }
 
-  Widget _buildContent(ThemeConfigManager themeManager) {
+  Widget _buildContent(Here4HelpThemeExtension themeExtension) {
     final theme = Theme.of(context);
-    final primaryColor = themeManager.dialogPrimaryColor;
+    final primaryColor = themeExtension.dialogPrimaryColor;
     final infoBackground =
         Color.alphaBlend(primaryColor.withOpacity(0.12), Colors.white);
     final infoBorder = primaryColor.withOpacity(0.2);
-    final subduedText = themeManager.dialogContentColor.withOpacity(0.75);
+    final subduedText = themeExtension.dialogContentColor.withOpacity(0.75);
 
     if (_isLoading) {
       return const SizedBox(
@@ -153,7 +166,7 @@ class _ConfirmCompletionDialogState extends State<ConfirmCompletionDialog> {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: themeManager.dialogTitleColor,
+            color: themeExtension.dialogTitleColor,
           ),
         ),
         const SizedBox(height: 12),

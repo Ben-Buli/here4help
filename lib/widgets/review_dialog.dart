@@ -3,8 +3,7 @@ import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:here4help/constants/app_colors.dart';
 import 'package:here4help/services/api/review_api.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
-import 'package:here4help/services/theme_config_manager.dart';
+import 'package:here4help/theme/h4h_theme_extension.dart';
 
 class ReviewDialog extends StatefulWidget {
   final String taskId;
@@ -56,14 +55,28 @@ class _ReviewDialogState extends State<ReviewDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final themeManager = context.watch<ThemeConfigManager>();
-    final primaryColor = themeManager.dialogPrimaryColor;
+    final themeExtension =
+        theme.extension<Here4HelpThemeExtension>() ??
+            Here4HelpThemeExtension(
+              appBarTextColor: theme.colorScheme.onSurface,
+              appBarSubtitleColor: theme.colorScheme.onSurface.withOpacity(0.8),
+              appBarGradient: const [],
+              navigationBarBackground: theme.colorScheme.surface,
+              navigationBarSelectedColor: theme.colorScheme.primary,
+              navigationBarUnselectedColor:
+                  theme.colorScheme.onSurface.withOpacity(0.7),
+              dialogBackgroundColor: theme.colorScheme.surface,
+              dialogTitleColor: theme.colorScheme.onSurface,
+              dialogContentColor: theme.colorScheme.onSurface.withOpacity(0.9),
+              dialogPrimaryColor: theme.colorScheme.primary,
+            );
+    final primaryColor = themeExtension.dialogPrimaryColor;
     final titleColor =
-        theme.dialogTheme.titleTextStyle?.color ?? themeManager.dialogTitleColor;
+        theme.dialogTheme.titleTextStyle?.color ?? themeExtension.dialogTitleColor;
     final subtitleColor =
-        themeManager.dialogContentColor.withValues(alpha: 0.75);
+        themeExtension.dialogContentColor.withValues(alpha: 0.75);
     final dialogBackground =
-        theme.dialogTheme.backgroundColor ?? themeManager.dialogBackgroundColor;
+        theme.dialogTheme.backgroundColor ?? themeExtension.dialogBackgroundColor;
     final cardBackground =
         Color.alphaBlend(primaryColor.withValues(alpha: 0.08), Colors.white);
     final capsuleBackground =
