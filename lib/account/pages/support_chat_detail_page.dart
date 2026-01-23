@@ -3395,8 +3395,7 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
                 // Theme 級別的 inputDecorationTheme 設定
                 inputDecorationTheme: theme.inputDecorationTheme.copyWith(
                   filled: true,
-                  fillColor: bg.withOpacity(0.08),
-                  // fillColor: bg.withOpacity(0.08),
+                  fillColor: bg.withOpacity(0.18), // 從 0.08 提高到 0.18，背景更明顯
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(24),
                     borderSide: BorderSide(color: fg.withOpacity(0.24)),
@@ -3405,7 +3404,10 @@ class _SupportChatDetailPageState extends State<SupportChatDetailPage>
                     borderRadius: BorderRadius.circular(24),
                     borderSide: BorderSide(color: fg, width: 1.5),
                   ),
-                  hintStyle: TextStyle(color: fg.withOpacity(0.6)),
+                  hintStyle: TextStyle(
+                    color: theme.colorScheme.onSurface
+                        .withOpacity(0.6), // 使用主題的 onSurface 顏色，確保對比度
+                  ),
                 ),
                 textSelectionTheme: TextSelectionThemeData(
                   cursorColor: fg,

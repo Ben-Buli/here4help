@@ -72,6 +72,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   // 以下為表單狀態
   late String selectedGender;
   String? oauthAvatarUrl; // 新增：OAuth 頭像 URL
+  bool _isOAuthSignup = false;
   bool isPermanentAddress = false;
   bool isLoading = false;
   bool showPassword = false;
@@ -131,10 +132,14 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     final savedVersionId = prefs.getInt('signup_terms_version_id');
     if (!mounted) return;
-    setState(() {
-      acceptedTermsVersionId = savedVersionId;
-      hasAcceptedTerms = savedVersionId != null;
-    });
+    final nextHasAccepted = savedVersionId != null;
+    if (acceptedTermsVersionId != savedVersionId ||
+        hasAcceptedTerms != nextHasAccepted) {
+      setState(() {
+        acceptedTermsVersionId = savedVersionId;
+        hasAcceptedTerms = nextHasAccepted;
+      });
+    }
   }
 
   Future<void> _persistTermsAcceptance(int? versionId) async {
@@ -248,7 +253,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     var hasPrefilled = false;
 
-    if (tokenParam != null && tokenParam.isNotEmpty) {
+    final hasTokenParam = tokenParam != null && tokenParam.isNotEmpty;
+    if (hasTokenParam) {
       try {
         debugPrint('🔍 開始獲取 OAuth 暫存資料，token: $tokenParam');
         final temp = await OAuthApi.fetchTempUser(tokenParam);
@@ -267,9 +273,9 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     }
 
     // 優先使用傳入的 oauthData
-    if (!hasPrefilled &&
-        widget.oauthData != null &&
-        widget.oauthData!.isNotEmpty) {
+    final hasWidgetOAuth =
+        widget.oauthData != null && widget.oauthData!.isNotEmpty;
+    if (!hasPrefilled && hasWidgetOAuth) {
       print('🔐 載入第三方登入資料: ${widget.oauthData}');
       _prefillOAuthData(widget.oauthData!);
       hasPrefilled = true;
@@ -294,6 +300,19 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
         };
         _prefillOAuthData(storedData);
         hasPrefilled = true;
+      }
+    }
+
+    final isOauthFlow = hasTokenParam ||
+        hasWidgetOAuth ||
+        (prefs.getString('signup_provider')?.isNotEmpty ?? false);
+    if (_isOAuthSignup != isOauthFlow) {
+      if (mounted) {
+        setState(() {
+          _isOAuthSignup = isOauthFlow;
+        });
+      } else {
+        _isOAuthSignup = isOauthFlow;
       }
     }
 
@@ -412,7 +431,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
   void _prefillOAuthData(Map<String, dynamic> oauthData) {
     try {
       debugPrint('🔍 開始預填 OAuth 資料: $oauthData');
-      _resetFormFields();
+      _resetFormFields(useSetState: false);
 
       final defaultGender =
           genderParams['Prefer not to disclose'] ?? 'Prefer not to disclose';
@@ -798,48 +817,46 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     final prefs = existingPrefs ?? await SharedPreferences.getInstance();
 
     // 載入已存在的資料
-    setState(() {
-      fullNameController.text = prefs.getString('signup_full_name') ?? '';
-      nicknameController.text = prefs.getString('signup_nickname') ?? '';
-      selectedGender =
-          prefs.getString('signup_gender') ?? 'Prefer not to disclose';
-      emailController.text = prefs.getString('signup_email') ?? '';
-      phoneController.text = prefs.getString('signup_phone') ?? '';
-      countryController.text = prefs.getString('signup_country') ?? '';
-      addressController.text = prefs.getString('signup_address') ?? '';
-      passwordController.text = prefs.getString('signup_password') ?? '';
-      confirmPasswordController.text = prefs.getString('signup_password') ?? '';
-      dateOfBirthController.text =
-          prefs.getString('signup_date_of_birth') ?? '';
-      paymentPasswordController.text =
-          prefs.getString('signup_payment_code') ?? '';
-      confirmPaymentPasswordController.text =
-          prefs.getString('signup_payment_code') ?? '';
-      isPermanentAddress =
-          prefs.getBool('signup_is_permanent_address') ?? false;
+    fullNameController.text = prefs.getString('signup_full_name') ?? '';
+    nicknameController.text = prefs.getString('signup_nickname') ?? '';
+    emailController.text = prefs.getString('signup_email') ?? '';
+    phoneController.text = prefs.getString('signup_phone') ?? '';
+    countryController.text = prefs.getString('signup_country') ?? '';
+    addressController.text = prefs.getString('signup_address') ?? '';
+    passwordController.text = prefs.getString('signup_password') ?? '';
+    confirmPasswordController.text = prefs.getString('signup_password') ?? '';
+    dateOfBirthController.text =
+        prefs.getString('signup_date_of_birth') ?? '';
+    paymentPasswordController.text =
+        prefs.getString('signup_payment_code') ?? '';
+    confirmPaymentPasswordController.text =
+        prefs.getString('signup_payment_code') ?? '';
 
-      // 載入語言選擇
-      final savedLanguages = prefs.getStringList('signup_languages') ?? ['en'];
-      selectedLanguages = savedLanguages;
-    });
+    final nextGender =
+        prefs.getString('signup_gender') ?? 'Prefer not to disclose';
+    final nextLanguages = prefs.getStringList('signup_languages') ?? ['en'];
+    final nextPermanent =
+        prefs.getBool('signup_is_permanent_address') ?? false;
+
+    final needsUpdate = nextGender != selectedGender ||
+        !_sameStringList(nextLanguages, selectedLanguages) ||
+        nextPermanent != isPermanentAddress;
+
+    if (needsUpdate && mounted) {
+      setState(() {
+        selectedGender = nextGender;
+        selectedLanguages = nextLanguages;
+        isPermanentAddress = nextPermanent;
+      });
+    }
   }
 
-  void _loadPrefilledData() {
-    // 預填測試資料
-    setState(() {
-      fullNameController.text = 'John Doe';
-      nicknameController.text = 'Johnny';
-      emailController.text = 'john.doe@example.com';
-      phoneController.text = '+886912345678';
-      countryController.text = 'Taiwan';
-      addressController.text = '123 Main Street, Taipei';
-      passwordController.text = 'password123';
-      confirmPasswordController.text = 'password123';
-      dateOfBirthController.text = '1995/01/15';
-      paymentPasswordController.text = '123456';
-      confirmPaymentPasswordController.text = '123456';
-      selectedLanguages = ['en', 'zh'];
-    });
+  bool _sameStringList(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   void _showLeaveWarning() {
@@ -1007,6 +1024,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                   child: TextFormField(
                     key: _signupEmailKey,
                     controller: emailController,
+                    enabled: !_isOAuthSignup ||
+                        emailController.text.trim().isEmpty,
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       prefixIcon: Icon(

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
@@ -361,19 +363,79 @@ class UserController extends Controller
             ], 404);
         }
 
-        $oldPermission = $user->permission;
-        $newPermission = $request->permission;
+        $oldPermission = (int) $user->permission;
+        $newPermission = (int) $request->permission;
         $reason = $request->get('reason', '');
+        $isAdminDelete = ($oldPermission !== -2 && $newPermission === -2);
+        $blockedReason = $reason !== '' ? $reason : 'Account deleted by admin';
+        $anonymizedEmail = null;
+        $identities = collect();
+
+        if ($isAdminDelete) {
+            $anonymizedEmail = sprintf(
+                'deleted_%s_u%s_%s@deleted.invalid',
+                now()->format('Ymd'),
+                $id,
+                Str::lower(Str::random(8))
+            );
+
+            $identities = DB::table('user_identities')
+                ->where('user_id', $id)
+                ->get();
+        }
 
         DB::beginTransaction();
         try {
             // 1) 更新用戶權限
-            DB::table('users')
-                ->where('id', $id)
-                ->update([
-                    'permission' => $newPermission,
-                    'updated_at' => now()
-                ]);
+            $updateData = [
+                'permission' => $newPermission,
+                'updated_at' => now(),
+            ];
+            if ($isAdminDelete && $anonymizedEmail) {
+                $updateData['email'] = $anonymizedEmail;
+            }
+            DB::table('users')->where('id', $id)->update($updateData);
+
+            // 1.1) 管理員刪除：寫入 blocked 並移除第三方綁定
+            if ($isAdminDelete) {
+                if (Schema::hasTable('blocked_emails') && !empty($user->email)) {
+                    DB::table('blocked_emails')->updateOrInsert(
+                        ['email' => $user->email],
+                        [
+                            'reason' => $blockedReason,
+                            'blocked_by' => $request->user()->id,
+                            'blocked_at' => now(),
+                            'source' => 'admin_delete',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]
+                    );
+                }
+
+                if (Schema::hasTable('blocked_identities')) {
+                    foreach ($identities as $identity) {
+                        if (empty($identity->provider) || empty($identity->provider_user_id)) {
+                            continue;
+                        }
+                        DB::table('blocked_identities')->updateOrInsert(
+                            [
+                                'provider' => $identity->provider,
+                                'provider_user_id' => $identity->provider_user_id,
+                            ],
+                            [
+                                'reason' => $blockedReason,
+                                'blocked_by' => $request->user()->id,
+                                'blocked_at' => now(),
+                                'source' => 'admin_delete',
+                                'created_at' => now(),
+                                'updated_at' => now(),
+                            ]
+                        );
+                    }
+                }
+
+                DB::table('user_identities')->where('user_id', $id)->delete();
+            }
 
             // 2) 若 0 -> 1：
             if ((int)$oldPermission === 0 && (int)$newPermission === 1) {

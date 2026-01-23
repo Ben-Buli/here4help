@@ -36,6 +36,18 @@ RewriteRule ^ admin/public/index.php [L]
 RewriteCond %{REQUEST_URI} ^/account/reset-password [NC]
 RewriteRule ^ admin/public/index.php [L]
 
+# Public password reset API (Laravel)
+RewriteCond %{REQUEST_URI} ^/api/password/forgot [NC]
+RewriteRule ^ admin/public/index.php [L]
+RewriteCond %{REQUEST_URI} ^/here4help/api/password/forgot [NC]
+RewriteRule ^ admin/public/index.php [L]
+
+# Public terms/privacy (Laravel)
+RewriteCond %{REQUEST_URI} ^/(terms|privacy)/?$ [NC]
+RewriteRule ^ admin/public/index.php [L]
+RewriteCond %{REQUEST_URI} ^/here4help/(terms|privacy)/?$ [NC]
+RewriteRule ^ admin/public/index.php [L]
+
 # Admin reset password requests (both GET and POST) hit Laravel
 # Handle both /admin/reset-password and /here4help/admin/reset-password
 RewriteCond %{REQUEST_URI} ^(/here4help)?/admin/reset-password [NC]

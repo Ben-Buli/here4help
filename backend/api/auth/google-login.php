@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/AccountBlocker.php';
 require_once __DIR__ . '/../../config/env_loader.php';
 
 try {
@@ -129,6 +130,15 @@ try {
 
     // 資料庫處理
     $db = Database::getInstance();
+    $pdo = $db->getConnection();
+
+    if (AccountBlocker::isEmailBlocked($pdo, $email)) {
+        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+    }
+
+    if (AccountBlocker::isIdentityBlocked($pdo, 'google', $googleId)) {
+        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+    }
 
     // 情況1：既有 user_identities + users
     $stmt = $db->query(
@@ -173,6 +183,20 @@ try {
     }
 
     if ($user !== null) {
+        // 檢查帳號權限（與傳統登入一致）
+        $userPermission = (int)($user['permission'] ?? 0);
+        if ($userPermission < 0 && $userPermission != -1) {
+            if ($userPermission == -2) {
+                Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+            } elseif ($userPermission == -3) {
+                Response::forbidden('ACCOUNT_DISABLED_BY_USER');
+            } elseif ($userPermission == -4) {
+                Response::forbidden('ACCOUNT_DELETED_BY_USER');
+            } else {
+                Response::forbidden('Account is not allowed to login (permission).');
+            }
+        }
+
         // 建立 Access/Refresh Tokens
         $payload = [
             'user_id' => (int)($user['id'] ?? $user['user_id']),

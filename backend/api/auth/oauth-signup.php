@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/AccountBlocker.php';
 
 try {
     // 獲取 POST 資料
@@ -60,6 +61,15 @@ try {
     
     // 建立資料庫連線
     $db = Database::getInstance();
+    $pdo = $db->getConnection();
+
+    if (AccountBlocker::isEmailBlocked($pdo, $email)) {
+        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+    }
+
+    if (AccountBlocker::isIdentityBlocked($pdo, $provider, $providerUserId)) {
+        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+    }
     
     // 檢查 email 是否已存在於 users 表
     $stmt = $db->query(
@@ -70,6 +80,18 @@ try {
     $existingUser = $stmt->fetch();
     
     if ($existingUser) {
+        $existingPermission = (int)($existingUser['permission'] ?? 0);
+        if ($existingPermission < 0 && $existingPermission != -1) {
+            if ($existingPermission == -2) {
+                Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+            } elseif ($existingPermission == -3) {
+                Response::forbidden('ACCOUNT_DISABLED_BY_USER');
+            } elseif ($existingPermission == -4) {
+                Response::forbidden('ACCOUNT_DELETED_BY_USER');
+            } else {
+                Response::forbidden('Account is not allowed to login (permission).');
+            }
+        }
         error_log("OAuth Signup - Email 已存在，用戶 ID: {$existingUser['id']}");
         
         // Email 已存在，檢查是否已有對應的 user_identity

@@ -57,7 +57,7 @@ class PasswordApi {
       };
 
       final response = await HttpClientService.post(
-        AppConfig.api('/account/request-password-reset.php'),
+        AppConfig.publicApi('/password/forgot'),
         body: jsonEncode(body),
       );
 

@@ -11,6 +11,20 @@ class AppConfig {
     return '$origin$prefix$path';
   }
 
+  // Public API (Laravel) 組裝：從 apiPrefix 推導 /api 前綴
+  static String publicApi(String path) {
+    final origin = EnvironmentConfig.apiOrigin;
+    final prefix = EnvironmentConfig.apiPrefix;
+    final normalized =
+        prefix.endsWith('/') ? prefix.substring(0, prefix.length - 1) : prefix;
+    final derived = normalized.replaceFirst(RegExp(r'/backend/api$'), '/api');
+    final publicPrefix = derived == normalized ? '/api' : derived;
+    if (!path.startsWith('/')) {
+      path = '/$path';
+    }
+    return '$origin$publicPrefix$path';
+  }
+
   // API 基礎 URL - 從環境配置獲取
   static String get apiBaseUrl => EnvironmentConfig.apiBaseUrl;
 

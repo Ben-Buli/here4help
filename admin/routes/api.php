@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\AdminAccountController;
 use App\Http\Controllers\Admin\PointPolicyController;
 use App\Http\Controllers\Admin\FAQController;
 use App\Http\Controllers\Admin\AppTermsController;
+use App\Http\Controllers\PasswordResetController;
 
 /*
 |--------------------------------------------------------------------------
@@ -144,3 +145,6 @@ Route::prefix('admin')->group(function () {
         Route::get('/dashboard', [AdminPingController::class, 'dashboard']);
     });
 });
+
+// Public password reset request
+Route::post('/password/forgot', [PasswordResetController::class, 'forgot']);

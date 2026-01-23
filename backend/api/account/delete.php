@@ -79,7 +79,7 @@ try {
     );
     
     // 查詢用戶資料
-    $stmt = $pdo->prepare("SELECT permission, status FROM users WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT permission, status, email FROM users WHERE id = ?");
     $stmt->execute([$userId]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -135,14 +135,25 @@ try {
         $before = $user; // 已於上方查詢取得 permission/status
         
         // 軟刪除用戶（設置為自行軟刪除狀態）— 不寫入 deleted_at（目前資料表無此欄）
+        $anonymizedEmail = sprintf(
+            'deleted_%s_u%s_%s@deleted.invalid',
+            date('Ymd'),
+            $userId,
+            bin2hex(random_bytes(4))
+        );
+
         $updateStmt = $pdo->prepare("
             UPDATE users 
             SET permission = -4,
                 status = 'inactive',
+                email = ?,
                 updated_at = NOW()
             WHERE id = ?
         ");
-        $updateStmt->execute([$userId]);
+        $updateStmt->execute([$anonymizedEmail, $userId]);
+
+        // 釋放第三方身份綁定（允許使用者重新註冊）
+        $pdo->prepare("DELETE FROM user_identities WHERE user_id = ?")->execute([$userId]);
     
         // 統一使用 UserActiveLogger 紀錄
         $ip  = $_SERVER['REMOTE_ADDR']        ?? null;
@@ -203,16 +214,6 @@ try {
                 metadata:  null
             );
         }
-    
-        // （選用）匿名化敏感資料：若政策要求立即匿名化，保留；否則可移除
-        $anonymizeStmt = $pdo->prepare("
-            UPDATE users 
-            SET email = CONCAT('deleted_', id, '@deleted.local'),
-                phone = NULL,
-                avatar_url = NULL
-            WHERE id = ?
-        ");
-        $anonymizeStmt->execute([$userId]);
     
         // 提交交易
         $pdo->commit();

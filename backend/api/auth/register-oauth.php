@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/AccountBlocker.php';
 
 // 載入環境配置
 require_once __DIR__ . '/../../config/env_loader.php';
@@ -64,6 +65,7 @@ try {
     
     // 建立資料庫連線
     $db = Database::getInstance();
+    $pdo = $db->getConnection();
     
     // 第一步：從 oauth_temp_users 表獲取並消費 token
     $stmt = $db->query(
@@ -89,8 +91,11 @@ try {
     
     // 檢查 email 是否已存在（如果提供了 email）
     if (!empty($email)) {
+        if (AccountBlocker::isEmailBlocked($pdo, $email)) {
+            Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+        }
         $stmt = $db->query(
-            "SELECT * FROM users WHERE email = ?",
+            "SELECT * FROM users WHERE email = ? AND permission NOT IN (-2, -4) ",
             [$email]
         );
         
@@ -120,6 +125,10 @@ try {
         }
     }
     
+    if (AccountBlocker::isIdentityBlocked($pdo, $oauthProvider, $providerUserId)) {
+        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+    }
+
     // 開始資料庫交易
     $db->beginTransaction();
     

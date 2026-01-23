@@ -106,8 +106,8 @@ class _ContactUsPageState extends State<ContactUsPage> {
         description: description,
       );
 
-      if (response['success'] == true && response['data'] != null) {
-        final roomId = response['data']['room_id'];
+      if (response['room_id'] != null) {
+        final roomId = response['room_id'];
         debugPrint('✅ ContactUsPage: 客服事件建立成功');
         debugPrint(
             '✅ ContactUsPage: 收到 roomId: $roomId (type: ${roomId.runtimeType})');
@@ -137,8 +137,8 @@ class _ContactUsPageState extends State<ContactUsPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content:
-                  Text(response['message'] ?? 'Failed to create support case'),
+              content: Text(response['message'] ??
+                  'Failed to create support case: Invalid response'),
               backgroundColor: Colors.red,
             ),
           );

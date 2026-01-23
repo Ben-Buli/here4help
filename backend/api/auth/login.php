@@ -83,18 +83,20 @@ try {
         throw new Exception('Invalid email or password');
     }
     
-    // 統一使用 permission 作為登入判斷：允許 permission >= 0 或 permission = -1, -3 登入
+    // 統一使用 permission 作為登入判斷：僅允許 permission >= 0 或 permission = -1 登入
     // -1: 管理員停權（可登入但功能受限）
-    // -3: 用戶自行停用（可登入但功能受限）
-    // -2, -4: 軟刪除（不可登入）
+    // -2: 管理員移除（不可登入）
+    // -3: 用戶自行停用（不可登入）
+    // -4: 用戶自行刪除（不可登入）
     $userPermission = (int)($user['permission']);
     error_log("User permission: " . $userPermission);
-    if ($userPermission < 0 && $userPermission != -1 && $userPermission != -3) {
-        // 根據不同的刪除類型返回對應的錯誤訊息
+    if ($userPermission < 0 && $userPermission != -1) {
         if ($userPermission == -2) {
-            throw new Exception('This account has been removed by an administrator and cannot be used. Please contact support if you believe this is an error.');
+            throw new Exception('ACCOUNT_DELETED_BY_ADMIN');
+        } elseif ($userPermission == -3) {
+            throw new Exception('ACCOUNT_DISABLED_BY_USER');
         } elseif ($userPermission == -4) {
-            throw new Exception('This account has been deleted and cannot be used. If you wish to use our service again, please create a new account.');
+            throw new Exception('ACCOUNT_DELETED_BY_USER');
         } else {
             throw new Exception('Account is not allowed to login (permission)');
         }

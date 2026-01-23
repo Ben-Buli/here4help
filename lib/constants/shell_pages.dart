@@ -19,6 +19,7 @@ import 'package:here4help/account/pages/theme_settings_page.dart';
 import 'package:here4help/account/pages/wallet_page.dart';
 import 'package:here4help/account/pages/wallet_withdraw_page.dart';
 import 'package:here4help/account/pages/point_history_page.dart';
+import 'package:here4help/account/pages/privacy_policy_page.dart';
 
 // ==================== auth 模組 ====================
 import 'package:here4help/auth/pages/login_page.dart';
@@ -419,6 +420,24 @@ final List<Map<String, dynamic>> shellPages = [
     'permission': 0, // 新用戶可查看 FAQ
   },
   {
+    'path': '/privacy',
+    'child': const PrivacyPolicyPage(),
+    'title': 'Privacy Policy',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'permission': -10, // 公開頁面：任何狀態都可訪問
+  },
+  {
+    'path': '/terms',
+    'child': const TermsOfUsePage(),
+    'title': 'Terms of Use',
+    'showAppBar': true,
+    'showBottomNav': false,
+    'showBackArrow': true,
+    'permission': -10, // 公開頁面：任何狀態都可訪問
+  },
+  {
     'path': '/account/support/terms',
     'child': const TermsOfUsePage(),
     'title': 'Terms of Use',
@@ -443,7 +462,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'Permission Denied', // 403
     'showAppBar': true,
     'showBottomNav': false,
-    'showBackArrow': true,
+    'showBackArrow': false,
     'permission': -10, // 公開頁面：任何狀態都可訪問權限不足頁面
   },
   {
@@ -452,7 +471,7 @@ final List<Map<String, dynamic>> shellPages = [
     'title': 'User Unverified', // 未驗證
     'showAppBar': true,
     'showBottomNav': false,
-    'showBackArrow': true,
+    'showBackArrow': false,
     'permission': 0, // 新用戶可訪問權限不足頁面
   },
   {

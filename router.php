@@ -38,6 +38,7 @@ if (strpos($path, '/here4help') === 0) {
 // 管理後臺 Laravel API & Sanctum
 if (
     strpos($path, '/api/admin') === 0 ||
+    strpos($path, '/api/password/forgot') === 0 ||
     strpos($path, '/sanctum') === 0 ||
     strpos($path, '/admintest') === 0
 ) {
@@ -58,6 +59,14 @@ if ($path === '/admin/reset-password') {
 if ($path === '/account/reset-password') {
     $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/admin/index.php';
     $_SERVER['REQUEST_URI'] = '/account/reset-password';
+    require $_SERVER['SCRIPT_FILENAME'];
+    exit();
+}
+
+// Laravel-powered public pages
+if ($path === '/terms' || $path === '/privacy') {
+    $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/admin/index.php';
+    $_SERVER['REQUEST_URI'] = $path;
     require $_SERVER['SCRIPT_FILENAME'];
     exit();
 }

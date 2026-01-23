@@ -175,7 +175,7 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login Success: $email')),
+        SnackBar(content: Text('Hi, $email!')),
       );
 
       context.go('/home');
@@ -186,6 +186,10 @@ class _LoginPageState extends State<LoginPage> {
       setState(() {
         isLoading = false;
       });
+
+      if (await _handleDeletedAccountError(e)) {
+        return;
+      }
 
       String errorMessage = 'Login Failed';
       String errorType =
@@ -246,7 +250,8 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Warning: Unable to verify terms status. Please check your connection.'),
+            content: Text(
+                'Warning: Unable to verify terms status. Please check your connection.'),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 3),
           ),
@@ -254,6 +259,76 @@ class _LoginPageState extends State<LoginPage> {
       }
       return true;
     }
+  }
+
+  bool _isDeletedOrDisabledAccountError(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('account_deleted_or_disabled') ||
+        normalized.contains('account_deleted_by_admin') ||
+        normalized.contains('account_deleted_by_user') ||
+        normalized.contains('account_disabled_by_user') ||
+        normalized.contains('has been deleted and cannot be used') ||
+        normalized.contains('account has been deleted and cannot be used') ||
+        normalized.contains('account deleted');
+  }
+
+  String _deletedAccountDialogContent(String message) {
+    final normalized = message.toLowerCase();
+    if (normalized.contains('account_deleted_by_admin') ||
+        normalized.contains('removed by an administrator')) {
+      return '此帳號已被管理員刪除，若要繼續使用，請重新註冊。';
+    }
+    if (normalized.contains('account_disabled_by_user')) {
+      return '此帳號已由使用者自行停用，若要繼續使用，請重新註冊。';
+    }
+    if (normalized.contains('account_deleted_by_user') ||
+        normalized.contains('account_deleted_or_disabled') ||
+        normalized.contains('has been deleted and cannot be used')) {
+      return '此帳號已由使用者自行刪除，若要繼續使用，請重新註冊。';
+    }
+    return '此帳號已刪除（停用），若要繼續使用，請重新註冊。';
+  }
+
+  Future<bool> _handleDeletedAccountError(Object error) async {
+    final message = error.toString();
+    if (!_isDeletedOrDisabledAccountError(message)) {
+      return false;
+    }
+
+    if (!mounted) {
+      return true;
+    }
+
+    final content = _deletedAccountDialogContent(message);
+    await _showDeletedAccountDialog(context, content);
+    return true;
+  }
+
+  Future<void> _showDeletedAccountDialog(
+      BuildContext dialogContext, String content) async {
+    return showDialog<void>(
+      context: dialogContext,
+      useRootNavigator: true,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('帳號已刪除（停用）'),
+          content: Text(content),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                dialogContext.go('/signup');
+              },
+              child: const Text('重新註冊'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildBrandedButton({
@@ -569,9 +644,11 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Google Login Error: $e')),
-      );
+      if (!await _handleDeletedAccountError(e)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Google Login Error: $e')),
+        );
+      }
     } finally {
       // 停止超時計時器
       _stopLoginTimeout();
@@ -964,9 +1041,11 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Facebook Login Error: $e')),
-      );
+      if (!await _handleDeletedAccountError(e)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Facebook Login Error: $e')),
+        );
+      }
     } finally {
       // 停止超時計時器
       _stopLoginTimeout();
@@ -1142,9 +1221,11 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Apple Login Error: $e')),
-      );
+      if (!await _handleDeletedAccountError(e)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Apple Login Error: $e')),
+        );
+      }
     } finally {
       // 停止超時計時器
       _stopLoginTimeout();

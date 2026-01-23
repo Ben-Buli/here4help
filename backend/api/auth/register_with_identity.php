@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/AccountBlocker.php';
 
 try {
     // 獲取 POST 資料
@@ -74,9 +75,13 @@ try {
     
     // 建立資料庫連線
     $db = Database::getInstance();
+    $pdo = $db->getConnection();
     
     // 檢查 email 是否已存在
-    $stmt = $db->query("SELECT id FROM users WHERE email = ?", [$email]);
+    if (AccountBlocker::isEmailBlocked($pdo, $email)) {
+        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+    }
+    $stmt = $db->query("SELECT id FROM users WHERE email = ? AND permission NOT IN (-2, -4) ", [$email]); // 排除管理員刪除用戶、自已刪除的用戶
     $existingUser = $stmt->fetch();
     
     if ($existingUser) {
@@ -84,6 +89,9 @@ try {
     }
     
     // 檢查 provider_user_id 是否已存在於 user_identities
+    if (AccountBlocker::isIdentityBlocked($pdo, $provider, $providerUserId)) {
+        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+    }
     $stmt = $db->query(
         "SELECT user_id FROM user_identities WHERE provider = ? AND provider_user_id = ?",
         [$provider, $providerUserId]

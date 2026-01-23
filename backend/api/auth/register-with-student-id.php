@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../utils/TokenValidator.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Response.php';
 require_once __DIR__ . '/../../utils/TermsManager.php';
+require_once __DIR__ . '/../../utils/AccountBlocker.php';
 
 Response::setCorsHeaders();
 
@@ -16,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 try {
     $db = Database::getInstance();
+    $pdo = $db->getConnection();
     
     // 驗證必要欄位
     $requiredFields = [
@@ -67,6 +69,9 @@ try {
     $nickname = isset($_POST['nickname']) ? trim((string)$_POST['nickname']) : null;
     $gender = trim($_POST['gender']);
     $email = trim($_POST['email']);
+    if (AccountBlocker::isEmailBlocked($pdo, $email)) {
+        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+    }
     $phone = isset($_POST['phone']) ? trim((string)$_POST['phone']) : '';
     $country = isset($_POST['country']) ? trim((string)$_POST['country']) : '';
     $address = trim($_POST['address']);
@@ -83,7 +88,7 @@ try {
     $studentId = trim($_POST['student_id']);
 
     // 檢查 email 是否已存在
-    $existingUser = $db->fetch("SELECT id FROM users WHERE email = ?", [$email]);
+    $existingUser = $db->fetch("SELECT id FROM users WHERE email = ? AND permission NOT IN (-2, -4) ", [$email]); // 排除管理員刪除用戶、自已刪除的用戶
     if ($existingUser) {
         Response::error(ErrorCodes::EMAIL_ALREADY_EXISTS);
     }

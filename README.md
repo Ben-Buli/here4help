@@ -28,6 +28,28 @@ here4help/
 └── assets/               # 靜態資源
 ```
 
+## 🌐 公開頁面與部署重點
+
+### 公開頁面 (Laravel)
+- `/terms`：公開服務條款頁，讀取後台 Terms of Use 最新啟用版本（來源：`backend/api/content/app_terms_active.php`）
+- `/privacy`：公開隱私權政策頁（Laravel Blade）
+
+### cPanel 部署路由 (public_html)
+- `/admin`：Laravel 後台
+- `/web`：Flutter Web SPA
+- `/backend`：PHP API
+- `/terms`、`/privacy`：由根目錄 `.htaccess` rewrite 到 `admin/public/index.php`
+
+### 部署注意事項
+- DocumentRoot 需指向 `public_html`（不要指到 `public_html/web`）
+- `public_html/.htaccess` 必須在 SPA rewrite 前攔截 `/terms`、`/privacy`
+- 若部署在子目錄（例如 `/here4help`），請在 rewrite 規則同時加入前綴
+
+```apache
+RewriteCond %{REQUEST_URI} ^/(terms|privacy)/?$ [NC]
+RewriteRule ^ admin/public/index.php [L]
+```
+
 ## 🚀 快速開始
 
 ### 前置需求

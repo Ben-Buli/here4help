@@ -55,6 +55,8 @@ Route::prefix('admintest')->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::view('/account/reset-password', 'account.reset-password')->name('manual-reset-password');
+Route::view('/terms', 'public.terms')->name('public.terms');
+Route::view('/privacy', 'public.privacy')->name('public.privacy');
 Route::get('/admin/reset-password', [AdminPasswordResetController::class, 'show'])->name('admin.password.reset');
 Route::post('/admin/reset-password', [AdminPasswordResetController::class, 'reset'])->name('admin.password.reset.submit');
 

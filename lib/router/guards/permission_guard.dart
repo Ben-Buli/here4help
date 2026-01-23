@@ -38,10 +38,7 @@ class PermissionGuard {
     final userPermission = permissionProvider.permission;
 
     // 從 shell_pages 中查找頁面權限要求
-    final pageConfig = shellPages.firstWhere(
-      (page) => page['path'] == path,
-      orElse: () => {'permission': 1}, // 預設需要已認證用戶
-    );
+    final pageConfig = _findBestMatchPageConfig(path);
 
     final requiredPermission = pageConfig['permission'] as int? ?? 1;
 
@@ -236,12 +233,40 @@ class PermissionGuard {
 
   /// 獲取頁面權限要求
   static int getPagePermissionRequirement(String path) {
-    final pageConfig = shellPages.firstWhere(
-      (page) => page['path'] == path,
-      orElse: () => {'permission': 1},
-    );
+    final pageConfig = _findBestMatchPageConfig(path);
 
     return pageConfig['permission'] as int? ?? 1;
+  }
+
+  static Map<String, dynamic> _findBestMatchPageConfig(String path) {
+    final normalizedPath = _normalizePath(path);
+    Map<String, dynamic>? bestMatch;
+    var bestLength = -1;
+
+    for (final page in shellPages) {
+      final pagePath = _normalizePath(page['path'] as String);
+      if (normalizedPath == pagePath ||
+          normalizedPath.startsWith('$pagePath/')) {
+        if (pagePath.length > bestLength) {
+          bestMatch = page;
+          bestLength = pagePath.length;
+        }
+      }
+    }
+
+    return bestMatch ?? {'permission': 1};
+  }
+
+  static String _normalizePath(String path) {
+    var normalized = path.trim();
+    if (normalized.isEmpty) return '/';
+    if (!normalized.startsWith('/')) {
+      normalized = '/$normalized';
+    }
+    if (normalized.length > 1 && normalized.endsWith('/')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized;
   }
 
   /// 獲取用戶權限狀態描述

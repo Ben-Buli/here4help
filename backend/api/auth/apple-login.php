@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/JWTManager.php';
 require_once __DIR__ . '/../../utils/Response.php';
+require_once __DIR__ . '/../../utils/AccountBlocker.php';
 
 try {
     // 獲取 POST 資料
@@ -60,6 +61,15 @@ try {
     
     // 建立資料庫連線
     $db = Database::getInstance();
+    $pdo = $db->getConnection();
+
+    if (AccountBlocker::isEmailBlocked($pdo, $email)) {
+        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+    }
+
+    if (AccountBlocker::isIdentityBlocked($pdo, 'apple', $appleId)) {
+        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+    }
     
     // 第一步：檢查是否已存在對應的 user_identity
     error_log("Apple Login - 檢查現有 user_identity...");
@@ -129,7 +139,7 @@ try {
             }
         }
 
-        if ($user === null) {
+    if ($user === null) {
             error_log("Apple Login - 建立 OAuth 暫存資料供新用戶註冊");
 
             $tempToken = bin2hex(openssl_random_pseudo_bytes(24));
@@ -175,6 +185,20 @@ try {
         }
     }
     
+    // 檢查帳號權限（與傳統登入一致）
+    $userPermission = (int)($user['permission'] ?? 0);
+    if ($userPermission < 0 && $userPermission != -1) {
+        if ($userPermission == -2) {
+            Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+        } elseif ($userPermission == -3) {
+            Response::forbidden('ACCOUNT_DISABLED_BY_USER');
+        } elseif ($userPermission == -4) {
+            Response::forbidden('ACCOUNT_DELETED_BY_USER');
+        } else {
+            Response::forbidden('Account is not allowed to login (permission).');
+        }
+    }
+
     // 生成 Access/Refresh Token
     $resolvedUserId = isset($user['id']) ? (int)$user['id'] : (int)($user['user_id'] ?? 0);
     $payload = [

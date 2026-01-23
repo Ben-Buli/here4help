@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../utils/Response.php';
 require_once __DIR__ . '/../../config/env_loader.php';
 require_once __DIR__ . '/../../utils/TermsManager.php';
+require_once __DIR__ . '/../../utils/AccountBlocker.php';
 
 Response::setCorsHeaders();
 
@@ -15,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 try {
     $db = Database::getInstance();
+    $pdo = $db->getConnection();
 
     $oauthToken = trim($_POST['oauth_token'] ?? '');
     if (empty($oauthToken)) {
@@ -85,6 +87,14 @@ try {
         Response::validationError(['name' => 'Name is required', 'email' => 'Email is required']);
     }
 
+    if (AccountBlocker::isEmailBlocked($pdo, $email)) {
+        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+    }
+
+    if (AccountBlocker::isIdentityBlocked($pdo, $tempUser['provider'], $tempUser['provider_user_id'])) {
+        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+    }
+
     // 驗證推薦碼
     $referrerId = null;
     if (!empty($introReferralCode)) {
@@ -101,7 +111,7 @@ try {
     }
 
     // 已存在 email 檢查
-    $existingUser = $db->fetch("SELECT id FROM users WHERE email = ?", [$email]);
+    $existingUser = $db->fetch("SELECT id FROM users WHERE email = ? AND permission NOT IN (-2, -4) ", [$email]); // 排除管理員刪除用戶、自已刪除的用戶
     if ($existingUser) {
         Response::error('Email already exists');
     }

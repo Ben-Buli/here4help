@@ -95,7 +95,7 @@
           @dragenter.prevent="handleDragEnter(index)"
           @dragover.prevent="handleDragOver(index)"
           @dragleave="handleDragLeave(index)"
-          @drop="handleDrop(index)"
+          @drop="handleDrop()"
           @dragend="handleDragEnd"
         >
           <div class="flex items-start justify-between">
