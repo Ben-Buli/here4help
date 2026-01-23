@@ -204,6 +204,8 @@ final GoRouter appRouter = GoRouter(
               AppScaffoldDefaults.defaultShowBottomNav,
           showBackArrow: pageConfig['showBackArrow'] ??
               AppScaffoldDefaults.defaultShowBackArrow,
+          allowSwipeBack: pageConfig['allowSwipeBack'] ??
+              AppScaffoldDefaults.defaultAllowSwipeBack,
           centerTitle: AppScaffoldDefaults.defaultCenterTitle,
           actions: actions,
           child: guardedPage,

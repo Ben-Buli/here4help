@@ -57,12 +57,14 @@ class PermissionGuard {
   /// 路由守衛中介層
   static Widget guardRoute(
       BuildContext context, GoRouterState state, Widget page) {
+    final permissionProvider =
+        Provider.of<PermissionProvider>(context, listen: false);
+    permissionProvider.refreshStatusIfNeeded();
+
     final path = state.uri.path;
 
     // 檢查權限
     if (!canAccessRoute(context, path)) {
-      final permissionProvider =
-          Provider.of<PermissionProvider>(context, listen: false);
       final userPermission = permissionProvider.permission;
 
       // 根據用戶狀態返回不同的處理
@@ -254,7 +256,7 @@ class PermissionGuard {
       }
     }
 
-    return bestMatch ?? {'permission': 1};
+    return bestMatch ?? {'permission': 0};
   }
 
   static String _normalizePath(String path) {
