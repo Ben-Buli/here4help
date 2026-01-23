@@ -37,17 +37,30 @@ class _PointHistoryPageState extends State<PointHistoryPage>
   bool depositHasNextPage = false;
   String? selectedStatus;
 
+  // 提領申請記錄相關狀態
+  List<WithdrawRequest> withdrawRequests = [];
+  List<WithdrawRequest> allWithdrawRequests = []; // 儲存所有提領申請記錄
+  bool isWithdrawLoading = true;
+  bool isWithdrawLoadingMore = false;
+  String? withdrawErrorMessage;
+  int withdrawCurrentPage = 1;
+  bool withdrawHasNextPage = false;
+  String? selectedWithdrawStatus;
+
   final ScrollController _scrollController = ScrollController();
   final ScrollController _depositScrollController = ScrollController();
+  final ScrollController _withdrawScrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadTransactions();
     _loadDepositRequests();
+    _loadWithdrawRequests();
     _scrollController.addListener(_onScroll);
     _depositScrollController.addListener(_onDepositScroll);
+    _withdrawScrollController.addListener(_onWithdrawScroll);
   }
 
   @override
@@ -55,6 +68,7 @@ class _PointHistoryPageState extends State<PointHistoryPage>
     _tabController.dispose();
     _scrollController.dispose();
     _depositScrollController.dispose();
+    _withdrawScrollController.dispose();
     super.dispose();
   }
 
@@ -179,6 +193,82 @@ class _PointHistoryPageState extends State<PointHistoryPage>
     await _loadDepositRequests();
   }
 
+  void _onWithdrawScroll() {
+    if (_withdrawScrollController.position.pixels ==
+        _withdrawScrollController.position.maxScrollExtent) {
+      if (withdrawHasNextPage && !isWithdrawLoadingMore) {
+        _loadMoreWithdrawRequests();
+      }
+    }
+  }
+
+  Future<void> _loadWithdrawRequests({bool refresh = false}) async {
+    try {
+      if (refresh) {
+        setState(() {
+          withdrawCurrentPage = 1;
+          withdrawRequests.clear();
+          isWithdrawLoading = true;
+          withdrawErrorMessage = null;
+        });
+      }
+
+      final userService = Provider.of<UserService>(context, listen: false);
+      await userService.ensureUserLoaded();
+
+      final result = await WalletService.getWithdrawRequests(
+        userService,
+        page: withdrawCurrentPage,
+      );
+
+      setState(() {
+        if (refresh || withdrawCurrentPage == 1) {
+          allWithdrawRequests = result.requests;
+          withdrawRequests = _filterWithdrawRequests(allWithdrawRequests);
+        } else {
+          allWithdrawRequests.addAll(result.requests);
+          withdrawRequests = _filterWithdrawRequests(allWithdrawRequests);
+        }
+        withdrawHasNextPage = result.pagination.hasNextPage;
+        isWithdrawLoading = false;
+        isWithdrawLoadingMore = false;
+      });
+    } catch (e) {
+      setState(() {
+        withdrawErrorMessage = e.toString();
+        isWithdrawLoading = false;
+        isWithdrawLoadingMore = false;
+      });
+    }
+  }
+
+  Future<void> _loadMoreWithdrawRequests() async {
+    if (!withdrawHasNextPage || isWithdrawLoadingMore) return;
+
+    setState(() {
+      isWithdrawLoadingMore = true;
+      withdrawCurrentPage++;
+    });
+
+    await _loadWithdrawRequests();
+  }
+
+  /// 無刷新篩選提領申請記錄
+  void _applyWithdrawStatusFilter(String? filterStatus) {
+    setState(() {
+      selectedWithdrawStatus = filterStatus;
+      withdrawRequests = _filterWithdrawRequests(allWithdrawRequests);
+    });
+  }
+
+  /// 篩選提領申請記錄
+  List<WithdrawRequest> _filterWithdrawRequests(List<WithdrawRequest> allReqs) {
+    if (selectedWithdrawStatus == null) {
+      return allReqs;
+    }
+    return allReqs.where((req) => req.status == selectedWithdrawStatus).toList();
+  }
+
   /// 無刷新篩選方法
   void _applyFilter(String? filterType) {
     setState(() {
@@ -265,6 +355,7 @@ class _PointHistoryPageState extends State<PointHistoryPage>
             children: [
               _buildTransactionHistoryTab(),
               _buildDepositRequestsTab(),
+              _buildWithdrawalsTab(),
             ],
           ),
         ),
@@ -300,6 +391,23 @@ class _PointHistoryPageState extends State<PointHistoryPage>
           child: RefreshIndicator(
             onRefresh: () => _loadDepositRequests(refresh: true),
             child: _buildDepositBody(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 提領申請記錄分頁
+  Widget _buildWithdrawalsTab() {
+    return Column(
+      children: [
+        // 狀態篩選區域
+        _buildWithdrawFilterSection(),
+        // 提領申請列表
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () => _loadWithdrawRequests(refresh: true),
+            child: _buildWithdrawBody(),
           ),
         ),
       ],
@@ -798,6 +906,286 @@ class _PointHistoryPageState extends State<PointHistoryPage>
                     ),
                     child: Text(
                       request.statusDisplay,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: statusColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1),
+      ],
+    );
+  }
+
+  /// 提領申請篩選區域
+  Widget _buildWithdrawFilterSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        border: Border(
+          bottom: BorderSide(
+            color: Theme.of(context).dividerColor,
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: DropdownButtonFormField<String?>(
+              value: selectedWithdrawStatus,
+              decoration: const InputDecoration(
+                labelText: 'Filter by Status',
+                border: OutlineInputBorder(),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              items: const [
+                DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('All Statuses'),
+                ),
+                DropdownMenuItem<String?>(
+                  value: 'pending',
+                  child: Text('Pending'),
+                ),
+                DropdownMenuItem<String?>(
+                  value: 'approved',
+                  child: Text('Approved'),
+                ),
+                DropdownMenuItem<String?>(
+                  value: 'paid',
+                  child: Text('Paid'),
+                ),
+                DropdownMenuItem<String?>(
+                  value: 'rejected',
+                  child: Text('Rejected'),
+                ),
+                DropdownMenuItem<String?>(
+                  value: 'cancelled',
+                  child: Text('Cancelled'),
+                ),
+              ],
+              onChanged: (value) {
+                _applyWithdrawStatusFilter(value);
+              },
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (selectedWithdrawStatus != null)
+            IconButton(
+              onPressed: () {
+                _applyWithdrawStatusFilter(null);
+              },
+              icon: const Icon(Icons.clear),
+              tooltip: 'Clear Filter',
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 提領申請記錄主體
+  Widget _buildWithdrawBody() {
+    if (isWithdrawLoading && withdrawRequests.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (withdrawErrorMessage != null && withdrawRequests.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to load withdraw requests',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              withdrawErrorMessage!,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => _loadWithdrawRequests(refresh: true),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (withdrawRequests.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.output_outlined,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No withdraw requests found',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              selectedWithdrawStatus != null
+                  ? 'No ${selectedWithdrawStatus!} requests'
+                  : 'Your withdraw requests will appear here',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      controller: _withdrawScrollController,
+      itemCount: withdrawRequests.length + (isWithdrawLoadingMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == withdrawRequests.length) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        final request = withdrawRequests[index];
+        return _buildWithdrawRequestItem(request);
+      },
+    );
+  }
+
+  /// 提領申請項目
+  Widget _buildWithdrawRequestItem(WithdrawRequest request) {
+    Color statusColor;
+    IconData statusIcon;
+
+    switch (request.status) {
+      case 'pending':
+        statusColor = Colors.orange;
+        statusIcon = Icons.schedule;
+        break;
+      case 'approved':
+        statusColor = Colors.blue;
+        statusIcon = Icons.check_circle;
+        break;
+      case 'paid':
+        statusColor = Colors.green;
+        statusIcon = Icons.payment;
+        break;
+      case 'rejected':
+        statusColor = Colors.red;
+        statusIcon = Icons.cancel;
+        break;
+      case 'cancelled':
+        statusColor = Colors.grey;
+        statusIcon = Icons.cancel_outlined;
+        break;
+      default:
+        statusColor = Colors.grey;
+        statusIcon = Icons.help;
+    }
+
+    return Column(
+      children: [
+        ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: CircleAvatar(
+            radius: 16,
+            backgroundColor: statusColor.withOpacity(0.1),
+            child: Icon(
+              statusIcon,
+              color: statusColor,
+              size: 16,
+            ),
+          ),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Withdraw Request #${request.id}',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w500, fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                WalletService.formatPoints(request.amountPoints),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: statusColor,
+                ),
+              ),
+            ],
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Fee: ${WalletService.formatPoints(request.feePoints)} | Total: ${WalletService.formatPoints(request.totalDeductPoints)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              if ((request.adminReply ?? '').isNotEmpty)
+                Text(
+                  'Reply: ${request.adminReply}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[500],
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _formatDate(request.createdAt),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: statusColor.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      request.status.toUpperCase(),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w500,

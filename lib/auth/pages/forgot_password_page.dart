@@ -105,7 +105,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               Center(
                 child: Text(
                   _emailSent
-                      ? 'We\'ve sent a password reset link to your email address. Please check your inbox and follow the instructions.'
+                      ? 'We\'ve sent a password reset link to your email address. Please check your inbox and follow the instructions in your browser.'
                       : 'Enter your email address and we\'ll send you a link to reset your password.',
                   style: TextStyle(
                     fontSize: 16,

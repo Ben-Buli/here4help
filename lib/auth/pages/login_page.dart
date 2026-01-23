@@ -1349,6 +1349,16 @@ class _LoginPageState extends State<LoginPage> {
                               onFieldSubmitted: (_) => _submitForm(),
                             ),
                             const SizedBox(height: 16),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: isLoading
+                                    ? null
+                                    : () => context.go('/forgot-password'),
+                                child: const Text('Forgot password?'),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
                             CheckboxListTile(
                               value: rememberMe,
                               onChanged: (value) {

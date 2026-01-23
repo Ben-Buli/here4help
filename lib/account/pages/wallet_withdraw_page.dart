@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/services/wallet_service.dart';
 import 'package:provider/provider.dart';
@@ -62,22 +63,57 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
       final userService = Provider.of<UserService>(context, listen: false);
       await userService.ensureUserLoaded();
 
-      final results = await Future.wait([
-        WalletService.getWalletSummary(userService),
-        WalletService.getWithdrawFeeSettings(userService),
-        WalletService.getWithdrawRequests(userService, page: currentPage),
-      ]);
+      // 分別處理每個 API，避免一個失敗導致全部失敗
+      WalletSummary? summary;
+      WithdrawFeeSettings? fee;
+      WithdrawRequestsResult? withdrawResult;
 
-      final withdrawResult = results[2] as WithdrawRequestsResult;
-      setState(() {
-        walletSummary = results[0] as WalletSummary;
-        feeSettings = results[1] as WithdrawFeeSettings;
-        if (currentPage == 1) {
-          requests = withdrawResult.requests;
-        } else {
-          requests.addAll(withdrawResult.requests);
+      try {
+        summary = await WalletService.getWalletSummary(userService);
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Failed to load wallet summary: $e');
         }
-        hasNextPage = withdrawResult.pagination.hasNextPage;
+      }
+
+      try {
+        fee = await WalletService.getWithdrawFeeSettings(userService);
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Failed to load withdraw fee settings: $e');
+        }
+        // 設置默認值，確保 fee info card 能正常顯示
+        fee = WithdrawFeeSettings(
+          id: 0,
+          rate: 0.0,
+          description: 'No withdraw fee settings configured',
+          isActive: false,
+          minWithdrawPoints: 100,
+        );
+      }
+
+      try {
+        withdrawResult = await WalletService.getWithdrawRequests(
+          userService,
+          page: currentPage,
+        );
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Failed to load withdraw requests: $e');
+        }
+      }
+
+      setState(() {
+        if (summary != null) walletSummary = summary;
+        if (fee != null) feeSettings = fee;
+        if (withdrawResult != null) {
+          if (currentPage == 1) {
+            requests = withdrawResult.requests;
+          } else {
+            requests.addAll(withdrawResult.requests);
+          }
+          hasNextPage = withdrawResult.pagination.hasNextPage;
+        }
         isLoading = false;
         isLoadingMore = false;
       });

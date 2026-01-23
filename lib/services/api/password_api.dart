@@ -72,37 +72,6 @@ class PasswordApi {
     }
   }
 
-  /// 重設密碼
-  static Future<Map<String, dynamic>> resetPassword({
-    required String token,
-    required String email,
-    required String newPassword,
-    required String confirmPassword,
-  }) async {
-    try {
-      final body = {
-        'token': token,
-        'email': email,
-        'new_password': newPassword,
-        'confirm_password': confirmPassword,
-      };
-
-      final response = await HttpClientService.post(
-        AppConfig.api('/account/reset-password.php'),
-        body: jsonEncode(body),
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Failed to reset password');
-      }
-    } catch (e) {
-      throw _toUserFacingException('Network error: $e');
-    }
-  }
-
   /// 刪除帳號
   static Future<Map<String, dynamic>> deleteAccount({
     required String password, // 現在是 "DELETE" 確認文字

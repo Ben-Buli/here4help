@@ -59,6 +59,7 @@ final GoRouter appRouter = GoRouter(
     // 定義公開頁面（不需要登入驗證）
     final publicPages = [
       '/login',
+      '/forgot-password',
       '/signup',
       '/signup/student-id',
       '/auth/callback'

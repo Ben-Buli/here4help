@@ -23,6 +23,7 @@ import 'package:here4help/account/pages/privacy_policy_page.dart';
 
 // ==================== auth 模組 ====================
 import 'package:here4help/auth/pages/login_page.dart';
+import 'package:here4help/auth/pages/forgot_password_page.dart';
 import 'package:here4help/auth/pages/signup_page.dart';
 import 'package:here4help/auth/pages/student_id_page.dart';
 import 'package:here4help/auth/pages/student_id_update_page.dart';
@@ -68,6 +69,16 @@ final List<Map<String, dynamic>> shellPages = [
     'showBackArrow': false,
     'allowSwipeBack': false,
     'permission': -10, // 公開頁面：任何狀態都可訪問登入頁
+  },
+  {
+    'path': '/forgot-password',
+    'child': const ForgotPasswordPage(),
+    'title': 'Forgot Password',
+    'showAppBar': false,
+    'showBottomNav': false,
+    'showBackArrow': false,
+    'allowSwipeBack': false,
+    'permission': -10, // 公開頁面：任何狀態都可訪問
   },
   {
     'path': '/signup',
