@@ -25,6 +25,8 @@ backend/.env
 backend/.env.*
 backend/config/.env
 backend/config/.env.*
+backend/storage/rate_limits/
+
 
 # Admin 環境配置
 admin/.env
