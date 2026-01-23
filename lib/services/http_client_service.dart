@@ -27,6 +27,8 @@ class HttpClientService {
   static const Map<String, String> _baseHeaders = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
   };
 
   /// 獲取帶有 Authorization 的 headers

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:here4help/auth/services/auth_service.dart';
 
 /// 權限狀態管理 Provider
 /// 提供權限變更通知和持久化功能
@@ -23,6 +24,8 @@ class PermissionProvider extends ChangeNotifier {
 
   // 是否已初始化
   bool _isInitialized = false;
+  DateTime? _lastStatusCheckAt;
+  bool _statusRefreshInFlight = false;
 
   // Getters
   int get permission => _permission;
@@ -37,6 +40,7 @@ class PermissionProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
       final userDataString = prefs.getString('user_data');
+      final userJsonString = prefs.getString('user_json');
 
       if (token != null && userDataString != null) {
         final userData = jsonDecode(userDataString) as Map<String, dynamic>;
@@ -47,6 +51,13 @@ class PermissionProvider extends ChangeNotifier {
             0) as int;
 
         print('🔐 權限狀態初始化完成: $_permission');
+      } else if (token != null && userJsonString != null) {
+        final userData = jsonDecode(userJsonString) as Map<String, dynamic>;
+        _userData = userData;
+        _permission = (userData['permission'] ??
+            prefs.getInt('user_permission') ??
+            0) as int;
+        print('🔐 從 user_json 載入權限: $_permission');
       } else {
         // 未登入或 user_data 缺失，嘗試從備援欄位載入權限
         final fallbackPermission = prefs.getInt('user_permission');
@@ -74,6 +85,32 @@ class PermissionProvider extends ChangeNotifier {
       print('🔐 權限狀態更新: $_permission');
       notifyListeners();
       _savePermissionToStorage();
+    }
+  }
+
+  /// 切頁時同步後端權限（具備節流）
+  Future<void> refreshStatusIfNeeded({
+    Duration minInterval = const Duration(seconds: 60),
+  }) async {
+    if (_statusRefreshInFlight) return;
+    final now = DateTime.now();
+    if (_lastStatusCheckAt != null &&
+        now.difference(_lastStatusCheckAt!) < minInterval) {
+      return;
+    }
+
+    _statusRefreshInFlight = true;
+    _lastStatusCheckAt = now;
+    try {
+      final status = await AuthService.getUserStatus();
+      final backendPermission = status['permission'] as int?;
+      if (backendPermission != null && backendPermission != _permission) {
+        updatePermission(backendPermission);
+      }
+    } catch (e) {
+      print('❌ refreshStatusIfNeeded 失敗: $e');
+    } finally {
+      _statusRefreshInFlight = false;
     }
   }
 

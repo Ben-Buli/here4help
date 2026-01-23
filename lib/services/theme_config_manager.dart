@@ -320,56 +320,10 @@ class ThemeConfigManager extends ChangeNotifier {
       case 'experimental':
         return 'Experimental';
       default:
-        // 如果 category 不在預期範圍內，回退到基於名稱的邏輯
-        return _getThemeGroupByName(theme);
+        return 'Other';
     }
   }
 
-  /// 基於名稱的備用分類邏輯（向後兼容）
-  ///
-  /// 當主題的 category 屬性不在預期範圍內時，使用此方法作為備用。
-  /// 這個方法保持原有的基於名稱的模式匹配邏輯。
-  ///
-  /// 參數：
-  /// - [theme]: 要分類的主題
-  ///
-  /// 返回主題組名稱。
-  String _getThemeGroupByName(ThemeScheme theme) {
-    // 移除 _dark 後綴來判斷原始主題類型
-    String baseName = theme.name.replaceAll('_dark', '');
-
-    if (baseName.startsWith('morandi_')) {
-      return 'Morandi';
-    } else if (baseName.contains('ocean') ||
-        baseName.contains('beach') ||
-        baseName.contains('sandy') ||
-        baseName == 'clownfish' ||
-        baseName == 'patrick_star' ||
-        baseName == 'sunset_beach') {
-      return 'Ocean';
-    } else if (baseName.contains('milk_tea') ||
-        baseName.contains('minimalist') ||
-        baseName == 'taipei_2019_pantone' ||
-        baseName == 'taipei_101') {
-      // 將 Milk Tea 與 Minimalist 歸類到 Taiwan 分類
-      return 'Taiwan';
-    } else if (baseName.contains('business') ||
-        baseName.contains('meta') ||
-        baseName.contains('glassmorphism') ||
-        baseName.contains('main_style')) {
-      // 將 Glass、Blue Grey、Main 也併入 Business 分類
-      return 'Business';
-    } else if (baseName.contains('rainbow_pride') ||
-        baseName.contains('blue_pink') ||
-        baseName.contains('pink_theme') ||
-        baseName.contains('yellow_white_purple') ||
-        baseName.contains('bear_gay_flat') ||
-        baseName.contains('pride_s_curve')) {
-      return 'Emotions';
-    } else {
-      return 'Other';
-    }
-  }
 
   /// 獲取主題模式選項（僅支援淺色模式）
   List<AppThemeMode> get themeModes => [AppThemeMode.light];
@@ -392,26 +346,6 @@ class ThemeConfigManager extends ChangeNotifier {
   ///
   /// 如果當前主題已經是淺色模式，則直接返回；否則會自動生成對應的淺色主題。
   ThemeScheme get effectiveTheme {
-    // 根據 Theme Mode 決定使用的主題（移除深色模式和系統模式支援）
-    switch (_themeMode) {
-      case AppThemeMode.light:
-        // Light Mode：確保使用 Light 主題
-        return _getLightTheme();
-    }
-  }
-
-  /// 獲取 Light 主題
-  ///
-  /// 如果當前主題是 Dark 主題，則返回對應的 Light 主題；
-  /// 否則直接返回當前主題。
-  ///
-  /// 返回 Light 主題。
-  ThemeScheme _getLightTheme() {
-    if (_currentTheme.name.endsWith('_dark')) {
-      // 如果當前是 Dark 主題，找到對應的 Light 主題
-      String lightThemeName = _currentTheme.name.replaceAll('_dark', '');
-      return ThemeScheme.getByName(lightThemeName);
-    }
     return _currentTheme;
   }
 
@@ -528,41 +462,10 @@ class ThemeConfigManager extends ChangeNotifier {
       case 'experimental':
         return 'experimental';
       default:
-        // 如果 category 不在預期範圍內，回退到基於名稱的邏輯
-        return _getThemeStyleByName(theme);
+        return 'default';
     }
   }
 
-  /// 基於名稱的備用風格判斷邏輯（向後兼容）
-  ///
-  /// 當主題的 category 屬性不在預期範圍內時，使用此方法作為備用。
-  /// 這個方法保持原有的基於名稱的模式匹配邏輯。
-  ///
-  /// 參數：
-  /// - [theme]: 要檢查的主題
-  ///
-  /// 返回主題風格字符串。
-  String _getThemeStyleByName(ThemeScheme theme) {
-    if (theme.name.startsWith('morandi_')) {
-      return 'morandi';
-    } else if (theme.name.contains('ocean') || theme.name.contains('beach')) {
-      return 'ocean';
-    } else if (theme.name.contains('glassmorphism') ||
-        theme.name.contains('blur')) {
-      return 'glassmorphism';
-    } else if (theme.name.contains('business') || theme.name.contains('meta')) {
-      return 'business';
-    } else if (theme.name.contains('rainbow_pride') ||
-        theme.name.contains('blue_pink') ||
-        theme.name.contains('pink_theme') ||
-        theme.name.contains('yellow_white_purple') ||
-        theme.name.contains('bear_gay_flat') ||
-        theme.name.contains('pride_s_curve')) {
-      return 'emotions';
-    } else {
-      return 'default';
-    }
-  }
 
   /// 獲取主題統計資訊
   Map<String, dynamic> getThemeStatistics() {
@@ -578,150 +481,6 @@ class ThemeConfigManager extends ChangeNotifier {
   /// 獲取當前主題風格類型
   String get themeStyle {
     return _getThemeStyle(effectiveTheme);
-  }
-
-  /// 獲取 AppBar 文字顏色
-  ///
-  /// 根據當前主題風格返回適合的 AppBar 文字顏色：
-  /// - 海洋主題：白色文字
-  /// - 莫蘭迪主題：白色文字
-  /// - Glassmorphism 主題：主題主要色
-  /// - 商業主題：根據具體主題返回深色或主要色文字
-  /// - 其他主題：主題主要色
-  ///
-  /// 這個方法確保 AppBar 文字在不同主題下都有良好的可讀性。
-  Color get appBarTextColor {
-    final theme = effectiveTheme;
-    if (theme.appBarTitleColor != null) return theme.appBarTitleColor!;
-    final style = _getThemeStyle(theme);
-    switch (style) {
-      case 'ocean':
-        return Colors.white; // 海洋主題保持白色
-      case 'morandi':
-        return Colors.white; // 莫蘭迪主題使用白色文字
-      case 'glassmorphism':
-        return theme.primary; // Glassmorphism 主題使用主要色
-      case 'business':
-        // Meta 主題使用深色文字
-        if (theme.name == 'meta_business_style' ||
-            theme.name == 'meta_business_style_dark') {
-          return const Color(0xFF1C1E21); // 深灰文字
-        }
-        // 彩虹主題使用深色文字
-        if (theme.name == 'business_gradient' ||
-            theme.name == 'business_gradient_dark') {
-          return const Color(0xFF1F2937); // 深灰文字
-        }
-        // 奶茶主題使用深色文字
-        if (theme.name == 'milk_tea_earth' ||
-            theme.name == 'milk_tea_earth_dark') {
-          return const Color(0xFF2D3748); // 深灰文字
-        }
-        // 簡約主題使用深色文字
-        if (theme.name == 'minimalist_still' ||
-            theme.name == 'minimalist_still_dark') {
-          return const Color(0xFF2D3748); // 深灰文字
-        }
-        // 其他商業主題使用主題主要色
-        return theme.primary;
-      case 'emotions':
-        // Emotions 主題使用深色文字以確保可讀性
-        return const Color(0xFF2D3748); // 深灰文字
-      case 'taiwan':
-        // Taiwan 主題使用白色文字（在深色背景上）
-        return Colors.white;
-      default:
-        // Sandy 主題使用白色文字
-        if (theme.name == 'sandy_footprints' ||
-            theme.name == 'sandy_footprints_dark') {
-          return Colors.white;
-        }
-        return theme.primary; // 標準主題使用主要色
-    }
-  }
-
-  /// AppBar 次標題顏色（若未定義則以標題色 80% 不透明度推導）
-  Color get appBarSubtitleColor {
-    final theme = effectiveTheme;
-    if (theme.appBarSubtitleColor != null) return theme.appBarSubtitleColor!;
-    return appBarTextColor.withOpacity(0.8);
-  }
-
-  /// 獲取 AppBar 背景漸層
-  ///
-  /// 根據當前主題風格返回適合的 AppBar 背景漸層：
-  /// - 海洋主題：海藍色漸層
-  /// - 莫蘭迪主題：主題主要色漸層
-  /// - Glassmorphism 主題：純白色背景
-  /// - 商業主題：白色半透明毛玻璃效果
-  /// - 其他主題：主題主要色和次要色漸層
-  ///
-  /// 返回的漸層顏色列表可以直接用於 LinearGradient 的 colors 屬性。
-  List<Color> get appBarGradient {
-    final theme = effectiveTheme;
-    final style = _getThemeStyle(effectiveTheme);
-    switch (style) {
-      case 'ocean':
-        return [
-          const Color(0xFF3B82F6).withValues(alpha: 0.9), // 海藍色
-          const Color(0xFF60A5FA).withValues(alpha: 0.8), // 中藍色
-        ];
-      case 'morandi':
-        return [
-          theme.primary, // 莫蘭迪主題使用主要色
-          theme.primary.withValues(alpha: 0.8), // 稍微透明的版本
-        ];
-      case 'glassmorphism':
-        return [
-          Colors.white, // 純白色背景
-          Colors.white, // 純白色背景
-        ];
-      case 'business':
-        // Meta 主題使用白色半透明模糊毛玻璃背景
-        if (theme.name == 'meta_business_style' ||
-            theme.name == 'meta_business_style_dark') {
-          return [
-            Colors.white.withValues(alpha: 1), // 白色半透明
-            Colors.white.withValues(alpha: 0.2), // 更透明的白色
-          ];
-        }
-        // 彩虹主題使用白色半透明模糊毛玻璃背景
-        if (theme.name == 'business_gradient' ||
-            theme.name == 'business_gradient_dark') {
-          return [
-            Colors.white.withValues(alpha: 0.3), // 白色半透明
-            Colors.white.withValues(alpha: 0.2), // 更透明的白色
-          ];
-        }
-        // 其他商業主題使用白色半透明模糊毛玻璃風格
-        return [
-          Colors.white.withValues(alpha: 1), // 白色半透明
-          Colors.white.withValues(alpha: 0.2), // 更透明的白色
-        ];
-      case 'taiwan':
-        // Taiwan 主題使用主題主要色漸層
-        return [
-          theme.primary.withValues(alpha: 0.9),
-          theme.secondary.withValues(alpha: 0.7),
-        ];
-      case 'emotions':
-        // Emotions 分類：AppBar 與 BottomNav 一致（交由 AppScaffold 用 navigationBarBackground 顏色渲染）
-        // 這裡回傳空陣列代表不使用漸層
-        return [];
-      default:
-        // Beach 主題使用碧綠色背景
-        if (theme.name == 'beach_sunset' || theme.name == 'beach_sunset_dark') {
-          return [
-            const Color(0xFF00BCD4).withValues(alpha: 0.9), // 碧綠色
-            const Color(0xFF26C6DA).withValues(alpha: 0.8), // 淺碧綠色
-          ];
-        }
-        // 其他主題使用主題主要色和次要色漸層
-        return [
-          theme.primary.withValues(alpha: 0.8),
-          theme.secondary.withValues(alpha: 0.6),
-        ];
-    }
   }
 
   /// 獲取毛玻璃效果的表面色
@@ -741,85 +500,6 @@ class ThemeConfigManager extends ChangeNotifier {
     }
   }
 
-  /// 獲取導航欄背景色
-  Color get navigationBarBackground {
-    final theme = effectiveTheme;
-    final style = _getThemeStyle(effectiveTheme);
-    switch (style) {
-      case 'ocean':
-        return const Color(0xFF3B82F6).withValues(alpha: 0.9); // 海藍色半透明
-      case 'morandi':
-        return theme.primary.withValues(alpha: 0.9); // 莫蘭迪主題使用主要色半透明
-      case 'glassmorphism':
-        return Colors.white; // Glassmorphism 主題使用純白色，不透明
-      case 'business':
-        return Colors.white.withValues(alpha: 0.3); // Business 主題使用半透明白色
-      case 'taiwan':
-        return theme.primary.withValues(alpha: 0.3); // Taiwan 主題使用主要色半透明
-      case 'emotions':
-        // Emotions 類主題：白色液態玻璃
-        return Colors.white.withValues(alpha: 0.3);
-      default:
-        // Beach 主題使用碧綠色半透明背景
-        if (theme.name == 'beach_sunset' || theme.name == 'beach_sunset_dark') {
-          return const Color(0xFF00BCD4).withValues(alpha: 0.3); // 碧綠色半透明
-        }
-        return Colors.white.withValues(alpha: 0.2); // 標準主題使用半透明白色
-    }
-  }
-
-  /// 獲取導航欄選中項目顏色
-  Color get navigationBarSelectedColor {
-    final theme = effectiveTheme;
-    final style = _getThemeStyle(effectiveTheme);
-    switch (style) {
-      case 'ocean':
-        return const Color.fromARGB(255, 229, 194, 163); // 沙灘色
-      case 'morandi':
-        return Colors.white; // 莫蘭迪主題使用白色（在深色背景上）
-      case 'glassmorphism':
-      case 'business':
-      default:
-        return theme.primary; // 使用主題主要色
-    }
-  }
-
-  /// Dialog 背景色（以主色調和白色混合的淺色）
-  Color get dialogBackgroundColor {
-    final theme = effectiveTheme;
-    return Color.alphaBlend(theme.primary.withOpacity(0.18), Colors.white);
-  }
-
-  /// Dialog 標題顏色（預設沿用 AppBar 文字色）
-  Color get dialogTitleColor {
-    return appBarTextColor;
-  }
-
-  /// Dialog 內容文字顏色
-  Color get dialogContentColor {
-    return effectiveTheme.onSurface.withOpacity(0.9);
-  }
-
-  /// Dialog 主要按鈕顏色
-  Color get dialogPrimaryColor {
-    return effectiveTheme.primary;
-  }
-
-  /// 獲取導航欄未選中項目顏色
-  Color get navigationBarUnselectedColor {
-    final theme = effectiveTheme;
-    final style = _getThemeStyle(effectiveTheme);
-    switch (style) {
-      case 'ocean':
-        return Colors.white.withValues(alpha: 0.7); // 半透明白色
-      case 'morandi':
-        return Colors.white.withValues(alpha: 0.6); // 莫蘭迪主題使用半透明白色（在深色背景上）
-      case 'glassmorphism':
-      case 'business':
-      default:
-        return theme.onSurface.withValues(alpha: 0.7); // 半透明深色
-    }
-  }
 
   /// 獲取輸入框文字顏色（僅支援淺色模式）
   ///

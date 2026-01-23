@@ -161,6 +161,9 @@ class UserService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final userJson = json.encode(user.toJson());
       await prefs.setString('user_json', userJson);
+      // 同步給 PermissionProvider 既有的 user_data/user_permission
+      await prefs.setString('user_data', userJson);
+      await prefs.setInt('user_permission', user.permission ?? 0);
       debugPrint('✅ 用戶資訊已保存到 SharedPreferences');
     } catch (e) {
       debugPrint('❌ 保存用戶資訊到 SharedPreferences 失敗: $e');

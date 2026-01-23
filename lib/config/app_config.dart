@@ -51,6 +51,7 @@ class AppConfig {
       api('/auth/register-oauth-with-student-id.php');
 
   static String get profileUrl => api('/account/profile.php');
+  static String get userStatusUrl => api('/account/status.php');
 
   // 任務相關 API
   static String get taskListUrl => api('/tasks/list.php');

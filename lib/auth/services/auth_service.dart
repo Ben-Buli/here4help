@@ -175,6 +175,33 @@ class AuthService {
     }
   }
 
+  // 取得使用者輕量狀態（permission/status）
+  static Future<Map<String, dynamic>> getUserStatus() async {
+    try {
+      final token = await getToken();
+      if (token == null) {
+        throw Exception('No token available');
+      }
+
+      debugPrint('🔍 調用 userStatus API...');
+      debugPrint('🔍 API URL: ${AppConfig.userStatusUrl}');
+
+      final data = await HttpClientService.getJson(
+        AppConfig.userStatusUrl,
+        useQueryParamToken: true,
+      );
+
+      if (data['success'] == true && data['data'] != null) {
+        return Map<String, dynamic>.from(data['data']);
+      }
+
+      throw Exception(data['message'] ?? 'Failed to get user status');
+    } catch (e) {
+      debugPrint('❌ getUserStatus 錯誤: $e');
+      rethrow;
+    }
+  }
+
   // 登出
   static Future<void> logout() async {
     // 先斷開 Socket 連線

@@ -9,6 +9,7 @@ import 'package:pinput/pinput.dart';
 import 'package:http/http.dart' as http;
 import 'package:here4help/services/api/oauth_api.dart';
 import 'dart:convert';
+import 'package:intl/intl.dart';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/auth/services/signup_draft_service.dart';
 import 'package:here4help/services/terms_service.dart';
@@ -825,8 +826,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     addressController.text = prefs.getString('signup_address') ?? '';
     passwordController.text = prefs.getString('signup_password') ?? '';
     confirmPasswordController.text = prefs.getString('signup_password') ?? '';
-    dateOfBirthController.text =
-        prefs.getString('signup_date_of_birth') ?? '';
+    dateOfBirthController.text = prefs.getString('signup_date_of_birth') ?? '';
     paymentPasswordController.text =
         prefs.getString('signup_payment_code') ?? '';
     confirmPaymentPasswordController.text =
@@ -835,8 +835,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
     final nextGender =
         prefs.getString('signup_gender') ?? 'Prefer not to disclose';
     final nextLanguages = prefs.getStringList('signup_languages') ?? ['en'];
-    final nextPermanent =
-        prefs.getBool('signup_is_permanent_address') ?? false;
+    final nextPermanent = prefs.getBool('signup_is_permanent_address') ?? false;
 
     final needsUpdate = nextGender != selectedGender ||
         !_sameStringList(nextLanguages, selectedLanguages) ||
@@ -1024,8 +1023,8 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                   child: TextFormField(
                     key: _signupEmailKey,
                     controller: emailController,
-                    enabled: !_isOAuthSignup ||
-                        emailController.text.trim().isEmpty,
+                    enabled:
+                        !_isOAuthSignup || emailController.text.trim().isEmpty,
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       prefixIcon: Icon(
@@ -1088,7 +1087,7 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                       color: Theme.of(context).colorScheme.primary,
                     ),
                     labelText: 'Birthday *',
-                    hintText: 'YYYY/MM/DD',
+                    hintText: 'MM/DD/YYYY',
                     border: const OutlineInputBorder(),
                   ),
                   readOnly: true,
@@ -1103,8 +1102,9 @@ class _SignupPageState extends State<SignupPage> with WidgetsBindingObserver {
                     );
                     if (date != null) {
                       setState(() {
+                        // Use MM/DD/YYYY format (US format) to match datepicker
                         dateOfBirthController.text =
-                            '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+                            DateFormat('MM/dd/yyyy').format(date);
                       });
                     }
                   },
