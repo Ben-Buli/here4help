@@ -5,10 +5,11 @@ export const config = {
   appTitle: import.meta.env.VITE_APP_TITLE || 'Here4Help Admin Panel',
   appVersion: import.meta.env.VITE_APP_VERSION || '1.0.0',
   debugMode: import.meta.env.VITE_DEBUG_MODE === 'true',
-  socketUrl: import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001',
+  socketUrl: import.meta.env.VITE_SOCKET_URL || 'http://localhost:8888/here4help/socket' || 'http://localhost:3000',
   imageBaseUrl: import.meta.env.VITE_IMAGE_BASE_URL || 'http://localhost:8888/here4help',
   isDevelopment: import.meta.env.DEV,
   isProduction: import.meta.env.PROD,
+  
   
   // 功能開關
   features: {
@@ -18,6 +19,9 @@ export const config = {
     analytics: import.meta.env.VITE_ENABLE_ANALYTICS !== 'false',
   }
 }
+
+console.log('config.socketUrl', config.socketUrl)
+
 
 // 環境檢查
 export const isLocal = config.apiBaseUrl.includes('localhost')

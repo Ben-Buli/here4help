@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:here4help/services/wallet_service.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 
 // **
 // according to DB: point_deposit_requests
@@ -16,6 +17,7 @@ class PointHistoryPage extends StatefulWidget {
 class _PointHistoryPageState extends State<PointHistoryPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  bool _initialTabSet = false;
 
   // 交易記錄相關狀態
   List<PointTransaction> transactions = [];
@@ -64,6 +66,29 @@ class _PointHistoryPageState extends State<PointHistoryPage>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialTabSet) return;
+
+    int? targetIndex;
+    try {
+      final routerState = GoRouterState.of(context);
+      final tabParam = routerState.uri.queryParameters['tab'];
+      if (tabParam != null && tabParam.isNotEmpty) {
+        targetIndex = _mapTabParamToIndex(tabParam);
+      }
+    } catch (_) {}
+
+    if (targetIndex != null &&
+        targetIndex >= 0 &&
+        targetIndex < _tabController.length) {
+      _tabController.index = targetIndex;
+    }
+
+    _initialTabSet = true;
+  }
+
+  @override
   void dispose() {
     _tabController.dispose();
     _scrollController.dispose();
@@ -79,6 +104,19 @@ class _PointHistoryPageState extends State<PointHistoryPage>
         _loadMoreTransactions();
       }
     }
+  }
+
+  int _mapTabParamToIndex(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'withdrawals' ||
+        normalized == 'withdrawal' ||
+        normalized == 'withdraw') {
+      return 2;
+    }
+    if (normalized == 'deposits' || normalized == 'deposit') {
+      return 1;
+    }
+    return 0;
   }
 
   Future<void> _loadTransactions({bool refresh = false}) async {

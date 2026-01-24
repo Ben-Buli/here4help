@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:here4help/auth/services/user_service.dart';
 import 'package:here4help/services/wallet_service.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 class WalletWithdrawPage extends StatefulWidget {
@@ -19,6 +20,7 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
   WithdrawFeeSettings? feeSettings;
   List<WithdrawRequest> requests = [];
   int pendingWithdrawPoints = 0;
+  int approvedWithdrawPoints = 0;
 
   bool isLoading = true;
   bool isSubmitting = false;
@@ -71,6 +73,7 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
       WithdrawFeeSettings? fee;
       WithdrawRequestsResult? withdrawResult;
       int pendingTotal = pendingWithdrawPoints;
+      int approvedTotal = approvedWithdrawPoints;
 
       try {
         summary = await WalletService.getWalletSummary(userService);
@@ -115,6 +118,14 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
         }
       }
 
+      try {
+        approvedTotal = await _loadApprovedWithdrawTotal(userService);
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Failed to load approved withdraw total: $e');
+        }
+      }
+
       setState(() {
         if (summary != null) walletSummary = summary;
         if (fee != null) feeSettings = fee;
@@ -127,6 +138,7 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
           hasNextPage = withdrawResult.pagination.hasNextPage;
         }
         pendingWithdrawPoints = pendingTotal;
+        approvedWithdrawPoints = approvedTotal;
         isLoading = false;
         isLoadingMore = false;
       });
@@ -159,6 +171,31 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
         page: page,
         perPage: 50,
         status: 'pending',
+      );
+      for (final request in result.requests) {
+        total += request.totalDeductPoints;
+      }
+      hasNext = result.pagination.hasNextPage;
+      page += 1;
+      if (result.requests.isEmpty) {
+        break;
+      }
+    }
+
+    return total;
+  }
+
+  Future<int> _loadApprovedWithdrawTotal(UserService userService) async {
+    int total = 0;
+    int page = 1;
+    bool hasNext = true;
+
+    while (hasNext) {
+      final result = await WalletService.getWithdrawRequests(
+        userService,
+        page: page,
+        perPage: 50,
+        status: 'approved',
       );
       for (final request in result.requests) {
         total += request.totalDeductPoints;
@@ -208,6 +245,34 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
     }
     if (available < totalDeduct) {
       _showSnack('Insufficient balance for this withdrawal.');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Withdrawal'),
+        content: Text(
+          'This withdrawal includes a platform fee of '
+          '${WalletService.formatPoints(feePoints)} points '
+          '(${(feeSettings?.rate ?? 0.0) * 100}% rate). '
+          'Total deduction: ${WalletService.formatPoints(totalDeduct)} points.\n\n'
+          'Do you agree to pay the platform fee and proceed with the withdrawal process?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
       return;
     }
 
@@ -314,6 +379,7 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
     final available = points?.availablePoints ?? 0;
     final total = points?.totalPoints ?? 0;
     final withdrawing = pendingWithdrawPoints;
+    final transferring = approvedWithdrawPoints;
 
     return Card(
       child: Padding(
@@ -348,6 +414,12 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
                     style: TextStyle(color: Colors.grey.shade600),
                   ),
                 ),
+                Expanded(
+                  child: Text(
+                    'Transferring: ${WalletService.formatPoints(transferring)}',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ),
               ],
             ),
           ],
@@ -379,10 +451,6 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
                   ? 'Min withdraw: $minWithdraw Points'
                   : 'Minimum withdraw: Not configured',
             ),
-            if ((feeSettings?.updatedAt ?? '').isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text('Updated at: ${feeSettings!.updatedAt}'),
-            ],
             if (!minConfigured) ...[
               const SizedBox(height: 8),
               Text(
@@ -475,11 +543,16 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
   }
 
   Widget _buildHistory() {
-    if (isLoading && requests.isEmpty) {
+    final visibleRequests = requests
+        .where((request) =>
+            request.status == 'pending' || request.status == 'approved')
+        .toList();
+
+    if (isLoading && visibleRequests.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (errorMessage != null && requests.isEmpty) {
+    if (errorMessage != null && visibleRequests.isEmpty) {
       return Center(
         child: Column(
           children: [
@@ -499,14 +572,14 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
       );
     }
 
-    if (requests.isEmpty) {
+    if (visibleRequests.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 24),
         child: Column(
           children: [
             Icon(Icons.history, color: Colors.grey.shade400, size: 48),
             const SizedBox(height: 12),
-            const Text('No withdraw requests yet'),
+            const Text('No pending or approved withdraw requests'),
           ],
         ),
       );
@@ -514,7 +587,7 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
 
     return Column(
       children: [
-        for (final request in requests) _buildRequestCard(request),
+        for (final request in visibleRequests) _buildRequestCard(request),
         if (hasNextPage)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -616,6 +689,15 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
           ),
           const SizedBox(height: 8),
           _buildHistory(),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () =>
+                  context.go('/account/wallet/point_history?tab=withdrawals'),
+              child: const Text('View More'),
+            ),
+          ),
         ],
       ),
     );

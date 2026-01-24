@@ -809,14 +809,14 @@ const navigationSections: NavigationSection[] = [
           { name: 'Referral Codes', href: '/users/referral-codes' },
         ],
       },
-      { name: 'Admin Management', href: '/admin-accounts' },
+      { name: 'Admins', href: '/admin-accounts' },
     ],
   },
   {
     title: 'Operations',
     items: [
       {
-        name: 'Customer Support',
+        name: 'Support',
         href: '/issues',
         children: [
           { name: 'Issues List', href: '/issues' },
@@ -824,7 +824,7 @@ const navigationSections: NavigationSection[] = [
         ],
       },
       {
-        name: 'Task Management',
+        name: 'Tasks',
         href: '/tasks',
         children: [
           { name: 'All Tasks', href: '/tasks' },
@@ -864,7 +864,7 @@ const navigationSections: NavigationSection[] = [
   {
     title: 'Content',
     items: [
-      { name: 'FAQ Management', href: '/faqs' },
+      { name: 'FAQs', href: '/faqs' },
       { name: 'Point Policy', href: '/point-policies' },
       { name: 'Terms of Use', href: '/app-terms' },
     ],
@@ -876,12 +876,12 @@ const navigationItems = navigationSections.flatMap((section) => section.items)
 const navigationIcons: Record<string, any> = {
   'Dashboard': HomeIcon,
   'Users': UsersIcon,
-  'Admin Management': UserCircleIcon,
-  'Customer Support': ChatBubbleLeftRightIcon,
-  'Task Management': ClipboardDocumentCheckIcon,
+  'Admins': UserCircleIcon,
+  'Support': ChatBubbleLeftRightIcon,
+  'Tasks': ClipboardDocumentCheckIcon,
   'Payments': CreditCardIcon,
   'Logs': DocumentTextIcon,
-  'FAQ Management': QuestionMarkCircleIcon,
+  'FAQs': QuestionMarkCircleIcon,
   'Point Policy': AdjustmentsHorizontalIcon,
   'Terms of Use': DocumentCheckIcon,
 }

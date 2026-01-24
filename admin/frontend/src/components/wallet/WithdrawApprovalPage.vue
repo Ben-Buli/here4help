@@ -186,7 +186,11 @@
               <td class="text-sm text-gray-900">#{{ item.id }}</td>
               <td>
                 <div class="text-sm text-gray-900">{{ item.user_name }}</div>
-                <div class="text-xs text-gray-500">{{ item.user_email }}</div>
+                  <span class="text-xs text-cyan-500 hover:text-cyan-600">
+                    <a :href="`mailto:${item.user_email}`" class="text-blue-500 hover:text-blue-600">
+                      {{ item.user_email }}
+                    </a>
+                  </span>
               </td>
               <td class="text-sm text-gray-900">{{ formatPoints(item.amount_points) }}</td>
               <td class="text-sm text-gray-900">{{ formatPoints(item.fee_points) }}</td>
@@ -203,12 +207,14 @@
               <td class="text-sm text-gray-500">{{ item.admin_reply || '-' }}</td>
               <td class="text-sm text-gray-500">
                 <div v-if="item.status === 'pending'" class="flex flex-col space-y-1">
-                  <button class="admin-button-primary text-xs" @click="openActionModal(item, 'approve')">
-                    Approve
-                  </button>
-                  <button class="admin-button-danger text-xs" @click="openActionModal(item, 'reject')">
-                    Reject
-                  </button>
+                  <div class="flex flex-row gap-2">
+                    <button class="admin-button-primary text-xs" @click="openActionModal(item, 'approve')">
+                      Approve
+                    </button>
+                    <button class="px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors" @click="openActionModal(item, 'reject')">
+                      Reject
+                    </button>
+                  </div>
                 </div>
                 <div v-else-if="item.status === 'approved'" class="flex flex-col space-y-1">
                   <button class="admin-button-secondary text-xs" @click="markPaid(item)">
@@ -233,7 +239,7 @@
         </p>
         <div class="mt-4">
           <label class="block text-sm font-medium text-gray-700">Reply Message</label>
-          <textarea v-model="actionNote" rows="3" class="admin-input mt-2 w-full" placeholder="Optional reply..."></textarea>
+          <textarea v-model="actionNote" rows="3" class="admin-input mt-2 w-full p-2 border-gray-300" placeholder="Optional reply..."></textarea>
         </div>
         <div class="mt-6 flex justify-end space-x-3">
           <button class="admin-button-secondary" @click="closeActionModal">Cancel</button>
