@@ -18,6 +18,7 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
   WalletSummary? walletSummary;
   WithdrawFeeSettings? feeSettings;
   List<WithdrawRequest> requests = [];
+  int pendingWithdrawPoints = 0;
 
   bool isLoading = true;
   bool isSubmitting = false;
@@ -25,6 +26,8 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
   String? errorMessage;
   int currentPage = 1;
   bool hasNextPage = false;
+
+  bool get minConfigured => feeSettings?.minWithdrawPoints != null;
 
   @override
   void initState() {
@@ -67,6 +70,7 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
       WalletSummary? summary;
       WithdrawFeeSettings? fee;
       WithdrawRequestsResult? withdrawResult;
+      int pendingTotal = pendingWithdrawPoints;
 
       try {
         summary = await WalletService.getWalletSummary(userService);
@@ -86,9 +90,9 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
         fee = WithdrawFeeSettings(
           id: 0,
           rate: 0.0,
-          description: 'No withdraw fee settings configured',
+          description: 'Withdraw minimum is not configured',
           isActive: false,
-          minWithdrawPoints: 100,
+          minWithdrawPoints: null,
         );
       }
 
@@ -103,6 +107,14 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
         }
       }
 
+      try {
+        pendingTotal = await _loadPendingWithdrawTotal(userService);
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('Failed to load pending withdraw total: $e');
+        }
+      }
+
       setState(() {
         if (summary != null) walletSummary = summary;
         if (fee != null) feeSettings = fee;
@@ -114,6 +126,7 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
           }
           hasNextPage = withdrawResult.pagination.hasNextPage;
         }
+        pendingWithdrawPoints = pendingTotal;
         isLoading = false;
         isLoadingMore = false;
       });
@@ -135,6 +148,31 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
     await _loadAll();
   }
 
+  Future<int> _loadPendingWithdrawTotal(UserService userService) async {
+    int total = 0;
+    int page = 1;
+    bool hasNext = true;
+
+    while (hasNext) {
+      final result = await WalletService.getWithdrawRequests(
+        userService,
+        page: page,
+        perPage: 50,
+        status: 'pending',
+      );
+      for (final request in result.requests) {
+        total += request.totalDeductPoints;
+      }
+      hasNext = result.pagination.hasNextPage;
+      page += 1;
+      if (result.requests.isEmpty) {
+        break;
+      }
+    }
+
+    return total;
+  }
+
   int _parseAmount() {
     final raw = _amountController.text.trim();
     return int.tryParse(raw) ?? 0;
@@ -150,13 +188,18 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
     await userService.ensureUserLoaded();
 
     final amount = _parseAmount();
-    final minWithdraw = feeSettings?.minWithdrawPoints ?? 0;
+    final minWithdraw = feeSettings?.minWithdrawPoints;
+    final minConfigured = minWithdraw != null;
     final available = walletSummary?.pointsSummary.availablePoints ?? 0;
     final feePoints = _calculateFeePoints(amount);
     final totalDeduct = amount + feePoints;
 
     if (amount <= 0) {
       _showSnack('Please enter a valid amount.');
+      return;
+    }
+    if (minWithdraw == null) {
+      _showSnack('Minimum withdraw is not configured yet.');
       return;
     }
     if (amount < minWithdraw) {
@@ -269,8 +312,8 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
   Widget _buildHeaderCard() {
     final points = walletSummary?.pointsSummary;
     final available = points?.availablePoints ?? 0;
-    final frozen = points?.frozenWithdrawPoints ?? 0;
     final total = points?.totalPoints ?? 0;
+    final withdrawing = pendingWithdrawPoints;
 
     return Card(
       child: Padding(
@@ -279,7 +322,7 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Available Points',
+              'Useable Points',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
@@ -287,18 +330,21 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
               WalletService.formatPoints(available),
               style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
+            const SizedBox(height: 4),
+            Text(
+              'Total: ${WalletService.formatPoints(total)}',
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    'Total: ${WalletService.formatPoints(total)}',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    'Frozen: ${WalletService.formatPoints(frozen)}',
+                    'Withdrawing: ${WalletService.formatPoints(withdrawing)}',
                     style: TextStyle(color: Colors.grey.shade600),
                   ),
                 ),
@@ -313,7 +359,7 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
   Widget _buildFeeInfoCard() {
     final rate = feeSettings?.rate ?? 0.0;
     final rateText = '${(rate * 100).toStringAsFixed(2)}%';
-    final minWithdraw = feeSettings?.minWithdrawPoints ?? 0;
+    final minWithdraw = feeSettings?.minWithdrawPoints;
 
     return Card(
       child: Padding(
@@ -326,12 +372,23 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
-            Text('Fee rate: $rateText'),
+            Text('Platform Fee: $rateText'),
             const SizedBox(height: 4),
-            Text('Minimum withdraw: $minWithdraw points'),
-            if ((feeSettings?.description ?? '').isNotEmpty) ...[
+            Text(
+              minConfigured
+                  ? 'Min withdraw: $minWithdraw Points'
+                  : 'Minimum withdraw: Not configured',
+            ),
+            if ((feeSettings?.updatedAt ?? '').isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(feeSettings!.description!),
+              Text('Updated at: ${feeSettings!.updatedAt}'),
+            ],
+            if (!minConfigured) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Withdrawals are temporarily unavailable. Please contact support.',
+                style: TextStyle(color: Colors.red.shade600),
+              ),
             ],
           ],
         ),
@@ -348,7 +405,8 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
     final canSubmit = !isSubmitting &&
         feeSettings != null &&
         walletSummary != null &&
-        !isLoading;
+        !isLoading &&
+        feeSettings?.minWithdrawPoints != null;
 
     return Card(
       child: Padding(
@@ -369,14 +427,33 @@ class _WalletWithdrawPageState extends State<WalletWithdrawPage> {
                 border: OutlineInputBorder(),
               ),
               onChanged: (_) {
-                setState(() {});
+                setState(() {
+                  // trigger validation on change
+                });
               },
             ),
+            if (feeSettings?.minWithdrawPoints != null &&
+                amount > 0 &&
+                amount < (feeSettings?.minWithdrawPoints! ?? 0))
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  'Minimum withdraw is ${WalletService.formatPoints(feeSettings!.minWithdrawPoints!)} points.',
+                  style: TextStyle(color: Colors.red.shade600),
+                ),
+              ),
             const SizedBox(height: 12),
             Text(
-              'Formula: $amount + $feePoints (fee $rateText) = $totalDeduct',
+              'Formula: $amount + $feePoints ($rateText) = $totalDeduct points',
               style: TextStyle(color: Colors.grey.shade700),
             ),
+            if (feeSettings?.minWithdrawPoints == null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Withdrawals are temporarily unavailable. Please contact support.',
+                style: TextStyle(color: Colors.red.shade600),
+              ),
+            ],
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,

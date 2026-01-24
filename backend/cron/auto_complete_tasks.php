@@ -122,14 +122,14 @@ function autoCompleteTasks() {
                 
                 // 記錄到用戶活動日誌（創建者和接受者）
                 $activitySql = "
-                    INSERT INTO user_activity_logs (
+                    INSERT INTO user_active_log (
                         user_id,
+                        actor_type,
+                        actor_id,
                         action,
-                        resource_type,
-                        resource_id,
-                        details,
+                        metadata,
                         created_at
-                    ) VALUES (?, ?, ?, ?, ?, NOW())
+                    ) VALUES (?, 'system', NULL, ?, ?, NOW())
                 ";
                 $activityStmt = $db->prepare($activitySql);
                 
@@ -138,9 +138,9 @@ function autoCompleteTasks() {
                     $activityStmt->execute([
                         $task['creator_id'],
                         'task_auto_completed',
-                        'task',
-                        $task['id'],
                         json_encode([
+                            'resource_type' => 'task',
+                            'resource_id' => $task['id'],
                             'task_title' => $task['title'],
                             'days_pending' => $task['days_pending'],
                             'auto_completed_at' => date('Y-m-d H:i:s')
@@ -153,9 +153,9 @@ function autoCompleteTasks() {
                     $activityStmt->execute([
                         $task['participant_id'],
                         'task_auto_completed',
-                        'task',
-                        $task['id'],
                         json_encode([
+                            'resource_type' => 'task',
+                            'resource_id' => $task['id'],
                             'task_title' => $task['title'],
                             'days_pending' => $task['days_pending'],
                             'auto_completed_at' => date('Y-m-d H:i:s')

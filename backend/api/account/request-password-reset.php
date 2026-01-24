@@ -1,7 +1,6 @@
 <?php
 require_once __DIR__ . '/bootstrap.php';
-// 載入 PHP 8.4 相容性配置
-
+require_once dirname(dirname(__DIR__)) . '/utils/SmtpMailer.php';
 
 // CORS headers
 header('Content-Type: application/json');
@@ -43,7 +42,7 @@ try {
                    EnvLoader::get('DB_USERNAME'), EnvLoader::get('DB_PASSWORD'));
     
     // 檢查用戶是否存在
-    $stmt = $pdo->prepare("SELECT id, name, email, permission FROM users WHERE email = ?");
+    $stmt = $pdo->prepare("SELECT id, name, email, permission, password FROM users WHERE email = ?");
     $stmt->execute([$email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -55,34 +54,63 @@ try {
         ]);
         exit;
     }
-    
-    // 生成重設 token
-    $resetToken = bin2hex(random_bytes(32));
-    $expiresAt = date('Y-m-d H:i:s', time() + 3600); // 1小時後過期
-    
-    // 檢查是否已有未過期的重設請求
-    $existingStmt = $pdo->prepare("
-        SELECT id FROM email_verification_tokens 
-        WHERE user_id = ? AND type = 'password_reset' AND expires_at > NOW() AND used = 0
+
+    if (empty($user['password'])) {
+        // 僅限直接註冊帳戶可使用密碼重設
+        echo json_encode([
+            'success' => true,
+            'message' => 'If this email exists in our system, you will receive a password reset link shortly.'
+        ]);
+        exit;
+    }
+
+    $requestIp = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+
+    // 1 分鐘內僅允許同一 IP 發送一次
+    $rateStmt = $pdo->prepare("
+        SELECT created_at FROM user_active_log
+        WHERE action = 'password_reset_requested' AND ip = ?
+        ORDER BY created_at DESC
+        LIMIT 1
     ");
-    $existingStmt->execute([$user['id']]);
-    
-    if ($existingStmt->fetch()) {
-        // 標記舊的重設請求為已使用
-        $deleteStmt = $pdo->prepare("
-            UPDATE email_verification_tokens 
-            SET used = 1, used_at = NOW() 
-            WHERE user_id = ? AND type = 'password_reset' AND used = 0
-        ");
-        $deleteStmt->execute([$user['id']]);
+    $rateStmt->execute([$requestIp]);
+    $lastRequest = $rateStmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($lastRequest) {
+        $lastTimestamp = strtotime($lastRequest['created_at']);
+        if ($lastTimestamp && (time() - $lastTimestamp) < 60) {
+            echo json_encode([
+                'success' => true,
+                'message' => 'If this email exists in our system, you will receive a password reset link shortly.'
+            ]);
+            exit;
+        }
     }
     
-    // 儲存重設 token
-    $insertStmt = $pdo->prepare("
-        INSERT INTO email_verification_tokens (user_id, token, type, expires_at, created_at)
-        VALUES (?, ?, 'password_reset', ?, NOW())
+    // 檢查是否已有未過期的重設請求（仍有效則沿用同一連結）
+    $existingStmt = $pdo->prepare("
+        SELECT token, expires_at FROM email_verification_tokens 
+        WHERE user_id = ? AND type = 'password_reset' AND expires_at > NOW() AND used = 0
+        ORDER BY expires_at DESC
+        LIMIT 1
     ");
-    $insertStmt->execute([$user['id'], $resetToken, $expiresAt]);
+    $existingStmt->execute([$user['id']]);
+    $existingToken = $existingStmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($existingToken) {
+        $resetToken = $existingToken['token'];
+        $expiresAt = $existingToken['expires_at'];
+    } else {
+        // 生成重設 token
+        $resetToken = bin2hex(random_bytes(32));
+        $expiresAt = date('Y-m-d H:i:s', time() + 3600); // 1小時後過期
+
+        // 儲存重設 token
+        $insertStmt = $pdo->prepare("
+        INSERT INTO email_verification_tokens (user_id, token, type, expires_at, created_by, created_by_name, created_at)
+        VALUES (?, ?, 'password_reset', ?, ?, ?, NOW())
+    ");
+    $insertStmt->execute([$user['id'], $resetToken, $expiresAt, null, null]);    }
     
     // 構建重設連結
     $frontendUrl = EnvLoader::get('FRONTEND_URL') ?: 'http://localhost:3000';
@@ -110,33 +138,41 @@ try {
         </body>
         </html>
     ";
-    
-    $headers = [
-        'MIME-Version: 1.0',
-        'Content-type: text/html; charset=UTF-8',
-        'From: noreply@here4help.com',
-        'Reply-To: support@here4help.com',
-        'X-Mailer: PHP/' . phpversion()
-    ];
-    
-    $mailSent = mail($email, $subject, $message, implode("\r\n", $headers));
+
+    $fromEmail = EnvLoader::get('MAIL_FROM_ADDRESS', EnvLoader::get('MAIL_USERNAME', 'noreply@here4help.com'));
+    $fromName = EnvLoader::get('MAIL_FROM_NAME', 'Here4Help');
+    $replyTo = EnvLoader::get('MAIL_REPLY_TO', '');
+
+    $smtpResult = SmtpMailer::send($email, $subject, $message, $fromEmail, $fromName, $replyTo);
+    $mailSent = $smtpResult['success'];
+    $mailError = $smtpResult['error'];
     
     // 記錄操作日誌
     $logSql = "
-        INSERT INTO user_activity_logs (user_id, action, details, ip_address, created_at)
-        VALUES (?, 'password_reset_requested', ?, ?, NOW())
+        INSERT INTO user_active_log (
+            user_id,
+            actor_type,
+            actor_id,
+            action,
+            metadata,
+            ip,
+            user_agent,
+            created_at
+        ) VALUES (?, 'user', ?, 'password_reset_requested', ?, ?, ?, NOW())
     ";
     
     $logStmt = $pdo->prepare($logSql);
     $logStmt->execute([
-        $user['id'], 
+        $user['id'],
+        $user['id'],
         json_encode([
             'email' => $email,
             'token_expires_at' => $expiresAt,
             'mail_sent' => $mailSent,
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
+            'mail_error' => $mailError,
         ]),
-        $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+        $requestIp,
+        $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
     ]);
     
     $response = [

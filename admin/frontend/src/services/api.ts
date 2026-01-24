@@ -512,7 +512,12 @@ export const paymentApi = {
     api.post<ApiResponse>(`/api/admin/payment/withdraw-requests/${id}/paid`, {}),
 
   getFeeSettings: () => api.get<ApiResponse<{ items: any[] }>>('/api/admin/payment/fee-settings'),
-  setFeeSettings: (percentage: number) => api.post<ApiResponse>('/api/admin/payment/fee-settings', { percentage }),
+  setFeeSettings: (percentage: number, minWithdrawPoints: number, description: string) =>
+    api.post<ApiResponse>('/api/admin/payment/fee-settings', {
+      percentage,
+      min_withdraw_points: minWithdrawPoints,
+      description,
+    }),
 
   getOfficialAccounts: () => api.get<ApiResponse<{ items: any[] }>>('/api/admin/payment/official-accounts'),
   setOfficialAccount: (payload: { bank_name: string; account_number: string; account_name: string }) =>

@@ -77,13 +77,22 @@ try {
         
         // 記錄操作日誌
         $logSql = "
-            INSERT INTO user_activity_logs (user_id, action, details, ip_address, created_at)
-            VALUES (?, 'application_deleted', ?, ?, NOW())
+            INSERT INTO user_active_log (
+                user_id,
+                actor_type,
+                actor_id,
+                action,
+                metadata,
+                ip,
+                user_agent,
+                created_at
+            ) VALUES (?, 'user', ?, 'application_deleted', ?, ?, ?, NOW())
         ";
         
         $logStmt = $pdo->prepare($logSql);
         $logStmt->execute([
-            $userId, 
+            $userId,
+            $userId,
             json_encode([
                 'application_id' => $applicationId,
                 'task_id' => $application['task_id'],
@@ -92,7 +101,8 @@ try {
                 'previous_status' => $application['status'],
                 'deleted_at' => date('Y-m-d H:i:s')
             ]),
-            $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+            $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
         ]);
         
         // 提交交易

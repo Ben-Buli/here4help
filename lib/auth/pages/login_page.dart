@@ -12,6 +12,7 @@ import 'package:here4help/auth/models/user_model.dart';
 import 'package:here4help/auth/services/third_party_auth_service.dart';
 import 'package:here4help/auth/services/signup_draft_service.dart';
 import 'package:here4help/auth/services/auth_service.dart';
+import 'package:here4help/auth/services/auth_exception.dart';
 import 'package:here4help/providers/permission_provider.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
@@ -195,24 +196,41 @@ class _LoginPageState extends State<LoginPage> {
       String errorType =
           'general'; // 'general', 'deleted_by_admin', 'self_deleted'
 
-      final errorString = e.toString();
-
-      // 檢查是否為已刪除帳號的錯誤
-      if (errorString.contains('removed by an administrator')) {
-        errorMessage =
-            'This account has been soft deleted by an administrator and cannot be used. Please contact support if you believe this is an error.';
-        errorType = 'deleted_by_admin';
-      } else if (errorString.contains('has been deleted and cannot be used')) {
-        errorMessage =
-            'This account has been soft deleted and cannot be used. If you wish to use our service again, please create a new account.';
-        errorType = 'self_deleted';
-      } else if (errorString.contains('Invalid email or password')) {
-        errorMessage = 'Invalid email or password';
-      } else if (errorString.contains('No token available')) {
-        errorMessage = 'Authentication failed, please login again';
+      if (e is AuthException) {
+        final msg = e.message;
+        if (msg == 'ACCOUNT_DELETED_BY_ADMIN' || e.data?['reason'] == 'admin') {
+          errorMessage =
+              'This account has been soft deleted by an administrator and cannot be used. Please contact support if you believe this is an error.';
+          errorType = 'deleted_by_admin';
+        } else if (msg == 'ACCOUNT_DELETED_BY_USER' ||
+            msg == 'ACCOUNT_DISABLED_BY_USER' ||
+            e.data?['reason'] == 'user') {
+          errorMessage =
+              'This account has been soft deleted and cannot be used. If you wish to use our service again, please create a new account.';
+          errorType = 'self_deleted';
+        } else {
+          errorMessage = msg;
+        }
       } else {
-        // 顯示後端返回的原始錯誤訊息
-        errorMessage = errorString.replaceAll('Exception: ', '');
+        final errorString = e.toString();
+        // 檢查是否為已刪除帳號的錯誤
+        if (errorString.contains('removed by an administrator')) {
+          errorMessage =
+              'This account has been soft deleted by an administrator and cannot be used. Please contact support if you believe this is an error.';
+          errorType = 'deleted_by_admin';
+        } else if (errorString
+            .contains('has been deleted and cannot be used')) {
+          errorMessage =
+              'This account has been soft deleted and cannot be used. If you wish to use our service again, please create a new account.';
+          errorType = 'self_deleted';
+        } else if (errorString.contains('Invalid email or password')) {
+          errorMessage = 'Invalid email or password';
+        } else if (errorString.contains('No token available')) {
+          errorMessage = 'Authentication failed, please login again';
+        } else {
+          // 顯示後端返回的原始錯誤訊息
+          errorMessage = errorString.replaceAll('Exception: ', '');
+        }
       }
 
       // 顯示錯誤訊息
@@ -261,8 +279,11 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  bool _isDeletedOrDisabledAccountError(String message) {
-    final normalized = message.toLowerCase();
+  bool _isDeletedOrDisabledAccountError(Object error) {
+    if (error is AuthException) {
+      return error.isDeletedOrDisabled;
+    }
+    final normalized = error.toString().toLowerCase();
     return normalized.contains('account_deleted_or_disabled') ||
         normalized.contains('account_deleted_by_admin') ||
         normalized.contains('account_deleted_by_user') ||
@@ -272,8 +293,24 @@ class _LoginPageState extends State<LoginPage> {
         normalized.contains('account deleted');
   }
 
-  String _deletedAccountDialogContent(String message) {
-    final normalized = message.toLowerCase();
+  String _deletedAccountDialogContent(Object error) {
+    if (error is AuthException) {
+      final reason = error.data?['reason']?.toString();
+      if (reason == 'admin' || error.message == 'ACCOUNT_DELETED_BY_ADMIN') {
+        return '此帳號已被管理員刪除，若要繼續使用，請重新註冊。';
+      }
+      if (reason == 'user') {
+        if (error.message == 'ACCOUNT_DISABLED_BY_USER') {
+          return '此帳號已由使用者自行停用，若要繼續使用，請重新註冊。';
+        }
+        return '此帳號已由使用者自行刪除，若要繼續使用，請重新註冊。';
+      }
+      if (error.message == 'ACCOUNT_DISABLED_BY_USER') {
+        return '此帳號已由使用者自行停用，若要繼續使用，請重新註冊。';
+      }
+    }
+
+    final normalized = error.toString().toLowerCase();
     if (normalized.contains('account_deleted_by_admin') ||
         normalized.contains('removed by an administrator')) {
       return '此帳號已被管理員刪除，若要繼續使用，請重新註冊。';
@@ -290,8 +327,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<bool> _handleDeletedAccountError(Object error) async {
-    final message = error.toString();
-    if (!_isDeletedOrDisabledAccountError(message)) {
+    if (!_isDeletedOrDisabledAccountError(error)) {
       return false;
     }
 
@@ -299,31 +335,29 @@ class _LoginPageState extends State<LoginPage> {
       return true;
     }
 
-    final content = _deletedAccountDialogContent(message);
-    await _showDeletedAccountDialog(context, content);
+    final content = _deletedAccountDialogContent(error);
+    await _showDeletedAccountDialog(content);
     return true;
   }
 
-  Future<void> _showDeletedAccountDialog(
-      BuildContext dialogContext, String content) async {
+  Future<void> _showDeletedAccountDialog(String content) async {
     return showDialog<void>(
-      context: dialogContext,
-      useRootNavigator: true,
-      builder: (context) {
+      context: context,
+      builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('帳號已刪除（停用）'),
+          title: const Text('Account Deleted (Disabled)'),
           content: Text(content),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('取消'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop();
-                dialogContext.go('/signup');
+                Navigator.of(dialogContext).pop();
+                context.go('/signup');
               },
-              child: const Text('重新註冊'),
+              child: const Text('Register Again'),
             ),
           ],
         );
@@ -334,10 +368,11 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildBrandedButton({
     required VoidCallback? onPressed,
     required Widget icon,
-    required String label,
+    String? label,
     required Color backgroundColor,
     required Color textColor,
     Color? borderColor,
+    bool iconOnly = false,
   }) {
     final bool disableInteraction = isLoading || onPressed == null;
     final Color effectiveTextColor =
@@ -352,9 +387,11 @@ class _LoginPageState extends State<LoginPage> {
     final Color effectiveBackgroundColor = disableInteraction
         ? backgroundColor.withValues(alpha: 0.6)
         : backgroundColor;
+    final double buttonWidth =
+        iconOnly ? (_socialButtonHeight * 1) : double.infinity;
 
     return SizedBox(
-      width: double.infinity,
+      width: buttonWidth,
       child: Material(
         color: effectiveBackgroundColor,
         clipBehavior: Clip.antiAlias,
@@ -369,28 +406,35 @@ class _LoginPageState extends State<LoginPage> {
           borderRadius: borderRadius,
           child: SizedBox(
             height: _socialButtonHeight,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: iconOnly || (label != null && label.trim().isEmpty)
+                ? Center(
                     child: Opacity(
                       opacity: disableInteraction ? 0.6 : 1,
                       child: icon,
                     ),
+                  )
+                : Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Opacity(
+                            opacity: disableInteraction ? 0.6 : 1,
+                            child: icon,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        label ?? '',
+                        style: TextStyle(
+                          color: effectiveTextColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: effectiveTextColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),
@@ -402,13 +446,12 @@ class _LoginPageState extends State<LoginPage> {
       onPressed: _handleGoogleLogin,
       icon: SvgPicture.asset(
         'assets/third-party-login-icon/google_icon.svg',
-        width: 24,
-        height: 24,
+        height: 32,
       ),
-      label: 'Sign in with Google',
       backgroundColor: Colors.white,
       textColor: _googleTextColor,
       borderColor: _googleBorderColor,
+      iconOnly: true,
     );
   }
 
@@ -417,12 +460,12 @@ class _LoginPageState extends State<LoginPage> {
       onPressed: _handleFacebookLogin,
       icon: SvgPicture.asset(
         'assets/third-party-login-icon/facebook_icon.svg',
-        width: 24,
         height: 24,
       ),
-      label: 'Continue with Facebook',
-      backgroundColor: _facebookBlue,
-      textColor: Colors.white,
+      backgroundColor: Colors.white,
+      textColor: _googleTextColor,
+      borderColor: _googleBorderColor,
+      iconOnly: true,
     );
   }
 
@@ -431,13 +474,12 @@ class _LoginPageState extends State<LoginPage> {
       onPressed: _handleAppleLogin,
       icon: SvgPicture.asset(
         'assets/third-party-login-icon/apple_icon.svg',
-        width: 20,
         height: 20,
-        colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
       ),
-      label: 'Sign in with Apple',
-      backgroundColor: _appleBlack,
-      textColor: Colors.white,
+      backgroundColor: Colors.white,
+      textColor: _googleTextColor,
+      borderColor: _googleBorderColor,
+      iconOnly: true,
     );
   }
 
@@ -1221,11 +1263,9 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
-      if (!await _handleDeletedAccountError(e)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Apple Login Error: $e')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Apple Login Error: $e')),
+      );
     } finally {
       // 停止超時計時器
       _stopLoginTimeout();
@@ -1349,16 +1389,6 @@ class _LoginPageState extends State<LoginPage> {
                               onFieldSubmitted: (_) => _submitForm(),
                             ),
                             const SizedBox(height: 16),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: isLoading
-                                    ? null
-                                    : () => context.go('/forgot-password'),
-                                child: const Text('Forgot password?'),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
                             CheckboxListTile(
                               value: rememberMe,
                               onChanged: (value) {
@@ -1388,22 +1418,36 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 16),
+                            Align(
+                              alignment: Alignment.center,
+                              child: TextButton(
+                                onPressed: () {
+                                  context.go('/forgot-password');
+                                },
+                                child: const Text('Forgot password?'),
+                              ),
+                            ),
                             const Divider(thickness: 1),
                             const SizedBox(height: 12),
                             // 跨平台第三方登入按鈕
                             Column(
                               children: [
-                                _buildGoogleButton(),
-                                const SizedBox(height: 8),
-                                _buildFacebookButton(),
-                                const SizedBox(height: 8),
-                                if (_platformAuthService.isIOS ||
-                                    _platformAuthService.isWeb) ...[
-                                  _buildAppleButton(),
-                                  const SizedBox(height: 8),
-                                ],
                                 _buildEmailButton(),
+                                const SizedBox(height: 12),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    _buildGoogleButton(),
+                                    const SizedBox(width: 12),
+                                    _buildFacebookButton(),
+                                    if (_platformAuthService.isIOS ||
+                                        _platformAuthService.isWeb) ...[
+                                      const SizedBox(width: 12),
+                                      _buildAppleButton(),
+                                    ],
+                                  ],
+                                ),
                               ],
                             ),
                           ],

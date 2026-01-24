@@ -23,7 +23,11 @@ try {
     $userId = (int)$auth['payload']['user_id'];
 
     $db = Database::getInstance();
-    $minWithdrawPoints = 100;
+    $minWithdrawPoints = null;
+    $feeSetting = $db->fetch("SELECT rate, min_withdraw_points FROM withdraw_fee_settings WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
+    if ($feeSetting && array_key_exists('min_withdraw_points', $feeSetting)) {
+        $minWithdrawPoints = $feeSetting['min_withdraw_points'];
+    }
 
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $page = max(1, (int)($_GET['page'] ?? 1));
@@ -113,15 +117,20 @@ try {
     $input = json_decode(file_get_contents('php://input'), true) ?? [];
     $amountPoints = isset($input['amount_points']) ? (int)$input['amount_points'] : 0;
 
+    if (!$feeSetting || !isset($feeSetting['rate'])) {
+        Response::error('Withdraw fee is not configured. Please contact support.', 422);
+    }
+
+    if (!array_key_exists('min_withdraw_points', $feeSetting) || $feeSetting['min_withdraw_points'] === null) {
+        Response::error(ErrorCodes::INVALID_PARAMETER, 'Withdraw minimum is not configured.');
+    }
+
+    $minWithdrawPoints = (int)$feeSetting['min_withdraw_points'];
+
     if ($amountPoints < $minWithdrawPoints) {
         Response::validationError([
             'amount_points' => "Minimum withdraw amount is {$minWithdrawPoints} points"
         ]);
-    }
-
-    $feeSetting = $db->fetch("SELECT rate FROM withdraw_fee_settings WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
-    if (!$feeSetting || !isset($feeSetting['rate'])) {
-        Response::error('Withdraw fee is not configured. Please contact support.', 422);
     }
 
     $feeRate = (float)$feeSetting['rate'];

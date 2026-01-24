@@ -14,14 +14,14 @@ try {
     echo "Database connected successfully.\n";
     
     // 停用所有現有設定
-    $pdo->exec("UPDATE task_completion_points_fee_settings SET is_active = 0");
+    $pdo->exec("UPDATE withdraw_fee_settings SET is_active = 0");
     echo "Deactivated all existing settings.\n";
     
     // 插入新的 2% 費率設定
     $insertSQL = "
-        INSERT INTO task_completion_points_fee_settings (
+        INSERT INTO withdraw_fee_settings (
             rate, description, is_active, updated_by, created_at, updated_at
-        ) VALUES (0.0200, 'Test 2% completion fee for Action Bar Logic', 1, NULL, NOW(), NOW())
+        ) VALUES (0.0200, 'Test 2% withdraw fee for Action Bar Logic', 1, NULL, NOW(), NOW())
     ";
     
     $pdo->exec($insertSQL);
@@ -34,7 +34,7 @@ try {
     // 顯示當前設定
     $stmt = $pdo->query("
         SELECT id, rate, description, is_active, created_at 
-        FROM task_completion_points_fee_settings 
+        FROM withdraw_fee_settings 
         WHERE is_active = 1 
         ORDER BY id DESC 
         LIMIT 1

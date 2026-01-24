@@ -125,21 +125,30 @@ try {
         
         // 記錄操作日誌
         $logSql = "
-            INSERT INTO user_activity_logs (user_id, action, details, ip_address, created_at)
-            VALUES (?, 'password_reset_completed', ?, ?, NOW())
+            INSERT INTO user_active_log (
+                user_id,
+                actor_type,
+                actor_id,
+                action,
+                metadata,
+                ip,
+                user_agent,
+                created_at
+            ) VALUES (?, 'user', ?, 'password_reset_completed', ?, ?, ?, NOW())
         ";
         
         $logStmt = $pdo->prepare($logSql);
         $logStmt->execute([
-            $user['id'], 
+            $user['id'],
+            $user['id'],
             json_encode([
                 'email' => $email,
                 'reset_token_created_at' => $resetRecord['created_at'],
                 'reset_requested_by_admin_id' => $resetRecord['created_by'] ?? null,
-                'reset_requested_by_admin_name' => $resetRecord['created_by_name'] ?? null,
-                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
+                'reset_requested_by_admin_name' => $resetRecord['created_by_name'] ?? null
             ]),
-            $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+            $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
         ]);
 
         try {

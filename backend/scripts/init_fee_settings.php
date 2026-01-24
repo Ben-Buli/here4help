@@ -1,7 +1,7 @@
 <?php
 /**
- * 初始化手續費設定腳本
- * 如果 task_completion_points_fee_settings 表不存在或沒有啟用的設定，則創建預設設定
+ * 初始化提領手續費設定腳本
+ * 如果 withdraw_fee_settings 表不存在或沒有啟用的設定，則創建預設設定
  */
 
 require_once __DIR__ . '/../config/database.php';
@@ -10,21 +10,22 @@ try {
     $db = Database::getInstance();
     
     // 檢查表是否存在
-    $tableExists = $db->fetch("SHOW TABLES LIKE 'task_completion_points_fee_settings'");
+    $tableExists = $db->fetch("SHOW TABLES LIKE 'withdraw_fee_settings'");
     
     if (!$tableExists) {
-        echo "Creating task_completion_points_fee_settings table...\n";
+        echo "Creating withdraw_fee_settings table...\n";
         
         // 創建表
         $createTableSQL = "
-            CREATE TABLE task_completion_points_fee_settings (
+            CREATE TABLE withdraw_fee_settings (
                 id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-                rate DECIMAL(5,4) NOT NULL DEFAULT 0.0000 COMMENT '手續費率，0.02 表示 2%',
-                description VARCHAR(255) NOT NULL DEFAULT '' COMMENT '設定描述',
-                is_active TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否啟用',
+                rate DECIMAL(6,4) NOT NULL COMMENT '提領手續費率，0.02 表示 2%',
+                description VARCHAR(255) DEFAULT NULL COMMENT '設定描述',
+                is_active TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否啟用',
                 updated_by BIGINT UNSIGNED NULL COMMENT '更新者ID',
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                min_withdraw_points INT UNSIGNED DEFAULT NULL COMMENT '最低提領門檻（點數）',
+                created_at TIMESTAMP NULL DEFAULT NULL,
+                updated_at TIMESTAMP NULL DEFAULT NULL,
                 INDEX idx_active (is_active),
                 INDEX idx_updated_at (updated_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -35,16 +36,16 @@ try {
     }
     
     // 檢查是否有啟用的設定
-    $activeSettings = $db->fetch("SELECT id FROM task_completion_points_fee_settings WHERE is_active = 1 LIMIT 1");
+    $activeSettings = $db->fetch("SELECT id FROM withdraw_fee_settings WHERE is_active = 1 LIMIT 1");
     
     if (!$activeSettings) {
         echo "Creating default fee settings...\n";
         
         // 插入預設設定（2% 手續費）
         $insertSQL = "
-            INSERT INTO task_completion_points_fee_settings (
+            INSERT INTO withdraw_fee_settings (
                 rate, description, is_active, updated_by, created_at, updated_at
-            ) VALUES (0.0200, 'Default 2% completion fee', 1, NULL, NOW(), NOW())
+            ) VALUES (0.0200, 'Default 2% withdraw fee', 1, NULL, NOW(), NOW())
         ";
         
         $db->execute($insertSQL);
@@ -60,7 +61,7 @@ try {
     // 顯示當前設定
     $currentSettings = $db->fetch("
         SELECT id, rate, description, is_active, created_at 
-        FROM task_completion_points_fee_settings 
+        FROM withdraw_fee_settings 
         WHERE is_active = 1 
         ORDER BY id DESC 
         LIMIT 1

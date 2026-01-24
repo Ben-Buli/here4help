@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:here4help/services/api/password_api.dart';
@@ -17,10 +19,15 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   bool _isLoading = false;
   String? _errorMessage;
   bool _emailSent = false;
+  int _resendSecondsLeft = 0;
+  static const int _resendCooldownSeconds = 60;
+  Timer? _resendTimer;
+  static const bool _enableResendCooldown = !kDebugMode;
 
   @override
   void dispose() {
     _emailController.dispose();
+    _resendTimer?.cancel();
     super.dispose();
   }
 
@@ -55,13 +62,63 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       setState(() {
         _emailSent = true;
         _isLoading = false;
+        _resendSecondsLeft =
+            _enableResendCooldown ? _resendCooldownSeconds : 0;
       });
+      _startResendCountdown();
     } catch (e) {
       setState(() {
         _errorMessage = e.toString().replaceFirst('Exception: ', '');
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _tryRequestPasswordReset() async {
+    if (_enableResendCooldown && _resendSecondsLeft > 0) {
+      _showCooldownMessage();
+      return;
+    }
+    await _requestPasswordReset();
+  }
+
+  void _showCooldownMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Please wait ${_formatCountdown(_resendSecondsLeft)} before sending another reset email.',
+        ),
+      ),
+    );
+  }
+
+  void _startResendCountdown() {
+    if (!_enableResendCooldown) {
+      return;
+    }
+    _resendTimer?.cancel();
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendSecondsLeft <= 1) {
+        setState(() {
+          _resendSecondsLeft = 0;
+        });
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _resendSecondsLeft -= 1;
+      });
+    });
+  }
+
+  String _formatCountdown(int seconds) {
+    final minutes = seconds ~/ 60;
+    final secs = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -102,7 +159,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               ),
               const SizedBox(height: 8),
 
-              Center(
+              SizedBox(
+                width: double.infinity,
                 child: Text(
                   _emailSent
                       ? 'We\'ve sent a password reset link to your email address. Please check your inbox and follow the instructions in your browser.'
@@ -151,7 +209,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _requestPasswordReset,
+                    onPressed: _isLoading ? null : _tryRequestPasswordReset,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -161,51 +219,97 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                             valueColor:
                                 AlwaysStoppedAnimation<Color>(Colors.white),
                           )
-                        : const Text(
-                            'Send Reset Link',
-                            style: TextStyle(
+                        : Text(
+                            _resendSecondsLeft > 0
+                                ? 'Send Reset Link (${_formatCountdown(_resendSecondsLeft)})'
+                                : 'Send Reset Link',
+                            style: const TextStyle(
                                 fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                   ),
                 ),
+                if (_resendSecondsLeft > 0) ...[
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Text(
+                      'You can resend in ${_formatCountdown(_resendSecondsLeft)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                ],
               ] else ...[
                 // 成功狀態
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.green[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green[200]!),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.check_circle,
-                        color: Colors.green[600],
-                        size: 48,
+                Align(
+                  alignment: Alignment.center,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green[200]!),
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.check_circle,
+                            color: Colors.green[600],
+                            size: 48,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Reset link sent to:',
+                                  style: TextStyle(
+                                    color: Colors.green[700],
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _emailController.text,
+                                  style: TextStyle(
+                                    color: Colors.green[600],
+                                    fontSize: 16,
+                                  ),
+                                  textAlign: TextAlign.left,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Reset link sent to:',
-                        style: TextStyle(
-                          color: Colors.green[700],
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _emailController.text,
-                        style: TextStyle(
-                          color: Colors.green[600],
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),
 
                 // 重新發送按鈕
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _tryRequestPasswordReset,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text(
+                      'Resend Email',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   height: 48,
@@ -244,31 +348,37 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               // 額外說明
               if (_emailSent) ...[
                 const SizedBox(height: 32),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue[200]!),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Didn\'t receive the email?',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                Align(
+                  alignment: Alignment.center,
+                  child: FractionallySizedBox(
+                    widthFactor: 0.8,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue[200]!),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '• Check your spam/junk folder\n'
-                        '• Make sure the email address is correct\n'
-                        '• The link will expire in 1 hour',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.blue[700],
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Didn\'t receive the email?',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '• Check your spam/junk folder\n'
+                            '• Make sure the email address is correct\n'
+                            '• ${_resendSecondsLeft > 0 ? 'You can resend in ${_formatCountdown(_resendSecondsLeft)}' : 'You can resend now'}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue[700],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ],

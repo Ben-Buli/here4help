@@ -769,7 +769,7 @@ class WithdrawFeeSettings {
   final bool isActive;
   final String? createdAt;
   final String? updatedAt;
-  final int minWithdrawPoints;
+  final int? minWithdrawPoints;
 
   WithdrawFeeSettings({
     required this.id,
@@ -782,19 +782,47 @@ class WithdrawFeeSettings {
   });
 
   factory WithdrawFeeSettings.fromJson(Map<String, dynamic> json) {
-    final feeSetting = json['fee_setting'] ?? {};
+    final rawFeeSetting = json['fee_setting'];
+    final feeSetting = rawFeeSetting is Map<String, dynamic> ? rawFeeSetting : json;
     return WithdrawFeeSettings(
-      id: feeSetting['id'] ?? 0,
-      rate: (feeSetting['rate'] ?? 0.0).toDouble(),
+      id: _toInt(feeSetting['id']) ?? 0,
+      rate: _toDouble(feeSetting['rate']),
       description: feeSetting['description'],
-      isActive: feeSetting['is_active'] == 1 || feeSetting['is_active'] == true,
+      isActive: _toBool(feeSetting['is_active']),
       createdAt: feeSetting['created_at'],
       updatedAt: feeSetting['updated_at'],
-      minWithdrawPoints: json['min_withdraw_points'] ?? 0,
+      minWithdrawPoints:
+          _toInt(json['min_withdraw_points'] ?? feeSetting['min_withdraw_points']),
     );
   }
 
   String get ratePercentage => '${(rate * 100).toStringAsFixed(2)}%';
+
+  static int? _toInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.round();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  static double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  static bool _toBool(dynamic value) {
+    if (value == null) return false;
+    if (value is bool) return value;
+    if (value is int) return value == 1;
+    if (value is String) {
+      return value == '1' || value.toLowerCase() == 'true';
+    }
+    return false;
+  }
 }
 
 /// 提領申請記錄模型
@@ -868,7 +896,7 @@ class WithdrawRequestsResult {
   final List<WithdrawRequest> requests;
   final PaginationInfo pagination;
   final Map<String, dynamic> filters;
-  final int minWithdrawPoints;
+  final int? minWithdrawPoints;
 
   WithdrawRequestsResult({
     required this.requests,
@@ -884,7 +912,7 @@ class WithdrawRequestsResult {
           .toList(),
       pagination: PaginationInfo.fromJson(json['pagination']),
       filters: json['filters'] ?? {},
-      minWithdrawPoints: json['min_withdraw_points'] ?? 0,
+      minWithdrawPoints: json['min_withdraw_points'],
     );
   }
 }
@@ -898,7 +926,7 @@ class WithdrawCreateResult {
   final int totalDeductPoints;
   final int netPayoutPoints;
   final String status;
-  final int minWithdrawPoints;
+  final int? minWithdrawPoints;
 
   WithdrawCreateResult({
     required this.requestId,
@@ -920,7 +948,7 @@ class WithdrawCreateResult {
       totalDeductPoints: json['total_deduct_points'],
       netPayoutPoints: json['net_payout_points'],
       status: json['status'],
-      minWithdrawPoints: json['min_withdraw_points'] ?? 0,
+      minWithdrawPoints: json['min_withdraw_points'],
     );
   }
 

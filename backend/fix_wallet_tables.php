@@ -61,38 +61,40 @@ try {
     
     echo "\n";
     
-    // 2. 檢查並創建 task_completion_points_fee_settings 表
-    echo "2. 檢查 task_completion_points_fee_settings 表...\n";
-    $tableExists = $db->fetch("SHOW TABLES LIKE 'task_completion_points_fee_settings'");
+    // 2. 檢查並創建 withdraw_fee_settings 表
+    echo "2. 檢查 withdraw_fee_settings 表...\n";
+    $tableExists = $db->fetch("SHOW TABLES LIKE 'withdraw_fee_settings'");
     
     if (!$tableExists) {
         echo "❌ 表格不存在，正在創建...\n";
         $createTableSql = "
-            CREATE TABLE IF NOT EXISTS `task_completion_points_fee_settings` (
-              `id` int(11) NOT NULL AUTO_INCREMENT,
-              `rate` decimal(5,4) NOT NULL DEFAULT '0.0000' COMMENT '手續費率 (0.0000 = 0%, 0.0500 = 5%)',
-              `is_active` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否啟用',
-              `description` text COMMENT '設定說明',
-              `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-              `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            CREATE TABLE IF NOT EXISTS `withdraw_fee_settings` (
+              `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+              `rate` decimal(6,4) NOT NULL COMMENT '提領手續費率 (0.0000 = 0%, 0.0500 = 5%)',
+              `description` varchar(255) DEFAULT NULL COMMENT '設定說明',
+              `is_active` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否啟用（單一啟用）',
+              `updated_by` bigint unsigned DEFAULT NULL COMMENT '更新者管理員 ID',
+              `min_withdraw_points` int unsigned DEFAULT NULL COMMENT '最低提領門檻（點數）',
+              `created_at` timestamp NULL DEFAULT NULL,
+              `updated_at` timestamp NULL DEFAULT NULL,
               PRIMARY KEY (`id`),
               KEY `idx_is_active` (`is_active`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='任務完成手續費設定'
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='提領手續費設定'
         ";
         $db->execute($createTableSql);
-        echo "✅ task_completion_points_fee_settings 表已創建\n";
+        echo "✅ withdraw_fee_settings 表已創建\n";
     } else {
-        echo "✅ task_completion_points_fee_settings 表已存在\n";
+        echo "✅ withdraw_fee_settings 表已存在\n";
     }
     
     // 檢查並創建預設手續費設定
-    $activeSettings = $db->fetch("SELECT * FROM task_completion_points_fee_settings WHERE is_active = 1 LIMIT 1");
+    $activeSettings = $db->fetch("SELECT * FROM withdraw_fee_settings WHERE is_active = 1 LIMIT 1");
     if (!$activeSettings) {
         echo "❌ 沒有啟用的手續費設定，創建預設設定...\n";
-        $db->execute("INSERT INTO task_completion_points_fee_settings (rate, is_active, description) VALUES (?, ?, ?)", [
+        $db->execute("INSERT INTO withdraw_fee_settings (rate, is_active, description) VALUES (?, ?, ?)", [
             0.0200, // 2% 手續費
             1,
-            'Default 2% completion fee'
+            'Default 2% withdraw fee'
         ]);
         echo "✅ 已創建預設手續費設定\n";
     } else {
@@ -108,9 +110,9 @@ try {
     $testUrl = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) . "/api/wallet/summary.php";
     echo "Summary API: $testUrl\n";
     
-    // 測試 fee-settings.php
-    $testUrl = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) . "/api/wallet/fee-settings.php";
-    echo "Fee Settings API: $testUrl\n";
+    // 測試 withdraw-fee-settings.php
+    $testUrl = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) . "/api/wallet/withdraw-fee-settings.php";
+    echo "Withdraw Fee Settings API: $testUrl\n";
     
     // 測試 bank-accounts.php
     $testUrl = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) . "/api/wallet/bank-accounts.php";
@@ -126,7 +128,7 @@ try {
         echo "✅ 銀行帳戶: " . $currentBankAccount['bank_name'] . " (" . $currentBankAccount['account_number'] . ")\n";
     }
     
-    $currentFeeSettings = $db->fetch("SELECT * FROM task_completion_points_fee_settings WHERE is_active = 1 LIMIT 1");
+    $currentFeeSettings = $db->fetch("SELECT * FROM withdraw_fee_settings WHERE is_active = 1 LIMIT 1");
     if ($currentFeeSettings) {
         $feePercentage = (float)$currentFeeSettings['rate'] * 100;
         echo "✅ 手續費率: " . number_format($feePercentage, 2) . "% (" . $currentFeeSettings['description'] . ")\n";
@@ -138,7 +140,7 @@ try {
     // 5. API 端點清單
     echo "📋 錢包 API 端點清單:\n";
     echo "- GET /api/wallet/summary.php - 錢包統計\n";
-    echo "- GET /api/wallet/fee-settings.php - 手續費設定\n";
+    echo "- GET /api/wallet/withdraw-fee-settings.php - 提領手續費設定\n";
     echo "- GET /api/wallet/bank-accounts.php - 銀行帳戶資訊\n";
     echo "- GET /api/wallet/transactions.php - 交易記錄\n";
     
@@ -147,4 +149,3 @@ try {
     error_log("Wallet tables fix error: " . $e->getMessage());
 }
 ?>
-

@@ -843,7 +843,6 @@ const navigationSections: NavigationSection[] = [
           { name: 'Deposit Requests', href: '/payments/requests' },
           { name: 'Withdraw Requests', href: '/payments/withdraw-requests' },
           { name: 'Fee Settings', href: '/payments/fee-settings' },
-          { name: 'Fee Revenue', href: '/payments/fee-revenue' },
           { name: 'Official Account', href: '/payments/official-account' },
         ],
       },

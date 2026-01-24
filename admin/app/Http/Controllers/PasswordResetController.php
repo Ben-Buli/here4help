@@ -83,14 +83,17 @@ class PasswordResetController extends Controller
         }
 
         try {
-            DB::table('user_activity_logs')->insert([
+            DB::table('user_active_log')->insert([
                 'user_id' => $user->id,
+                'actor_type' => 'user',
+                'actor_id' => $user->id,
                 'action' => 'password_reset_requested',
-                'details' => json_encode([
+                'metadata' => json_encode([
                     'email' => $email,
                     'token_expires_at' => $expiresAt->toDateTimeString(),
                 ], JSON_UNESCAPED_UNICODE),
-                'ip_address' => $request->ip(),
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
                 'created_at' => $now,
             ]);
         } catch (\Throwable $logError) {

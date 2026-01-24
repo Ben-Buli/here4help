@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:here4help/services/http_client_service.dart';
 import 'package:here4help/config/app_config.dart';
 
@@ -57,18 +58,33 @@ class PasswordApi {
       };
 
       final response = await HttpClientService.post(
-        AppConfig.publicApi('/password/forgot'),
+        AppConfig.api('/account/request-password-reset.php'),
         body: jsonEncode(body),
       );
-
+      debugPrint('RESET FILE v2 🔴');
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        final error = jsonDecode(response.body);
-        throw Exception(error['message'] ?? 'Failed to request password reset');
+        if (kDebugMode) {
+          debugPrint(
+              '[PasswordApi] requestPasswordReset failed: ${response.statusCode} body:${response.body}');
+        }
+        final dynamic errorBody = _safeDecodeJson(response.body);
+        if (errorBody is Map && errorBody['message'] != null) {
+          throw Exception(errorBody['message']);
+        }
+        throw Exception('Failed to request password reset');
       }
     } catch (e) {
       throw _toUserFacingException('Network error: $e');
+    }
+  }
+
+  static dynamic _safeDecodeJson(String body) {
+    try {
+      return jsonDecode(body);
+    } catch (_) {
+      return null;
     }
   }
 

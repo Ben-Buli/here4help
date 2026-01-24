@@ -46,7 +46,9 @@ class PaymentController extends Controller
         if ($to) $query->where('pdr.created_at', '<=', $to . ' 23:59:59');
 
         $total = $query->count();
-        $items = $query->orderBy('pdr.created_at', 'desc')
+        $items = $query
+            ->orderByRaw("CASE WHEN pdr.status = 'pending' THEN 0 ELSE 1 END")
+            ->orderBy('pdr.created_at', 'desc')
             ->offset(($page - 1) * $perPage)
             ->limit($perPage)
             ->get();
@@ -189,7 +191,8 @@ class PaymentController extends Controller
         if ($to) $query->where('pwr.created_at', '<=', $to . ' 23:59:59');
 
         $total = $query->count();
-        $items = $query->orderBy('pwr.created_at', 'desc')
+        $items = $query->orderByRaw("CASE WHEN pwr.status = 'pending' THEN 0 ELSE 1 END")
+            ->orderBy('pwr.created_at', 'desc')
             ->offset(($page - 1) * $perPage)
             ->limit($perPage)
             ->get();
@@ -427,11 +430,11 @@ class PaymentController extends Controller
     public function feeSettings(Request $request)
     {
         if ($request->isMethod('get')) {
-            $items = DB::table('task_completion_points_fee_settings')
+            $items = DB::table('withdraw_fee_settings')
                 ->orderBy('created_at', 'desc')
                 ->get()
                 ->map(function ($item) {
-                    $rate = isset($item->rate) ? (float)$item->rate : (isset($item->percentage) ? (float)$item->percentage / 100 : null);
+                    $rate = isset($item->rate) ? (float)$item->rate : null;
                     $item->rate = $rate;
                     $item->percentage = $rate !== null ? round($rate * 100, 4) : null;
                     return $item;
@@ -441,6 +444,8 @@ class PaymentController extends Controller
 
         $validator = Validator::make($request->all(), [
             'percentage' => 'required|numeric|min:0|max:100',
+            'min_withdraw_points' => 'required|integer|min:0',
+            'description' => 'required|string|max:255',
         ]);
         if ($validator->fails()) {
             return response()->json(['success' => false, 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
@@ -448,26 +453,44 @@ class PaymentController extends Controller
 
         DB::beginTransaction();
         try {
+            $adminId = $request->user()->id;
             $percentage = (float)$request->get('percentage');
             $rate = $percentage / 100;
+            $minWithdrawPoints = (int)$request->get('min_withdraw_points');
 
-            DB::table('task_completion_points_fee_settings')
+            DB::table('withdraw_fee_settings')
                 ->where('is_active', 1)
                 ->update(['is_active' => 0]);
 
+            $description = $request->get('description');
             $insertData = [
                 'rate' => $rate,
                 'is_active' => 1,
-                'description' => $request->get('description', 'Updated via admin panel'),
+                'description' => $description,
+                'updated_by' => $adminId,
+                'min_withdraw_points' => $minWithdrawPoints,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
 
-            if (Schema::hasColumn('task_completion_points_fee_settings', 'percentage')) {
-                $insertData['percentage'] = $percentage;
-            }
+            DB::table('withdraw_fee_settings')->insert($insertData);
 
-            DB::table('task_completion_points_fee_settings')->insert($insertData);
+            DB::table('admin_activity_logs')->insert([
+                'admin_id' => $adminId,
+                'action' => 'update',
+                'table_name' => 'withdraw_fee_settings',
+                'record_id' => null,
+                'old_data' => null,
+                'new_data' => json_encode([
+                    'rate' => $rate,
+                    'percentage' => $percentage,
+                    'min_withdraw_points' => $minWithdrawPoints,
+                    'description' => $description,
+                ]),
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'created_at' => now(),
+            ]);
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Fee setting updated']);
         } catch (\Throwable $e) {

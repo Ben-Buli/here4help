@@ -189,14 +189,16 @@ try {
         
         // 記錄管理員操作日誌
         $logStmt = $db->prepare("
-            INSERT INTO user_activity_logs (
+            INSERT INTO user_active_log (
                 user_id,
                 actor_type,
                 actor_id,
                 action,
-                details,
+                metadata,
+                ip,
+                user_agent,
                 created_at
-            ) VALUES (?, 'admin', ?, 'user_verification_review', ?, NOW())
+            ) VALUES (?, 'admin', ?, 'user_verification_review', ?, ?, ?, NOW())
         ");
         
         $logDetails = json_encode([
@@ -209,7 +211,13 @@ try {
             'referral_reward' => $referralReward
         ]);
         
-        $logStmt->execute([$userId, $adminId, $logDetails]);
+        $logStmt->execute([
+            $userId,
+            $adminId,
+            $logDetails,
+            $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
+        ]);
         
         // 提交交易
         $db->commit();

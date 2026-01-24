@@ -90,7 +90,7 @@ Route::prefix('admin')->group(function () {
             Route::get('/chat-rooms/{roomId}', [SupportController::class, 'getChatRoom']);
             Route::get('/chat-rooms/{roomId}/messages', [SupportController::class, 'getMessages']);
             Route::post('/chat-rooms/{roomId}/messages', [SupportController::class, 'sendMessage']);
-            Route::post('/chat-rooms/{roomId}/mark-read', [SupportController::class, 'markAsRead']);
+            Route::post('/chat-rooms/{roomId}/read', [SupportController::class, 'markAsRead']);        
         });
 
         // 支付

@@ -8,6 +8,7 @@ import 'package:here4help/config/app_config.dart';
 import 'package:here4help/utils/debug_helper.dart';
 import 'package:here4help/chat/services/socket_service.dart';
 import 'package:here4help/services/http_client_service.dart';
+import 'package:here4help/auth/services/auth_exception.dart';
 
 class AuthService {
   static const String _tokenKey = 'auth_token';
@@ -96,12 +97,19 @@ class AuthService {
         );
         await _saveUserData(responseData['user']);
         return responseData;
-      } else {
-        print('❌ 登入失敗: ${data['message']}');
-        throw Exception(data['message'] ?? 'Login failed');
       }
+
+      final code = data['code']?.toString() ?? 'E2006';
+      final message = data['message']?.toString() ?? 'Login failed';
+      final responseData =
+          data['data'] is Map ? Map<String, dynamic>.from(data['data']) : null;
+      print('❌ 登入失敗: $message ($code)');
+      throw AuthException(code: code, message: message, data: responseData);
     } catch (e) {
       print('💥 登入錯誤: $e');
+      if (e is AuthException) {
+        rethrow;
+      }
       throw Exception('Login failed: $e');
     }
   }

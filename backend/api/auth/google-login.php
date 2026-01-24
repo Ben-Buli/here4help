@@ -130,11 +130,19 @@ try {
     $pdo = $db->getConnection();
 
     if (AccountBlocker::isEmailBlocked($pdo, $email)) {
-        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+        Response::error(
+            ErrorCodes::ACCOUNT_DELETED,
+            'ACCOUNT_DELETED_BY_ADMIN',
+            ['reason' => 'admin']
+        );
     }
 
     if (AccountBlocker::isIdentityBlocked($pdo, 'google', $googleId)) {
-        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+        Response::error(
+            ErrorCodes::ACCOUNT_DELETED,
+            'ACCOUNT_DELETED_BY_ADMIN',
+            ['reason' => 'admin']
+        );
     }
 
     // 情況1：既有 user_identities + users
@@ -184,13 +192,28 @@ try {
         $userPermission = (int)($user['permission'] ?? 0);
         if ($userPermission < 0 && $userPermission != -1) {
             if ($userPermission == -2) {
-                Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+                Response::error(
+                    ErrorCodes::ACCOUNT_DELETED,
+                    'ACCOUNT_DELETED_BY_ADMIN',
+                    ['reason' => 'admin']
+                );
             } elseif ($userPermission == -3) {
-                Response::forbidden('ACCOUNT_DISABLED_BY_USER');
+                Response::error(
+                    ErrorCodes::ACCOUNT_SUSPENDED,
+                    'ACCOUNT_DISABLED_BY_USER',
+                    ['reason' => 'user']
+                );
             } elseif ($userPermission == -4) {
-                Response::forbidden('ACCOUNT_DELETED_BY_USER');
+                Response::error(
+                    ErrorCodes::ACCOUNT_DELETED,
+                    'ACCOUNT_DELETED_BY_USER',
+                    ['reason' => 'user']
+                );
             } else {
-                Response::forbidden('Account is not allowed to login (permission).');
+                Response::error(
+                    ErrorCodes::INSUFFICIENT_PERMISSION,
+                    'ACCOUNT_NOT_ALLOWED'
+                );
             }
         }
 

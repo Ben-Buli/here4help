@@ -1077,12 +1077,12 @@ class ThemeScheme {
           side: BorderSide(color: dialogBorderColor, width: 1),
         ),
         titleTextStyle: TextStyle(
-          color: resolvedAppBarTitleColor,
+          color: extension.dialogTitleColor,
           fontSize: 18,
           fontWeight: FontWeight.w700,
         ),
         contentTextStyle: TextStyle(
-          color: onSurface.withValues(alpha: 0.9),
+          color: extension.dialogContentColor,
           fontSize: 14,
           height: 1.4,
         ),
@@ -1285,7 +1285,7 @@ class ThemeScheme {
       navigationBarSelectedColor: resolveNavigationSelectedColor(),
       navigationBarUnselectedColor: resolveNavigationUnselectedColor(),
       dialogBackgroundColor: blendWithWhite(primary),
-      dialogTitleColor: appBarTextColor,
+      dialogTitleColor: onSurface,
       dialogContentColor: onSurface.withOpacity(0.9),
       dialogPrimaryColor: primary,
     );

@@ -218,19 +218,23 @@ try {
         
         // 記錄用戶活動日誌
         $activitySql = "
-            INSERT INTO user_activity_logs (
+            INSERT INTO user_active_log (
                 user_id,
+                actor_type,
+                actor_id,
                 action,
-                resource_type,
-                resource_id,
-                details,
+                metadata,
+                ip,
+                user_agent,
                 created_at
             ) VALUES (
                 :user_id,
+                'user',
+                :actor_id,
                 'task_dispute_created',
-                'task',
-                :task_id,
-                :details,
+                :metadata,
+                :ip,
+                :user_agent,
                 NOW()
             )
         ";
@@ -238,14 +242,18 @@ try {
         $activityStmt = $db->prepare($activitySql);
         $activityStmt->execute([
             ':user_id' => $userId,
-            ':task_id' => $taskId,
-            ':details' => json_encode([
+            ':actor_id' => $userId,
+            ':metadata' => json_encode([
+                'resource_type' => 'task',
+                'resource_id' => $taskId,
                 'dispute_id' => $disputeId,
                 'task_title' => $task['title'],
                 'reason' => $reason,
                 'description' => $description,
                 'previous_status' => $task['status_code']
-            ])
+            ]),
+            ':ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            ':user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
         ]);
         
         // 提交交易
@@ -288,4 +296,3 @@ try {
     error_log("Dispute API Error: " . $e->getMessage());
     Response::error('Internal server error: ' . $e->getMessage(), 500);
 }
-

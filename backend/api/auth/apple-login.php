@@ -62,11 +62,19 @@ try {
     $pdo = $db->getConnection();
 
     if (AccountBlocker::isEmailBlocked($pdo, $email)) {
-        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+        Response::error(
+            ErrorCodes::ACCOUNT_DELETED,
+            'ACCOUNT_DELETED_BY_ADMIN',
+            ['reason' => 'admin']
+        );
     }
 
     if (AccountBlocker::isIdentityBlocked($pdo, 'apple', $appleId)) {
-        Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
+        Response::error(
+            ErrorCodes::ACCOUNT_DELETED,
+            'ACCOUNT_DELETED_BY_ADMIN',
+            ['reason' => 'admin']
+        );
     }
     
     // 第一步：檢查是否已存在對應的 user_identity
@@ -185,17 +193,32 @@ try {
     
     // 檢查帳號權限（與傳統登入一致）
     $userPermission = (int)($user['permission'] ?? 0);
-    if ($userPermission < 0 && $userPermission != -1) {
-        if ($userPermission == -2) {
-            Response::forbidden('ACCOUNT_DELETED_BY_ADMIN');
-        } elseif ($userPermission == -3) {
-            Response::forbidden('ACCOUNT_DISABLED_BY_USER');
-        } elseif ($userPermission == -4) {
-            Response::forbidden('ACCOUNT_DELETED_BY_USER');
-        } else {
-            Response::forbidden('Account is not allowed to login (permission).');
+        if ($userPermission < 0 && $userPermission != -1) {
+            if ($userPermission == -2) {
+                Response::error(
+                    ErrorCodes::ACCOUNT_DELETED,
+                    'ACCOUNT_DELETED_BY_ADMIN',
+                    ['reason' => 'admin']
+                );
+            } elseif ($userPermission == -3) {
+                Response::error(
+                    ErrorCodes::ACCOUNT_SUSPENDED,
+                    'ACCOUNT_DISABLED_BY_USER',
+                    ['reason' => 'user']
+                );
+            } elseif ($userPermission == -4) {
+                Response::error(
+                    ErrorCodes::ACCOUNT_DELETED,
+                    'ACCOUNT_DELETED_BY_USER',
+                    ['reason' => 'user']
+                );
+            } else {
+                Response::error(
+                    ErrorCodes::INSUFFICIENT_PERMISSION,
+                    'ACCOUNT_NOT_ALLOWED'
+                );
+            }
         }
-    }
 
     // 生成 Access/Refresh Token
     $resolvedUserId = isset($user['id']) ? (int)$user['id'] : (int)($user['user_id'] ?? 0);

@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:here4help/auth/services/auth_exception.dart';
 import 'package:here4help/config/app_config.dart';
 import 'package:here4help/config/environment_config_legacy.dart' as legacy;
 
@@ -253,7 +254,13 @@ class ThirdPartyAuthService {
       final message = decoded is Map && decoded['message'] != null
           ? decoded['message']
           : 'Google login failed';
-      throw Exception(message);
+      final code = decoded is Map && decoded['code'] != null
+          ? decoded['code'].toString()
+          : 'E2006';
+      final data = decoded is Map && decoded['data'] is Map
+          ? Map<String, dynamic>.from(decoded['data'])
+          : null;
+      throw AuthException(code: code, message: message, data: data);
     } catch (e) {
       debugPrint('❌ 呼叫後端 Google 登入 API 失敗: $e');
       rethrow;
@@ -516,7 +523,13 @@ class ThirdPartyAuthService {
       final message = decoded is Map && decoded['message'] != null
           ? decoded['message']
           : 'Apple login failed';
-      throw Exception(message);
+      final code = decoded is Map && decoded['code'] != null
+          ? decoded['code'].toString()
+          : 'E2006';
+      final data = decoded is Map && decoded['data'] is Map
+          ? Map<String, dynamic>.from(decoded['data'])
+          : null;
+      throw AuthException(code: code, message: message, data: data);
     } catch (e) {
       debugPrint('❌ 呼叫後端 Apple 登入 API 失敗: $e');
       rethrow;
@@ -570,7 +583,13 @@ class ThirdPartyAuthService {
       final message = decoded is Map && decoded['message'] != null
           ? decoded['message']
           : 'Facebook login failed';
-      throw Exception(message);
+      final code = decoded is Map && decoded['code'] != null
+          ? decoded['code'].toString()
+          : 'E2006';
+      final data = decoded is Map && decoded['data'] is Map
+          ? Map<String, dynamic>.from(decoded['data'])
+          : null;
+      throw AuthException(code: code, message: message, data: data);
     } catch (e) {
       debugPrint('❌ 呼叫後端 Facebook 登入 API 失敗: $e');
       rethrow;

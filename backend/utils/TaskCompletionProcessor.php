@@ -220,21 +220,9 @@ class TaskCompletionProcessor
             return self::$cachedFeeRate;
         }
 
-        $db = Database::getInstance();
-        $row = $db->fetch("SELECT rate FROM task_completion_points_fee_settings WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
-
-        if (!$row || !isset($row['rate'])) {
-            throw new Exception('Active platform fee rate is not configured. Please set the fee in admin > Payments > Fee Settings.');
-        }
-
-        $rate = (float)$row['rate'];
-        if ($rate <= 0 || $rate >= 1) {
-            throw new Exception('Platform fee rate configuration is invalid.');
-        }
-
-        self::$cachedFeeRate = $rate;
+        self::$cachedFeeRate = 0.0;
         self::$cachedFeeRateFetchedAt = $now;
-        return $rate;
+        return 0.0;
     }
 
     private static function getStatusId(string $code): int

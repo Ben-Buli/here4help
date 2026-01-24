@@ -12,7 +12,7 @@ require_once dirname(__DIR__, 2) . '/config/database.php';
 Response::setCorsHeaders();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    Response::error('Method not allowed', 405);
+    Response::methodNotAllowed('Method not allowed');
 }
 
 try {
@@ -22,9 +22,10 @@ try {
     }
 
     $db = Database::getInstance();
-    $minWithdrawPoints = 100;
-
-    $row = $db->fetch("SELECT id, rate, description, is_active, created_at, updated_at FROM withdraw_fee_settings WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
+    $row = $db->fetch("SELECT id, rate, description, is_active, min_withdraw_points, created_at, updated_at FROM withdraw_fee_settings WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
+    $minWithdrawPoints = $row && array_key_exists('min_withdraw_points', $row)
+        ? $row['min_withdraw_points']
+        : null;
 
     if (!$row) {
         $row = [
@@ -32,6 +33,7 @@ try {
             'rate' => 0.0,
             'description' => 'No withdraw fee settings configured',
             'is_active' => 0,
+            'min_withdraw_points' => null,
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s'),
         ];
