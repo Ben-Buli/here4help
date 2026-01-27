@@ -1,12 +1,12 @@
 // 環境變數配置
 export const config = {
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8888/here4help/backend',
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8888',
   apiTimeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '10000'),
   appTitle: import.meta.env.VITE_APP_TITLE || 'Here4Help Admin Panel',
   appVersion: import.meta.env.VITE_APP_VERSION || '1.0.0',
   debugMode: import.meta.env.VITE_DEBUG_MODE === 'true',
-  socketUrl: import.meta.env.VITE_SOCKET_URL || 'http://localhost:8888/here4help/socket' || 'http://localhost:3000',
-  imageBaseUrl: import.meta.env.VITE_IMAGE_BASE_URL || 'http://localhost:8888/here4help',
+  socketUrl: import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000',
+  imageBaseUrl: import.meta.env.VITE_IMAGE_BASE_URL || 'http://localhost:8888',
   isDevelopment: import.meta.env.DEV,
   isProduction: import.meta.env.PROD,
   

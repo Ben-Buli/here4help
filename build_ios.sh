@@ -90,7 +90,7 @@ update_version() {
   fi
   
   # 解析版本號格式：主版本號.次版本號.修訂號+yyyymmddv
-  # 例如：1.9.5+2025110915
+  # 例如：1.9.6+202601251
   local version_part=$(echo "$current_version" | cut -d'+' -f1)
   local date_build_part=$(echo "$current_version" | cut -d'+' -f2)
   

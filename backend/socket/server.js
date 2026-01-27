@@ -23,8 +23,6 @@ const jwt = require('jsonwebtoken');
 // 引入客服事件處理器
 const SupportEventHandler = require('./support_events');
 
-const PORT = process.env.PORT || process.env.SOCKET_PORT || 3000;
-
 // Load environment variables from socket/.env only
 const path = require('path');
 const crypto = require('crypto');
@@ -33,6 +31,8 @@ const dotenv = require('dotenv');
 // 明確指定 socket 目錄的 .env
 const envPath = path.resolve(__dirname, './.env');
 dotenv.config({ path: envPath });
+
+const PORT = process.env.PORT || process.env.SOCKET_PORT || 3000;
 
 console.log(`🔧 Loaded environment from ${envPath}`);
 
@@ -61,7 +61,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   path: "/socket",
   cors: {
-    origin: ['http://localhost/3000', 'https://hero4help.demofhs.com'],
+    origin: ['http://localhost:3000', 'https://hero4help.demofhs.com'],
     methods: ['GET', 'POST'],
     credentials: true
   }

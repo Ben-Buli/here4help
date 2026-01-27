@@ -804,7 +804,7 @@ class SupportController extends Controller
     private function sendSocketNotification($chatRoomId, $eventId, $oldStatus, $newStatus, $adminId)
     {
         try {
-            $socketUrl = env('SOCKET_SERVER_URL', 'http://localhost:3001') . '/support/event/update';
+            $socketUrl = config('services.socket.url', 'https://hero4help.demofhs.com/socket') . '/support/event/update';
             $socketData = [
                 'chatRoomId' => $chatRoomId,
                 'eventId' => $eventId,
@@ -835,7 +835,7 @@ class SupportController extends Controller
     private function sendSocketMessage($roomId, $messageId, $fromUserId, $content, $kind)
     {
         try {
-            $socketUrl = env('SOCKET_SERVER_URL', 'http://localhost:3001') . '/support/message';
+            $socketUrl = config('services.socket.url', 'https://hero4help.demofhs.com/socket');
             $socketData = [
                 'roomId' => (string)$roomId,
                 'messageId' => $messageId,
@@ -866,5 +866,4 @@ class SupportController extends Controller
         }
     }
 }
-
 

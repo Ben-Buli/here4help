@@ -122,12 +122,12 @@ class PasswordResetController extends Controller
 
     private function getPasswordResetBaseUrl(): string
     {
-        $configured = trim((string) env('PASSWORD_RESET_PAGE_URL', ''));
+        $configured = config('app.password_reset_page_url', '');
         if ($configured !== '') {
             return rtrim($configured, '/');
         }
 
-        $appUrl = config('app.url', env('APP_URL', 'http://localhost'));
+        $appUrl = config('app.url', 'http://localhost');
         $appUrl = rtrim($appUrl ?: 'http://localhost', '/');
 
         if (str_ends_with($appUrl, '/admin')) {

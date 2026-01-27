@@ -230,7 +230,7 @@ class AdminAccountController extends Controller
 
     private function buildResetLink(string $token, string $email): string
     {
-        $baseUrl = rtrim(env('ADMIN_PASSWORD_RESET_URL') ?: config('app.url', 'http://localhost') . '/admin/reset-password', '/');
+        $baseUrl = rtrim(config('app.admin_password_reset_url') ?: config('app.url', 'http://localhost') . '/admin/reset-password', '/');
         if (!str_contains($baseUrl, 'http')) {
             $baseUrl = rtrim(config('app.url', 'http://localhost'), '/') . '/' . ltrim($baseUrl, '/');
         }

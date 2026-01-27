@@ -47,7 +47,7 @@ class SocketService {
       // 創建 Socket.IO 連接
       this.socket = io(config.socketUrl, {
         path: '/socket',
-        transports: ['websocket'],
+        transports: ['websocket', 'polling'],
         autoConnect: false,
         query: {
           token: token

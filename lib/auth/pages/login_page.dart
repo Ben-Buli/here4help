@@ -1419,16 +1419,16 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            Align(
-                              alignment: Alignment.center,
-                              child: TextButton(
-                                onPressed: () {
-                                  context.go('/forgot-password');
-                                },
-                                child: const Text('Forgot password?'),
-                              ),
-                            ),
-                            const Divider(thickness: 1),
+                            // Align(
+                            //   alignment: Alignment.center,
+                            //   child: TextButton(
+                            //     onPressed: () {
+                            //       context.go('/forgot-password');
+                            //     },
+                            //     child: const Text('Forgot password?'),
+                            //   ),
+                            // ),
+                            // const Divider(thickness: 1),
                             const SizedBox(height: 12),
                             // 跨平台第三方登入按鈕
                             Column(

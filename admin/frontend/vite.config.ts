@@ -17,8 +17,8 @@ export default defineConfig(({ mode }) => {
      // 前端資源路徑以 /admin/ 開頭
      base: '/admin/',
      build: {
-       outDir: '../public/admin-spa',
-       emptyOutDir: true,
+       outDir: '../public/',
+       emptyOutDir: false,
      },
     plugins: [vue(), vueDevTools()],
     resolve: {

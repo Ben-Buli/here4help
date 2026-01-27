@@ -683,7 +683,7 @@ class UserController extends Controller
                     }
                     
                     // 根據環境構建完整的圖片 URL
-                    $appUrl = rtrim(env('APP_URL', ''), '/');
+                    $appUrl = rtrim(config('app.url', ''), '/');
                     $isLocal = str_contains($appUrl, 'localhost') || str_contains($appUrl, '127.0.0.1');
                     
                     if ($isLocal) {
@@ -691,7 +691,7 @@ class UserController extends Controller
                         $imageUrl = '/uploads/' . $normalizedImagePath;
                     } else {
                         // 生產環境：使用完整 URL，包含 /backend/ 路徑
-                        $backendUrl = env('BACKEND_API_URL', $appUrl . '/backend');
+                        $backendUrl = config('services.backend.url', $appUrl . '/backend');
                         // 移除 /api 後綴（如果有）
                         $backendUrl = preg_replace('#/api$#', '', $backendUrl);
                         $imageUrl = $backendUrl . '/uploads/' . $normalizedImagePath;
@@ -1007,12 +1007,12 @@ class UserController extends Controller
 
     private function getPasswordResetBaseUrl(): string
     {
-        $configured = trim((string) env('PASSWORD_RESET_PAGE_URL', ''));
+        $configured = trim((string) config('app.password_reset_page_url', ''));
         if ($configured !== '') {
             return rtrim($configured, '/');
         }
 
-        $appUrl = config('app.url', env('APP_URL', 'http://localhost'));
+        $appUrl = config('app.url', 'http://localhost');
         $appUrl = rtrim($appUrl ?: 'http://localhost', '/');
 
         if (str_ends_with($appUrl, '/admin')) {

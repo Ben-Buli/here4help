@@ -1,15 +1,3 @@
-# /home/hero4helpdemofhs/public_html/.htaccess
-
-# ==============================
-# Node.js (Passenger) mount for /socket
-# ==============================
-PassengerEnabled on
-PassengerAppType node
-PassengerBaseURI /socket
-PassengerAppRoot /home/hero4helpdemofhs/public_html/backend/socket
-PassengerStartupFile server.js
-PassengerNodejs /home/hero4helpdemofhs/nodevenv/public_html/backend/socket/20/bin/node
-
 RewriteEngine On
 # Preserve Authorization header before rewriting into backend
 RewriteCond %{HTTP:Authorization} .
@@ -18,10 +6,6 @@ SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
 
 
 RewriteBase /
-# ==============================
-# Socket - do NOT rewrite
-# ==============================
-RewriteRule ^socket(/.*)?$ - [L]
 
 # ==============================
 # 0. Flutter Web 必要 JSON 檔案允許存取
@@ -47,14 +31,34 @@ AddType application/json .json
 # 2. API Rewrite
 # ==============================
 RewriteCond %{REQUEST_URI} ^/api/admin [NC]
-RewriteRule ^ admin/index.php [L]
+RewriteRule ^ admin/public/index.php [L]
+
+RewriteCond %{REQUEST_URI} ^/account/reset-password [NC]
+RewriteRule ^ admin/public/index.php [L]
+
+# Public password reset API (Laravel)
+RewriteCond %{REQUEST_URI} ^/api/password/forgot [NC]
+RewriteRule ^ admin/public/index.php [L]
+RewriteCond %{REQUEST_URI} ^/here4help/api/password/forgot [NC]
+RewriteRule ^ admin/public/index.php [L]
+
+# Public terms/privacy (Laravel)
+RewriteCond %{REQUEST_URI} ^/(terms|privacy)/?$ [NC]
+RewriteRule ^ admin/public/index.php [L]
+RewriteCond %{REQUEST_URI} ^/here4help/(terms|privacy)/?$ [NC]
+RewriteRule ^ admin/public/index.php [L]
+
+# Admin reset password requests (both GET and POST) hit Laravel
+# Handle both /admin/reset-password and /here4help/admin/reset-password
+RewriteCond %{REQUEST_URI} ^(/here4help)?/admin/reset-password [NC]
+RewriteRule ^.*$ admin/public/index.php [L]
 
 RewriteCond %{REQUEST_URI} ^/api/ [NC]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^api/(.*)$ backend/api/$1.php [L,QSA]
 
-RewriteRule ^sanctum/(.*)$ admin/index.php [L]
+RewriteRule ^sanctum/(.*)$ admin/public/index.php [L]
 
 # ==============================
 # 3. Flutter Web SPA (放在 /web/)
@@ -76,27 +80,29 @@ RewriteRule ^ web/index.html [L]
 # 4. Admin Laravel 測試路由 (/admintest/*)
 # ==============================
 RewriteCond %{REQUEST_URI} ^/admintest [NC]
-RewriteRule ^ admin/index.php [L]
+RewriteRule ^ admin/public/index.php [L]
 
 # ==============================
 # 5. Admin Panel (Laravel + Vite SPA)
 # ==============================
 RewriteCond %{REQUEST_URI} ^/admin/(ping|logtest|test-view) [NC]
-RewriteRule ^ admin/index.php [L]
+RewriteRule ^ admin/public/index.php [L]
 
 RewriteCond %{REQUEST_URI} ^/admin/assets/
-RewriteRule ^admin/assets/(.*)$ admin/public/assets/$1 [L]
+RewriteRule ^admin/assets/(.*)$ admin/public/admin-spa/assets/$1 [L]
 
 RewriteCond %{REQUEST_URI} ^/admin/(.*\.(?:ico|png|jpg|jpeg|svg|json|webmanifest))$ [NC]
-RewriteCond %{DOCUMENT_ROOT}/admin/public/%1 -f
-RewriteRule ^admin/.*$ admin/public/%1 [L]
+RewriteCond %{DOCUMENT_ROOT}/admin/public/admin-spa/%1 -f
+RewriteRule ^admin/.*$ admin/public/admin-spa/%1 [L]
+
+RewriteRule ^admin/?$ admin/public/admin-spa/index.html [L]
 
 RewriteCond %{REQUEST_URI} ^/admin [NC]
 RewriteCond %{REQUEST_URI} !^/admin/api/ [NC]
 RewriteCond %{REQUEST_URI} !^/admin/(ping|logtest|test-view) [NC]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^admin/.*$ admin/public/index.html [L]
+RewriteRule ^admin/.*$ admin/public/admin-spa/index.html [L]
 
 # ==============================
 # 6. 禁止目錄瀏覽
