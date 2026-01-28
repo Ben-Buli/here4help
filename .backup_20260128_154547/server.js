@@ -23,6 +23,8 @@ const jwt = require('jsonwebtoken');
 // 引入客服事件處理器
 const SupportEventHandler = require('./support_events');
 
+const PORT = process.env.PORT || process.env.SOCKET_PORT || 3000;
+
 // Load environment variables from socket/.env only
 const path = require('path');
 const crypto = require('crypto');
@@ -31,8 +33,6 @@ const dotenv = require('dotenv');
 // 明確指定 socket 目錄的 .env
 const envPath = path.resolve(__dirname, './.env');
 dotenv.config({ path: envPath });
-
-const PORT = process.env.PORT || process.env.SOCKET_PORT || 3000;
 
 console.log(`🔧 Loaded environment from ${envPath}`);
 
@@ -61,7 +61,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   path: "/socket",
   cors: {
-    origin: ['http://localhost:3000', 'https://hero4help.demofhs.com'],
+    origin: ['http://localhost/3000', 'https://hero4help.demofhs.com'],
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -78,7 +78,7 @@ async function initDatabase() {
       port: process.env.DB_PORT || 8889,
       user: process.env.DB_USERNAME || 'root',
       password: process.env.DB_PASSWORD || 'root',
-      database: process.env.DB_NAME || 'hero4helpdemofhs_hero4helpdemofhs',
+      database: process.env.DB_NAME || 'hero4helpdemofhs_hero4helpdemofhs,
       charset: process.env.DB_CHARSET || 'utf8mb4',
       waitForConnections: true,
       connectionLimit: 10,

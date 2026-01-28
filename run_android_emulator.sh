@@ -38,7 +38,7 @@ API_ORIGIN="http://$EMULATOR_HOST:8888"
 API_PREFIX="/here4help/backend/api"
 API_BASE_URL="$API_ORIGIN/here4help/backend"
 IMAGE_BASE_URL="$API_ORIGIN/here4help"
-SOCKET_URL="http://$EMULATOR_HOST:3000"
+SOCKET_URL="http://$EMULATOR_HOST:3001"
 
 # ==============================
 # OAuth 參數

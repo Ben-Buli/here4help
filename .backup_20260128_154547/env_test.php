@@ -11,7 +11,7 @@ putenv('JWT_EXPIRY=604800');
 // 資料庫配置
 putenv('DB_HOST=localhost');
 putenv('DB_PORT=3306');
-putenv('DB_NAME=hero4helpdemofhs_hero4helpdemofhs');
+putenv('DB_NAME=hero4helpdemofhs_hero4helpdemofhs);
 putenv('DB_USERNAME=root');
 putenv('DB_PASSWORD=root');
 putenv('DB_CHARSET=utf8mb4');

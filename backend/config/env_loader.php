@@ -10,6 +10,7 @@ class EnvLoader {
     private static $loaded = false;
     private static $vars = [];
     private static $instance = null;
+    private static $loadedPath = null;
 
     /**
      * 獲取單例實例
@@ -103,6 +104,7 @@ if (strpos($line, '=') !== false) {
         }
 
         self::$loaded = true;
+        self::$loadedPath = $path;
     }
 
     /**
@@ -181,5 +183,13 @@ if (strpos($line, '=') !== false) {
     public static function getAllVars() {
         self::load();
         return self::$vars;
+    }
+
+    /**
+     * 取得實際載入的 .env 檔案路徑
+     */
+    public static function getLoadedPath() {
+        self::load();
+        return self::$loadedPath;
     }
 }

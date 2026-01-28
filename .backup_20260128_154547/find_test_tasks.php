@@ -5,7 +5,7 @@
 
 try {
     // 使用 MAMP socket 連接
-    $dsn = "mysql:unix_socket=/Applications/MAMP/tmp/mysql/mysql.sock;dbname=hero4helpdemofhs_hero4helpdemofhs;charset=utf8mb4";
+    $dsn = "mysql:unix_socket=/Applications/MAMP/tmp/mysql/mysql.sock;dbname=hero4helpdemofhs_hero4helpdemofhscharset=utf8mb4";
     $pdo = new PDO($dsn, 'root', 'root', [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

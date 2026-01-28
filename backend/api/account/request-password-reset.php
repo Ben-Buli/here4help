@@ -174,6 +174,15 @@ try {
         $requestIp,
         $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
     ]);
+
+    if (!$mailSent) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Failed to send reset email. Please try again later.'
+        ]);
+        exit;
+    }
     
     $response = [
         'success' => true,

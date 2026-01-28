@@ -8,7 +8,7 @@ try {
     // 直接連接資料庫 - 使用 MAMP socket 連接
     $host = 'localhost';
     $port = '8889'; // MAMP 預設端口
-    $dbname = 'hero4helpdemofhs_hero4helpdemofhs';
+    $dbname = 'hero4helpdemofhs_hero4helpdemofhs;
     $username = 'root';
     $password = 'root';
     
